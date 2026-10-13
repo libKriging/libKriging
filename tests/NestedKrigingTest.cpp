@@ -440,21 +440,23 @@ TEST_CASE("NestedKriging: deprecated LLVecchia objective is an alias of method v
                    "LLVecchia(20)");
   CHECK(nk.objective() == "LL");
   CHECK(nk.method() == "vecchia(20)");
-  // approximate methods only exist for the LL objective
-  CHECK_THROWS_AS(NestedKriging(y,
-                                X,
-                                "matern5_2",
-                                3,
-                                NestedKriging::Aggregation::NK,
-                                NestedKriging::Partition::KMeans,
-                                123,
-                                Trend::RegressionModel::Constant,
-                                "BFGS",
-                                "LOO",
-                                Kriging::Parameters{},
-                                std::vector<std::string>{},
-                                "vecchia"),
-                  std::invalid_argument);
+  // approximate methods exist for the LOO / LMP objectives too: the common
+  // prior then comes from one global approximate LOO / LMP fit
+  NestedKriging nk_loo(y,
+                       X,
+                       "matern5_2",
+                       3,
+                       NestedKriging::Aggregation::NK,
+                       NestedKriging::Partition::KMeans,
+                       123,
+                       Trend::RegressionModel::Constant,
+                       "BFGS",
+                       "LOO",
+                       Kriging::Parameters{},
+                       std::vector<std::string>{},
+                       "vecchia");
+  CHECK(nk_loo.objective() == "LOO");
+  CHECK(nk_loo.method() == "vecchia(30)");
 }
 
 #include "libKriging/KrigingLoader.hpp"

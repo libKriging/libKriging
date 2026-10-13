@@ -59,11 +59,12 @@ TEST_CASE("Vecchia method spec parsing and validation", "[vecchia][kriging]") {
                     std::invalid_argument);
   }
 
-  // only the LL objective has a Vecchia version
+  // LOO and LMP have a Vecchia version too (see KrigingApproxObjectivesTest.cpp)
   for (const std::string objective : {"LOO", "LMP"}) {
-    CHECK_THROWS_AS(
-        Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", objective, {}, "vecchia"),
-        std::invalid_argument);
+    Kriging ko(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", objective, {}, "vecchia(10)");
+    CHECK(ko.objective() == objective);
+    CHECK(ko.method() == "vecchia(10)");
+    CHECK(ko.is_vecchia_light());
   }
 
   // Vecchia is available with a nugget/noise channel (Nystrom is not)
@@ -73,7 +74,7 @@ TEST_CASE("Vecchia method spec parsing and validation", "[vecchia][kriging]") {
   CHECK_NOTHROW(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(10)", {}));
   CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)"),
                   std::invalid_argument);
-  // only the LL objective has a Vecchia version, with noise models too
+  // LOO / LMP with an approximate method: noise model None only
   CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LMP", {}, "vecchia(10)"),
                   std::invalid_argument);
 }

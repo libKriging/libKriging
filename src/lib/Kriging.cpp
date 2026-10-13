@@ -1313,15 +1313,21 @@ void check_nystrom_rank(const ApproxMethod& am, arma::uword fitted_k, const char
     throw std::invalid_argument(std::string(what) + ": the Nystrom method uses the fitted rank ("
                                 + std::to_string(fitted_k) + "): use method \"nystrom\"");
 }
+
+// The Vecchia likelihood / LOO / LMP use the fitted neighbor sets: "vecchia(m)"
+// is accepted only with the fitted m.
+void check_vecchia_m(const ApproxMethod& am, arma::uword fitted_m, const char* what) {
+  if (am.kind == ApproxMethod::Vecchia && am.m != 0 && am.m != fitted_m)
+    throw std::invalid_argument(std::string(what) + ": the Vecchia criterion uses the fitted m ("
+                                + std::to_string(fitted_m) + "): use method \"vecchia\"");
+}
 }  // namespace
 
 LIBKRIGING_EXPORT double Kriging::logLikelihood(const std::string& method) {
   const ApproxMethod am = parse_approx_method(method, "logLikelihood");
   switch (am.kind) {
     case ApproxMethod::Vecchia:
-      if (am.m != 0 && am.m != m_vecchia_m)
-        throw std::invalid_argument("logLikelihood: the Vecchia likelihood uses the fitted m ("
-                                    + std::to_string(m_vecchia_m) + "): use method \"vecchia\"");
+      check_vecchia_m(am, m_vecchia_m, "logLikelihood");
       if (m_vecchia_m == 0)
         throw std::runtime_error("logLikelihoodVecchiaFun: model was not fitted with method=\"vecchia(m)\"");
       if (m_vecchia_order.n_elem != m_X.n_rows)
@@ -1852,7 +1858,10 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const
   arma::vec stdev;
   if (return_stdev) {
     const arma::vec quad = arma::sum(R_on % RinvR_on, 0).t();  // r_j' Rinv r_j per prediction point j
-    stdev = arma::sqrt(arma::clamp(m_sigma2 * (1.0 - quad), 0.0, arma::datum::inf));
+    // LMP fits rescale sigma2 by (n-p)/(n-p-2), like predict() / predictVecchia()
+    const double n_o = static_cast<double>(m_X.n_rows);
+    const double lmp_scale = (m_objective == "LMP") ? (n_o - m_F.n_cols) / (n_o - m_F.n_cols - 2.0) : 1.0;
+    stdev = arma::sqrt(arma::clamp(m_sigma2 * lmp_scale * (1.0 - quad), 0.0, arma::datum::inf));
     stdev *= m_scaleY;
   }
   return {mean, stdev};
@@ -1968,8 +1977,9 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
     lbfgsb::Optimizer optimizer{static_cast<unsigned int>(d)};
     optimizer.iprint = Optim::log_level - 2;
     optimizer.max_iter = Optim::max_iteration;
-    optimizer.pgtol = Optim::gradient_tolerance;
-    optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+    const double loo_scale = (m_objective == "LOO") ? static_cast<double>(m_X.n_rows * m_X.n_rows) : 1.0;
+    optimizer.pgtol = Optim::gradient_tolerance / loo_scale;
+    optimizer.factr = Optim::objective_rel_tolerance / 1E-13 / loo_scale;
     const arma::ivec bounds_type{d, arma::fill::value(2)};
 
     optimizer.minimize([&fit_ofn](const arma::vec& vals_inp,
@@ -1983,17 +1993,7 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
     m_est_theta = true;
   }
 
-  arma::vec beta_v;
-  double sigma2_v = -1;
-  arma::mat U_v;
-  arma::vec D_v;
-  _logLikelihoodNystrom(m_theta, nullptr, &beta_v, &sigma2_v, &U_v, &D_v);
-  if (m_est_beta)
-    m_beta = beta_v;
-  if (m_est_sigma2)
-    m_sigma2 = sigma2_v;
-  m_nystrom_U = std::move(U_v);
-  m_nystrom_D = std::move(D_v);
+  commit_approx(/*lmp_dof=*/refit && m_optim != "none");
 }
 
 void Kriging::update_vecchia_light(const arma::vec& y_u, const arma::mat& X_u, bool refit) {
@@ -2055,8 +2055,9 @@ void Kriging::update_vecchia_light(const arma::vec& y_u, const arma::mat& X_u, b
     lbfgsb::Optimizer optimizer{static_cast<unsigned int>(gd)};
     optimizer.iprint = Optim::log_level - 2;
     optimizer.max_iter = Optim::max_iteration;
-    optimizer.pgtol = Optim::gradient_tolerance;
-    optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+    const double loo_scale = (m_objective == "LOO") ? static_cast<double>(m_X.n_rows * m_X.n_rows) : 1.0;
+    optimizer.pgtol = Optim::gradient_tolerance / loo_scale;
+    optimizer.factr = Optim::objective_rel_tolerance / 1E-13 / loo_scale;
     const arma::ivec bounds_type{gd, arma::fill::value(2)};
 
     optimizer.minimize([&fit_ofn](const arma::vec& vals_inp,
@@ -2075,7 +2076,7 @@ void Kriging::update_vecchia_light(const arma::vec& y_u, const arma::mat& X_u, b
   }
 
   // light commit, as in fit(): beta / sigma2 (/ nugget) profiled by the Vecchia likelihood
-  commit_vecchia(m_theta, extra);
+  commit_approx(/*lmp_dof=*/refit && m_optim != "none" && m_est_theta, extra);
   // drop a legacy exact factorization (now stale): the model is a light Vecchia fit
   m_T.reset();
   m_R.reset();
@@ -2085,6 +2086,621 @@ void Kriging::update_vecchia_light(const arma::vec& y_u, const arma::mat& X_u, b
   m_Rinv.reset();
   m_z.reset();
   m_dX.reset();
+}
+
+// =============================================================================
+// LOO and LMP objectives with an approximate method (internal objectives
+// "LOOVecchia(m)", "LMPVecchia(m)", "LOONystrom(k)", "LMPNystrom(k)").
+//
+// Both criteria only need the approximate correlation PRECISION P ~= R^-1,
+// its diagonal, log det R, and, for the gradient, the bilinear forms
+// X' dP/dtheta_k Z, the weighted diagonal sum_i w_i (dP/dtheta_k)_ii and
+// d log det R / dtheta_k. They are written once (approx_loo / approx_lmp
+// below) on top of two precision "back-ends":
+//
+//  * Vecchia: P = B' D^-1 B, B unit lower-triangular in the maxmin order with
+//    row t = e_{o(t)} - a_t' e_{N(t)} (a_t = R_NN^-1 r_N), D = diag(v_t),
+//    v_t = 1 - r_N' a_t. log det R = sum log v_t, and dP = dB' D^-1 B +
+//    B' D^-1 dB - B' D^-1 dD D^-1 B, with da_t, dv_t from the same m x m
+//    solves as the LLVecchia gradient. Everything is O(n m) per vector
+//    besides the O(n m^3) block solves.
+//  * Nystrom: P = Rhat^-1, Rhat = U U' + diag(D), U U' = M K^-1 M' (M = R_ns,
+//    K = R_ss, fixed landmarks). P X = D^-1 X - Y (Y' X) with Y = D^-1 U
+//    L_c^-T, L_c L_c' = I + U' D^-1 U (Woodbury), log det Rhat by the
+//    determinant lemma. dP = -P dRhat P, and dRhat = dM W' + W dM' - W dK W'
+//    - diag(delta * unclamped) (W = M K^-1, delta = diag of the low-rank
+//    part: Rhat_ii == 1 while D_i is not clamped), so every needed quantity
+//    is O(n k^2) per theta component.
+//
+// See docs/math/LOO.md and docs/math/LMP.md for the formulas.
+// =============================================================================
+
+namespace {
+
+struct VecchiaPrecision {
+  arma::uword n = 0;
+  arma::uword d = 0;
+  const arma::uvec* order = nullptr;
+  const std::vector<arma::uvec>* nb = nullptr;
+  std::vector<arma::vec> a;   // per ordered point t: kriging weights on N(t)
+  arma::vec v;                // conditional variances
+  std::vector<arma::mat> da;  // per t: (m_t x d) d a_t / d theta
+  arma::mat dv;               // n x d
+
+  // B X (rows indexed by the ordered position t)
+  arma::mat B(const arma::mat& X) const {
+    arma::mat out(n, X.n_cols);
+    for (arma::uword t = 0; t < n; ++t) {
+      const arma::uvec& N = (*nb)[t];
+      out.row(t) = X.row((*order)(t));
+      if (N.n_elem > 0)
+        out.row(t) -= a[t].t() * X.rows(N);
+    }
+    return out;
+  }
+  // B' Z (Z rows indexed by the ordered position t)
+  arma::mat Bt(const arma::mat& Z) const {
+    arma::mat out(n, Z.n_cols, arma::fill::zeros);
+    for (arma::uword t = 0; t < n; ++t) {
+      const arma::uvec& N = (*nb)[t];
+      out.row((*order)(t)) += Z.row(t);
+      if (N.n_elem > 0)
+        out.rows(N) -= a[t] * Z.row(t);
+    }
+    return out;
+  }
+  // (dB/dtheta_k) X
+  arma::mat dB(arma::uword k, const arma::mat& X) const {
+    arma::mat out(n, X.n_cols, arma::fill::zeros);
+    for (arma::uword t = 0; t < n; ++t) {
+      const arma::uvec& N = (*nb)[t];
+      if (N.n_elem > 0)
+        out.row(t) = -da[t].col(k).t() * X.rows(N);
+    }
+    return out;
+  }
+  arma::mat P(const arma::mat& X) const {
+    arma::mat BX = B(X);
+    BX.each_col() /= v;
+    return Bt(BX);
+  }
+  arma::vec diagP() const {
+    arma::vec dg(n, arma::fill::zeros);
+    for (arma::uword t = 0; t < n; ++t) {
+      const arma::uvec& N = (*nb)[t];
+      dg((*order)(t)) += 1.0 / v(t);
+      for (arma::uword j = 0; j < N.n_elem; ++j)
+        dg(N(j)) += a[t](j) * a[t](j) / v(t);
+    }
+    return dg;
+  }
+  double logdetR() const { return arma::accu(arma::log(v)); }
+  // X' dP_k Z
+  arma::mat bil(arma::uword k, const arma::mat& X, const arma::mat& Z) const {
+    const arma::mat BX = B(X);
+    const arma::mat BZ = B(Z);
+    const arma::mat dBX = dB(k, X);
+    const arma::mat dBZ = dB(k, Z);
+    const arma::vec iv = 1.0 / v;
+    const arma::vec dvv = dv.col(k) / (v % v);
+    return dBX.t() * (BZ.each_col() % iv) + (BX.each_col() % iv).t() * dBZ - BX.t() * (BZ.each_col() % dvv);
+  }
+  // sum_i w_i (dP_k)_ii, with (dP)_ii = sum_t 2 B_ti dB_ti / v_t - B_ti^2 dv_t / v_t^2
+  double diag_term(arma::uword k, const arma::vec& w) const {
+    double s = 0;
+    for (arma::uword t = 0; t < n; ++t) {
+      const arma::uvec& N = (*nb)[t];
+      const double dvt = dv(t, k) / (v(t) * v(t));
+      s -= w((*order)(t)) * dvt;
+      for (arma::uword j = 0; j < N.n_elem; ++j) {
+        const double aj = a[t](j);
+        s += w(N(j)) * (2.0 * aj * da[t](j, k) / v(t) - aj * aj * dvt);
+      }
+    }
+    return s;
+  }
+  double dlogdetR(arma::uword k) const { return arma::accu(dv.col(k) / v); }
+};
+
+VecchiaPrecision build_vecchia_precision(const arma::mat& X,
+                                         const arma::uvec& order,
+                                         const std::vector<arma::uvec>& nb,
+                                         const arma::vec& theta,
+                                         const std::function<double(const arma::vec&, const arma::vec&)>& Cov,
+                                         const std::function<arma::vec(const arma::vec&, const arma::vec&)>& DlnCov,
+                                         bool with_grad) {
+  constexpr double v_floor = 1e-15;  // as in _logLikelihoodVecchia
+  VecchiaPrecision vp;
+  vp.n = X.n_rows;
+  vp.d = X.n_cols;
+  vp.order = &order;
+  vp.nb = &nb;
+  vp.a.resize(vp.n);
+  vp.v.set_size(vp.n);
+  if (with_grad) {
+    vp.da.resize(vp.n);
+    vp.dv.zeros(vp.n, vp.d);
+  }
+  const arma::uword d = vp.d;
+  for (arma::uword t = 0; t < vp.n; ++t) {
+    const arma::uword oi = order(t);
+    const arma::uvec& Ni = nb[t];
+    const arma::uword mi = Ni.n_elem;
+    if (mi == 0) {
+      vp.v(t) = 1.0;
+      continue;
+    }
+    arma::mat RN(mi, mi, arma::fill::ones);
+    arma::vec r(mi);
+    arma::cube dRN;
+    arma::mat dr;
+    if (with_grad) {
+      dRN.zeros(mi, mi, d);
+      dr.zeros(mi, d);
+    }
+    for (arma::uword i = 0; i < mi; ++i) {
+      for (arma::uword j = i + 1; j < mi; ++j) {
+        const arma::vec dx = (X.row(Ni(i)) - X.row(Ni(j))).t();
+        const double c = Cov(dx, theta);
+        RN(i, j) = RN(j, i) = c;
+        if (with_grad) {
+          const arma::vec dln = DlnCov(dx, theta);
+          for (arma::uword k = 0; k < d; ++k)
+            dRN(i, j, k) = dRN(j, i, k) = c * dln(k);
+        }
+      }
+      const arma::vec dx = (X.row(Ni(i)) - X.row(oi)).t();
+      const double c = Cov(dx, theta);
+      r(i) = c;
+      if (with_grad) {
+        const arma::vec dln = DlnCov(dx, theta);
+        for (arma::uword k = 0; k < d; ++k)
+          dr(i, k) = c * dln(k);
+      }
+    }
+    RN.diag() += LinearAlgebra::num_nugget;
+    const arma::mat LN = LinearAlgebra::safe_chol_lower(RN);
+    const arma::vec a_vec = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), r));
+    vp.a[t] = a_vec;
+    vp.v(t) = std::max(1.0 - arma::dot(r, a_vec), v_floor);
+    if (with_grad) {
+      arma::mat dA(mi, d);
+      for (arma::uword k = 0; k < d; ++k) {
+        const arma::vec rhs = dr.col(k) - dRN.slice(k) * a_vec;
+        dA.col(k) = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), rhs));
+        vp.dv(t, k) = -(arma::dot(dr.col(k), a_vec) + arma::dot(r, dA.col(k)));
+      }
+      vp.da[t] = std::move(dA);
+    }
+  }
+  return vp;
+}
+
+struct NystromPrecision {
+  arma::uword n = 0;
+  arma::uword d = 0;
+  arma::vec Dinv;  // n (1 / clamped D)
+  arma::mat Y;     // n x k: P = diag(Dinv) - Y Y'
+  double logdet = 0;
+  // gradient data
+  arma::mat Wt;                 // n x k: M K^-1
+  arma::mat PW;                 // n x k: P W
+  std::vector<arma::mat> dM;    // n x k per theta component
+  std::vector<arma::mat> dK;    // k x k per theta component
+  std::vector<arma::vec> dlow;  // n: diag of the low-rank part of dRhat
+  std::vector<arma::vec> ddg;   // n: actual d Rhat_ii (0 where D is not clamped)
+
+  arma::mat P(const arma::mat& X) const { return (X.each_col() % Dinv) - Y * (Y.t() * X); }
+  arma::vec diagP() const { return Dinv - arma::sum(arma::square(Y), 1); }
+  double logdetR() const { return logdet; }
+  // X' dRhat_k Z
+  arma::mat bilR(arma::uword k, const arma::mat& X, const arma::mat& Z) const {
+    const arma::mat WX = Wt.t() * X;
+    const arma::mat WZ = Wt.t() * Z;
+    const arma::mat dMX = dM[k].t() * X;
+    const arma::mat dMZ = dM[k].t() * Z;
+    const arma::vec corr = dlow[k] - ddg[k];  // diagonal removed from the low-rank part
+    return dMX.t() * WZ + WX.t() * dMZ - WX.t() * dK[k] * WZ - X.t() * (Z.each_col() % corr);
+  }
+  // X' dP_k Z = -(P X)' dRhat_k (P Z)
+  arma::mat bil(arma::uword k, const arma::mat& X, const arma::mat& Z) const { return -bilR(k, P(X), P(Z)); }
+  // The two quantities below are written with P applied to the n x k
+  // matrices W and dM (P W, P dM: Woodbury, like every P X here) rather than
+  // expanded through P = D^-1 - Y Y': at the landmarks D_i is ~num_nugget, and
+  // the expanded form is a difference of O(1/num_nugget^2) terms (no correct
+  // digit left), whereas P itself stays moderate there.
+  //
+  // sum_i w_i (dP_k)_ii = -sum_i w_i p_i' dRhat_k p_i (p_i = P e_i)
+  //   = -sum_i w_i [2 (dM' p_i).(W' p_i) - (W' p_i)' dK (W' p_i)] + sum_j corr_j (P diag(w) P)_jj
+  // with (P diag(w) P)_jj = w_j P_jj^2 + y_j' (sum_i w_i y_i y_i') y_j - w_j |y_j|^4
+  // (off-diagonal P_ij = -y_i' y_j), only needed where corr_j != 0, i.e.
+  // where D_j is not clamped.
+  double diag_term(arma::uword k, const arma::vec& w) const {
+    const arma::mat PdM = P(dM[k]);
+    const double t_low = 2.0 * arma::dot(w, arma::sum(PdM % PW, 1)) - arma::dot(w, arma::sum((PW * dK[k]) % PW, 1));
+    const arma::vec corr = dlow[k] - ddg[k];
+    const arma::uvec J = arma::find(corr != 0.0);
+    double t_diag = 0;
+    if (J.n_elem > 0) {
+      const arma::mat Omega = Y.t() * (Y.each_col() % w);
+      const arma::mat YJ = Y.rows(J);
+      const arma::vec yy = arma::sum(arma::square(YJ), 1);
+      const arma::vec PJJ = Dinv(J) - yy;
+      const arma::vec wJ = w(J);
+      const arma::vec pwp = wJ % arma::square(PJJ) + arma::sum((YJ * Omega) % YJ, 1) - wJ % arma::square(yy);
+      t_diag = arma::dot(corr(J), pwp);
+    }
+    return -t_low + t_diag;
+  }
+  // d log det Rhat = tr(P dRhat) = 2 tr(W' P dM) - tr(dK W' P W) - sum_j corr_j P_jj
+  double dlogdetR(arma::uword k) const {
+    const arma::vec corr = dlow[k] - ddg[k];
+    return 2.0 * arma::accu(Wt % P(dM[k])) - arma::accu(dK[k] % (Wt.t() * PW)) - arma::dot(corr, diagP());
+  }
+};
+
+NystromPrecision build_nystrom_precision(const arma::mat& X,
+                                         const arma::uvec& landmarks,
+                                         const arma::vec& theta,
+                                         const std::function<double(const arma::vec&, const arma::vec&)>& Cov,
+                                         const std::function<arma::vec(const arma::vec&, const arma::vec&)>& DlnCov,
+                                         bool with_grad) {
+  NystromPrecision np;
+  const arma::uword n = X.n_rows;
+  const arma::uword d = X.n_cols;
+  const arma::uword kL = landmarks.n_elem;
+  np.n = n;
+  np.d = d;
+  const arma::mat X_land = X.rows(landmarks);
+  // same factorization as _logLikelihoodNystrom
+  arma::mat R_ss(kL, kL, arma::fill::none);
+  LinearAlgebra::covMat_sym_X(&R_ss, X_land.t(), theta, Cov, /*factor=*/1.0, KrigingImpl::ones);
+  arma::mat R_ns(n, kL, arma::fill::none);
+  LinearAlgebra::covMat_rect(&R_ns, X.t(), X_land.t(), theta, Cov, /*factor=*/1.0);
+  R_ss.diag() += LinearAlgebra::num_nugget;
+  const arma::mat L_ss = arma::chol(R_ss, "lower");
+  const arma::mat U = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));
+  const arma::vec captured = arma::sum(arma::square(U), 1);
+  const arma::vec D = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
+  np.Dinv = 1.0 / D;
+  const arma::mat DinvU = U.each_col() % np.Dinv;
+  const arma::mat Mcore = arma::eye<arma::mat>(kL, kL) + U.t() * DinvU;
+  const arma::mat Lc = arma::chol(Mcore, "lower");
+  np.Y = arma::trans(LinearAlgebra::solve_lower(Lc, DinvU.t()));
+  np.logdet = arma::accu(arma::log(D)) + 2.0 * arma::accu(arma::log(Lc.diag()));
+
+  if (with_grad) {
+    const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);
+    np.Wt = R_ns * Kinv;
+    np.PW = np.P(np.Wt);
+    const arma::uvec clamped = arma::find((1.0 - captured) <= LinearAlgebra::num_nugget);
+    np.dM.resize(d);
+    np.dK.resize(d);
+    np.dlow.resize(d);
+    np.ddg.resize(d);
+    for (arma::uword k = 0; k < d; ++k) {
+      np.dM[k].set_size(n, kL);
+      np.dK[k].zeros(kL, kL);
+    }
+    for (arma::uword i = 0; i < n; ++i)
+      for (arma::uword j = 0; j < kL; ++j) {
+        const arma::vec dln = DlnCov((X.row(i) - X_land.row(j)).t(), theta);
+        for (arma::uword k = 0; k < d; ++k)
+          np.dM[k](i, j) = R_ns(i, j) * dln(k);
+      }
+    for (arma::uword a = 0; a < kL; ++a)
+      for (arma::uword b = a + 1; b < kL; ++b) {
+        const arma::vec dln = DlnCov((X_land.row(a) - X_land.row(b)).t(), theta);
+        for (arma::uword k = 0; k < d; ++k)
+          np.dK[k](a, b) = np.dK[k](b, a) = R_ss(a, b) * dln(k);
+      }
+    for (arma::uword k = 0; k < d; ++k) {
+      np.dlow[k] = 2.0 * arma::sum(np.dM[k] % np.Wt, 1) - arma::sum((np.Wt * np.dK[k]) % np.Wt, 1);
+      np.ddg[k].zeros(n);
+      np.ddg[k](clamped) = np.dlow[k](clamped);
+    }
+  }
+  return np;
+}
+
+// Leave-one-out under the approximate joint law (precision P):
+// Q = P - P F (F' P F)^-1 F' P (or Q = P with a known beta), e_i = (Q y)_i / Q_ii,
+// LOO = |e|^2 / n. Gradient: with r = y - F beta, H = I - F A^-1 F' P,
+// c = e / diag(Q), w = c o e (dQ = H' dP H),
+//   d LOO = 2/n [ (H c)' dP r - tr(dP H diag(w) H') ]
+// and H diag(w) H' = diag(w) + F C1' + C1 F' + F C2 F' (C1 = -diag(w) G A^-1,
+// C2 = A^-1 G' diag(w) G A^-1, G = P F).
+template <class Prec>
+double approx_loo(const Prec& P,
+                  const arma::vec& y,
+                  const arma::mat& F,
+                  bool est_beta,
+                  const arma::vec& beta_fixed,
+                  arma::vec* grad_out,
+                  arma::mat* yhat_out) {
+  const arma::uword n = y.n_elem;
+  arma::vec r;
+  arma::vec diagQ = P.diagP();
+  arma::mat G, Ainv;
+  if (est_beta) {
+    G = P.P(F);
+    const arma::mat A = arma::symmatu(F.t() * G);
+    Ainv = LinearAlgebra::inv_sympd(LinearAlgebra::safe_chol_lower(A));
+    const arma::vec beta = Ainv * (G.t() * y);
+    r = y - F * beta;
+    diagQ -= arma::sum((G * Ainv) % G, 1);
+  } else {
+    r = y - F * beta_fixed;
+  }
+  const arma::vec q = P.P(r);
+  const arma::vec e = q / diagQ;
+  const double loo = arma::dot(e, e) / n;
+  if (yhat_out != nullptr) {
+    yhat_out->set_size(n, 2);
+    yhat_out->col(0) = y - e;
+    yhat_out->col(1) = arma::sqrt(1.0 / diagQ);
+  }
+  if (grad_out != nullptr) {
+    const arma::uword d = grad_out->n_elem;
+    const arma::vec c = e / diagQ;
+    const arma::vec w = c % e;
+    arma::vec Hc = c;
+    arma::mat C1, C2;
+    if (est_beta) {
+      Hc -= F * (Ainv * (G.t() * c));
+      C1 = -(G.each_col() % w) * Ainv;
+      C2 = Ainv * (G.t() * (G.each_col() % w)) * Ainv;
+    }
+    for (arma::uword k = 0; k < d; ++k) {
+      double g = arma::as_scalar(P.bil(k, Hc, r)) - P.diag_term(k, w);
+      if (est_beta)
+        g -= 2.0 * arma::trace(P.bil(k, F, C1)) + arma::accu(C2 % P.bil(k, F, F));
+      (*grad_out)(k) = 2.0 * g / n;
+    }
+  }
+  return loo;
+}
+
+// Log-marginal posterior (docs/math/LMP.md) with the approximate R:
+// -1/2 log det R - 1/2 log det(F' P F) - (n-p)/2 log(S2) + jointly robust prior,
+// S2 = (y - F beta)' P (y - F beta) (= sigma2 (n-p) when sigma2 is estimated).
+template <class Prec>
+double approx_lmp(const Prec& P,
+                  const arma::vec& y,
+                  const arma::mat& F,
+                  const arma::mat& X,
+                  const arma::vec& theta,
+                  bool est_sigma2,
+                  double sigma2_fixed,
+                  arma::vec* grad_out) {
+  const arma::uword n = X.n_rows;
+  const arma::uword d = X.n_cols;
+  const arma::uword p = F.n_cols;
+  const arma::mat G = P.P(F);
+  const arma::mat A = arma::symmatu(F.t() * G);
+  const arma::mat LA = LinearAlgebra::safe_chol_lower(A);
+  const arma::mat Ainv = LinearAlgebra::inv_sympd(LA);
+  const arma::vec beta = Ainv * (G.t() * y);
+  const arma::vec r = y - F * beta;
+  const double S2 = arma::dot(r, P.P(r));
+  const double sigma2 = est_sigma2 ? S2 / (n - p) : sigma2_fixed;
+  const double log_S_2 = std::log(sigma2 * (n - p));
+  const double log_marginal_lik = -0.5 * P.logdetR() - arma::accu(arma::log(LA.diag())) - (n - p) / 2.0 * log_S_2;
+
+  // jointly robust prior, as in _logMargPost
+  const double a = 0.2;
+  const double b = 1.0 / std::pow(n, 1.0 / d) * (a + d);
+  const arma::vec CL = arma::trans(arma::max(X, 0) - arma::min(X, 0)) / std::pow(n, 1.0 / d);
+  const double t = arma::accu(CL / theta);
+  const double log_approx_ref_prior = -b * t + a * std::log(t);
+
+  if (grad_out != nullptr) {
+    for (arma::uword k = 0; k < d; ++k) {
+      double g = -0.5 * P.dlogdetR(k) - 0.5 * arma::accu(Ainv % P.bil(k, F, F));
+      if (est_sigma2)
+        g -= (n - p) / 2.0 * arma::as_scalar(P.bil(k, r, r)) / S2;
+      (*grad_out)(k) = g;
+    }
+    grad_out->head(d) -= (a * CL / t - b * CL) / arma::square(theta);
+  }
+  return log_marginal_lik + log_approx_ref_prior;
+}
+
+}  // namespace
+
+double Kriging::_leaveOneOutApprox(bool vecchia,
+                                   const arma::vec& _theta,
+                                   arma::vec* grad_out,
+                                   arma::mat* yhat_out) const {
+  const bool est_beta = m_est_beta || m_beta.n_elem != m_F.n_cols;
+  if (grad_out != nullptr)
+    grad_out->set_size(_theta.n_elem);
+  if (vecchia) {
+    const VecchiaPrecision P = build_vecchia_precision(
+        m_X, m_vecchia_order, m_vecchia_neighbors, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+    return approx_loo(P, m_y, m_F, est_beta, m_beta, grad_out, yhat_out);
+  }
+  const NystromPrecision P
+      = build_nystrom_precision(m_X, m_nystrom_landmarks, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+  return approx_loo(P, m_y, m_F, est_beta, m_beta, grad_out, yhat_out);
+}
+
+double Kriging::_logMargPostApprox(bool vecchia, const arma::vec& _theta, arma::vec* grad_out) const {
+  if (grad_out != nullptr)
+    grad_out->set_size(_theta.n_elem);
+  if (vecchia) {
+    const VecchiaPrecision P = build_vecchia_precision(
+        m_X, m_vecchia_order, m_vecchia_neighbors, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+    return approx_lmp(P, m_y, m_F, m_X, _theta, m_est_sigma2, m_sigma2, grad_out);
+  }
+  const NystromPrecision P
+      = build_nystrom_precision(m_X, m_nystrom_landmarks, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+  return approx_lmp(P, m_y, m_F, m_X, _theta, m_est_sigma2, m_sigma2, grad_out);
+}
+
+void Kriging::commit_approx(bool lmp_dof, double extra) {
+  if (m_nystrom_k == 0) {
+    // Vecchia: beta / sigma2 (/ nugget, with a noise model) profiled by the
+    // Vecchia likelihood at m_theta (and extra = alpha | sigma2)
+    commit_vecchia(m_theta, extra);
+    // LOO / LMP with an approximate method are restricted to noise model None
+    if (lmp_dof && m_est_sigma2 && m_objective == "LMP" && m_noise_model == NoiseModel::None)
+      m_sigma2 *= static_cast<double>(m_X.n_rows) / static_cast<double>(m_X.n_rows - m_F.n_cols);
+    return;
+  }
+  arma::vec beta_v;
+  double sigma2_v = -1;
+  {
+    arma::mat U_v;
+    arma::vec D_v;
+    _logLikelihoodNystrom(m_theta, nullptr, &beta_v, &sigma2_v, &U_v, &D_v);
+    m_nystrom_U = std::move(U_v);
+    m_nystrom_D = std::move(D_v);
+    m_nystrom_light = true;
+  }
+  // beta: GLS under the approximate precision (the same for LL, LOO and
+  // LMP, as in the exact commits); sigma2 = SSE / n, or SSE / (n - p) for a
+  // LMP (re)fit, like the exact LMP commit
+  if (m_est_beta)
+    m_beta = beta_v;
+  if (m_est_sigma2) {
+    m_sigma2 = sigma2_v;
+    if (lmp_dof && m_objective == "LMP")
+      m_sigma2 *= static_cast<double>(m_X.n_rows) / static_cast<double>(m_X.n_rows - m_F.n_cols);
+  }
+  m_is_empty = true;  // no committed factorization: predict routes to the approximate predictor
+}
+
+// Public approximate LOO / LMP: original-scale convention (as leaveOneOutFun /
+// logMargPostFun): theta is read in the original scale of X, the value is the
+// one of the original data (LOO * scaleY^2, LMP + lmp_offset()) and the
+// gradient is chain-ruled back. The no-theta versions evaluate the internal
+// implementation at the committed m_theta (no double conversion).
+void Kriging::check_approx_theta(const arma::vec& theta, const char* what) const {
+  if (theta.n_elem != m_X.n_cols)
+    throw std::invalid_argument(std::string(what) + ": expected " + std::to_string(m_X.n_cols) + " theta values, got "
+                                + std::to_string(theta.n_elem));
+}
+
+double Kriging::loo_scale2() const {
+  return m_normalize ? m_scaleY * m_scaleY : 1.0;
+}
+
+void Kriging::ensure_approx_sets(bool vecchia, const char* what) {
+  if (vecchia) {
+    if (m_vecchia_m == 0)
+      throw std::runtime_error(std::string(what) + ": model was not fitted with method=\"vecchia(m)\"");
+    if (m_vecchia_order.n_elem != m_X.n_rows)
+      make_vecchia_sets();  // not stored by save(): rebuilt on demand after load
+  } else if (m_nystrom_k == 0) {
+    throw std::runtime_error(std::string(what) + ": model was not fitted with method=\"nystrom(k)\"");
+  }
+}
+
+std::tuple<double, arma::vec> Kriging::approx_objective_fun(bool loo,
+                                                            bool vecchia,
+                                                            const arma::vec& theta,
+                                                            bool return_grad,
+                                                            const char* what) {
+  ensure_approx_sets(vecchia, what);
+  check_approx_theta(theta, what);
+  const arma::vec theta_n = gamma_from_original(theta);
+  arma::vec grad;
+  double val = loo ? _leaveOneOutApprox(vecchia, theta_n, return_grad ? &grad : nullptr, nullptr)
+                   : _logMargPostApprox(vecchia, theta_n, return_grad ? &grad : nullptr);
+  if (loo) {
+    val *= loo_scale2();
+    if (return_grad)
+      grad *= loo_scale2();
+  } else {
+    val += lmp_offset();
+  }
+  if (return_grad)
+    grad_to_original(grad);
+  return {val, grad};
+}
+
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutVecchiaFun(const arma::vec& theta,
+                                                                               bool return_grad) {
+  return approx_objective_fun(true, true, theta, return_grad, "leaveOneOutVecchiaFun");
+}
+
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutNystromFun(const arma::vec& theta,
+                                                                               bool return_grad) {
+  return approx_objective_fun(true, false, theta, return_grad, "leaveOneOutNystromFun");
+}
+
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostVecchiaFun(const arma::vec& theta,
+                                                                               bool return_grad) {
+  return approx_objective_fun(false, true, theta, return_grad, "logMargPostVecchiaFun");
+}
+
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostNystromFun(const arma::vec& theta,
+                                                                               bool return_grad) {
+  return approx_objective_fun(false, false, theta, return_grad, "logMargPostNystromFun");
+}
+
+LIBKRIGING_EXPORT double Kriging::leaveOneOut(const std::string& method) {
+  const ApproxMethod am = parse_approx_method(method, "leaveOneOut");
+  switch (am.kind) {
+    case ApproxMethod::Vecchia:
+      check_vecchia_m(am, m_vecchia_m, "leaveOneOut");
+      ensure_approx_sets(true, "leaveOneOutVecchiaFun");
+      return _leaveOneOutApprox(true, m_theta, nullptr, nullptr) * loo_scale2();
+    case ApproxMethod::Nystrom:
+      check_nystrom_rank(am, m_nystrom_k, "leaveOneOut");
+      ensure_approx_sets(false, "leaveOneOutNystromFun");
+      return _leaveOneOutApprox(false, m_theta, nullptr, nullptr) * loo_scale2();
+    case ApproxMethod::Exact:
+    default:
+      return leaveOneOut();
+  }
+}
+
+LIBKRIGING_EXPORT double Kriging::logMargPost(const std::string& method) {
+  const ApproxMethod am = parse_approx_method(method, "logMargPost");
+  switch (am.kind) {
+    case ApproxMethod::Vecchia:
+      check_vecchia_m(am, m_vecchia_m, "logMargPost");
+      ensure_approx_sets(true, "logMargPostVecchiaFun");
+      return _logMargPostApprox(true, m_theta, nullptr) + lmp_offset();
+    case ApproxMethod::Nystrom:
+      check_nystrom_rank(am, m_nystrom_k, "logMargPost");
+      ensure_approx_sets(false, "logMargPostNystromFun");
+      return _logMargPostApprox(false, m_theta, nullptr) + lmp_offset();
+    case ApproxMethod::Exact:
+    default:
+      return logMargPost();
+  }
+}
+
+LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::leaveOneOutVec(const arma::vec& theta,
+                                                                           const std::string& method) {
+  const ApproxMethod am = parse_approx_method(method, "leaveOneOutVec");
+  bool vecchia = true;
+  switch (am.kind) {
+    case ApproxMethod::Vecchia:
+      check_vecchia_m(am, m_vecchia_m, "leaveOneOutVec");
+      break;
+    case ApproxMethod::Nystrom:
+      check_nystrom_rank(am, m_nystrom_k, "leaveOneOutVec");
+      vecchia = false;
+      break;
+    case ApproxMethod::Exact:
+    default:
+      return leaveOneOutVec(theta);
+  }
+  ensure_approx_sets(vecchia, "leaveOneOutVec");
+  check_approx_theta(theta, "leaveOneOutVec");
+  arma::mat yhat;
+  _leaveOneOutApprox(vecchia, gamma_from_original(theta), nullptr, &yhat);
+  arma::vec mean = yhat.col(0);
+  arma::vec stdev = yhat.col(1) * std::sqrt(m_sigma2);
+  if (m_normalize) {  // back to the original scale of y, like the exact leaveOneOutVec
+    mean = mean * m_scaleY + m_centerY;
+    stdev *= m_scaleY;
+  }
+  return std::make_tuple(std::move(mean), std::move(stdev));
 }
 
 Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const {
@@ -2196,6 +2812,28 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
         return -lmp;
       };
     }
+  } else if (objective.rfind("LOOVecchia", 0) == 0 || objective.rfind("LOONystrom", 0) == 0
+             || objective.rfind("LMPVecchia", 0) == 0 || objective.rfind("LMPNystrom", 0) == 0) {
+    // LOO / LMP under an approximate method (see _leaveOneOutApprox /
+    // _logMargPostApprox); km_data is never populated, as for LLVecchia
+    if (m_noise_model != NoiseModel::None)
+      throw std::invalid_argument("approximate methods are not supported for Nugget/Heterogeneous noise models");
+    const bool vecchia = objective.find("Vecchia") != std::string::npos;
+    const bool loo = objective.rfind("LOO", 0) == 0;
+    return [this, vecchia, loo](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
+      const arma::vec _theta = Optim::reparametrize ? Optim::reparam_from(_gamma) : _gamma;
+      arma::vec grad;
+      arma::vec* g = (grad_out != nullptr) ? &grad : nullptr;
+      // minimized: LOO as is, LMP negated
+      const double val
+          = loo ? this->_leaveOneOutApprox(vecchia, _theta, g, nullptr) : -this->_logMargPostApprox(vecchia, _theta, g);
+      if (grad_out != nullptr) {
+        if (!loo)
+          grad = -grad;
+        *grad_out = Optim::reparametrize ? Optim::reparam_from_deriv(_theta, grad) : grad;
+      }
+      return val;
+    };
   } else if (objective.rfind("LLVecchia", 0) == 0) {
     parse_vll_m(objective);  // validate the spec early (throws on malformed)
     // km_data (the dense O(n^3) KModel) is never populated: a Vecchia fit
@@ -2330,9 +2968,6 @@ LIBKRIGING_EXPORT std::pair<std::string, std::string> Kriging::fit_objective_met
   }
   if (objective_out != "LL" && objective_out != "LOO" && objective_out != "LMP")
     throw std::invalid_argument("Unsupported fit objective: " + objective + " (supported are: LL, LOO, LMP)");
-  if (method_out != "exact" && objective_out != "LL")
-    throw std::invalid_argument("fit: objective \"" + objective_out + "\" is not implemented with method \""
-                                + method_out + "\" (only \"LL\" is); use method \"exact\"");
   return {objective_out, method_out};
 }
 
@@ -2343,8 +2978,12 @@ std::string Kriging::internal_fit_objective(const std::string& objective, const 
     throw std::invalid_argument("fit: method \"" + method
                                 + "\" is not implemented for Nugget/Heterogeneous noise models; use method "
                                   "\"exact\" or \"vecchia(m)\"");
-  // internal objective name of the approximate likelihood
-  return (method.rfind("vecchia", 0) == 0 ? "LLVecchia" : "LLNystrom") + method.substr(7);
+  if (m_noise_model != NoiseModel::None && objective != "LL")
+    throw std::invalid_argument("fit: objective \"" + objective + "\" with method \"" + method
+                                + "\" is not implemented for Nugget/Heterogeneous noise models; use objective "
+                                  "\"LL\" or method \"exact\"");
+  // internal objective name of the approximate criterion, e.g. "LLVecchia(30)", "LOONystrom(50)"
+  return objective + (method.rfind("vecchia", 0) == 0 ? "Vecchia" : "Nystrom") + method.substr(7);
 }
 
 std::string Kriging::internal_objective() const {
@@ -2410,8 +3049,9 @@ void Kriging::fit_impl(const arma::vec& y,
 
   // Nystrom and Vecchia never touch m_dX (they work straight from m_X) and
   // never build the exact factorization that would need it.
-  const bool approx = (objective.rfind("LLNystrom", 0) == 0) || (objective.rfind("LLVecchia", 0) == 0);
-  const bool build_dX = !approx;
+  const bool vecchia_method = m_method.rfind("vecchia", 0) == 0;
+  const bool nystrom_method = m_method.rfind("nystrom", 0) == 0;
+  const bool build_dX = !vecchia_method && !nystrom_method;
   arma::mat theta0 = fit_setup_impl(
       y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta, build_dX);
   // The per-observation noise variances live in the same (normalized-y)
@@ -2424,14 +3064,14 @@ void Kriging::fit_impl(const arma::vec& y,
   m_nystrom_k = 0;
   m_nystrom_U.reset();
   m_nystrom_D.reset();
-  if (objective.rfind("LLVecchia", 0) == 0) {
-    m_vecchia_m = parse_vll_m(objective);
+  if (vecchia_method) {
+    m_vecchia_m = parse_vll_m("LLVecchia" + m_method.substr(7));
     make_vecchia_sets();
   } else {
     m_vecchia_m = 0;
   }
-  if (objective.rfind("LLNystrom", 0) == 0) {
-    m_nystrom_k = parse_nystrom_k(objective);
+  if (nystrom_method) {
+    m_nystrom_k = parse_nystrom_k("LLNystrom" + m_method.substr(7));
     make_nystrom_landmarks();
   }
 
@@ -2498,21 +3138,10 @@ void Kriging::fit_impl(const arma::vec& y,
       // with objective=\"LLNystrom(k)\""). This is what makes a fully
       // deterministic (no BFGS, no platform-dependent convergence) Nystrom
       // fit possible -- see docs/math/Nystrom.md and issue #351's follow-up.
-      arma::vec beta_v;
-      double sigma2_v = -1;
-      arma::mat U_v;
-      arma::vec D_v;
-      _logLikelihoodNystrom(m_theta, nullptr, &beta_v, &sigma2_v, &U_v, &D_v);
-      if (m_est_beta)
-        m_beta = beta_v;
-      if (m_est_sigma2)
-        m_sigma2 = sigma2_v;
-      else
+      // (any objective: like the exact optim="none" commit, sigma2 = SSE / n)
+      if (!m_est_sigma2)
         m_sigma2 = sigma2;
-      m_nystrom_U = std::move(U_v);
-      m_nystrom_D = std::move(D_v);
-      m_nystrom_light = true;
-      m_is_empty = true;  // no committed factorization: predict routes to predictNystrom
+      commit_approx(/*lmp_dof=*/false);
       return;
     }
 
@@ -2911,12 +3540,12 @@ void Kriging::fit_impl(const arma::vec& y,
           lbfgsb::Optimizer optimizer{gd};
           optimizer.iprint = -1;  // Disable output in parallel mode. was Optim::log_level - 2;
           optimizer.max_iter = Optim::max_iteration;
-          optimizer.pgtol = objective.compare("LOO") == 0
-                                ? Optim::gradient_tolerance / (n * n)
-                                : Optim::gradient_tolerance;  // scale by: n^2 for LOO vs. LL, and /10 because LOO is
-                                                              // usually more smooth
-          optimizer.factr = objective.compare("LOO") == 0 ? Optim::objective_rel_tolerance / 1E-13 / (n * n)
-                                                          : Optim::objective_rel_tolerance / 1E-13;
+          const bool loo_objective = objective.rfind("LOO", 0) == 0;  // exact or approximate LOO
+          optimizer.pgtol = loo_objective ? Optim::gradient_tolerance / (n * n)
+                                          : Optim::gradient_tolerance;  // scale by: n^2 for LOO vs. LL, and /10
+                                                                        // because LOO is usually more smooth
+          optimizer.factr = loo_objective ? Optim::objective_rel_tolerance / 1E-13 / (n * n)
+                                          : Optim::objective_rel_tolerance / 1E-13;
           arma::ivec bounds_type{gd, arma::fill::value(2)};
 
           if (Optim::log_level > Optim::log_none) {
@@ -3095,27 +3724,15 @@ void Kriging::fit_impl(const arma::vec& y,
         // light Vecchia commit: no exact factorization; theta (and alpha /
         // sigma2) from the optimizer, beta/sigma2 profiled by the Vecchia likelihood
         const auto& best = results[best_idx];
-        commit_vecchia(best.theta, best.extra_param);
+        m_theta = best.theta;
         m_est_theta = true;
+        commit_approx(/*lmp_dof=*/true, best.extra_param);
       } else if (best_idx >= 0 && m_nystrom_k > 0) {
         // Nystrom commit: never an exact factorization; theta from the
         // optimizer, beta/sigma2/U/D profiled by the Nystrom likelihood at theta*
-        const auto& best = results[best_idx];
-        m_theta = best.theta;
+        m_theta = results[best_idx].theta;
         m_est_theta = true;
-        arma::vec beta_v;
-        double sigma2_v = -1;
-        arma::mat U_v;
-        arma::vec D_v;
-        _logLikelihoodNystrom(m_theta, nullptr, &beta_v, &sigma2_v, &U_v, &D_v);
-        if (m_est_beta)
-          m_beta = beta_v;
-        if (m_est_sigma2)
-          m_sigma2 = sigma2_v;
-        m_nystrom_U = U_v;
-        m_nystrom_D = D_v;
-        m_nystrom_light = true;
-        m_is_empty = true;  // no committed factorization: predict routes to predictNystrom
+        commit_approx(/*lmp_dof=*/true);
       } else if (best_idx >= 0) {
         const auto& best = results[best_idx];
         m_theta = best.theta;  // copy

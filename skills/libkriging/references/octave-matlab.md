@@ -37,8 +37,8 @@ k.save("k.json");              % JSON, any libKriging class
 k = load_kriging("k.json");    % auto-detects the class
 
 ll = k.logLikelihood();    % a mex method returning a value needs an output variable
-loo = k.leaveOneOut();
-lmp = k.logMargPost();
+loo = k.leaveOneOut();        % or k.leaveOneOut("vecchia") / ("nystrom") after such a fit
+lmp = k.logMargPost();        % idem
 ```
 
 Optional starting/fixed hyperparameters go through `Params(...)`, e.g.

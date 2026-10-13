@@ -261,8 +261,9 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("method") = "exact",
            R"pbdoc(Fit on (X, y). fit method: "exact" (default), "vecchia" / "vecchia(m)" (Vecchia approximation, m
 neighbors, default 30) or "nystrom" / "nystrom(k)" (rank-k Nystrom, default 50). An approximate
-fit keeps no exact factorization: predict / simulate / logLikelihood then take the same method.
-Only objective "LL" has approximate versions. objective="LLVecchia(m)" / "LLNystrom(k)" are
+fit keeps no exact factorization: predict / simulate / logLikelihood / leaveOneOut / logMargPost then take
+the same method. Objectives "LL", "LOO" and "LMP" all have approximate versions (noise-free models only).
+objective="LLVecchia(m)" / "LLNystrom(k)" are
 deprecated aliases of objective="LL" with method="vecchia(m)" / "nystrom(k)".)pbdoc")
       .def("predict",
            &PyKriging::predict,
@@ -313,7 +314,12 @@ discards n - n_max points outright.)pbdoc")
       .def("save", &PyKriging::save)
       .def_static("load", &PyKriging::load)
       .def("leaveOneOutFun", &PyKriging::leaveOneOutFun)
-      .def("leaveOneOutVec", &PyKriging::leaveOneOutVec)
+      .def("leaveOneOutVec",
+           &PyKriging::leaveOneOutVec,
+           py::arg("theta"),
+           py::arg("method") = "exact",
+           "Leave-one-out (mean, stdev) at theta; method: \"exact\" (default), \"vecchia\" or \"nystrom\" "
+           "(LOO under the approximate joint law, requires a fit with that method).")
       .def("logLikelihoodFun",
            &PyKriging::logLikelihoodFun,
            py::arg("theta"),
@@ -325,8 +331,16 @@ discards n - n_max points outright.)pbdoc")
            py::arg("method") = "exact",
            "Log-likelihood at the fitted parameters; method: \"exact\" (default), \"vecchia\" "
            "(requires a method=\"vecchia\" fit) or \"nystrom\" (requires a method=\"nystrom\" fit).")
-      .def("logMargPost", &PyKriging::logMargPost)
-      .def("leaveOneOut", &PyKriging::leaveOneOut)
+      .def("logMargPost",
+           &PyKriging::logMargPost,
+           py::arg("method") = "exact",
+           "Log-marginal posterior at the fitted parameters; method: \"exact\" (default), \"vecchia\" "
+           "(requires a method=\"vecchia\" fit) or \"nystrom\" (requires a method=\"nystrom\" fit).")
+      .def("leaveOneOut",
+           &PyKriging::leaveOneOut,
+           py::arg("method") = "exact",
+           "Leave-one-out criterion at the fitted parameters; method: \"exact\" (default), \"vecchia\" "
+           "(requires a method=\"vecchia\" fit) or \"nystrom\" (requires a method=\"nystrom\" fit).")
       .def("covMat", &PyKriging::covMat)
       .def("model", &PyKriging::model)
 

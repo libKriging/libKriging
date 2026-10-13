@@ -485,15 +485,34 @@ function log_likelihood(k::Kriging; method::String="exact")
     return ll[]
 end
 
-function leave_one_out(k::Kriging)
-    return ccall(dlsym(_lk(), :lk_kriging_leave_one_out), Float64, (Ptr{Nothing},), k.ptr)
+"""
+    leave_one_out(k::Kriging; method="exact")
+
+Leave-one-out criterion at the fitted parameters; `method`: `"exact"`
+(default), `"vecchia"` (requires a `method="vecchia"` fit) or `"nystrom"`
+(requires a `method="nystrom"` fit): LOO under the approximate joint law.
+"""
+function leave_one_out(k::Kriging; method::String="exact")
+    loo = Ref{Float64}(0.0)
+    _check_error(ccall(dlsym(_lk(), :lk_kriging_leave_one_out_method), Cint,
+                       (Ptr{Nothing}, Cstring, Ptr{Float64}), k.ptr, method, loo))
+    return loo[]
 end
 
-function log_marg_post(k::Kriging)
-    return ccall(dlsym(_lk(), :lk_kriging_log_marg_post), Float64, (Ptr{Nothing},), k.ptr)
+"""
+    log_marg_post(k::Kriging; method="exact")
+
+Log-marginal posterior at the fitted parameters; `method`: `"exact"`
+(default), `"vecchia"` or `"nystrom"` (same requirements as `leave_one_out`).
+"""
+function log_marg_post(k::Kriging; method::String="exact")
+    lmp = Ref{Float64}(0.0)
+    _check_error(ccall(dlsym(_lk(), :lk_kriging_log_marg_post_method), Cint,
+                       (Ptr{Nothing}, Cstring, Ptr{Float64}), k.ptr, method, lmp))
+    return lmp[]
 end
 
-function leave_one_out_vec(k::Kriging, theta::Vector{Float64})
+function leave_one_out_vec(k::Kriging, theta::Vector{Float64}; method::String="exact")
     n_theta = length(theta)
     n_ref = Ref{Cint}(0)
     # query size
@@ -502,9 +521,9 @@ function leave_one_out_vec(k::Kriging, theta::Vector{Float64})
     n_obs = n_ref[]
     yhat = Vector{Float64}(undef, n_obs)
     stderr_out = Vector{Float64}(undef, n_obs)
-    ret = ccall(dlsym(_lk(), :lk_kriging_leave_one_out_vec), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Ptr{Float64}),
-                k.ptr, theta, n_theta, yhat, stderr_out)
+    ret = ccall(dlsym(_lk(), :lk_kriging_leave_one_out_vec_method), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cstring, Ptr{Float64}, Ptr{Float64}),
+                k.ptr, theta, n_theta, method, yhat, stderr_out)
     _check_error(ret)
     return (yhat=yhat, stderr=stderr_out)
 end

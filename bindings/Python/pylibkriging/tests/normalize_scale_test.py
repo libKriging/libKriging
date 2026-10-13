@@ -112,3 +112,34 @@ def test_vecchia_noise_normalize_true_matches_false(noise):
     else:
         sim = [k.simulate(3, 7, Xn, with_noise=np.full(4, 0.7), method=sm) for k in ks]
     np.testing.assert_allclose(sim[0], sim[1], rtol=1e-7)
+
+
+@pytest.mark.parametrize("method", ["vecchia(29)", "nystrom(15)"])
+@pytest.mark.parametrize("objective", ["LOO", "LMP"])
+def test_approx_loo_lmp_original_scale(method, objective):
+    # Vecchia with m = n-1 (exact; the ordering in the normalized inputs only
+    # changes roundoff) and Nystrom (landmarks ranked at a reference range
+    # scaled to the data extent: the same rows): the approximate LOO / LMP of a
+    # normalize=True model are those of a normalize=False one at the same theta
+    X, y, _ = make_data(30)
+    params = {"theta": np.array([[9.0, 2.1]]), "is_theta_estim": False}
+    kw = dict(regmodel="linear", optim="none", objective=objective, parameters=params, method=method)
+    kn = lk.Kriging(y, X, "matern5_2", normalize=True, **kw)
+    ko = lk.Kriging(y, X, "matern5_2", normalize=False, **kw)
+    m = method.split("(")[0]
+    tol = 1e-6 if m == "vecchia" else 1e-4  # (jittered Nystrom factorization)
+    np.testing.assert_allclose(kn.leaveOneOut(m), ko.leaveOneOut(m), rtol=tol)
+    np.testing.assert_allclose(kn.logMargPost(kn.method()), ko.logMargPost(m), rtol=tol)
+    t1 = np.array([12.0, 1.4])
+    mn, sn = kn.leaveOneOutVec(t1, m)
+    mo, so = ko.leaveOneOutVec(t1, m)
+    np.testing.assert_allclose(mn, mo, rtol=tol)
+    np.testing.assert_allclose(sn, so, rtol=tol)
+    if m == "vecchia":  # m = n-1: the exact criteria, in the original scale
+        ke = lk.Kriging(y, X, "matern5_2", regmodel="linear", normalize=False, optim="none",
+                        objective=objective, parameters=params)
+        np.testing.assert_allclose(kn.leaveOneOut(m), ke.leaveOneOut(), rtol=1e-6)
+        np.testing.assert_allclose(kn.logMargPost(m), ke.logMargPost(), rtol=1e-6)
+        me, se = ke.leaveOneOutVec(t1)
+        np.testing.assert_allclose(mn, me, rtol=1e-6)
+        np.testing.assert_allclose(sn, se, rtol=1e-6)

@@ -134,8 +134,8 @@ class Kriging : public KrigingImpl {
    * size ("vecchia" -> "vecchia(30)", "nystrom" -> "nystrom(50)"), the
    * deprecated objectives "LLVecchia(m)" / "LLNystrom(k)" become ("LL",
    * "vecchia(m)") / ("LL", "nystrom(k)") (with a deprecation warning), and
-   * unknown names or unimplemented combinations (approximate method with
-   * an objective other than "LL") raise std::invalid_argument. */
+   * unknown names raise std::invalid_argument. Every objective ("LL",
+   * "LOO", "LMP") accepts every method. */
   LIBKRIGING_EXPORT static std::pair<std::string, std::string> fit_objective_method(const std::string& objective,
                                                                                     const std::string& method);
 
@@ -189,9 +189,12 @@ class Kriging : public KrigingImpl {
    *        simulate / logLikelihood then need the same method, and the
    *        exact model at the fitted theta is a separate fit
    *        (objective='LL', method='exact', optim='none', theta given).
-   *        Approximate methods are only implemented with objective 'LL';
-   *        'vecchia(m)' supports the Nugget / Heterogeneous noise models
-   *        (response Vecchia), 'nystrom(k)' only noise model None: other
+   *        Approximate methods are implemented for the objectives 'LL',
+   *        'LOO' (LOO under the approximate joint law) and 'LMP' (approximate
+   *        log det R and R^-1). 'vecchia(m)' with objective 'LL' also
+   *        supports the Nugget / Heterogeneous noise models (response
+   *        Vecchia); 'LOO' / 'LMP' with an approximate method and
+   *        'nystrom(k)' with any objective require noise model None: other
    *        combinations raise std::invalid_argument.
    */
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
@@ -243,9 +246,50 @@ class Kriging : public KrigingImpl {
    * requires a method="nystrom(k)" fit). */
   LIBKRIGING_EXPORT double logLikelihood(const std::string& method);
   LIBKRIGING_EXPORT double leaveOneOut();
+  /** Leave-one-out criterion at the committed theta, computed with an explicit
+   * method: "exact" (= leaveOneOut()), "vecchia" (leaveOneOutVecchiaFun,
+   * requires a method="vecchia(m)" fit) or "nystrom" (leaveOneOutNystromFun,
+   * requires a method="nystrom(k)" fit). See docs/math/LOO.md. */
+  LIBKRIGING_EXPORT double leaveOneOut(const std::string& method);
   LIBKRIGING_EXPORT double logMargPost();
+  /** Log-marginal posterior at the committed theta, computed with an explicit
+   * method: "exact" (= logMargPost()), "vecchia" (logMargPostVecchiaFun) or
+   * "nystrom" (logMargPostNystromFun), with the same fit requirements as
+   * leaveOneOut(method). See docs/math/LMP.md. */
+  LIBKRIGING_EXPORT double logMargPost(const std::string& method);
 
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> leaveOneOutVec(const arma::vec& theta);
+  /** Leave-one-out predictions (mean, stdev) at given theta with an explicit
+   * method ("exact", "vecchia" or "nystrom", same requirements as
+   * leaveOneOut(method)): under the approximate joint law, the LOO mean of
+   * y_i is y_i - (Qy)_i / Q_ii and its stdev sqrt(sigma2 / Q_ii); theta and
+   * the results in the original scale, as leaveOneOutVec(theta). */
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> leaveOneOutVec(const arma::vec& theta, const std::string& method);
+
+  /** Approximate LOO / LMP below: original scale, as leaveOneOutFun /
+   * logMargPostFun: with normalize=true theta is read in the original scale
+   * of X, the value is the one of the original data (LOO in y units squared,
+   * LMP of the original y) and the gradient is chain-ruled back, so that
+   * leaveOneOut("vecchia") == leaveOneOutVecchiaFun(theta()) etc., and a
+   * normalize=true model gives the normalize=false values whenever the
+   * approximation itself is scale-free (all predecessors as Vecchia
+   * neighbors, all points as Nystrom landmarks). Noise model None only. */
+  /** Leave-one-out criterion under the Vecchia joint law (precision
+   * B' D^-1 B) at given theta; requires a method="vecchia(m)" fit.
+   * @return (loo, gradient) ; analytic gradient, empty if return_grad=false. */
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutVecchiaFun(const arma::vec& theta, bool return_grad);
+  /** Leave-one-out criterion under the Nystrom joint law (covariance
+   * U U' + diag(D)) at given theta; requires a method="nystrom(k)" fit.
+   * @return (loo, gradient) ; analytic gradient, empty if return_grad=false. */
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutNystromFun(const arma::vec& theta, bool return_grad);
+  /** Log-marginal posterior with the Vecchia approximation of R (log det R
+   * = sum log D, R^-1 = B' D^-1 B) at given theta; requires a
+   * method="vecchia(m)" fit. @return (lmp, gradient) ; analytic gradient. */
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostVecchiaFun(const arma::vec& theta, bool return_grad);
+  /** Log-marginal posterior with the Nystrom approximation of R (Woodbury
+   * solves and determinant lemma) at given theta; requires a
+   * method="nystrom(k)" fit. @return (lmp, gradient) ; analytic gradient. */
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostNystromFun(const arma::vec& theta, bool return_grad);
 
   /** Vecchia approximated log-likelihood at given theta (d values) or,
    * with a noise model, gamma = [theta, alpha] (Nugget) / [theta, sigma2]
@@ -481,7 +525,8 @@ class Kriging : public KrigingImpl {
   FitOfn make_fit_objective(const std::string& objective) const;
   /// Validates the noise model against the canonical (objective, method)
   /// pair, and returns the internal objective name evaluated by
-  /// make_fit_objective ("LL", "LOO", "LMP", "LLVecchia(m)", "LLNystrom(k)").
+  /// make_fit_objective ("LL", "LOO", "LMP", or "<objective>Vecchia(m)" /
+  /// "<objective>Nystrom(k)", e.g. "LOOVecchia(30)", "LMPNystrom(50)").
   std::string internal_fit_objective(const std::string& objective, const std::string& method) const;
   /// Internal objective name of the committed (m_objective, m_method) pair
   [[nodiscard]] std::string internal_objective() const;
@@ -567,6 +612,32 @@ class Kriging : public KrigingImpl {
                                arma::mat* U_out = nullptr,
                                arma::vec* D_out = nullptr) const;
   bool m_nystrom_light = false;  ///< true whenever m_nystrom_k > 0 (no exact factorization ever exists)
+
+  // --- LOO / LMP with an approximate method (see docs/math/LOO.md, LMP.md) ---
+  /// Leave-one-out under the Vecchia (vecchia=true) or Nystrom joint law at
+  /// theta, with analytic gradient; yhat_out (n x 2: LOO mean, LOO stdev / sigma)
+  double _leaveOneOutApprox(bool vecchia, const arma::vec& _theta, arma::vec* grad_out, arma::mat* yhat_out) const;
+  /// Log-marginal posterior with the Vecchia / Nystrom approximation of R
+  double _logMargPostApprox(bool vecchia, const arma::vec& _theta, arma::vec* grad_out) const;
+  /// Commit beta / sigma2 (and the Nystrom factors) at m_theta for an
+  /// approximate fit: beta = GLS under the approximate precision, sigma2 =
+  /// SSE / n, or SSE / (n - p) for objective "LMP" when lmp_dof (a BFGS
+  /// fit / refit, like the exact LMP commit). Vecchia: delegates to
+  /// commit_vecchia(m_theta, extra) (extra = alpha | sigma2 with a noise model)
+  void commit_approx(bool lmp_dof, double extra = 0.0);
+  /// Public approximate LOO (loo=true) / LMP at an original-scale theta:
+  /// original-data value and chain-ruled gradient (see leaveOneOutVecchiaFun)
+  std::tuple<double, arma::vec> approx_objective_fun(bool loo,
+                                                     bool vecchia,
+                                                     const arma::vec& theta,
+                                                     bool return_grad,
+                                                     const char* what);
+  /// Throw unless the model was fitted with the Vecchia (vecchia=true) /
+  /// Nystrom method; rebuilds the Vecchia sets if needed (after load)
+  void ensure_approx_sets(bool vecchia, const char* what);
+  void check_approx_theta(const arma::vec& theta, const char* what) const;
+  /// LOO value factor from the internal to the original scale (scaleY^2)
+  [[nodiscard]] double loo_scale2() const;
   /// Throw if the model is a Nystrom fit (used by simulate/update/save)
   void check_not_nystrom_light(const char* what) const;
   /// Nystrom-specific incremental update: extends m_X/m_y/m_F with the new

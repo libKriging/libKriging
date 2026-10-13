@@ -147,8 +147,17 @@ double lk_kriging_log_likelihood(void* ptr);
 int lk_kriging_log_likelihood_method(void* ptr, const char* method, double* ll_out);
 double lk_kriging_leave_one_out(void* ptr);
 double lk_kriging_log_marg_post(void* ptr);
+/* LOO / log-marginal posterior with an explicit method ("exact", "vecchia" or "nystrom"); 0 or -1 on error */
+int lk_kriging_leave_one_out_method(void* ptr, const char* method, double* loo_out);
+int lk_kriging_log_marg_post_method(void* ptr, const char* method, double* lmp_out);
 
 int lk_kriging_leave_one_out_vec(void* ptr, const double* theta, int theta_n, double* yhat_out, double* stderr_out);
+int lk_kriging_leave_one_out_vec_method(void* ptr,
+                                        const double* theta,
+                                        int theta_n,
+                                        const char* method,
+                                        double* yhat_out,
+                                        double* stderr_out);
 
 int lk_kriging_cov_mat(void* ptr, const double* X1, int n1, int d1, const double* X2, int n2, int d2, double* cov_out);
 

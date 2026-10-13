@@ -455,11 +455,36 @@ double lk_kriging_log_marg_post(void* ptr) {
   CATCH_RETURN_NAN
 }
 
+int lk_kriging_leave_one_out_method(void* ptr, const char* method, double* loo_out) {
+  try {
+    *loo_out = static_cast<Kriging*>(ptr)->leaveOneOut(std::string(method ? method : "exact"));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_kriging_log_marg_post_method(void* ptr, const char* method, double* lmp_out) {
+  try {
+    *lmp_out = static_cast<Kriging*>(ptr)->logMargPost(std::string(method ? method : "exact"));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
 int lk_kriging_leave_one_out_vec(void* ptr, const double* theta, int theta_n, double* yhat_out, double* stderr_out) {
+  return lk_kriging_leave_one_out_vec_method(ptr, theta, theta_n, "exact", yhat_out, stderr_out);
+}
+
+int lk_kriging_leave_one_out_vec_method(void* ptr,
+                                        const double* theta,
+                                        int theta_n,
+                                        const char* method,
+                                        double* yhat_out,
+                                        double* stderr_out) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
-    auto [yhat, stderr_v] = k->leaveOneOutVec(theta_v);
+    auto [yhat, stderr_v] = k->leaveOneOutVec(theta_v, std::string(method ? method : "exact"));
     if (yhat_out)
       std::memcpy(yhat_out, yhat.memptr(), yhat.n_elem * sizeof(double));
     if (stderr_out)

@@ -103,12 +103,15 @@ classKriging <- function(nk) {
 #'     dimension), \code{"nystrom"} or \code{"nystrom(k)"} for the Nystrom
 #'     (global low-rank) approximation of rank \code{k} (default 50; O(n k^2)).
 #'     An approximate fit keeps no exact factorization: \code{predict},
-#'     \code{simulate} and \code{logLikelihood} then take the same
-#'     \code{method}, and the exact model at the fitted \code{theta} is a
-#'     separate fit (\code{optim = "none"}). Approximate methods are only
-#'     implemented with \code{objective = "LL"}; \code{"vecchia"} supports
-#'     \code{noise} (response Vecchia, accurate while the noise stays small
-#'     relative to the signal), \code{"nystrom"} does not.
+#'     \code{simulate}, \code{logLikelihood}, \code{leaveOneOut} and
+#'     \code{logMargPost} then take the same \code{method}, and the exact
+#'     model at the fitted \code{theta} is a separate fit
+#'     (\code{optim = "none"}). Approximate methods are implemented for the
+#'     objectives \code{"LL"}, \code{"LOO"} and \code{"LMP"};
+#'     \code{"vecchia"} also supports \code{noise} with
+#'     \code{objective = "LL"} (response Vecchia, accurate while the noise
+#'     stays small relative to the signal); \code{"LOO"} / \code{"LMP"} with
+#'     an approximate method and \code{"nystrom"} require no \code{noise}.
 #'
 #' @return An object with S3 class \code{"Kriging"}. Should be used
 #'     with its \code{predict}, \code{simulate}, \code{update}
@@ -968,6 +971,9 @@ leaveOneOutFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FAL
 #' @param object A \code{Kriging} object.
 #' @param theta A numeric vector of range parameters at which the LOO
 #'     will be evaluated.
+#' @param method \code{Character}: \code{"exact"} (default),
+#'     \code{"vecchia"} or \code{"nystrom"} (LOO under the approximate
+#'     joint law; requires a fit with that method).
 #' @param ... Not used.
 #'
 #' @return The leave-One-Out vector computed for the given vector
@@ -1010,7 +1016,7 @@ leaveOneOutFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FAL
 #' loov = k$leaveOneOutVec(matrix(k$theta()))
 #' points(X[2],loov$mean[2],col='red')
 #' lines(rep(X[2],2),loov$mean[2]+2*c(-loov$stdev[2],loov$stdev[2]),col='red')
-leaveOneOutVec.Kriging <- function(object, theta, ...) {
+leaveOneOutVec.Kriging <- function(object, theta, method = "exact", ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (!is.array(theta)) 
@@ -1018,7 +1024,7 @@ leaveOneOutVec.Kriging <- function(object, theta, ...) {
     if (length(theta) != ncol(k$X))
         stop("Input theta must have ", ncol(k$X), " values (instead of ",
              length(theta),")")
-    return( kriging_leaveOneOutVec(object,theta) )
+    return( kriging_leaveOneOutVec(object, theta, method) )
 }
 
 
@@ -1027,6 +1033,10 @@ leaveOneOutVec.Kriging <- function(object, theta, ...) {
 #' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 Kriging object.
+#' @param method \code{Character}: \code{"exact"} (default),
+#'     \code{"vecchia"} (requires a \code{method = "vecchia"} fit) or
+#'     \code{"nystrom"} (requires a \code{method = "nystrom"} fit): the
+#'     criterion under the approximate model (see docs/math/LOO.md, LMP.md).
 #' @param ... Not used.
 #'
 #' @return The leaveOneOut computed for fitted
@@ -1046,9 +1056,9 @@ leaveOneOutVec.Kriging <- function(object, theta, ...) {
 #' print(k)
 #'
 #' leaveOneOut(k)
-leaveOneOut.Kriging <- function(object, ...) {
+leaveOneOut.Kriging <- function(object, method = "exact", ...) {
   if (length(L <- list(...)) > 0) warnOnDots(L)
-  return(kriging_leaveOneOut(object))
+  return(kriging_leaveOneOut(object, method))
 }
 
 #' Compute the log-marginal posterior of a kriging model, using the
@@ -1115,6 +1125,10 @@ logMargPostFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FAL
 #' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 Kriging object.
+#' @param method \code{Character}: \code{"exact"} (default),
+#'     \code{"vecchia"} (requires a \code{method = "vecchia"} fit) or
+#'     \code{"nystrom"} (requires a \code{method = "nystrom"} fit): the
+#'     criterion under the approximate model (see docs/math/LOO.md, LMP.md).
 #' @param ... Not used.
 #'
 #' @return The logMargPost computed for fitted
@@ -1134,9 +1148,9 @@ logMargPostFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FAL
 #' print(k)
 #'
 #' logMargPost(k)
-logMargPost.Kriging <- function(object, ...) {
+logMargPost.Kriging <- function(object, method = "exact", ...) {
   if (length(L <- list(...)) > 0) warnOnDots(L)
-  return(kriging_logMargPost(object))
+  return(kriging_logMargPost(object, method))
 }
 
 

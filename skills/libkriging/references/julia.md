@@ -20,7 +20,7 @@ k = Kriging(y, X, "matern5_2";
             optim="BFGS",          # "BFGS", "BFGS10" (10 restarts), "none"
             objective="LL",        # "LL" | "LOO" | "LMP"
             noise=nothing,         # nothing | "nugget" | Float64 | Vector{Float64}
-            method="exact")        # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (LL only; nystrom: noise=nothing only)
+            method="exact")        # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (noise: vecchia + LL only)
 
 p = predict(k, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
 #   predict / simulate / log_likelihood also take method="exact" (default) |
@@ -87,7 +87,7 @@ issue, not a bug).
 idx = subsetOfData(X, 2000; method="kmeans", seed=123) .+ 1
 k = Kriging(y[idx], X[idx, :], "matern5_2")
 
-# Or keep every point and approximate the likelihood (objective="LL", noise-free Kriging only)
+# Or keep every point and approximate the criterion (any objective, noise-free Kriging only)
 k = Kriging(y, X, "matern5_2"; method="vecchia(30)")   # d <~ 5
 k = Kriging(y, X, "matern5_2"; method="nystrom(50)")   # higher d
 jlibkriging.method(k)   # "nystrom(50)" (exported as `method`); objective(k) is "LL"

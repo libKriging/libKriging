@@ -14,8 +14,9 @@ test_that("method is stored with its explicit size; objective stays the criterio
   expect_equal(kv$method(), "vecchia(30)")
   expect_equal(Kriging(y, X, "matern5_2", method = "nystrom")$method(), "nystrom(50)")
   expect_equal(as.list(kv)$method, "vecchia(30)")
-  # only LL has approximate versions; Nystrom has no noise model
-  expect_error(Kriging(y, X, "matern5_2", objective = "LOO", method = "vecchia"))
+  # LOO / LMP have approximate versions too (without noise model); Nystrom has no noise model
+  expect_equal(Kriging(y, X, "matern5_2", objective = "LOO", method = "vecchia(10)")$objective(), "LOO")
+  expect_error(Kriging(y, X, "matern5_2", objective = "LOO", method = "vecchia", noise = "nugget"))
   expect_error(Kriging(y, X, "matern5_2", method = "nystrom", noise = "nugget"))
   expect_equal(Kriging(y, X, "matern5_2", method = "vecchia", noise = "nugget")$method(), "vecchia(30)")
   expect_error(Kriging(y, X, "matern5_2", method = "Vecchia"))
@@ -88,6 +89,30 @@ test_that("Nystrom fits need method nystrom", {
   expect_equal(dim(kn$simulate(nsim = 3, seed = 1, x = Xn, method = "nystrom")), c(7, 3))
   expect_true(is.finite(kn$logLikelihood(method = "nystrom")))
   expect_error(kn$logLikelihood(method = "vecchia"))
+})
+
+test_that("LOO / LMP objectives with an approximate method", {
+  for (m in c("vecchia(10)", "nystrom(20)")) {
+    am <- substr(m, 1, 7)
+    kl <- Kriging(y, X, "matern5_2", objective = "LOO", method = m)
+    expect_equal(kl$objective(), "LOO")
+    expect_equal(kl$method(), m)
+    expect_true(is.finite(kl$leaveOneOut(method = am)))
+    expect_equal(kl$leaveOneOut(method = m), kl$leaveOneOut(method = am))
+    expect_true(is.finite(kl$leaveOneOut()))  # exact LOO at the approximate theta
+    loov <- kl$leaveOneOutVec(array(kl$theta()), method = am)
+    expect_equal(length(loov$mean), 60)
+    expect_equal(mean((loov$mean - y)^2), kl$leaveOneOut(method = am), tolerance = 1e-8)
+    kp <- Kriging(y, X, "matern5_2", objective = "LMP", method = m)
+    expect_equal(kp$objective(), "LMP")
+    expect_true(is.finite(kp$logMargPost(method = am)))
+    expect_error(kp$logMargPost(method = "unknown"))
+  }
+  # with m = n - 1 the Vecchia LOO is the exact one
+  ke <- Kriging(y, X, "matern5_2", optim = "none", objective = "LOO", method = "vecchia(59)",
+                parameters = list(theta = matrix(c(0.3, 0.3), nrow = 1), is_theta_estim = FALSE))
+  expect_equal(ke$leaveOneOut(method = "vecchia"), ke$leaveOneOut(), tolerance = 1e-4)
+  expect_equal(ke$logMargPost(method = "vecchia"), ke$logMargPost(), tolerance = 1e-4)
 })
 
 test_that("NestedKriging: the common prior from one approximate fit", {

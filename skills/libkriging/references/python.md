@@ -20,7 +20,7 @@ model = lk.Kriging(
     objective="LL",            # "LL" | "LOO" | "LMP"
     parameters={},
     noise=None,                 # None | "nugget" | per-observation variance vector
-    method="exact",            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (LL only; nystrom: noise=None only)
+    method="exact",            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (noise: vecchia + LL only)
 )
 
 mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(
@@ -29,8 +29,9 @@ mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(
 # control whether cov/mean_deriv/stdev_deriv are actually computed
 # (empty arrays otherwise), not how many values come back.
 # mean / stdev are 1-D, shape (q,); cov is (q, q).
-# predict / simulate / logLikelihood also take method="exact" (default) |
-# "vecchia" | "vecchia(m)" | "nystrom" -- see "Large designs" below.
+# predict / simulate / logLikelihood / leaveOneOut / leaveOneOutVec / logMargPost
+# also take method="exact" (default) | "vecchia" | "vecchia(m)" | "nystrom"
+# -- see "Large designs" below.
 sims = model.simulate(nsim=10, seed=123, X=Xnew, will_update=True)   # shape (q, nsim)
 sims_u = model.update_simulate(y_u, X_u)   # condition those paths on new observations
 model.update(y_u, X_u, refit=True)
@@ -102,7 +103,7 @@ specifically wants SELU's less-saturating behavior for deep/wide MLPs.
 idx = lk.Kriging.subsetOfData(X, n_max=2000, method="kmeans", seed=123).ravel()
 model = lk.Kriging(y[idx], X[idx], "matern5_2")
 
-# Or keep every point and approximate the likelihood (objective="LL", noise-free Kriging only)
+# Or keep every point and approximate the criterion (any objective, noise-free Kriging only)
 model = lk.Kriging(y, X, "matern5_2", method="vecchia(30)")   # d <~ 5
 model = lk.Kriging(y, X, "matern5_2", method="nystrom(50)")   # higher d
 model.method()         # "nystrom(50)"; model.objective() is "LL"

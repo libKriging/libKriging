@@ -268,14 +268,15 @@ std::tuple<double, py::array_t<double>> PyKriging::leaveOneOutFun(const py::arra
   return {llo, vec_to_arr(grad)};
 }
 
-std::tuple<py::array_t<double>, py::array_t<double>> PyKriging::leaveOneOutVec(const py::array_t<double>& theta) {
+std::tuple<py::array_t<double>, py::array_t<double>> PyKriging::leaveOneOutVec(const py::array_t<double>& theta,
+                                                                               const std::string& method) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [yhat_mean, yhat_sd] = m_internal->leaveOneOutVec(vec_theta);
+  auto [yhat_mean, yhat_sd] = m_internal->leaveOneOutVec(vec_theta, method);
   return {vec_to_arr(yhat_mean), vec_to_arr(yhat_sd)};
 }
 
-double PyKriging::leaveOneOut() {
-  return m_internal->leaveOneOut();
+double PyKriging::leaveOneOut(const std::string& method) {
+  return m_internal->leaveOneOut(method);
 }
 
 std::tuple<double, py::array_t<double>, py::array_t<double>>
@@ -296,8 +297,8 @@ std::tuple<double, py::array_t<double>> PyKriging::logMargPostFun(const py::arra
   return {lmp, vec_to_arr(grad)};
 }
 
-double PyKriging::logMargPost() {
-  return m_internal->logMargPost();
+double PyKriging::logMargPost(const std::string& method) {
+  return m_internal->logMargPost(method);
 }
 
 // --- accessors ---

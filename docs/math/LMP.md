@@ -67,6 +67,41 @@ uncommon configuration). With `noise_model="nugget"` (see
 prior simultaneously discourages a degenerate θ *and* a degenerate
 nugget-to-signal ratio — one prior term regularizes both.
 
+### Approximate versions (`method="vecchia(m)"` / `"nystrom(k)"`)
+
+With an approximate fit method (noise-free models only), the same
+formula is evaluated with the approximate correlation matrix R̃ and its
+precision P = R̃⁻¹:
+
+  LMP(θ) = −½ log det R̃ − ½ log det(FᵀPF) − (n−p)/2 · log(S²) + log p_prior(θ)
+  S² = (y − Fβ̂)ᵀ P (y − Fβ̂),  β̂ = (FᵀPF)⁻¹FᵀPy
+
+(with σ² fixed, S² is replaced by σ²(n−p) as in the exact objective).
+
+- **Vecchia**: P = BᵀD⁻¹B (B unit lower triangular, D = diag(vᵢ) the
+  conditional variances, see [Vecchia.md](Vecchia.md)), so
+  log det R̃ = Σᵢ log vᵢ, and every product by P costs O(n m).
+- **Nystrom**: R̃ = UUᵀ + diag(D); P by Woodbury and
+  log det R̃ = Σᵢ log Dᵢ + log det(I + UᵀD⁻¹U) (determinant lemma), O(n k²).
+
+The gradient is analytic (FD-verified in
+`tests/KrigingApproxObjectivesTest.cpp`): with r = y − Fβ̂, A = FᵀPF and
+∂ₖP the derivative of P along θₖ,
+
+  ∂LMP/∂θₖ = −½ ∂ₖ log det R̃ − ½ tr(A⁻¹ Fᵀ∂ₖP F) − (n−p)/2 · rᵀ∂ₖP r / S² + ∂ₖ log p_prior
+
+(β̂'s own dependence on θ drops out: S² is minimal in β at β̂), where
+∂ₖ log det R̃ = Σᵢ ∂vᵢ/vᵢ (Vecchia) or tr(P ∂R̂) (Nystrom), and the
+bilinear forms in ∂ₖP are those of the approximate LOO gradient
+(see [LOO.md](LOO.md)). The committed σ² is S²/(n−p) (as for the exact
+LMP fit) and β = β̂. `logMargPost(method)` (C++ `logMargPostVecchiaFun` /
+`logMargPostNystromFun` at a given θ) evaluates this criterion. As for
+LL, the Vecchia version depends on the maxmin ordering and the Nystrom
+version smooths R (the short-range correlation not captured by the k
+landmarks is moved to the diagonal D); both are exact for m = n − 1 and
+k = n. With `normalize=true`, θ, the value (log-density of the original y)
+and the gradient are in the original scale, as for `logMargPostFun`.
+
 ## Simple example
 
 ```python

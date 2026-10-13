@@ -31,13 +31,22 @@ kno = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", []
 assert(isempty(lastwarn()));
 assert(strcmp(ka.objective(), "LL"));
 assert(strcmp(ka.method(), "vecchia(7)"));
-failed = false;
-try
-  kx = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LOO", [], "none", [], "vecchia");
-catch
-  failed = true;
+
+% LOO / LMP objectives with an approximate method
+for mth = {"vecchia(10)", "nystrom(20)"}
+  m = mth{1};
+  am = m(1:7);
+  kx = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LOO", [], "none", [], m);
+  assert(strcmp(kx.objective(), "LOO"));
+  assert(strcmp(kx.method(), m));
+  assert(isfinite(kx.leaveOneOut(am)));
+  assert(kx.leaveOneOut(m) == kx.leaveOneOut(am));
+  [lm, ls] = kx.leaveOneOutVec(kx.theta(), am);
+  assert(abs(mean((lm - y).^2) - kx.leaveOneOut(am)) < 1e-8 * kx.leaveOneOut(am));
+  kp = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LMP", [], "none", [], m);
+  assert(strcmp(kp.objective(), "LMP"));
+  assert(isfinite(kp.logMargPost(am)));
 end
-assert(failed, "only objective LL has an approximate version");
 
 % no implicit switch from the exact methods
 failed = false;
@@ -122,6 +131,13 @@ catch
   failed = true;
 end
 assert(failed, "Vecchia likelihood needs a Vecchia fit");
+failed = false;
+try
+  kn.leaveOneOut("vecchia");
+catch
+  failed = true;
+end
+assert(failed, "Vecchia LOO needs a Vecchia fit");
 
 % NestedKriging: common prior from one global Vecchia fit
 Xl = [mod(0.3819660 * (1:200)', 1), mod(0.7548777 * (1:200)', 1)];

@@ -192,7 +192,8 @@ end
     @test jlibkriging.method(ka) == "vecchia(7)"
     kb = @test_logs (:warn, r"method=\"nystrom\(5\)\"") match_mode=:any Kriging(y, X, "matern5_2"; objective="LLNystrom(5)")
     @test jlibkriging.method(kb) == "nystrom(5)"
-    @test_throws ErrorException Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia")
+    @test objective(Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia(10)")) == "LOO"
+    @test_throws ErrorException Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia", noise="nugget")
     @test_throws ErrorException Kriging(y, X, "matern5_2"; method="nystrom", noise="nugget")
 
     # method="vecchia" with noise models (response Vecchia)
@@ -261,6 +262,23 @@ end
     @test size(simulate(kn, 3, 1, Xn; method="nystrom")) == (3, 3)
     @test isfinite(log_likelihood(kn; method="nystrom"))
     @test_throws ErrorException log_likelihood(kn; method="vecchia")
+
+    # LOO / LMP objectives with an approximate method
+    for m in ("vecchia(10)", "nystrom(20)")
+        am = m[1:7]
+        kl = Kriging(y, X, "matern5_2"; objective="LOO", method=m)
+        @test objective(kl) == "LOO"
+        @test jlibkriging.method(kl) == m
+        @test isfinite(leave_one_out(kl; method=am))
+        @test leave_one_out(kl; method=m) == leave_one_out(kl; method=am)
+        lv = leave_one_out_vec(kl, Vector{Float64}(theta(kl)); method=am)
+        @test isapprox(sum((lv.yhat .- y) .^ 2) / 60, leave_one_out(kl; method=am); rtol=1e-8)
+        kp = Kriging(y, X, "matern5_2"; objective="LMP", method=m)
+        @test objective(kp) == "LMP"
+        @test isfinite(log_marg_post(kp; method=am))
+    end
+    @test_throws ErrorException leave_one_out(kn; method="vecchia")
+    @test leave_one_out(ke) == leave_one_out(ke; method="exact")
 
     # NestedKriging: common prior from one global Vecchia fit
     Xl = [mod.(0.3819660 .* (1:200), 1.0) mod.(0.7548777 .* (1:200), 1.0)]

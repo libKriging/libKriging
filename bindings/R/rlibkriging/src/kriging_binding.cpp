@@ -561,14 +561,14 @@ Rcpp::List kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta, bool return_gra
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_leaveOneOutVec(Rcpp::List k, arma::vec theta) {
+Rcpp::List kriging_leaveOneOutVec(Rcpp::List k, arma::vec theta, std::string method = "exact") {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  std::tuple<arma::vec, arma::vec> yhat = impl_ptr->leaveOneOutVec(theta);
+  std::tuple<arma::vec, arma::vec> yhat = impl_ptr->leaveOneOutVec(theta, method);
 
   Rcpp::List ret
       = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(yhat), Rcpp::Named("stdev") = std::get<1>(yhat));
@@ -577,14 +577,14 @@ Rcpp::List kriging_leaveOneOutVec(Rcpp::List k, arma::vec theta) {
 }
 
 // [[Rcpp::export]]
-double kriging_leaveOneOut(Rcpp::List k) {
+double kriging_leaveOneOut(Rcpp::List k, std::string method = "exact") {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  return impl_ptr->leaveOneOut();
+  return impl_ptr->leaveOneOut(method);
 }
 
 // [[Rcpp::export]]
@@ -606,14 +606,14 @@ Rcpp::List kriging_logMargPostFun(Rcpp::List k, arma::vec theta, bool return_gra
 }
 
 // [[Rcpp::export]]
-double kriging_logMargPost(Rcpp::List k) {
+double kriging_logMargPost(Rcpp::List k, std::string method = "exact") {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  return impl_ptr->logMargPost();
+  return impl_ptr->logMargPost(method);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////

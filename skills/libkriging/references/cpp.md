@@ -83,9 +83,13 @@ params.theta = arma::mat(model.theta().t());
 params.is_theta_estim = false;
 Kriging exact(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", params);
 ```
-Approximate methods: `objective="LL"` only; `"vecchia(m)"` with any
-`NoiseModel` (response Vecchia), `"nystrom(k)"` with `NoiseModel::None`
-only (else `std::invalid_argument`); `update` keeps the method (a
+Approximate methods: any objective (`"LL"`, `"LOO"`, `"LMP"`) with
+`NoiseModel::None`; `"vecchia(m)"` with `objective="LL"` also supports
+the Nugget / Heterogeneous `NoiseModel` (response Vecchia); other
+combinations raise `std::invalid_argument`. `leaveOneOut(method)`,
+`leaveOneOutVec(theta, method)`, `logMargPost(method)` evaluate the approximate
+criteria (C++ also `leaveOneOutVecchiaFun` / `logMargPostNystromFun` etc. at a
+given theta, with analytic gradient); `update` keeps the method (a
 Heterogeneous model needs `update(y_u, noise_u, X_u, refit)`), `save` /
 `load` too. Noise-model Vecchia simulation: `simulate(nsim, seed, X_n,
 with_nugget, will_update, "vecchia")` (Nugget) /
