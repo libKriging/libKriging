@@ -75,3 +75,13 @@ TEST_CASE("NoiseKrigingFitTest - BFGS finds better LL than grid search", "[fit][
     CHECK(ll_bfgs >= best_ll_grid - std::abs(best_ll_grid) * 1e-3);
   }
 }
+
+TEST_CASE("NoiseKrigingFitTest - negative noise variance is rejected", "[fit][noisekriging]") {
+  arma::mat X = arma::linspace(0, 1, 10);
+  arma::colvec y = arma::sin(6 * X.col(0));
+  arma::colvec noise(10, arma::fill::value(0.01));
+  noise(0) = -1.0;
+
+  Kriging nk("matern3_2", Kriging::NoiseModel::Heterogeneous);
+  REQUIRE_THROWS_WITH(nk.fit(y, noise, X), Catch::Contains("non-negative"));
+}

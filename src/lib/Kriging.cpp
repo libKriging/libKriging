@@ -4054,6 +4054,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     throw std::runtime_error("fit(y, noise, X, ...) requires NoiseModel::Heterogeneous");
   if (noise.n_elem != y.n_elem)
     throw std::runtime_error("noise vector must have the same length as y");
+  if (!noise.is_finite() || noise.min() < 0)
+    throw std::invalid_argument("noise variances must be finite and non-negative");
   fit_impl(y, &noise, X, regmodel, normalize, optim, objective, parameters, method);
 }
 
