@@ -301,6 +301,7 @@ if (NOT CMAKE_VERSION VERSION_LESS 3.15)
             -DCXX_COMPILER=${CMAKE_CXX_COMPILER}
             -DEXPECTED_VERSION=${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}
             -DINSTALLED_PREFIX=${CMAKE_INSTALL_PREFIX}
+            "-DCONSUMER_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
             "-DINSTALL_DIRS=${PROJECT_BINARY_DIR}/dependencies/armadillo-code|${PROJECT_BINARY_DIR}/dependencies/lbfgsb_cpp|$<TARGET_PROPERTY:Kriging,BINARY_DIR>"
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake_package/run_test.cmake)
     set_tests_properties(cmake_package PROPERTIES LABELS "install")

@@ -1,5 +1,5 @@
 # Test of the installed CMake package (issue #127). Usage:
-#   cmake -DSRC_DIR= -DWORK_DIR= -DCONFIG= -DGENERATOR= -DEXPECTED_VERSION= -DINSTALL_DIRS="a|b|c" -DINSTALLED_PREFIX= -P run_test.cmake
+#   cmake -DSRC_DIR= -DWORK_DIR= -DCONFIG= -DGENERATOR= -DEXPECTED_VERSION= -DINSTALL_DIRS="a|b|c" -DINSTALLED_PREFIX= -DCONSUMER_LINKER_FLAGS= -P run_test.cmake
 # 1. install the library and its dependencies in a temporary prefix
 # 2. configure, build and run a minimal project using find_package(libKriging)
 
@@ -55,6 +55,10 @@ endif ()
 
 set(configure_args -S "${SRC_DIR}" -B "${consumer_build}" -G "${GENERATOR}"
     -DCMAKE_BUILD_TYPE=${CONFIG} -DCMAKE_PREFIX_PATH=${prefix} -DEXPECTED_VERSION=${EXPECTED_VERSION})
+# the library may be built with instrumentation (coverage, sanitizers) that the consumer has to link with
+if (CONSUMER_LINKER_FLAGS)
+  list(APPEND configure_args "-DCMAKE_EXE_LINKER_FLAGS=${CONSUMER_LINKER_FLAGS}")
+endif ()
 if (PLATFORM)
   list(APPEND configure_args -A "${PLATFORM}")
 endif ()
