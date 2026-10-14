@@ -23,7 +23,20 @@ foreach (dir IN LISTS INSTALL_DIRS)
     file(GLOB siblings "${parent}/*")
     message(FATAL_ERROR "No cmake_install.cmake in '${dir}'\n  content: ${children}\n  parent content: ${siblings}")
   endif ()
-  run_step("install ${dir}" ${CMAKE_COMMAND} --install "${dir}" --prefix "${prefix}" --config "${CONFIG}")
+  execute_process(COMMAND ${CMAKE_COMMAND} --install "${dir}" --prefix "${prefix}" --config "${CONFIG}"
+      RESULT_VARIABLE result)
+  if (NOT result EQUAL 0)
+    # replay the install script with a trace to show where it fails
+    execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=${prefix} -DCMAKE_INSTALL_CONFIG_NAME=${CONFIG}
+        --trace-expand -P "${dir}/cmake_install.cmake" OUTPUT_QUIET ERROR_VARIABLE trace)
+    string(LENGTH "${trace}" trace_length)
+    math(EXPR trace_start "${trace_length} - 3000")
+    if (trace_start LESS 0)
+      set(trace_start 0)
+    endif ()
+    string(SUBSTRING "${trace}" ${trace_start} -1 trace_tail)
+    message(FATAL_ERROR "Install of '${dir}' failed (${result}); end of trace:\n${trace_tail}")
+  endif ()
 endforeach ()
 
 set(configure_args -S "${SRC_DIR}" -B "${consumer_build}" -G "${GENERATOR}"
