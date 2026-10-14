@@ -13,7 +13,7 @@ past release, see the corresponding entry on the
 
 ### Fixed
 - **R**: `str()`/`as.list()` on an unfitted `Kriging("gauss")` no longer segfaults
-  (the trend `regmodel` was left uninitialized, [#249](https://github.com/libKriging/libKriging/issues/249)).
+  (the trend `regmodel` was left uninitialized, and a `str.Kriging` method now displays the model content, [#249](https://github.com/libKriging/libKriging/issues/249)).
 
 ### Changed
 - **Kriging (breaking): with `normalize=true`, every parameter accessor and
