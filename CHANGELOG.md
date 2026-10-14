@@ -11,6 +11,10 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Fixed
+- **R**: `str()`/`as.list()` on an unfitted `Kriging("gauss")` no longer segfaults
+  (the trend `regmodel` was left uninitialized, and a `str.Kriging` method now displays the model content, [#249](https://github.com/libKriging/libKriging/issues/249)).
+
 ### Changed
 - **Kriging (breaking): `simulate(…, with_noise, …)` takes noise VARIANCES**,
   consistent with the `noise` of `fit` / `update(y_u, noise_u, X_u)` /

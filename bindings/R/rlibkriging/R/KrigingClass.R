@@ -227,6 +227,18 @@ as.list.Kriging <- function(x, ...) {
     kriging_model(x)
 }
 
+# The S3 object is a list holding accessor closures, whose length differs from
+# the one of as.list(): the default str() mixes both and fails (even on an
+# unfitted model). Display the model content instead.
+#' @importFrom utils str
+#' @export
+#' @method str Kriging
+#' @noRd
+str.Kriging <- function(object, ...) {
+    utils::str(as.list(object), ...)
+    invisible()
+}
+
 
 #' Print the content of a \code{Kriging} object.
 #'
