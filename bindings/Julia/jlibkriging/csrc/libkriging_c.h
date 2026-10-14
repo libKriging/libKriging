@@ -273,12 +273,17 @@ int lk_warp_kriging_predict(void* ptr,
                             double* mean_deriv_out,
                             double* stdev_deriv_out);
 
+/* with_noise: observation-noise VARIANCES (raw y scale, like the fit's noise),
+ * noise_n = 1 (common) or m (one per row of X_n); NULL / noise_n = 0 for no
+ * noise. Negative / NaN values return an error. */
 int lk_warp_kriging_simulate(void* ptr,
                              int nsim,
                              int seed,
                              const double* X_n,
                              int m,
                              int d,
+                             const double* with_noise,
+                             int noise_n,
                              int will_update,
                              double* sim_out);
 
@@ -398,12 +403,17 @@ int lk_mlp_kriging_predict(void* ptr,
                            double* mean_deriv_out,
                            double* stdev_deriv_out);
 
+/* with_noise: observation-noise VARIANCES (raw y scale, like the fit's noise),
+ * noise_n = 1 (common) or m (one per row of X_n); NULL / noise_n = 0 for no
+ * noise. Negative / NaN values return an error. */
 int lk_mlp_kriging_simulate(void* ptr,
                             int nsim,
                             int seed,
                             const double* X_n,
                             int m,
                             int d,
+                            const double* with_noise,
+                            int noise_n,
                             int will_update,
                             double* sim_out);
 

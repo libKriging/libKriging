@@ -12,6 +12,11 @@
 
 namespace py = pybind11;
 
+/// simulate's with_noise for WarpKriging / MLPKriging: None -> empty (no
+/// noise), a number or an array -> observation-noise variances; a bool raises
+/// std::invalid_argument (ValueError).
+arma::vec with_noise_variances(const py::object& with_noise);
+
 class PyWarpKriging {
  private:
   PyWarpKriging(std::unique_ptr<libKriging::WarpKriging>&& internal) : m_internal(std::move(internal)) {}
@@ -53,7 +58,8 @@ class PyWarpKriging {
   py::array_t<double> simulate(const int nsim,
                                const int seed,
                                const py::array_t<double>& X_n,
-                               const bool will_update = false);
+                               const bool will_update = false,
+                               const py::object& with_noise = py::none());
 
   py::array_t<double> update_simulate(const py::array_t<double>& y_u,
                                       const py::array_t<double>& X_u,

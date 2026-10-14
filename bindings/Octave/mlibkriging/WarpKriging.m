@@ -150,7 +150,10 @@ classdef WarpKriging < handle
         end
 
         function varargout = simulate(obj, varargin)
-            % simulate(obj, nsim, seed, X, ...)
+            % simulate(obj, nsim, seed, X [, will_update [, with_noise]]):
+            % nsim / seed as int32; with_noise: observation-noise VARIANCES
+            % (column vector, one per row of X, or a scalar; [] / omitted: no
+            % noise), negative / NaN values raise
             if nargin >= 4 && iscell(varargin{3})
                 ws = mLibKriging("WarpKriging::warping", obj.ref);
                 X_enc = WarpKriging.encode_X_from_warping(varargin{3}, ws);
@@ -162,11 +165,14 @@ classdef WarpKriging < handle
         end
 
         function varargout = update_simulate(obj, varargin)
-            % update_simulate(obj, y_u, X_u)
+            % update_simulate(obj, y_u, X_u [, noise_u]): noise_u (noise
+            % variances of the update points) is required when the model was
+            % fit with noise, and must be omitted otherwise
             if nargin >= 3 && iscell(varargin{2})
                 ws = mLibKriging("WarpKriging::warping", obj.ref);
                 X_enc = WarpKriging.encode_X_from_warping(varargin{2}, ws);
-                [varargout{1:nargout}] = mLibKriging("WarpKriging::update_simulate", obj.ref, varargin{1}, X_enc);
+                args = [{varargin{1}, X_enc}, varargin(3:end)];
+                [varargout{1:nargout}] = mLibKriging("WarpKriging::update_simulate", obj.ref, args{:});
             else
                 [varargout{1:nargout}] = mLibKriging("WarpKriging::update_simulate", obj.ref, varargin{:});
             end

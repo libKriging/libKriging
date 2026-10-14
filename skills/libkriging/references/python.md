@@ -70,6 +70,10 @@ model = lk.WarpKriging(
     method="exact",       # only "exact" is implemented (same for MLPKriging)
 )
 mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(Xnew, return_stdev=True)
+sims = model.simulate(10, 123, Xnew, will_update=False, with_noise=None)
+# with_noise: None (latent process) | noise VARIANCES, a scalar or one per row of Xnew
+# (same for MLPKriging; negative/NaN -> ValueError; no True "fitted nugget" shortcut)
+sims_u = model.update_simulate(y_u, X_u, noise_u=None)   # noise_u required iff fitted with noise
 ```
 One spec string per column of `X` (see `SKILL.md` §4). If `X` has string
 columns, `WarpKriging` can auto-encode them — but being explicit about the

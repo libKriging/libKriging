@@ -72,3 +72,22 @@ catch err
   assert(~isempty(strfind(err.message, "not implemented for Nugget/Heterogeneous noise models")), err.message);
 end
 assert(failed, "logMargPost(vecchia) should raise on a nugget model");
+
+% update_simulate dispatches on the number of arguments, whatever the noise
+% model: (y_u, X_u) and (y_u, noise_u, X_u) both work on a heterogeneous model
+Xu = [0.35 0.65; 0.75 0.25];
+yu = sin(3 * Xu(:, 1)) + cos(5 * Xu(:, 2));
+nsim_u = int32(5000);
+s_ = kh.simulate(nsim_u, int32(11), Xn, var_n, true);
+u3 = kh.update_simulate(yu, Xu);  % 3-arg form: noise-free update points
+assert(size(u3), [3, double(nsim_u)]);
+assert(all(isfinite(u3(:))));
+s_ = kh.simulate(nsim_u, int32(11), Xn, var_n, true);
+u4 = kh.update_simulate(yu, 0.01 * ones(2, 1), Xu);  % 4-arg form
+assert(size(u4), [3, double(nsim_u)]);
+% the 4-arg form adds the with_noise draws of the last simulate again, the
+% 3-arg form does not: the spread of u4 exceeds that of u3 by about var_n
+assert(all(var(u4, 0, 2) > var(u3, 0, 2)));
+% on a model without noise, the 3-arg form is the only one
+s_ = k.simulate(int32(10), int32(1), Xn, true);
+assert(size(k.update_simulate(yu, Xu)), [3, 10]);

@@ -60,6 +60,10 @@ wk <- WarpKriging(y, X, warping = c("kumaraswamy", "categorical(5,2)", "none"),
                   noise = NULL,        # NULL | numeric variance vector (no "nugget" mode)
                   method = "exact")    # only "exact" is implemented (same for MLPKriging)
 predict(wk, x = Xnew, return_stdev = TRUE)
+s <- simulate(wk, nsim = 10, seed = 123, x = Xnew, will_update = FALSE, with_noise = NULL)
+# with_noise: NULL / FALSE (latent process) | numeric noise VARIANCES, a scalar or
+# one per row of x (same for MLPKriging; negative/NA raise; TRUE raises: no
+# "fitted nugget" shortcut as in simulate.Kriging)
 ```
 One spec string per column of `X` (see `SKILL.md` §4). If `X` has string
 columns, `WarpKriging` can auto-encode them — but being explicit about the

@@ -903,12 +903,37 @@ function predict(wk::WarpKriging, X_n::Matrix{Float64};
             stdev_deriv=return_deriv ? stdev_deriv_out : nothing)
 end
 
-function simulate(wk::WarpKriging, nsim::Int, seed::Int, X_n::Matrix{Float64}; will_update::Bool=false)
+# simulate's with_noise for WarpKriging / MLPKriging: nothing (no noise), a
+# scalar or a vector of noise variances. A Bool is rejected (it is a Real in
+# Julia, and there is no fitted-nugget shortcut for these models).
+function _with_noise_variances(with_noise)
+    with_noise === nothing && return nothing
+    with_noise isa Bool && error("simulate: with_noise must hold noise variances, not a Bool")
+    return with_noise isa Real ? [Float64(with_noise)] : with_noise
+end
+
+"""
+    simulate(wk::WarpKriging, nsim, seed, X_n; will_update=false, with_noise=nothing)
+
+`with_noise`: observation-noise VARIANCES (raw y scale, like the fit's
+`noise`), a scalar or one per row of `X_n`; `nothing` (default) adds no noise.
+Independent N(0, `with_noise`) draws are added to the simulated latent process
+(and again by `update_simulate` when `will_update=true`); negative / NaN values
+raise. There is no fitted-nugget shortcut (unlike `Kriging`'s `with_nugget`).
+"""
+function simulate(wk::WarpKriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
+                  will_update::Bool=false,
+                  with_noise::Union{Nothing,Real,Vector{Float64}}=nothing)
     m, d = size(X_n)
     sim_out = Matrix{Float64}(undef, m, nsim)
+    noise_v = _with_noise_variances(with_noise)
+    noise_ptr = noise_v === nothing ? C_NULL : noise_v  # GC-rooted by ccall
+    noise_n = noise_v === nothing ? 0 : length(noise_v)
     ret = ccall(dlsym(_lk(), :lk_warp_kriging_simulate), Cint,
-                (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint, Cint, Ptr{Float64}),
-                wk.ptr, nsim, seed, X_n, m, d, will_update ? 1 : 0, sim_out)
+                (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint,
+                 Ptr{Float64}, Cint, Cint, Ptr{Float64}),
+                wk.ptr, nsim, seed, X_n, m, d,
+                noise_ptr, noise_n, will_update ? 1 : 0, sim_out)
     _check_error(ret)
     return sim_out
 end
@@ -1114,9 +1139,9 @@ function predict(wk::WarpKriging, X_n::Matrix{Any}; kwargs...)
 end
 
 # simulate accepting mixed-type Matrix{Any}
-function simulate(wk::WarpKriging, nsim::Int, seed::Int, X_n::Matrix{Any})
+function simulate(wk::WarpKriging, nsim::Int, seed::Int, X_n::Matrix{Any}; kwargs...)
     X_num, _ = encode_string_columns(X_n, get_warping(wk))
-    return simulate(wk, nsim, seed, X_num)
+    return simulate(wk, nsim, seed, X_num; kwargs...)
 end
 
 # update! accepting mixed-type Matrix{Any}
@@ -1269,12 +1294,28 @@ function predict(mk::MLPKriging, X_n::Matrix{Float64};
             stdev_deriv=return_deriv ? stdev_deriv_out : nothing)
 end
 
-function simulate(mk::MLPKriging, nsim::Int, seed::Int, X_n::Matrix{Float64}; will_update::Bool=false)
+"""
+    simulate(mk::MLPKriging, nsim, seed, X_n; will_update=false, with_noise=nothing)
+
+`with_noise`: observation-noise VARIANCES (raw y scale, like the fit's
+`noise`), a scalar or one per row of `X_n`; `nothing` (default) adds no noise.
+Independent N(0, `with_noise`) draws are added to the simulated latent process
+(and again by `update_simulate` when `will_update=true`); negative / NaN values
+raise. There is no fitted-nugget shortcut (unlike `Kriging`'s `with_nugget`).
+"""
+function simulate(mk::MLPKriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
+                  will_update::Bool=false,
+                  with_noise::Union{Nothing,Real,Vector{Float64}}=nothing)
     m, d = size(X_n)
     sim_out = Matrix{Float64}(undef, m, nsim)
+    noise_v = _with_noise_variances(with_noise)
+    noise_ptr = noise_v === nothing ? C_NULL : noise_v  # GC-rooted by ccall
+    noise_n = noise_v === nothing ? 0 : length(noise_v)
     ret = ccall(dlsym(_lk(), :lk_mlp_kriging_simulate), Cint,
-                (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint, Cint, Ptr{Float64}),
-                mk.ptr, nsim, seed, X_n, m, d, will_update ? 1 : 0, sim_out)
+                (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint,
+                 Ptr{Float64}, Cint, Cint, Ptr{Float64}),
+                mk.ptr, nsim, seed, X_n, m, d,
+                noise_ptr, noise_n, will_update ? 1 : 0, sim_out)
     _check_error(ret)
     return sim_out
 end

@@ -4,6 +4,7 @@ Mirrors bindings/R/rlibkriging/tests/testthat/test-MLPKriging.R.
 """
 
 import numpy as np
+import pytest
 
 import pylibkriging as lk
 
@@ -147,3 +148,27 @@ def test_mlpkriging_getters():
     th = k.theta()
     assert th.size > 0 and np.all(th > 0)
     assert k.sigma2() > 0
+
+
+def test_mlpkriging_simulate_with_noise_variances():
+    """with_noise holds observation-noise VARIANCES (as Kriging.simulate):
+    at equal seed the latent draws are identical, the difference is the noise"""
+    X = np.linspace(0.01, 0.99, 10).reshape(-1, 1)
+    y = f1d(X)
+    k = lk.MLPKriging(y, X, hidden_dims=[8], d_out=2, activation="tanh",
+                      kernel="gauss", parameters={"max_iter_adam": "100"})
+    Xn = np.array([[0.15], [0.45], [0.85]])
+    var_n = np.array([0.02, 0.1, 0.3])
+
+    # default call unchanged: no noise added (None == empty)
+    s0 = k.simulate(5000, 7, Xn)
+    assert s0.shape == (3, 5000)
+    np.testing.assert_array_equal(k.simulate(5000, 7, Xn, False, None), s0)
+
+    d = k.simulate(5000, 7, Xn, with_noise=var_n) - s0
+    np.testing.assert_allclose(np.var(d, axis=1, ddof=1), var_n, rtol=0.15)
+    d1 = k.simulate(5000, 8, Xn, with_noise=0.2) - k.simulate(5000, 8, Xn)
+    np.testing.assert_allclose(np.var(d1, axis=1, ddof=1), 0.2, rtol=0.15)
+
+    with pytest.raises(ValueError):
+        k.simulate(10, 7, Xn, with_noise=-var_n)

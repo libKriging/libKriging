@@ -60,6 +60,14 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::update", obj.ref, varargin{:});
         end
 
+        % update_simulate(y_u, X_u) or update_simulate(y_u, noise_u, X_u)
+        % (after simulate(..., will_update=true)), chosen by the number of
+        % arguments whatever the noise model. With noise_u (noise variances
+        % of the update points) the update points are noisy observations and
+        % the with_noise draws of the last simulate are added again. Without
+        % it, on a heterogeneous model, the update points are conditioned on
+        % as noise-free observations of the latent process and no with_noise
+        % draws are added again.
         function varargout = update_simulate(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::update_simulate", obj.ref, varargin{:});
         end

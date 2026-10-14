@@ -163,15 +163,26 @@ predict.MLPKriging <- function(object, x, return_stdev = TRUE, return_cov = FALS
 #' @param x simulation matrix (m x d)
 #' @param will_update logical; if \code{TRUE} keep the internal state for a
 #'   subsequent \code{update_simulate()} call.
-#' @param ... ignored
+#' @param with_noise \code{NULL} (default) or \code{FALSE}: no observation
+#'   noise (the simulated latent process). A numeric value gives the
+#'   observation-noise \emph{variances} (a scalar or one per row of \code{x},
+#'   in the units of \code{y}, like \code{noise} at fit) added as independent
+#'   N(0, \code{with_noise}) draws; with \code{will_update = TRUE},
+#'   \code{update_simulate()} adds fresh draws again. Negative or \code{NA}
+#'   values raise an error. Unlike \code{simulate.Kriging}, there is no
+#'   fitted-nugget shortcut: \code{with_noise = TRUE} raises an error.
+#' @param ... ignored (a warning is issued for unused arguments)
 #' @return matrix (m x nsim)
 #' @method simulate MLPKriging
 #' @export
 simulate.MLPKriging <- function(object, nsim = 1, seed = 123, x,
-                                 will_update = FALSE, ...) {
+                                 will_update = FALSE, with_noise = NULL, ...) {
+  args <- list(...)
+  if (length(args) > 0) warnOnDots(args)
+  with_noise <- .simulate_noise_variances(with_noise)
   mlpKriging_simulate(object$ptr, as.integer(nsim),
                       as.integer(seed), as.matrix(x),
-                      as.logical(will_update))
+                      as.logical(will_update), with_noise)
 }
 
 #' @title Update simulated paths with new observations (FOXY algorithm)

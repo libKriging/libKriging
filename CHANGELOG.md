@@ -25,14 +25,15 @@ past release, see the corresponding entry on the
   `with_noise` in the exact path no longer adds an uninitialized matrix.
   R: a numeric scalar `with_noise` (e.g. `0.3`) is now a noise variance for
   every point; it was taken as the logical nugget flag `TRUE`.
-  Same for **WarpKriging and MLPKriging** (C++ API): `simulate(nsim, seed,
-  X_n, will_update, with_noise)` and the `update_simulate` re-add take noise
-  VARIANCES (like `WarpKriging`'s fit `noise` / `noise_u`), where
+  Same for **WarpKriging and MLPKriging**: `simulate(nsim, seed, X_n,
+  will_update, with_noise)` and the `update_simulate` re-add take noise
+  VARIANCES (like `WarpKriging`'s fit `noise` / `noise_u`), where the C++
   `WarpKriging` used standard deviations; negative / NaN values raise
   `std::invalid_argument` (was `std::runtime_error` for negative values).
   `MLPKriging::simulate` gains the optional trailing `with_noise` argument
-  (forwarded to `WarpKriging`). The bindings of both classes do not expose
-  `with_noise` (unchanged). `NestedKriging` has no `simulate`.
+  (forwarded to `WarpKriging`). The bindings now expose `with_noise` for
+  both classes with these semantics (see Added). `NestedKriging` has no
+  `simulate`.
 - **Kriging: LOO / LMP with an approximate method reject noise models.**
   `leaveOneOut(method)`, `logMargPost(method)`, `leaveOneOutVec(theta,
   method)` with `"vecchia"` / `"nystrom"`, and `leaveOneOutVecchiaFun`,
@@ -154,6 +155,20 @@ past release, see the corresponding entry on the
     uniform API (only `"exact"` is implemented).
 
 ### Added
+- **WarpKriging / MLPKriging bindings: `simulate(…, will_update, with_noise)`**
+  in Python, R, Julia and Octave / MATLAB, after `will_update` (its existing
+  position is kept): `with_noise` holds observation-noise VARIANCES (a
+  scalar or one per row of `X`), added as independent N(0, `with_noise`)
+  draws to the simulated latent process (and again by `update_simulate`
+  after a `will_update=true` simulate). Default (Python `None`, R `NULL`,
+  Julia `nothing`, Octave omitted / `[]`): no noise, unchanged. Negative /
+  NaN values raise (Python `ValueError`). There is no "fitted nugget"
+  shortcut as with `Kriging`: a logical `TRUE` / `True` raises. Julia C
+  shim: `lk_warp_kriging_simulate` / `lk_mlp_kriging_simulate` take
+  `(…, with_noise, noise_n, will_update, sim_out)`. R:
+  `simulate.WarpKriging` / `simulate.MLPKriging` warn about unused
+  arguments instead of silently ignoring them (e.g. a `with_noise=` passed
+  through `...` was dropped).
 - **Kriging: `objective="LOO"` and `"LMP"` with `method="vecchia(m)"` /
   `"nystrom(k)"`** (noise-free models). The LOO criterion is the virtual
   leave-one-out of the approximate joint law (Vecchia precision BᵀD⁻¹B,
@@ -244,6 +259,15 @@ past release, see the corresponding entry on the
   dispatches to it.
 
 ### Fixed
+- **Octave / MATLAB `Kriging.update_simulate`** dispatches on its argument
+  count, as `update`: `update_simulate(y_u, X_u)` and
+  `update_simulate(y_u, noise_u, X_u)`, whatever the noise model. On a
+  heterogeneous model the 3-argument form failed with an unclear
+  missing-argument error; it now calls the C++ `update_simulate(y_u, X_u)`,
+  which conditions on the update points as noise-free observations of the
+  latent process and does not re-add the `with_noise` draws of the last
+  `simulate` (unchanged C++ behaviour). `WarpKriging.update_simulate` with a
+  cell (categorical) `X_u` forwards `noise_u` (it was dropped).
 - **Octave / MATLAB `Kriging.logLikelihoodFun`**: the 4th argument
   (`want_hess`) was passed to the C++ `logLikelihoodFun(theta, return_grad,
   bench)` as `bench` (printing timings instead of returning a hessian). The

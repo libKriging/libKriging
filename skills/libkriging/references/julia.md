@@ -64,6 +64,9 @@ wk = WarpKriging(y, X, ["kumaraswamy", "categorical(5,2)", "none"], "gauss";
                  noise=nothing,      # nothing | Vector{Float64} of variances (no "nugget" mode)
                  method="exact")     # only "exact" is implemented (same for MLPKriging)
 predict(wk, Xnew; return_stdev=true)
+s = simulate(wk, 10, 123, Xnew; will_update=false, with_noise=nothing)
+# with_noise: nothing (latent process) | noise VARIANCES, a scalar or a
+# Vector{Float64} with one per row of Xnew (same for MLPKriging; negative/NaN raise)
 ```
 
 ## MLPKriging

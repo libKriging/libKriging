@@ -501,7 +501,12 @@ needs "exact" or "vecchia"
            py::arg("nsim") = 1,
            py::arg("seed") = 123,
            py::arg("X"),
-           py::arg("will_update") = false)
+           py::arg("will_update") = false,
+           py::arg("with_noise") = py::none(),
+           R"pbdoc(Conditional simulations at X. with_noise (default None: no noise): observation-noise
+VARIANCES (raw y scale, like fit's noise), a scalar or one per row of X; N(0, with_noise) draws are added to
+the simulated latent process (and again by update_simulate when will_update=True). Negative or NaN values
+raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pbdoc")
       .def("update_simulate",
            &PyWarpKriging::update_simulate,
            py::arg("y_u"),
@@ -597,7 +602,12 @@ needs "exact" or "vecchia"
            py::arg("nsim") = 1,
            py::arg("seed") = 123,
            py::arg("X"),
-           py::arg("will_update") = false)
+           py::arg("will_update") = false,
+           py::arg("with_noise") = py::none(),
+           R"pbdoc(Conditional simulations at X. with_noise (default None: no noise): observation-noise
+VARIANCES (raw y scale, like fit's noise), a scalar or one per row of X; N(0, with_noise) draws are added to
+the simulated latent process (and again by update_simulate when will_update=True). Negative or NaN values
+raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pbdoc")
       .def("update_simulate", &PyMLPKriging::update_simulate, py::arg("y_u"), py::arg("X_u"))
       .def("update", &PyMLPKriging::update, py::arg("y_u"), py::arg("X_u"), py::arg("refit") = true)
       .def("summary", &PyMLPKriging::summary)
