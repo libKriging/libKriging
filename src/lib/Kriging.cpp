@@ -2122,8 +2122,10 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
     const arma::vec maxdX_local = arma::trans(arma::max(m_X, 0) - arma::min(m_X, 0));
     arma::vec gamma_lower = gamma;
     arma::vec gamma_upper = gamma;
-    gamma_lower.head(d) = arma::min(m_theta, Optim::theta_lower_factor * maxdX_local);
-    gamma_upper.head(d) = arma::max(m_theta, Optim::theta_upper_factor * maxdX_local);
+    if (m_est_theta) {  // else fixed theta: pinned at lower == upper
+      gamma_lower.head(d) = arma::min(m_theta, Optim::theta_lower_factor * maxdX_local);
+      gamma_upper.head(d) = arma::max(m_theta, Optim::theta_upper_factor * maxdX_local);
+    }
     if (m_noise_model == NoiseModel::Nugget) {
       gamma_lower.at(d) = std::min(gamma.at(d), nugget_alpha_lower);
       gamma_upper.at(d) = 1.0;
@@ -2166,7 +2168,6 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
       gamma = nugget_reparam_from(gamma_start);
     else
       gamma = Optim::reparam_from(gamma_start);
-    m_est_theta = true;
   }
 
   // commit at gamma (beta / sigma2 [/ nugget] / U / D profiled by the Nystrom
@@ -3498,6 +3499,11 @@ void Kriging::fit_impl(const arma::vec& y,
     arma::vec theta_lower = theta_bounds_pair.first;
     arma::vec theta_upper = theta_bounds_pair.second;
 
+    const bool theta_fixed = !parameters.is_theta_estim && parameters.theta.has_value();
+    if (theta_fixed && theta0.n_rows != 1)
+      throw std::invalid_argument("fit: is_theta_estim = false needs a single theta (1x" + std::to_string(d)
+                                  + " matrix), got " + std::to_string(theta0.n_rows) + " rows");
+
     if (optim.rfind("BFGS", 0) == 0) {
       Random::init();
 
@@ -3588,6 +3594,16 @@ void Kriging::fit_impl(const arma::vec& y,
         theta0.resize(multistart, theta0.n_cols);
       } else {
         theta0 = theta0_rand;
+      }
+      // Fixed theta (given with is_theta_estim = false): pin it with
+      // lower == upper bounds (L-BFGS-B keeps such a variable fixed), so the
+      // other hyperparameters (alpha / sigma2) are still optimized according
+      // to their own is_*_estim flags, and sigma2 / beta are profiled as for
+      // an estimated theta.
+      if (theta_fixed) {
+        theta_lower = theta0.row(0).t();
+        theta_upper = theta_lower;
+        theta0 = arma::repmat(theta0.row(0), multistart, 1);
       }
       // arma::cout << "theta0:" << theta0 << arma::endl;
 
@@ -3970,7 +3986,7 @@ void Kriging::fit_impl(const arma::vec& y,
         // sigma2) from the optimizer, beta/sigma2 profiled by the Vecchia likelihood
         const auto& best = results[best_idx];
         m_theta = best.theta;
-        m_est_theta = true;
+        m_est_theta = !theta_fixed;
         commit_approx(/*lmp_dof=*/true, best.extra_param);
       } else if (best_idx >= 0 && m_nystrom_k > 0) {
         // Nystrom commit: never an exact factorization; theta from the
@@ -3978,12 +3994,12 @@ void Kriging::fit_impl(const arma::vec& y,
         // likelihood at gamma* = (theta* [, alpha* | sigma2*])
         const auto& best = results[best_idx];
         m_theta = best.theta;
-        m_est_theta = true;
+        m_est_theta = !theta_fixed;
         commit_approx(/*lmp_dof=*/true, best.extra_param);
       } else if (best_idx >= 0) {
         const auto& best = results[best_idx];
         m_theta = best.theta;  // copy
-        m_est_theta = true;
+        m_est_theta = !theta_fixed;
         m_is_empty = false;
         m_T = best.L;  // copy instead of move to avoid issues
         m_R = best.R;
@@ -4413,8 +4429,8 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
 
     // Compute theta bounds for the extended dataset
     auto theta_bounds_pair = Optim::theta_bounds(m_maxdX, m_dX, m_y, n);
-    arma::vec theta_lower = theta_bounds_pair.first;
-    arma::vec theta_upper = theta_bounds_pair.second;
+    arma::vec theta_lower = m_est_theta ? theta_bounds_pair.first : m_theta;  // fixed theta: pinned
+    arma::vec theta_upper = m_est_theta ? theta_bounds_pair.second : m_theta;
 
     const arma::uword gd = gamma_dim();
     arma::vec gamma_start(gd), gamma_lower(gd), gamma_upper(gd);
@@ -4515,7 +4531,6 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
       m_theta = Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp;
     }
 
-    m_est_theta = true;
     m_is_empty = false;
     m_T = std::move(km.L);
     m_R = std::move(km.R);
