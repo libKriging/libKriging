@@ -81,8 +81,9 @@ Cholesky), `"vecchia"` / `"vecchia(m)"` (Vecchia, m conditioning neighbors, defa
 [docs/math/Vecchia.md](../docs/math/Vecchia.md)) or `"nystrom"` / `"nystrom(k)"` (rank-k Nystrom, default 50, O(n·k²),
 see [docs/math/Nystrom.md](../docs/math/Nystrom.md)). Every objective has approximate versions (`"LOO"`: leave-one-out
 of the approximate joint law, `"LMP"`: approximate log det R and R⁻¹, see [docs/math/LOO.md](../docs/math/LOO.md) and
-[docs/math/LMP.md](../docs/math/LMP.md)), with the noise-free model only (`noise_model` `none`; a nugget / noise model
-raises). `method()` returns the canonical string with its size (`"exact"`, `"vecchia(30)"`, `"nystrom(50)"`),
+[docs/math/LMP.md](../docs/math/LMP.md)) with the noise-free model (`noise_model` `none`); with `objective="LL"` both
+approximate methods also support the noise models (`noise="nugget"` and a heterogeneous `noise` vector), other
+combinations raise. `method()` returns the canonical string with its size (`"exact"`, `"vecchia(30)"`, `"nystrom(50)"`),
 `objective()` returns the criterion (`"LL"` for a deprecated `"LLVecchia(m)"` alias);
 `nystrom_rank()` returns the rank `k` of a Nystrom fit (0 otherwise), `vecchia_neighbors()` the number `m` of
 conditioning neighbors of a Vecchia fit (0 otherwise). `WarpKriging` and `MLPKriging` take `method` too, but only
@@ -99,12 +100,12 @@ fit:
 
 | Step | exact | Vecchia | Nystrom |
 |---|---|---|---|
-| fit (`method=`) | `"exact"` (default), any `objective` | `"vecchia(m)"`, any `objective`: Vecchia estimation, no exact factorization is kept; `noise` (none, `"nugget"`, known variances: response Vecchia) with `objective="LL"` only | `"nystrom(k)"`, any `objective`, no `noise`: no exact factorization is kept |
+| fit (`method=`) | `"exact"` (default), any `objective`, any `noise` | `"vecchia(m)"`, any `objective`: Vecchia estimation, no exact factorization is kept; `noise` (none, `"nugget"`, known variances: response Vecchia) with `objective="LL"` only | `"nystrom(k)"`, any `objective`: no exact factorization is kept; `noise` (none, `"nugget"`, known variances) with `objective="LL"` only |
 | `predict(…, method=)` | `"exact"` (default): after an exact fit | `"vecchia"` / `"vecchia(m)"`: after any fit (m = fitted m, or 30) | `"nystrom"` / fitted `"nystrom(k)"`: after a Nystrom fit |
-| `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit; `with_noise` / nugget | `"nystrom"`: after a Nystrom fit |
+| `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit; `with_noise` / nugget | `"nystrom"`: after a Nystrom fit (latent process; `with_noise` / nugget raise) |
 | `logLikelihood(method=)` | `"exact"` (default; after an approximate fit, recomputed in O(n³) at the fitted θ) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
 | `leaveOneOut(method=)`, `leaveOneOutVec(θ, method=)`, `logMargPost(method=)` | `"exact"` (default; O(n³), on any fit) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
-| `update` | exact refit | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks) |
+| `update` | exact refit | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks; with heterogeneous noise, `update` with `noise` refits on the joined data) |
 | `update_simulate` | yes | — | — |
 | `save` / `load` | yes | yes (`"method"` saved) | yes (`"method"` saved) |
 

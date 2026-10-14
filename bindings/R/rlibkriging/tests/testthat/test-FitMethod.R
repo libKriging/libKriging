@@ -14,10 +14,12 @@ test_that("method is stored with its explicit size; objective stays the criterio
   expect_equal(kv$method(), "vecchia(30)")
   expect_equal(Kriging(y, X, "matern5_2", method = "nystrom")$method(), "nystrom(50)")
   expect_equal(as.list(kv)$method, "vecchia(30)")
-  # LOO / LMP have approximate versions too (without noise model); Nystrom has no noise model
+  # LOO / LMP have approximate versions too (without noise model); with
+  # objective LL, both approximate methods support the noise models
   expect_equal(Kriging(y, X, "matern5_2", objective = "LOO", method = "vecchia(10)")$objective(), "LOO")
   expect_error(Kriging(y, X, "matern5_2", objective = "LOO", method = "vecchia", noise = "nugget"))
-  expect_error(Kriging(y, X, "matern5_2", method = "nystrom", noise = "nugget"))
+  expect_error(Kriging(y, X, "matern5_2", objective = "LMP", method = "nystrom(10)", noise = "nugget"))
+  expect_equal(Kriging(y, X, "matern5_2", method = "nystrom(10)", noise = "nugget")$method(), "nystrom(10)")
   expect_equal(Kriging(y, X, "matern5_2", method = "vecchia", noise = "nugget")$method(), "vecchia(30)")
   expect_error(Kriging(y, X, "matern5_2", method = "Vecchia"))
 })
@@ -89,6 +91,41 @@ test_that("Nystrom fits need method nystrom", {
   expect_equal(dim(kn$simulate(nsim = 3, seed = 1, x = Xn, method = "nystrom")), c(7, 3))
   expect_true(is.finite(kn$logLikelihood(method = "nystrom")))
   expect_error(kn$logLikelihood(method = "vecchia"))
+})
+
+test_that("Nystrom fits with the noise models", {
+  set.seed(11)
+  yn <- y + rnorm(length(y), sd = 0.05)
+  # nugget: estimated noise variance
+  knn <- Kriging(yn, X, "matern5_2", noise = "nugget", method = "nystrom(20)")
+  expect_equal(knn$method(), "nystrom(20)")
+  expect_equal(knn$noise_model(), "nugget")
+  expect_true(knn$nugget() > 0)
+  expect_error(knn$predict(Xn))
+  p <- knn$predict(Xn, method = "nystrom")
+  expect_equal(length(p$mean), 7)
+  expect_true(all(p$stdev > 0))
+  expect_equal(dim(knn$simulate(nsim = 3, seed = 1, x = Xn, method = "nystrom")), c(7, 3))
+  expect_true(is.finite(knn$logLikelihood(method = "nystrom")))
+  # heterogeneous: known noise vector
+  noise <- rep(0.0025, length(yn))
+  knh <- Kriging(yn, X, "matern5_2", noise = noise, method = "nystrom(20)")
+  expect_equal(knh$noise_model(), "heterogeneous")
+  ph <- knh$predict(Xn, method = "nystrom")
+  expect_true(all(is.finite(ph$mean)))
+  f <- tempfile(fileext = ".json")
+  knh$save(f)
+  kl <- load(f)
+  expect_equal(kl$method(), "nystrom(20)")
+  expect_equal(kl$predict(Xn, method = "nystrom")$mean, ph$mean, tolerance = 1e-12)
+  # full rank: close to the exact nugget fit
+  ke <- Kriging(yn, X, "matern5_2", noise = "nugget")
+  kf <- Kriging(yn, X, "matern5_2", noise = "nugget", method = "nystrom(60)")
+  expect_true(max(abs(ke$predict(Xn)$mean - kf$predict(Xn, method = "nystrom")$mean)) < 0.1 * sd(yn))
+  # Nystrom simulates the latent process only: with_noise raises with it
+  expect_equal(dim(knn$simulate(nsim = 3, seed = 1, x = Xn, with_noise = FALSE, method = "nystrom")), c(7, 3))
+  expect_error(knn$simulate(nsim = 3, seed = 1, x = Xn, with_noise = TRUE, method = "nystrom"))
+  expect_error(knh$simulate(nsim = 3, seed = 1, x = Xn, with_noise = rep(0.1, 7), method = "nystrom"))
 })
 
 test_that("LOO / LMP objectives with an approximate method", {

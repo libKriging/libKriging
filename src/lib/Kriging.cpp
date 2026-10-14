@@ -1338,7 +1338,8 @@ LIBKRIGING_EXPORT double Kriging::logLikelihood(const std::string& method) {
       check_nystrom_rank(am, m_nystrom_k, "logLikelihood");
       if (m_nystrom_k == 0)
         throw std::runtime_error("logLikelihoodNystromFun: model was not fitted with method=\"nystrom(k)\"");
-      return _logLikelihoodNystrom(m_theta) + ll_offset();
+      // internal members (theta and, with a noise model, alpha / sigma2) + offset
+      return _logLikelihoodNystrom(current_gamma()) + ll_offset();
     case ApproxMethod::Exact:
     default:
       return logLikelihood();
@@ -1688,15 +1689,29 @@ void Kriging::make_nystrom_landmarks() {
                                &m_nystrom_landmarks);
 }
 
-double Kriging::_logLikelihoodNystrom(const arma::vec& _theta,
+double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
                                       arma::vec* grad_out,
                                       arma::vec* beta_out,
                                       double* sigma2_out,
                                       arma::mat* U_out,
-                                      arma::vec* D_out) const {
+                                      arma::vec* D_out,
+                                      double* sse_out) const {
   const arma::uword n = m_X.n_rows;
+  const arma::uword d = m_X.n_cols;
   const arma::uword kL = m_nystrom_landmarks.n_elem;
   const arma::mat X_land = m_X.rows(m_nystrom_landmarks);  // k x d
+  const arma::vec _theta = _gamma.head(d);
+
+  // Extra parameter (alpha for Nugget, sigma2 for Heterogeneous), with the
+  // same defaults / forcing rules as the exact _logLikelihood.
+  double extra = 0.0;
+  if (m_noise_model != NoiseModel::None) {
+    extra = (_gamma.n_elem > d) ? _gamma.at(d) : ((m_noise_model == NoiseModel::Nugget) ? m_alpha : m_sigma2);
+    if (m_noise_model == NoiseModel::Heterogeneous && !m_est_sigma2)
+      extra = m_sigma2;
+    else if (m_noise_model == NoiseModel::Nugget && !m_est_sigma2 && !m_est_nugget)
+      extra = m_sigma2 / (m_sigma2 + m_nugget);
+  }
 
   arma::mat R_ss(kL, kL, arma::fill::none);
   LinearAlgebra::covMat_sym_X(&R_ss, X_land.t(), _theta, _Cov, /*factor=*/1.0, KrigingImpl::ones);
@@ -1712,11 +1727,31 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _theta,
   // meant to eliminate.
   R_ss.diag() += LinearAlgebra::num_nugget;
   const arma::mat L_ss = arma::chol(R_ss, "lower");
-  const arma::mat U
-      = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));  // n x k; U*U.t() = R_ns R_ss^-1 R_ns.t()
+  const arma::mat U0
+      = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));  // n x k; U0*U0.t() = R_ns R_ss^-1 R_ns.t()
 
-  const arma::vec captured = arma::sum(arma::square(U), 1);
-  const arma::vec D = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
+  const arma::vec captured = arma::sum(arma::square(U0), 1);
+  const arma::vec D0 = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
+
+  // Correlation matrix of the observations, with Ct := U0*U0.t() + diag(D0) ~= C:
+  //   None:          Rhat = Ct                     -> (U, D) = (U0, D0)
+  //   Nugget:        Rhat = a*Ct + (1-a)*I          -> (U, D) = (sqrt(a)*U0, a*D0 + 1 - a)
+  //   Heterogeneous: Rhat = Ct + diag(noise/sigma2) -> (U, D) = (U0, D0 + noise/sigma2)
+  // i.e. always "low rank + diagonal", so the Woodbury solve/logdet apply as is.
+  double c_scale = 1.0;  // dRhat/dtheta = c_scale * dCt/dtheta
+  arma::mat U;
+  arma::vec D;
+  if (m_noise_model == NoiseModel::Nugget) {
+    c_scale = extra;
+    U = std::sqrt(extra) * U0;
+    D = extra * D0 + (1.0 - extra);
+  } else if (m_noise_model == NoiseModel::Heterogeneous) {
+    U = U0;
+    D = D0 + m_noise / extra;
+  } else {
+    U = U0;
+    D = D0;
+  }
 
   const arma::mat RinvF = LinearAlgebra::woodbury_solve(U, D, m_F);
   const arma::vec Rinvy = LinearAlgebra::woodbury_solve(U, D, m_y);
@@ -1728,34 +1763,74 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _theta,
   const arma::vec e = m_y - m_F * beta;
   const arma::vec Rinve = Rinvy - RinvF * beta;  // Rinv is linear: Rinv(y - F*beta) = Rinv*y - Rinv*F*beta
   const double SSE = arma::dot(e, Rinve);
-  const double sigma2 = SSE / n;
   const double logdetR = LinearAlgebra::woodbury_logdet(U, D);
+
+  // Variance scale tv (Cov(y) = tv * Rhat) and its derivative wrt the extra
+  // parameter, with exactly the profiling of the exact _logLikelihood:
+  //   None:          tv = SSE/n (concentrated)
+  //   Nugget:        tv = sigma2 + nugget: SSE/n when both are estimated
+  //                  (concentrated), nugget/(1-a) when only sigma2 is,
+  //                  sigma2/a when only the nugget is, sigma2 + nugget when
+  //                  both are fixed (a then forced to sigma2/(sigma2+nugget))
+  //   Heterogeneous: tv = sigma2 (NOT concentrated: an optimized parameter)
+  double tv = SSE / n;
+  double dtv = 0.0;  // d(tv)/d(extra); 0 when tv is concentrated (envelope theorem)
+  bool extra_free = false;
+  if (m_noise_model == NoiseModel::Nugget) {
+    if (m_est_sigma2 && m_est_nugget) {
+      extra_free = true;
+    } else if (m_est_sigma2) {
+      tv = m_nugget / (1.0 - extra);
+      dtv = tv / (1.0 - extra);
+      extra_free = true;
+    } else if (m_est_nugget) {
+      tv = m_sigma2 / extra;
+      dtv = -tv / extra;
+      extra_free = true;
+    } else {
+      tv = m_sigma2 + m_nugget;
+    }
+  } else if (m_noise_model == NoiseModel::Heterogeneous) {
+    tv = extra;
+    dtv = 1.0;
+    extra_free = m_est_sigma2;
+  }
+  const double ll = -0.5 * (n * std::log(2 * M_PI * tv) + logdetR + SSE / tv);
 
   if (beta_out != nullptr)
     *beta_out = beta;
   if (sigma2_out != nullptr)
-    *sigma2_out = sigma2;
+    *sigma2_out = tv;
+  if (sse_out != nullptr)
+    *sse_out = SSE;
   if (U_out != nullptr)
     *U_out = U;
   if (D_out != nullptr)
     *D_out = D;
 
   if (grad_out != nullptr) {
-    // Analytic gradient, envelope theorem (beta_hat and sigma2_hat held fixed
-    // -- see the file-level comment above): for the standard concentrated GP
-    // log-likelihood, d(ll)/d(theta_k) = 0.5*(x' dRhat/dtheta_k x / sigma2 -
-    // trace(Rinv dRhat/dtheta_k)), x = Rinv*(y - F*beta_hat) = Rinve.
+    // Analytic gradient, envelope theorem (beta_hat -- and tv when it is
+    // concentrated -- held fixed, see the file-level comment above). For any
+    // scalar parameter p of Rhat (and possibly of tv):
+    //   d(ll)/dp = -0.5 * ( n tv'/tv + tr(Rinv dRhat/dp) - x' dRhat/dp x / tv - SSE tv'/tv^2 ),
+    // x = Rinv*(y - F*beta_hat) = Rinve.
     //
-    // Rhat_total = U*U.t() + diag(D) with D = 1 - diag(U*U.t()) (constant on
-    // the diagonal, by construction): so dRhat_total/dtheta_k equals
-    // d(U*U.t())/dtheta_k with its diagonal zeroed out. Writing U*U.t() =
+    // theta: tv' = 0 and dRhat/dtheta_k = c_scale * dCt/dtheta_k, where
+    // Ct = U0*U0.t() + diag(D0) with D0 = 1 - diag(U0*U0.t()) (constant on
+    // the diagonal, by construction): so dCt/dtheta_k equals
+    // d(U0*U0.t())/dtheta_k with its diagonal zeroed out. Writing U0*U0.t() =
     // M*K^-1*M.t() (M=R_ns, K=R_ss, both smooth in theta since the landmark
     // set is fixed), d(M K^-1 M.t())/dtheta_k = dM_k K^-1 M.t() + (same
     // transposed) - M K^-1 dK_k K^-1 M.t(); both the quadratic form x'(.)x
     // and the trace of Rinv*(.) reduce to O(n*k) / O(n*k^2) work per theta_k
     // via the identities below (derived directly in this function's body).
-    const arma::uword d = _theta.n_elem;
-    grad_out->set_size(d);
+    //
+    // extra parameter (index d of gamma):
+    //   Nugget:        dRhat/da      = Ct - I = U0*U0.t() + diag(D0 - 1)
+    //   Heterogeneous: dRhat/dsigma2 = -diag(noise)/sigma2^2
+    // so x' dRhat x and tr(Rinv dRhat) only need U0.t()*x, U0.t()*Rinv*U0
+    // and diag(Rinv).
+    grad_out->set_size(_gamma.n_elem);
 
     const arma::vec& x = Rinve;
 
@@ -1793,33 +1868,92 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _theta,
       const arma::vec rowdot = arma::sum(dM_k % W.t(), 1);         // n: dM_k(i,:) . w_i
       const arma::vec quad = LinearAlgebra::diagABA(W.t(), dK_k);  // n: w_i' dK_k w_i
       const double diagcorr1 = arma::dot(x % x, 2.0 * rowdot - quad);
-      const double term1_k = raw1 - diagcorr1;
+      const double term1_k = raw1 - diagcorr1;  // x' dCt x
 
       const arma::mat RMt_dMk = RM.t() * dM_k;  // k x k
       const double raw2 = 2.0 * arma::trace(Kinv * RMt_dMk) - arma::trace(Kinv * dK_k * Kinv * RMtM);
       const double diagcorr2 = arma::dot(diagRinv, 2.0 * rowdot - quad);
-      const double term2_k = raw2 - diagcorr2;
+      const double term2_k = raw2 - diagcorr2;  // tr(Rinv dCt)
 
-      (*grad_out)(kk) = 0.5 * (term1_k / sigma2 - term2_k);
+      (*grad_out)(kk) = 0.5 * c_scale * (term1_k / tv - term2_k);
+    }
+
+    if (_gamma.n_elem > d) {
+      double g = 0.0;  // 0 when the extra parameter is fixed (as the exact gradient)
+      if (extra_free && m_noise_model == NoiseModel::Nugget) {
+        const arma::vec U0tx = U0.t() * x;
+        const arma::mat RinvU0 = LinearAlgebra::woodbury_solve(U, D, U0);  // n x k
+        const double xdRx = arma::dot(U0tx, U0tx) + arma::dot(x % x, D0 - 1.0);
+        const double trRdR = arma::accu(U0 % RinvU0) + arma::dot(diagRinv, D0 - 1.0);
+        g = -0.5 * (n * dtv / tv + trRdR - xdRx / tv - SSE * dtv / (tv * tv));
+      } else if (extra_free && m_noise_model == NoiseModel::Heterogeneous) {
+        const double s2sq = extra * extra;
+        const double xdRx = -arma::dot(m_noise, x % x) / s2sq;
+        const double trRdR = -arma::dot(m_noise, diagRinv) / s2sq;
+        g = -0.5 * (n * dtv / tv + trRdR - xdRx / tv - SSE * dtv / (tv * tv));
+      }
+      (*grad_out)(d) = g;
     }
   }
 
-  return -0.5 * (n * std::log(2 * M_PI * sigma2) + logdetR + n);
+  return ll;
 }
 
-LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodNystromFun(const arma::vec& theta,
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodNystromFun(const arma::vec& gamma,
                                                                                  bool return_grad) {
   if (m_nystrom_k == 0)
     throw std::runtime_error("logLikelihoodNystromFun: model was not fitted with method=\"nystrom(k)\"");
-  const arma::vec theta_n = gamma_from_original(theta);
+  if (gamma.n_elem != m_X.n_cols && gamma.n_elem != gamma_dim())
+    throw std::invalid_argument("logLikelihoodNystromFun: expected " + std::to_string(m_X.n_cols) + " (theta) or "
+                                + std::to_string(gamma_dim()) + " (theta, alpha | sigma2) values, got "
+                                + std::to_string(gamma.n_elem));
+  const arma::vec gamma_n = gamma_from_original(gamma);
   arma::vec grad;
   if (return_grad) {
-    grad.set_size(theta_n.n_elem);
-    const double ll = _logLikelihoodNystrom(theta_n, &grad) + ll_offset();
+    const double ll = _logLikelihoodNystrom(gamma_n, &grad) + ll_offset();
     grad_to_original(grad);
     return {ll, grad};
   }
-  return {_logLikelihoodNystrom(theta_n) + ll_offset(), grad};
+  return {_logLikelihoodNystrom(gamma_n) + ll_offset(), grad};
+}
+
+void Kriging::commit_nystrom(const arma::vec& gamma) {
+  const arma::uword d = m_X.n_cols;
+  m_theta = gamma.head(d);
+  arma::vec beta_v;
+  double tv = -1;
+  arma::mat U_v;
+  arma::vec D_v;
+  _logLikelihoodNystrom(gamma, nullptr, &beta_v, &tv, &U_v, &D_v);
+  if (m_est_beta)
+    m_beta = beta_v;
+  if (m_noise_model == NoiseModel::Nugget) {
+    // same conventions as the exact Nugget BFGS commit in fit()
+    if (!m_est_sigma2 && !m_est_nugget)
+      m_alpha = m_sigma2 / (m_sigma2 + m_nugget);  // alpha forced by the likelihood
+    else
+      m_alpha = (gamma.n_elem > d) ? gamma.at(d) : m_alpha;
+    if (m_est_sigma2) {
+      if (m_est_nugget) {
+        m_sigma2 = m_alpha * tv;  // tv = SSE/n (concentrated total variance)
+        m_nugget = m_sigma2 / m_alpha - m_sigma2;
+      } else {
+        m_sigma2 = m_nugget * m_alpha / (1.0 - m_alpha);
+      }
+    } else if (m_est_nugget) {
+      m_nugget = m_sigma2 * (1.0 - m_alpha) / m_alpha;
+    }
+  } else if (m_noise_model == NoiseModel::Heterogeneous) {
+    // unconcentrated: sigma2 is the optimized parameter
+    if (m_est_sigma2 && gamma.n_elem > d)
+      m_sigma2 = gamma.at(d);
+  } else if (m_est_sigma2) {
+    m_sigma2 = tv;
+  }
+  m_nystrom_U = std::move(U_v);
+  m_nystrom_D = std::move(D_v);
+  m_nystrom_light = true;
+  m_is_empty = true;  // no committed factorization: predict routes to predictNystrom
 }
 
 void Kriging::check_not_nystrom_light(const char* what) const {
@@ -1847,8 +1981,23 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const
 
   arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
 
+  // Same noise-model semantics as the exact predict (predict_impl): with a
+  // nugget, the cross-correlations are alpha*C, except at a prediction point
+  // coinciding with an observation (1: the observation itself), and the
+  // variance scale is sigma2/alpha = sigma2 + nugget; with heterogeneous
+  // noise, the cross-correlations are C and the variance scale sigma2 (the
+  // noise only enters through the committed factors of Rhat).
+  const bool nugget = (m_noise_model == NoiseModel::Nugget);
+  const double r_factor = nugget ? m_alpha : 1.0;
+  const double var_scale = nugget ? m_sigma2 / m_alpha : m_sigma2;
+
   arma::mat R_on = arma::mat(m_X.n_rows, X_n.n_rows, arma::fill::none);
-  LinearAlgebra::covMat_rect(&R_on, m_X.t(), Xn_n.t(), m_theta, _Cov, 1.0);
+  LinearAlgebra::covMat_rect(&R_on, m_X.t(), Xn_n.t(), m_theta, _Cov, r_factor);
+  if (nugget)
+    for (arma::uword j = 0; j < Xn_n.n_rows; ++j)
+      for (arma::uword i = 0; i < m_X.n_rows; ++i)
+        if (arma::approx_equal(m_X.row(i), Xn_n.row(j), "absdiff", arma::datum::eps))
+          R_on.at(i, j) = 1.0;
 
   const arma::mat RinvR_on = LinearAlgebra::woodbury_solve(m_nystrom_U, m_nystrom_D, R_on);  // n_o x n_n
 
@@ -1861,7 +2010,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const
     // LMP fits rescale sigma2 by (n-p)/(n-p-2), like predict() / predictVecchia()
     const double n_o = static_cast<double>(m_X.n_rows);
     const double lmp_scale = (m_objective == "LMP") ? (n_o - m_F.n_cols) / (n_o - m_F.n_cols - 2.0) : 1.0;
-    stdev = arma::sqrt(arma::clamp(m_sigma2 * lmp_scale * (1.0 - quad), 0.0, arma::datum::inf));
+    stdev = arma::sqrt(arma::clamp(var_scale * lmp_scale * (1.0 - quad), 0.0, arma::datum::inf));
     stdev *= m_scaleY;
   }
   return {mean, stdev};
@@ -1882,8 +2031,16 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateNystrom(int nsim, int seed, const a
   arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
   const arma::uword n_n = X_n.n_rows;
 
+  // Same noise-model semantics as the exact simulate (with_nugget=false for
+  // a nugget, no added noise for heterogeneous noise): the latent process,
+  // with alpha-scaled correlations and variance scale sigma2/alpha for a
+  // nugget (as simulate_impl's Sigma_divisor = alpha), sigma2 otherwise.
+  const bool nugget = (m_noise_model == NoiseModel::Nugget);
+  const double r_factor = nugget ? m_alpha : 1.0;
+  const double var_scale = nugget ? m_sigma2 / m_alpha : m_sigma2;
+
   arma::mat R_on = arma::mat(m_X.n_rows, n_n, arma::fill::none);
-  LinearAlgebra::covMat_rect(&R_on, m_X.t(), Xn_n.t(), m_theta, _Cov, 1.0);
+  LinearAlgebra::covMat_rect(&R_on, m_X.t(), Xn_n.t(), m_theta, _Cov, r_factor);
 
   const arma::mat RinvR_on = LinearAlgebra::woodbury_solve(m_nystrom_U, m_nystrom_D, R_on);  // n_o x n_n
 
@@ -1893,7 +2050,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateNystrom(int nsim, int seed, const a
   // covariance among the n_n SIMULATION points: dense, but only n_n x n_n
   // (n_n is expected to be small; it is m_X, not X_n, that can be large).
   arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
-  LinearAlgebra::covMat_sym_X(&R_nn, Xn_n.t(), m_theta, _Cov, 1.0, arma::vec());
+  LinearAlgebra::covMat_sym_X(&R_nn, Xn_n.t(), m_theta, _Cov, r_factor, arma::vec());
   arma::mat Sigma_n = arma::symmatu(R_nn - R_on.t() * RinvR_on);
 
   // Unlike a per-point marginal variance (predictNystrom's "1 - quad", simply
@@ -1925,7 +2082,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateNystrom(int nsim, int seed, const a
   arma::mat y_n = arma::mat(n_n, nsim, arma::fill::none);
   y_n.each_col() = yhat_n;
   Random::reset_seed(seed);
-  y_n += L_sigma * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
+  y_n += L_sigma * Random::randn_mat(n_n, nsim) * std::sqrt(var_scale);
 
   y_n = m_centerY + m_scaleY * y_n;
   return y_n;
@@ -1938,6 +2095,11 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
   if (X_u.n_cols != m_X.n_cols)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
                              + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
+  // the noise of the new observations is needed: update(y_u, noise_u, X_u)
+  // refits on the joined data (as for the exact heterogeneous-noise model)
+  if (m_noise_model == NoiseModel::Heterogeneous)
+    throw std::invalid_argument(
+        "update: a heterogeneous-noise model needs the noise of the new observations: use update(y_u, noise_u, X_u)");
 
   arma::mat Xn_u = X_u;
   Xn_u.each_row() -= m_centerX;
@@ -1950,37 +2112,53 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
   m_y = arma::join_cols(m_y, yn_u);
   m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
 
+  arma::vec gamma = current_gamma();
   if (refit && m_optim != "none") {
-    // Warm restart: single BFGS from the current theta, over the SAME
-    // (fixed) landmark set -- landmarks are only re-picked by a full fit(),
-    // which is what keeps this O((n_old+n_new)*k^2) rather than paying the
-    // O(n*k) landmark-ranking pass (and losing the warm start) again.
+    // Warm restart: single BFGS from the current theta (and alpha for a
+    // nugget), over the SAME (fixed) landmark set -- landmarks are only
+    // re-picked by a full fit(), which is what keeps this
+    // O((n_old+n_new)*k^2) rather than paying the O(n*k) landmark-ranking
+    // pass (and losing the warm start) again.
     const FitOfn fit_ofn = make_fit_objective(internal_objective());
     const arma::uword d = m_X.n_cols;
+    const arma::uword gd = gamma_dim();
 
     // theta bounds from the per-dimension range of the extended data --
     // O(n*d), NOT Optim::theta_bounds's variogram-slope heuristic, which
     // needs the O(n^2) dX cube this update path is built to avoid.
     const arma::vec maxdX_local = arma::trans(arma::max(m_X, 0) - arma::min(m_X, 0));
-    arma::vec theta_lower = arma::min(m_theta, Optim::theta_lower_factor * maxdX_local);
-    arma::vec theta_upper = arma::max(m_theta, Optim::theta_upper_factor * maxdX_local);
-
-    arma::vec gamma_start = m_theta;
-    arma::vec gamma_lower = theta_lower;
-    arma::vec gamma_upper = theta_upper;
-    if (Optim::reparametrize) {
-      gamma_start = Optim::reparam_to(gamma_start);
-      gamma_lower = Optim::reparam_to(gamma_lower);
-      gamma_upper = Optim::reparam_to(gamma_upper);
+    arma::vec gamma_lower = gamma;
+    arma::vec gamma_upper = gamma;
+    gamma_lower.head(d) = arma::min(m_theta, Optim::theta_lower_factor * maxdX_local);
+    gamma_upper.head(d) = arma::max(m_theta, Optim::theta_upper_factor * maxdX_local);
+    if (m_noise_model == NoiseModel::Nugget) {
+      gamma_lower.at(d) = std::min(gamma.at(d), nugget_alpha_lower);
+      gamma_upper.at(d) = 1.0;
     }
 
-    lbfgsb::Optimizer optimizer{static_cast<unsigned int>(d)};
+    arma::vec gamma_start = gamma;
+    if (Optim::reparametrize) {
+      if (m_noise_model == NoiseModel::Nugget) {
+        gamma_start = nugget_reparam_to(gamma_start);
+        gamma_lower = nugget_reparam_to(gamma_lower);
+        gamma_upper = nugget_reparam_to(gamma_upper);
+      } else {
+        gamma_start = Optim::reparam_to(gamma_start);
+        gamma_lower = Optim::reparam_to(gamma_lower);
+        gamma_upper = Optim::reparam_to(gamma_upper);
+      }
+    }
+    // L-BFGS-B does not project its starting point: keep it inside the bounds
+    gamma_lower = arma::min(gamma_lower, gamma_start);
+    gamma_upper = arma::max(gamma_upper, gamma_start);
+
+    lbfgsb::Optimizer optimizer{static_cast<unsigned int>(gd)};
     optimizer.iprint = Optim::log_level - 2;
     optimizer.max_iter = Optim::max_iteration;
     const double loo_scale = (m_objective == "LOO") ? static_cast<double>(m_X.n_rows * m_X.n_rows) : 1.0;
     optimizer.pgtol = Optim::gradient_tolerance / loo_scale;
     optimizer.factr = Optim::objective_rel_tolerance / 1E-13 / loo_scale;
-    const arma::ivec bounds_type{d, arma::fill::value(2)};
+    const arma::ivec bounds_type{gd, arma::fill::value(2)};
 
     optimizer.minimize([&fit_ofn](const arma::vec& vals_inp,
                                   arma::vec& grad_out) -> double { return fit_ofn(vals_inp, &grad_out, nullptr); },
@@ -1989,11 +2167,20 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
                        gamma_upper.memptr(),
                        bounds_type.memptr());
 
-    m_theta = Optim::reparametrize ? Optim::reparam_from(gamma_start) : gamma_start;
+    if (!Optim::reparametrize)
+      gamma = gamma_start;
+    else if (m_noise_model == NoiseModel::Nugget)
+      gamma = nugget_reparam_from(gamma_start);
+    else
+      gamma = Optim::reparam_from(gamma_start);
     m_est_theta = true;
   }
 
-  commit_approx(/*lmp_dof=*/refit && m_optim != "none");
+  // commit at gamma (beta / sigma2 [/ nugget] / U / D profiled by the Nystrom
+  // likelihood over the extended data; sigma2 = SSE / (n - p) for a LMP refit)
+  const arma::uword d_all = m_X.n_cols;
+  m_theta = gamma.head(d_all);
+  commit_approx(/*lmp_dof=*/refit && m_optim != "none", gamma.n_elem > d_all ? gamma.at(d_all) : 0.0);
 }
 
 void Kriging::update_vecchia_light(const arma::vec& y_u, const arma::mat& X_u, bool refit) {
@@ -2543,32 +2730,17 @@ void Kriging::commit_approx(bool lmp_dof, double extra) {
     // Vecchia: beta / sigma2 (/ nugget, with a noise model) profiled by the
     // Vecchia likelihood at m_theta (and extra = alpha | sigma2)
     commit_vecchia(m_theta, extra);
-    // LOO / LMP with an approximate method are restricted to noise model None
-    if (lmp_dof && m_est_sigma2 && m_objective == "LMP" && m_noise_model == NoiseModel::None)
-      m_sigma2 *= static_cast<double>(m_X.n_rows) / static_cast<double>(m_X.n_rows - m_F.n_cols);
-    return;
+  } else {
+    // Nystrom: beta (GLS under the approximate precision, the same for LL,
+    // LOO and LMP, as in the exact commits), sigma2 (/ alpha / nugget with a
+    // noise model) and the rank-k factors U / D, profiled by the Nystrom
+    // likelihood at gamma = (m_theta [, extra = alpha | sigma2])
+    commit_nystrom(m_noise_model == NoiseModel::None ? m_theta : arma::vec(arma::join_cols(m_theta, arma::vec{extra})));
   }
-  arma::vec beta_v;
-  double sigma2_v = -1;
-  {
-    arma::mat U_v;
-    arma::vec D_v;
-    _logLikelihoodNystrom(m_theta, nullptr, &beta_v, &sigma2_v, &U_v, &D_v);
-    m_nystrom_U = std::move(U_v);
-    m_nystrom_D = std::move(D_v);
-    m_nystrom_light = true;
-  }
-  // beta: GLS under the approximate precision (the same for LL, LOO and
-  // LMP, as in the exact commits); sigma2 = SSE / n, or SSE / (n - p) for a
-  // LMP (re)fit, like the exact LMP commit
-  if (m_est_beta)
-    m_beta = beta_v;
-  if (m_est_sigma2) {
-    m_sigma2 = sigma2_v;
-    if (lmp_dof && m_objective == "LMP")
-      m_sigma2 *= static_cast<double>(m_X.n_rows) / static_cast<double>(m_X.n_rows - m_F.n_cols);
-  }
-  m_is_empty = true;  // no committed factorization: predict routes to the approximate predictor
+  // sigma2 = SSE / (n - p) for a LMP (re)fit, like the exact LMP commit (LOO /
+  // LMP with an approximate method are restricted to noise model None)
+  if (lmp_dof && m_est_sigma2 && m_objective == "LMP" && m_noise_model == NoiseModel::None)
+    m_sigma2 *= static_cast<double>(m_X.n_rows) / static_cast<double>(m_X.n_rows - m_F.n_cols);
 }
 
 // Public approximate LOO / LMP: original-scale convention (as leaveOneOutFun /
@@ -2866,9 +3038,30 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
     }
   } else if (objective.rfind("LLNystrom", 0) == 0) {
     parse_nystrom_k(objective);  // validate the spec early (throws on malformed)
-    if (m_noise_model != NoiseModel::None)
-      throw std::invalid_argument("method \"nystrom\" not supported for Nugget/Heterogeneous noise models");
     // km_data (the dense O(n^3) KModel) is never populated, by design.
+    if (m_noise_model != NoiseModel::None) {
+      // d+1 gamma, same reparametrizations as the exact noise-model "LL":
+      // composite (theta, alpha) one for a nugget, Optim::reparam_from on all
+      // components (sigma2 as theta) for heterogeneous noise
+      const bool nugget = (m_noise_model == NoiseModel::Nugget);
+      if (Optim::reparametrize) {
+        return [this, nugget](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
+          const arma::vec _gamma_nat = nugget ? nugget_reparam_from(_gamma) : Optim::reparam_from(_gamma);
+          arma::vec grad;
+          const double ll = this->_logLikelihoodNystrom(_gamma_nat, grad_out != nullptr ? &grad : nullptr);
+          if (grad_out != nullptr)
+            *grad_out = nugget ? arma::vec(-nugget_reparam_from_deriv(_gamma_nat, grad))
+                               : arma::vec(-Optim::reparam_from_deriv(_gamma_nat, grad));
+          return -ll;
+        };
+      }
+      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
+        const double ll = this->_logLikelihoodNystrom(_gamma, grad_out);
+        if (grad_out != nullptr)
+          *grad_out = -*grad_out;
+        return -ll;
+      };
+    }
     if (Optim::reparametrize) {
       return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
         const arma::vec _theta = Optim::reparam_from(_gamma);
@@ -2974,14 +3167,11 @@ LIBKRIGING_EXPORT std::pair<std::string, std::string> Kriging::fit_objective_met
 std::string Kriging::internal_fit_objective(const std::string& objective, const std::string& method) const {
   if (method == "exact")
     return objective;
-  if (m_noise_model != NoiseModel::None && method.rfind("nystrom", 0) == 0)
-    throw std::invalid_argument("fit: method \"" + method
-                                + "\" is not implemented for Nugget/Heterogeneous noise models; use method "
-                                  "\"exact\" or \"vecchia(m)\"");
   if (m_noise_model != NoiseModel::None && objective != "LL")
     throw std::invalid_argument("fit: objective \"" + objective + "\" with method \"" + method
                                 + "\" is not implemented for Nugget/Heterogeneous noise models; use objective "
                                   "\"LL\" or method \"exact\"");
+  // every noise model is supported by both approximate methods with objective "LL"
   // internal objective name of the approximate criterion, e.g. "LLVecchia(30)", "LOONystrom(50)"
   return objective + (method.rfind("vecchia", 0) == 0 ? "Vecchia" : "Nystrom") + method.substr(7);
 }
@@ -3139,9 +3329,58 @@ void Kriging::fit_impl(const arma::vec& y,
       // deterministic (no BFGS, no platform-dependent convergence) Nystrom
       // fit possible -- see docs/math/Nystrom.md and issue #351's follow-up.
       // (any objective: like the exact optim="none" commit, sigma2 = SSE / n)
-      if (!m_est_sigma2)
+      //
+      // Noise models: same conventions as the exact optim="none" branch
+      // below (alpha from the given sigma2/nugget, or 1 - alpha_lower;
+      // heterogeneous sigma2 given, or the previous one), with the profiled
+      // quantities computed from the Nystrom Rhat instead of the dense R.
+      arma::vec gamma = m_theta;
+      double nugget_param = 0.0;
+      if (m_noise_model == NoiseModel::Nugget) {
+        m_est_nugget = parameters.is_nugget_estim;
+        if (parameters.nugget.has_value()) {
+          nugget_param = parameters.nugget.value();
+          if (m_normalize)
+            nugget_param /= (scaleY * scaleY);
+        }
+        m_alpha
+            = (sigma2 > 0 && (sigma2 + nugget_param) > 0) ? sigma2 / (sigma2 + nugget_param) : 1.0 - nugget_alpha_lower;
+        if (!m_est_sigma2)
+          m_sigma2 = sigma2;
+        m_nugget = nugget_param;
+        gamma = arma::join_cols(m_theta, arma::vec{m_alpha});
+      } else if (m_noise_model == NoiseModel::Heterogeneous) {
+        // the noisy correlation needs a sigma2 (internal scale): the given
+        // one, else the variogram sill (as method "vecchia" and the BFGS bounds)
+        const double s2 = (sigma2 > 0) ? sigma2 : std::max(variogram_sill(m_X, m_y), 1e-10);
+        m_sigma2 = s2;
+        gamma = arma::join_cols(m_theta, arma::vec{s2});
+      }
+      arma::vec beta_v;
+      double tv = -1;
+      double sse = -1;
+      arma::mat U_v;
+      arma::vec D_v;
+      _logLikelihoodNystrom(gamma, nullptr, &beta_v, &tv, &U_v, &D_v, &sse);
+      if (m_est_beta)
+        m_beta = beta_v;
+      if (m_noise_model == NoiseModel::Nugget) {
+        if (m_est_sigma2) {
+          const double total_var = sse / n;
+          m_sigma2 = m_alpha * total_var;
+          m_nugget = m_est_nugget ? (1.0 - m_alpha) * total_var : nugget_param;
+        } else {
+          m_sigma2 = sigma2;
+          m_nugget = m_est_nugget ? 0.0 : nugget_param;
+        }
+      } else if (m_est_sigma2)
+        m_sigma2 = sse / n;
+      else
         m_sigma2 = sigma2;
-      commit_approx(/*lmp_dof=*/false);
+      m_nystrom_U = std::move(U_v);
+      m_nystrom_D = std::move(D_v);
+      m_nystrom_light = true;
+      m_is_empty = true;  // no committed factorization: predict routes to predictNystrom
       return;
     }
 
@@ -3729,10 +3968,12 @@ void Kriging::fit_impl(const arma::vec& y,
         commit_approx(/*lmp_dof=*/true, best.extra_param);
       } else if (best_idx >= 0 && m_nystrom_k > 0) {
         // Nystrom commit: never an exact factorization; theta from the
-        // optimizer, beta/sigma2/U/D profiled by the Nystrom likelihood at theta*
-        m_theta = results[best_idx].theta;
+        // optimizer, beta/sigma2 (alpha/nugget)/U/D profiled by the Nystrom
+        // likelihood at gamma* = (theta* [, alpha* | sigma2*])
+        const auto& best = results[best_idx];
+        m_theta = best.theta;
         m_est_theta = true;
-        commit_approx(/*lmp_dof=*/true);
+        commit_approx(/*lmp_dof=*/true, best.extra_param);
       } else if (best_idx >= 0) {
         const auto& best = results[best_idx];
         m_theta = best.theta;  // copy
@@ -3885,13 +4126,20 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const bool will_update,
                                               const std::string& method) {
   const ApproxMethod am = parse_approx_method(method, "simulate");
+  check_nystrom_rank(am, m_nystrom_k, "simulate");
   if (am.kind == ApproxMethod::Exact)
     return simulate(nsim, seed, X_n, with_nugget, will_update);
   if (will_update)
     throw std::invalid_argument(
         "simulate: will_update=true (for update_simulate) is only available with method \"exact\"");
-  if (am.kind != ApproxMethod::Vecchia)
-    throw std::invalid_argument("simulate: with_nugget is only available with method \"exact\" or \"vecchia\"");
+  if (am.kind == ApproxMethod::Nystrom) {
+    // simulateNystrom draws the latent process only (no observation noise)
+    if (with_nugget)
+      throw std::invalid_argument(
+          "simulate: with_nugget=true is not available with method \"nystrom\" (it simulates the latent process "
+          "only); use method \"exact\" or \"vecchia\"");
+    return simulateNystrom(nsim, seed, X_n);
+  }
   return simulateVecchia(nsim, seed, X_n, am.m, with_nugget);
 }
 
@@ -3902,15 +4150,22 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const bool will_update,
                                               const std::string& method) {
   const ApproxMethod am = parse_approx_method(method, "simulate");
+  check_nystrom_rank(am, m_nystrom_k, "simulate");
   if (am.kind == ApproxMethod::Exact)
     return simulate(nsim, seed, X_n, with_noise, will_update);
   if (will_update)
     throw std::invalid_argument(
         "simulate: will_update=true (for update_simulate) is only available with method \"exact\"");
-  if (am.kind != ApproxMethod::Vecchia)
-    throw std::invalid_argument("simulate: with_noise is only available with method \"exact\" or \"vecchia\"");
   if (with_noise.n_elem > 1 && with_noise.n_elem != X_n.n_rows)
     throw std::runtime_error("Noise vector should have same length as X_n");
+  if (am.kind == ApproxMethod::Nystrom) {
+    // simulateNystrom draws the latent process only (no observation noise)
+    if (arma::any(with_noise != 0.0))
+      throw std::invalid_argument(
+          "simulate: a non-zero with_noise is not available with method \"nystrom\" (it simulates the latent "
+          "process only); use method \"exact\" or \"vecchia\"");
+    return simulateNystrom(nsim, seed, X_n);
+  }
   return simulateVecchia(nsim, seed, X_n, am.m, false, with_noise);
 }
 

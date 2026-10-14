@@ -20,7 +20,7 @@ model = lk.Kriging(
     objective="LL",            # "LL" | "LOO" | "LMP"
     parameters={},
     noise=None,                 # None | "nugget" | per-observation variance vector
-    method="exact",            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (noise: vecchia + LL only)
+    method="exact",            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (noise models: LL only)
 )
 
 mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(
@@ -117,6 +117,10 @@ kn = lk.Kriging(y, X, "matern5_2", method="nystrom(50)")
 mean, stdev, *_ = kn.predict(Xnew, method="nystrom")            # "exact" would raise
 sims = kn.simulate(10, 123, Xnew, method="nystrom")
 kn.logLikelihood(method="nystrom")                               # the fitted objective
+# noisy data: Nystrom (not Vecchia) supports both noise models
+knn = lk.Kriging(y, X, "matern5_2", noise="nugget", method="nystrom(50)")
+knh = lk.Kriging(y, X, "matern5_2", noise=noise_var, method="nystrom(50)")
+knh.update(y_new, X_new, noise_u=noise_var_new)                  # heterogeneous: new noise required
 kv = lk.Kriging(y, X, "matern5_2", method="vecchia(30)")
 mean, stdev, *_ = kv.predict(Xnew, method="vecchia")             # or method=kv.method()
 kv.update(y_u, X_u)                                              # Vecchia refit, still approximate

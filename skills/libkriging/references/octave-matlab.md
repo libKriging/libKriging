@@ -98,6 +98,9 @@ kn = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [],
 [m, s] = kn.predict(Xnew, true, false, false, "nystrom");   % "exact" would raise
 sims = kn.simulate(int32(10), int32(123), Xnew, false, "nystrom");
 ll = kn.logLikelihood("nystrom");                            % the fitted objective
+% noisy data: Nystrom (not Vecchia) supports both noise models
+knn = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "nugget", [], "nystrom(50)");
+knh = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "heterogeneous", noise_var, "nystrom(50)");
 kv = Kriging("matern5_2");
 kv.fit(y, X, "constant", false, "BFGS", "LL", [], "vecchia(30)");
 [m, s] = kv.predict(Xnew, true, false, false, "vecchia");    % or kv.method()

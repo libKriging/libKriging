@@ -20,7 +20,7 @@ k = Kriging(y, X, "matern5_2";
             optim="BFGS",          # "BFGS", "BFGS10" (10 restarts), "none"
             objective="LL",        # "LL" | "LOO" | "LMP"
             noise=nothing,         # nothing | "nugget" | Float64 | Vector{Float64}
-            method="exact")        # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (noise: vecchia + LL only)
+            method="exact")        # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (noise models: LL only)
 
 p = predict(k, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
 #   predict / simulate / log_likelihood also take method="exact" (default) |
@@ -101,6 +101,9 @@ kn = Kriging(y, X, "matern5_2"; method="nystrom(50)")
 p = predict(kn, Xnew; method="nystrom")                       # "exact" would raise
 s = simulate(kn, 10, 123, Xnew; method="nystrom")
 log_likelihood(kn; method="nystrom")                          # the fitted objective
+# noisy data: Nystrom (not Vecchia) supports both noise models
+knn = Kriging(y, X, "matern5_2"; noise="nugget", method="nystrom(50)")
+knh = Kriging(y, X, "matern5_2"; noise=noise_var, method="nystrom(50)")
 kv = Kriging(y, X, "matern5_2"; method="vecchia(30)")
 p = predict(kv, Xnew; method="vecchia")                       # or method=jlibkriging.method(kv)
 update!(kv, y_u, X_u)                                         # Vecchia refit, still approximate

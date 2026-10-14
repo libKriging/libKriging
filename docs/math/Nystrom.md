@@ -98,6 +98,68 @@ Every point is coupled to the same k landmarks (greedy pivoted Cholesky picks sp
   raises a clear error (no such path exists yet, see Current
   limitations).
 
+## Noise models (`noise="nugget"` / heterogeneous `noise`)
+
+`method="nystrom(k)"` also works with the two noise models of
+[Noise.md](Noise.md). Write C̃ = U·Uᵀ + diag(D) for the Nystrom
+correlation above (U = R_ns · L_ss⁻ᵀ, D = 1 − diag(U·Uᵀ), jittered), the
+approximation of ρ(θ). The noise model only changes the diagonal (and
+scale) of the matrix fed into Woodbury, which stays "rank k + diagonal":
+
+- **nugget** (γ = [θ, α], α = σ²/(σ²+τ²)):
+  R̂ = α·C̃ + (1 − α)·I = (√α·U)(√α·U)ᵀ + diag(α·D + 1 − α)
+- **heterogeneous** (γ = [θ, σ²], known noise_i):
+  R̂ = C̃ + diag(noise)/σ² = U·Uᵀ + diag(D + noise/σ²)
+
+The log-likelihood has the exact one's form,
+ll(γ) = −½ ( n·log(2π·v) + log|R̂| + e'R̂⁻¹e / v ), e = y − F·β̂ (β̂ by GLS
+through Woodbury), with the same profiling of the variance scale v
+(Cov(y) = v·R̂) as the exact noise-model objectives:
+
+| model | v | concentrated? |
+|---|---|---|
+| nugget, σ² and τ² estimated | e'R̂⁻¹e / n (= σ² + τ²) | yes |
+| nugget, τ² fixed | τ² / (1 − α) | no |
+| nugget, σ² fixed | σ² / α | no |
+| nugget, both fixed | σ² + τ² (α forced to σ²/(σ²+τ²)) | – |
+| heterogeneous | σ² (optimized, γ_{d+1}) | no |
+
+Gradient (analytic): for any parameter p of R̂ (and of v),
+∂ll/∂p = −½ ( n·v'/v + tr(R̂⁻¹ ∂R̂/∂p) − x'(∂R̂/∂p)x / v − e'R̂⁻¹e·v'/v² ),
+x = R̂⁻¹e, v' = 0 when v is concentrated (envelope theorem), with
+
+- ∂R̂/∂θ_k = c·∂C̃/∂θ_k, c = α (nugget) or 1 (heterogeneous): the same
+  O(n·k²) Woodbury trace identities as the noise-free gradient, R̂⁻¹ now
+  being that of the noisy R̂;
+- ∂R̂/∂α = C̃ − I = U·Uᵀ + diag(D − 1): x'(∂R̂/∂α)x = ‖Uᵀx‖² + Σ(D_i − 1)x_i²,
+  tr(R̂⁻¹ ∂R̂/∂α) = tr(Uᵀ R̂⁻¹ U) + Σ(D_i − 1)(R̂⁻¹)_ii;
+- ∂R̂/∂σ² = −diag(noise)/σ⁴ (v' = 1): only diag(R̂⁻¹) and x are needed.
+
+All of it is O(n·k²) per evaluation, and at k = n (full rank) it
+reproduces the exact noise-model log-likelihood and gradient (tested in
+`KrigingNystromTest.cpp`). The optimizer uses the same γ
+reparametrizations and bounds as the exact noise-model fits (α in
+[10⁻³, 1]; σ² bounds from the variogram, computed on an evenly spaced
+subsample of at most 500 points instead of all O(n²) pairs).
+
+The fitted σ², τ² (α) follow the exact conventions (σ̂² = α·v̂,
+τ̂² = (1 − α)·v̂ when both are estimated), and the committed (U, D) are
+the factors of R̂ (so the noise is part of the saved factors).
+Prediction and simulation follow the exact semantics:
+
+- **predict, nugget**: cross-correlations α·C(x_i, x) (1 where x coincides
+  with an observation), mean F·β̂ + rᵀR̂⁻¹e, variance
+  (σ² + τ²)·(1 − rᵀR̂⁻¹r) (β treated as known, as in the noise-free
+  Nystrom predictor: no trend-estimation term);
+- **predict, heterogeneous**: cross-correlations C(x_i, x), variance
+  σ²·(1 − rᵀR̂⁻¹r) (noise-free latent process);
+- **simulate**: the latent process (exact default: `with_nugget=false`,
+  no `with_noise`), i.e. covariance σ²·(C_nn − α·rᵀR̂⁻¹r) for a nugget.
+- **update**: nugget fits use the landmarks-fixed `update_nystrom` path
+  (warm-restart over (θ, α) when `refit=true`); a heterogeneous fit needs
+  the noise of the new points, `update(y_u, noise_u, X_u)`, which refits
+  on the joined data (as the exact heterogeneous update).
+
 ## Usage
 
 ```r
@@ -117,10 +179,15 @@ pred <- predict(k, Xnew, return_stdev = TRUE, method = "nystrom")  # explicit: n
 
 ## Current limitations
 
-- `NoiseModel::None` only (no nugget/noise channel). `objective="LOO"`
-  and `"LMP"` have Nystrom versions (LOO under the low-rank joint law,
-  Woodbury log-determinant; see [LOO.md](LOO.md) and [LMP.md](LMP.md)):
-  they inherit the smoothing bias of R̂ for small k.
+- Noise models are supported with `objective="LL"` (see above), but the
+  approximate simulator has no `with_nugget=true` / `with_noise` variant
+  (the `simulate(…, with_nugget | with_noise, will_update,
+  method="nystrom")` overloads raise for them), and `update_simulate` is
+  unavailable as for the noise-free Nystrom fit.
+- `objective="LOO"` and `"LMP"` have Nystrom versions for
+  `NoiseModel::None` (LOO under the low-rank joint law, Woodbury
+  log-determinant; see [LOO.md](LOO.md) and [LMP.md](LMP.md)): they
+  inherit the smoothing bias of R̂ for small k; with a noise model they raise.
 - Landmarks are not serialized (rebuilt on refit).
 - Rank k is a fixed hyperparameter chosen by the caller; there is no
   automatic rank selection based on a target approximation accuracy.

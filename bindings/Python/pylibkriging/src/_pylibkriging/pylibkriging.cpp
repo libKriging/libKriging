@@ -262,8 +262,9 @@ PYBIND11_MODULE(_pylibkriging, m) {
            R"pbdoc(Fit on (X, y). fit method: "exact" (default), "vecchia" / "vecchia(m)" (Vecchia approximation, m
 neighbors, default 30) or "nystrom" / "nystrom(k)" (rank-k Nystrom, default 50). An approximate
 fit keeps no exact factorization: predict / simulate / logLikelihood / leaveOneOut / logMargPost then take
-the same method. Objectives "LL", "LOO" and "LMP" all have approximate versions (noise-free models only).
-objective="LLVecchia(m)" / "LLNystrom(k)" are
+the same method. Objectives "LL", "LOO" and "LMP" all have approximate versions; with objective "LL" both
+methods also support noise ("nugget" or a heterogeneous noise vector), "LOO" / "LMP" with an approximate
+method are noise-free only. objective="LLVecchia(m)" / "LLNystrom(k)" are
 deprecated aliases of objective="LL" with method="vecchia(m)" / "nystrom(k)".)pbdoc")
       .def("predict",
            &PyKriging::predict,
@@ -298,7 +299,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("method") = "exact",
            R"pbdoc(Conditional simulations at X. method: "exact" (default), "vecchia" /
 "vecchia(m)" or "nystrom" (see predict); will_update needs "exact", with_noise
-(True: nugget, array: noise standard deviations) needs "exact" or "vecchia".)pbdoc")
+(True: nugget, array: noise standard deviations) needs "exact" or "vecchia"
+("nystrom" simulates the latent process only and raises for it).)pbdoc")
       .def("update",
            &PyKriging::update,
            py::arg("y_u"),

@@ -107,11 +107,12 @@ classKriging <- function(nk) {
 #'     \code{logMargPost} then take the same \code{method}, and the exact
 #'     model at the fitted \code{theta} is a separate fit
 #'     (\code{optim = "none"}). Approximate methods are implemented for the
-#'     objectives \code{"LL"}, \code{"LOO"} and \code{"LMP"};
-#'     \code{"vecchia"} also supports \code{noise} with
-#'     \code{objective = "LL"} (response Vecchia, accurate while the noise
-#'     stays small relative to the signal); \code{"LOO"} / \code{"LMP"} with
-#'     an approximate method and \code{"nystrom"} require no \code{noise}.
+#'     objectives \code{"LL"}, \code{"LOO"} and \code{"LMP"}; with
+#'     \code{objective = "LL"} both also support \code{noise} (nugget or
+#'     heterogeneous): \code{"vecchia"} as a response Vecchia (accurate while
+#'     the noise stays small relative to the signal), \code{"nystrom"} with
+#'     the rank-k approximation of the noisy correlation; \code{"LOO"} /
+#'     \code{"LMP"} with an approximate method require no \code{noise}.
 #'
 #' @return An object with S3 class \code{"Kriging"}. Should be used
 #'     with its \code{predict}, \code{simulate}, \code{update}
@@ -470,7 +471,8 @@ subsetOfData <- function(X, n_max, method = "kmeans", seed = 123) {
 #'     \code{"vecchia"} / \code{"vecchia(m)"} or \code{"nystrom"} (see
 #'     \code{predict.Kriging}); \code{with_noise} needs \code{"exact"} or
 #'     \code{"vecchia"} (for a nugget model, \code{with_noise} defaults to
-#'     \code{TRUE} with both).
+#'     \code{TRUE} with both); \code{"nystrom"} simulates the latent process
+#'     only (\code{with_noise = TRUE} or a non-zero noise raises).
 #' @param ... Ignored.
 #'
 #' @return a matrix with \code{nrow(x)} rows and \code{nsim}

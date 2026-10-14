@@ -364,12 +364,14 @@ def test_fit_method_and_deprecated_objectives():
         with pytest.raises(DeprecationWarning):
             lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
         lk.Kriging(y, X, "matern5_2", method="vecchia(7)")  # no warning
-    # LOO / LMP have approximate versions too (without noise model); Nystrom has no noise model
+    # LOO / LMP have approximate versions too (without noise model); with
+    # objective LL, both approximate methods support the noise models
     assert lk.Kriging(y, X, "matern5_2", objective="LOO", method="vecchia(10)").objective() == "LOO"
     with pytest.raises(ValueError):
         lk.Kriging(y, X, "matern5_2", objective="LOO", method="vecchia", noise="nugget")
     with pytest.raises(ValueError):
-        lk.Kriging(y, X, "matern5_2", method="nystrom", noise="nugget")
+        lk.Kriging(y, X, "matern5_2", objective="LMP", method="nystrom(10)", noise="nugget")
+    assert lk.Kriging(y, X, "matern5_2", method="nystrom(10)", noise="nugget").method() == "nystrom(10)"
     assert lk.Kriging(y, X, "matern5_2", method="vecchia", noise="nugget").method() == "vecchia(30)"
     with pytest.raises(ValueError):
         lk.Kriging(y, X, "matern5_2", method="Vecchia")
@@ -528,6 +530,56 @@ def test_nystrom_fit_explicit_method():
     assert np.isfinite(k.logLikelihood(method="nystrom"))
     with pytest.raises(RuntimeError):
         k.logLikelihood(method="vecchia")  # not a Vecchia fit
+
+
+def test_nystrom_fit_noise_models(tmp_path):
+    rng = np.random.default_rng(11)
+    n = 80
+    X = rng.uniform(size=(n, 2))
+    y = np.sin(3 * X[:, 0]) + X[:, 1] + 0.05 * rng.standard_normal(n)
+    Xn = rng.uniform(size=(7, 2))
+    noise = np.full(n, 0.0025)
+
+    # nugget: the noise variance is estimated
+    kn = lk.Kriging(y, X, "matern5_2", noise="nugget", method="nystrom(20)")
+    assert kn.method() == "nystrom(20)" and kn.noise_model() == "nugget"
+    assert kn.nugget() > 0
+    with pytest.raises(RuntimeError):
+        kn.predict(Xn)  # no exact factorization
+    mean, stdev, _, _, _ = kn.predict(Xn, method="nystrom")
+    assert mean.shape == (7,) and np.all(stdev > 0)
+    assert kn.simulate(3, 1, Xn, method="nystrom").shape == (7, 3)
+    assert np.isfinite(kn.logLikelihood(method="nystrom"))
+    kn.update(y[:5] + 0.01, X[:5] + 0.01, refit=False)
+    assert kn.X().shape == (n + 5, 2)
+
+    # heterogeneous: known noise vector
+    kh = lk.Kriging(y, X, "matern5_2", noise=noise, method="nystrom(20)")
+    assert kh.method() == "nystrom(20)" and kh.noise_model() == "heterogeneous"
+    mean_h, stdev_h, _, _, _ = kh.predict(Xn, method="nystrom")
+    assert np.all(np.isfinite(mean_h)) and np.all(stdev_h >= 0)
+    assert kh.simulate(3, 1, Xn, method="nystrom").shape == (7, 3)
+    f = str(tmp_path / "nys_hetero.json")
+    kh.save(f)
+    kh2 = lk.Kriging.load(f)
+    np.testing.assert_array_equal(kh2.predict(Xn, method="nystrom")[0], mean_h)
+    kh.update(y[:5], X[:5] + 0.01, refit=False, noise_u=np.full(5, 0.0025))
+    assert kh.X().shape == (n + 5, 2) and kh.method() == "nystrom(20)"
+
+    # close to full rank, the Nystrom fit agrees with the exact one
+    ke = lk.Kriging(y, X, "matern5_2", noise="nugget")
+    kf = lk.Kriging(y, X, "matern5_2", noise="nugget", method=f"nystrom({n})")
+    me = ke.predict(Xn)[0]
+    mf = kf.predict(Xn, method="nystrom")[0]
+    assert np.max(np.abs(me - mf)) < 0.1 * np.std(y)
+
+    # Nystrom simulates the latent process only: with_noise raises with it
+    assert kn.simulate(3, 1, Xn, with_noise=False, method="nystrom").shape == (7, 3)
+    with pytest.raises(ValueError):
+        kn.simulate(3, 1, Xn, with_noise=True, method="nystrom")
+    assert kh.simulate(3, 1, Xn, with_noise=np.zeros(7), method="nystrom").shape == (7, 3)
+    with pytest.raises(ValueError):
+        kh.simulate(3, 1, Xn, with_noise=np.full(7, 0.1), method="nystrom")
 
 
 def test_nested_kriging_method():

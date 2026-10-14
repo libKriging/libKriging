@@ -58,12 +58,15 @@ TEST_CASE("Nystrom method spec parsing and validation", "[nystrom][kriging]") {
                     std::invalid_argument);
   }
 
-  // LLNystrom is not available with a nugget/noise channel
+  // the nugget/noise channel is available with method "nystrom" (and only
+  // the LL objective), as with method "vecchia"
   Kriging knug("matern5_2", Kriging::NoiseModel::Nugget);
-  CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)"),
+  CHECK_NOTHROW(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)"));
+  CHECK(knug.is_nystrom_light());
+  CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LMP", {}, "nystrom(10)"),
                   std::invalid_argument);
-  CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(10)", {}),
-                  std::invalid_argument);
+  CHECK_NOTHROW(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "vecchia(10)"));
+  CHECK(knug.is_vecchia_light());
 }
 
 TEST_CASE("LLNystrom(n) matches the exact concentrated log-likelihood", "[nystrom][kriging]") {
@@ -505,4 +508,369 @@ TEST_CASE("LLNystrom benchmark", "[.benchmark]") {
   BENCHMARK("Kriging::predictNystrom 100pts n=400") {
     return k_eval.predictNystrom(arma::mat(100, 2, arma::fill::randu), true);
   };
+}
+
+// -----------------------------------------------------------------------------
+// Noise models (NoiseModel::Nugget / NoiseModel::Heterogeneous) with method "nystrom(k)"
+// -----------------------------------------------------------------------------
+
+static void make_noisy_data(arma::uword n, arma::mat& X, arma::vec& y, double noise_sd, unsigned seed = 123) {
+  make_data(n, X, y, seed);
+  y += noise_sd * arma::vec(n, arma::fill::randn);
+}
+
+static Kriging fit_nugget(const arma::vec& y,
+                          const arma::mat& X,
+                          const std::string& optim,
+                          const Kriging::Parameters& params,
+                          const std::string& method) {
+  Kriging k("matern5_2", Kriging::NoiseModel::Nugget);
+  k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params, method);
+  return k;
+}
+
+static Kriging fit_hetero(const arma::vec& y,
+                          const arma::vec& noise,
+                          const arma::mat& X,
+                          const std::string& optim,
+                          const Kriging::Parameters& params,
+                          const std::string& method) {
+  Kriging k("matern5_2", Kriging::NoiseModel::Heterogeneous);
+  k.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params, method);
+  return k;
+}
+
+TEST_CASE("Nystrom noise models: method nystrom(k) accepted, LOO still rejected", "[nystrom][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_noisy_data(60, X, y, 0.1);
+  const arma::vec noise(60, arma::fill::value(0.01));
+
+  Kriging kn = fit_nugget(y, X, "BFGS", {}, "nystrom(15)");
+  CHECK(kn.is_nystrom_light());
+  CHECK(kn.method() == "nystrom(15)");
+  CHECK(kn.nugget() > 0.0);
+  Kriging kh = fit_hetero(y, noise, X, "BFGS", {}, "nystrom(15)");
+  CHECK(kh.is_nystrom_light());
+  CHECK(kh.sigma2() > 0.0);
+
+  // exact-only methods are unavailable on the light fit
+  CHECK_THROWS_AS(kn.predict(X.rows(0, 2), true, false, false), std::runtime_error);
+  CHECK_THROWS_AS(kh.simulate(2, 1, X.rows(0, 2)), std::runtime_error);
+
+  Kriging k2("matern5_2", Kriging::NoiseModel::Nugget);
+  CHECK_THROWS_AS(k2.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LOO", {}, "nystrom(10)"),
+                  std::invalid_argument);
+
+  // simulate(..., with_nugget | with_noise, will_update, "nystrom"): the
+  // latent process only, so with_nugget=true / a non-zero with_noise raise
+  const arma::mat Xs = X.rows(0, 2);
+  CHECK(
+      arma::approx_equal(kn.simulate(4, 7, Xs, false, false, "nystrom"), kn.simulateNystrom(4, 7, Xs), "absdiff", 0.0));
+  CHECK_THROWS_AS(kn.simulate(4, 7, Xs, true, false, "nystrom"), std::invalid_argument);
+  CHECK(arma::approx_equal(kh.simulate(4, 7, Xs, arma::vec(3, arma::fill::zeros), false, "nystrom"),
+                           kh.simulateNystrom(4, 7, Xs),
+                           "absdiff",
+                           0.0));
+  CHECK_THROWS_AS(kh.simulate(4, 7, Xs, arma::vec(3, arma::fill::value(0.1)), false, "nystrom"), std::invalid_argument);
+  CHECK_THROWS_AS(kh.simulate(4, 7, Xs, arma::vec(3, arma::fill::zeros), true, "nystrom"), std::invalid_argument);
+}
+
+TEST_CASE("LLNystrom(n) reproduces the exact Nugget / Heterogeneous log-likelihood and gradient",
+          "[nystrom][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  const arma::uword n = 50;
+  make_noisy_data(n, X, y, 0.1);
+  arma::arma_rng::set_seed(7);
+  const arma::vec noise = 0.01 * (1.0 + arma::vec(n, arma::fill::randu));
+
+  // full rank (k = n): Ct = C (up to the num_nugget jitter), so Rhat = R and
+  // the Nystrom likelihood (value AND gradient, incl. the alpha / sigma2
+  // component) must match the exact one at any gamma
+  SECTION("Nugget") {
+    Kriging k_ex = fit_nugget(y, X, "BFGS", {}, "exact");
+    Kriging k_ny = fit_nugget(y, X, "BFGS", {}, "nystrom(50)");
+    for (const arma::vec gamma : {arma::vec{0.2, 0.3, 0.9}, arma::vec{0.4, 0.25, 0.6}, arma::vec{0.3, 0.3, 0.99}}) {
+      auto [ll_ex, g_ex] = k_ex.logLikelihoodFun(gamma, true, false);
+      auto [ll_ny, g_ny] = k_ny.logLikelihoodNystromFun(gamma, true);
+      INFO("gamma=" << gamma.t() << " LL exact=" << ll_ex << " nystrom=" << ll_ny);
+      INFO("grad exact=" << g_ex.t() << "grad nystrom=" << g_ny.t());
+      CHECK(std::abs(ll_ny - ll_ex) < 1e-6 * std::abs(ll_ex) + 1e-6);
+      REQUIRE(g_ny.n_elem == 3);
+      CHECK(arma::abs(g_ny - g_ex).max() < 1e-4 * std::max(1.0, arma::abs(g_ex).max()));
+    }
+  }
+  SECTION("Heterogeneous") {
+    Kriging k_ex = fit_hetero(y, noise, X, "BFGS", {}, "exact");
+    Kriging k_ny = fit_hetero(y, noise, X, "BFGS", {}, "nystrom(50)");
+    for (const arma::vec gamma : {arma::vec{0.2, 0.3, 1.0}, arma::vec{0.4, 0.25, 0.5}, arma::vec{0.3, 0.3, 2.0}}) {
+      auto [ll_ex, g_ex] = k_ex.logLikelihoodFun(gamma, true, false);
+      auto [ll_ny, g_ny] = k_ny.logLikelihoodNystromFun(gamma, true);
+      INFO("gamma=" << gamma.t() << " LL exact=" << ll_ex << " nystrom=" << ll_ny);
+      INFO("grad exact=" << g_ex.t() << "grad nystrom=" << g_ny.t());
+      CHECK(std::abs(ll_ny - ll_ex) < 1e-6 * std::abs(ll_ex) + 1e-6);
+      REQUIRE(g_ny.n_elem == 3);
+      CHECK(arma::abs(g_ny - g_ex).max() < 1e-4 * std::max(1.0, arma::abs(g_ex).max()));
+    }
+  }
+}
+
+TEST_CASE("LLNystrom noise-model analytic gradient matches finite differences", "[nystrom][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  const arma::uword n = 120;
+  make_noisy_data(n, X, y, 0.1);
+  arma::arma_rng::set_seed(11);
+  const arma::vec noise = 0.01 * (1.0 + arma::vec(n, arma::fill::randu));
+
+  auto check_fd = [](Kriging& k, const arma::vec& gamma) {
+    auto [ll0, grad] = k.logLikelihoodNystromFun(gamma, true);
+    REQUIRE(grad.n_elem == gamma.n_elem);
+    for (arma::uword j = 0; j < gamma.n_elem; ++j) {
+      const double h = 1e-5 * std::max(1.0, std::abs(gamma(j)));
+      arma::vec gp = gamma;
+      arma::vec gm = gamma;
+      gp(j) += h;
+      gm(j) -= h;
+      const double fd
+          = (std::get<0>(k.logLikelihoodNystromFun(gp, false)) - std::get<0>(k.logLikelihoodNystromFun(gm, false)))
+            / (2 * h);
+      INFO("gamma=" << gamma.t() << " dim " << j << ": analytic=" << grad(j) << " fd=" << fd);
+      CHECK(std::abs(grad(j) - fd) < 1e-3 * std::max(1.0, std::abs(fd)));
+    }
+  };
+
+  SECTION("Nugget, sigma2 and nugget estimated (concentrated)") {
+    Kriging k = fit_nugget(y, X, "BFGS", {}, "nystrom(25)");
+    for (const arma::vec gamma : {arma::vec{0.4, 0.4, 0.9}, arma::vec{0.6, 0.5, 0.7}, arma::vec{0.5, 0.3, 0.98}})
+      check_fd(k, gamma);
+  }
+  SECTION("Nugget, nugget fixed (sigma2 estimated)") {
+    Kriging::Parameters p;
+    p.nugget = 0.01;
+    p.is_nugget_estim = false;
+    Kriging k = fit_nugget(y, X, "BFGS", p, "nystrom(25)");
+    for (const arma::vec gamma : {arma::vec{0.4, 0.4, 0.9}, arma::vec{0.5, 0.3, 0.98}})
+      check_fd(k, gamma);
+  }
+  SECTION("Nugget, sigma2 fixed (nugget estimated)") {
+    Kriging::Parameters p;
+    p.sigma2 = 1.0;
+    p.is_sigma2_estim = false;
+    Kriging k = fit_nugget(y, X, "BFGS", p, "nystrom(25)");
+    for (const arma::vec gamma : {arma::vec{0.4, 0.4, 0.9}, arma::vec{0.5, 0.3, 0.98}})
+      check_fd(k, gamma);
+  }
+  SECTION("Heterogeneous") {
+    Kriging k = fit_hetero(y, noise, X, "BFGS", {}, "nystrom(25)");
+    for (const arma::vec gamma : {arma::vec{0.4, 0.4, 1.0}, arma::vec{0.6, 0.5, 0.3}, arma::vec{0.5, 0.3, 3.0}})
+      check_fd(k, gamma);
+  }
+}
+
+TEST_CASE("Nystrom noise-model fit is consistent with the exact fit", "[nystrom][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  const arma::uword n = 150;
+  make_noisy_data(n, X, y, 0.1);
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(80, Xt, yt, 456);  // noise-free truth
+  const double sdy = arma::stddev(y);
+
+  SECTION("Nugget") {
+    Kriging k_ex = fit_nugget(y, X, "BFGS", {}, "exact");
+    Kriging k_ny = fit_nugget(y, X, "BFGS", {}, "nystrom(100)");
+    auto [m_ex, s_ex, c1, d1, e1] = k_ex.predict(Xt, true, false, false);
+    auto [m_ny, s_ny, c2, d2, e2] = k_ny.predict(Xt, true, false, false, "nystrom");
+    INFO("exact: theta=" << k_ex.theta().t() << " sigma2=" << k_ex.sigma2() << " nugget=" << k_ex.nugget()
+                         << " LL=" << k_ex.logLikelihood());
+    INFO("nystrom: theta=" << k_ny.theta().t() << " sigma2=" << k_ny.sigma2() << " nugget=" << k_ny.nugget()
+                           << " LL=" << k_ny.logLikelihood("nystrom"));
+    INFO("max |mean diff| = " << arma::abs(m_ny - m_ex).max()
+                              << ", rmse nystrom = " << std::sqrt(arma::mean(arma::square(m_ny - yt))));
+    // the noise variance estimate is the nugget (true value 0.01)
+    CHECK(k_ny.nugget() > 0.002);
+    CHECK(k_ny.nugget() < 0.05);
+    CHECK(std::abs(k_ny.logLikelihood("nystrom") - k_ex.logLikelihood()) < 0.05 * std::abs(k_ex.logLikelihood()) + 2);
+    CHECK(arma::abs(m_ny - m_ex).max() < 0.1 * sdy);
+    CHECK(std::sqrt(arma::mean(arma::square(m_ny - yt))) < 0.2 * sdy);
+    CHECK(arma::median(arma::abs(s_ny - s_ex)) < 0.1 * sdy);
+    // theta-only evaluation uses the committed alpha
+    const double ll_theta = std::get<0>(k_ny.logLikelihoodNystromFun(k_ny.theta(), false));
+    CHECK(std::abs(ll_theta - k_ny.logLikelihood("nystrom")) < 1e-8 * std::abs(ll_theta));
+  }
+  SECTION("Heterogeneous") {
+    const arma::vec noise(n, arma::fill::value(0.01));
+    Kriging k_ex = fit_hetero(y, noise, X, "BFGS", {}, "exact");
+    Kriging k_ny = fit_hetero(y, noise, X, "BFGS", {}, "nystrom(100)");
+    auto [m_ex, s_ex, c1, d1, e1] = k_ex.predict(Xt, true, false, false);
+    auto [m_ny, s_ny, c2, d2, e2] = k_ny.predict(Xt, true, false, false, "nystrom");
+    INFO("exact: theta=" << k_ex.theta().t() << " sigma2=" << k_ex.sigma2() << " LL=" << k_ex.logLikelihood());
+    INFO("nystrom: theta=" << k_ny.theta().t() << " sigma2=" << k_ny.sigma2()
+                           << " LL=" << k_ny.logLikelihood("nystrom"));
+    INFO("max |mean diff| = " << arma::abs(m_ny - m_ex).max());
+    CHECK(std::abs(k_ny.logLikelihood("nystrom") - k_ex.logLikelihood()) < 0.05 * std::abs(k_ex.logLikelihood()) + 2);
+    CHECK(std::abs(std::log(k_ny.sigma2() / k_ex.sigma2())) < std::log(2.0));
+    CHECK(arma::abs(m_ny - m_ex).max() < 0.1 * sdy);
+    CHECK(std::sqrt(arma::mean(arma::square(m_ny - yt))) < 0.2 * sdy);
+    CHECK(arma::median(arma::abs(s_ny - s_ex)) < 0.1 * sdy);
+  }
+}
+
+TEST_CASE("predictNystrom / simulateNystrom with noise models follow the exact semantics", "[nystrom][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  const arma::uword n = 120;
+  make_noisy_data(n, X, y, 0.1);
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(40, Xt, yt, 456);
+  const double sdy = arma::stddev(y);
+
+  // shared, fixed parameters (optim="none"), full rank: the Nystrom
+  // predictor must reproduce the exact one, including at the training
+  // points (where the exact nugget predictor returns the observation)
+  Kriging::Parameters p;
+  p.theta = arma::mat(1, 2, arma::fill::value(0.3));
+  p.is_theta_estim = false;
+  p.sigma2 = 1.0;
+  p.is_sigma2_estim = false;
+
+  SECTION("Nugget") {
+    p.nugget = 0.01;
+    p.is_nugget_estim = false;
+    Kriging k_ex = fit_nugget(y, X, "none", p, "exact");
+    Kriging k_ny = fit_nugget(y, X, "none", p, "nystrom(120)");
+    CHECK(k_ny.sigma2() == k_ex.sigma2());
+    CHECK(k_ny.nugget() == k_ex.nugget());
+    const arma::mat Xp = arma::join_cols(Xt, X.rows(0, 9));
+    auto [m_ex, s_ex, c1, d1, e1] = k_ex.predict(Xp, true, false, false);
+    auto [m_ny, s_ny] = k_ny.predictNystrom(Xp, true);
+    INFO("max |mean diff| = " << arma::abs(m_ny - m_ex).max() << ", max |sd diff| = " << arma::abs(s_ny - s_ex).max());
+    CHECK(arma::abs(m_ny - m_ex).max() < 1e-3 * sdy);
+    // the exact stdev also carries the (small) trend-estimation term, the
+    // Nystrom one treats beta as known
+    CHECK(arma::abs(s_ny - s_ex).max() < 2e-2 * std::sqrt(k_ex.sigma2() + k_ex.nugget()));
+    CHECK(arma::abs(m_ny.tail(10) - y.head(10)).max() < 1e-6);
+
+    // simulate: the latent process (exact with_nugget=false): sample variance
+    // + nugget = predicted variance, sample mean = predicted mean
+    const arma::mat sims = k_ny.simulate(4000, 123, Xt.rows(0, 9), "nystrom");
+    const arma::vec sim_mean = arma::mean(sims, 1);
+    const arma::vec sim_var = arma::var(sims, 0, 1);
+    const arma::vec pred_var = arma::square(s_ny.head(10));
+    INFO("sim var + nugget = " << (sim_var + k_ny.nugget()).t() << "pred var = " << pred_var.t());
+    CHECK(arma::abs(sim_mean - m_ny.head(10)).max() < 0.1 * std::sqrt(k_ny.sigma2()));
+    CHECK(arma::abs(sim_var + k_ny.nugget() - pred_var).max() < 0.1 * arma::max(pred_var));
+    // and the exact latent simulation has the same marginal variance (up to
+    // the trend term and Monte-Carlo noise)
+    const arma::mat sims_ex = k_ex.simulate(4000, 123, Xt.rows(0, 9));
+    CHECK(arma::abs(arma::var(sims_ex, 0, 1) - sim_var).max() < 0.15 * arma::max(sim_var) + 1e-3);
+  }
+  SECTION("Heterogeneous") {
+    arma::arma_rng::set_seed(3);
+    const arma::vec noise = 0.01 * (1.0 + arma::vec(n, arma::fill::randu));
+    Kriging k_ex = fit_hetero(y, noise, X, "none", p, "exact");
+    Kriging k_ny = fit_hetero(y, noise, X, "none", p, "nystrom(120)");
+    CHECK(k_ny.sigma2() == k_ex.sigma2());
+    auto [m_ex, s_ex, c1, d1, e1] = k_ex.predict(Xt, true, false, false);
+    auto [m_ny, s_ny] = k_ny.predictNystrom(Xt, true);
+    INFO("max |mean diff| = " << arma::abs(m_ny - m_ex).max() << ", max |sd diff| = " << arma::abs(s_ny - s_ex).max());
+    CHECK(arma::abs(m_ny - m_ex).max() < 1e-3 * sdy);
+    CHECK(arma::abs(s_ny - s_ex).max() < 2e-2 * std::sqrt(k_ex.sigma2()));
+
+    const arma::mat sims = k_ny.simulate(4000, 123, Xt.rows(0, 9), "nystrom");
+    const arma::vec sim_var = arma::var(sims, 0, 1);
+    const arma::vec pred_var = arma::square(s_ny.head(10));
+    CHECK(arma::abs(arma::mean(sims, 1) - m_ny.head(10)).max() < 0.1 * std::sqrt(k_ny.sigma2()));
+    CHECK(arma::abs(sim_var - pred_var).max() < 0.1 * arma::max(pred_var) + 1e-4);
+  }
+}
+
+TEST_CASE("Nystrom noise-model save/load round-trip", "[nystrom][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  const arma::uword n = 100;
+  make_noisy_data(n, X, y, 0.1);
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(30, Xt, yt, 456);
+  const arma::vec noise(n, arma::fill::value(0.01));
+
+  for (const bool nugget : {true, false}) {
+    CAPTURE(nugget);
+    Kriging k
+        = nugget ? fit_nugget(y, X, "BFGS", {}, "nystrom(20)") : fit_hetero(y, noise, X, "BFGS", {}, "nystrom(20)");
+    k.save("dump_nystrom_noise_test.json");
+    Kriging k2 = Kriging::load("dump_nystrom_noise_test.json");
+    CHECK(k2.noise_model() == k.noise_model());
+    CHECK(k2.is_nystrom_light());
+    CHECK(k2.method() == "nystrom(20)");
+    CHECK(k2.sigma2() == k.sigma2());
+    CHECK(k2.nugget() == k.nugget());
+    CHECK(k2.logLikelihood("nystrom") == k.logLikelihood("nystrom"));
+    auto [m1, s1, c1, d1, e1] = k.predict(Xt, true, false, false, "nystrom");
+    auto [m2, s2, c2, d2, e2] = k2.predict(Xt, true, false, false, "nystrom");
+    CHECK(arma::abs(m1 - m2).max() == 0.0);
+    CHECK(arma::abs(s1 - s2).max() == 0.0);
+    CHECK(arma::abs(k.simulate(3, 7, Xt.rows(0, 4), "nystrom") - k2.simulate(3, 7, Xt.rows(0, 4), "nystrom")).max()
+          == 0.0);
+  }
+}
+
+TEST_CASE("Nystrom noise-model update", "[nystrom][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_noisy_data(120, X, y, 0.1);
+  arma::mat Xu;
+  arma::vec yu;
+  make_noisy_data(30, Xu, yu, 0.1, 456);
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(80, Xt, yt, 789);
+  const double sdy = arma::stddev(y);
+
+  SECTION("Nugget, refit=false: fixed theta / alpha, re-profiled over the extended data") {
+    Kriging k = fit_nugget(y, X, "BFGS", {}, "nystrom(25)");
+    const arma::vec theta0 = k.theta();
+    const double ratio0 = k.sigma2() / (k.sigma2() + k.nugget());
+    k.update(yu, Xu, false);
+    CHECK(k.X().n_rows == 150);
+    CHECK(k.is_nystrom_light());
+    CHECK(arma::abs(k.theta() - theta0).max() == 0.0);
+    CHECK(std::abs(k.sigma2() / (k.sigma2() + k.nugget()) - ratio0) < 1e-12);
+    CHECK(std::isfinite(k.logLikelihood("nystrom")));
+    auto [m, s, c, d, e] = k.predict(Xt, true, false, false, "nystrom");
+    CHECK(std::sqrt(arma::mean(arma::square(m - yt))) < 0.2 * sdy);
+  }
+  SECTION("Nugget, refit=true: warm restart over (theta, alpha)") {
+    Kriging k = fit_nugget(y, X, "BFGS", {}, "nystrom(25)");
+    Kriging k_norefit(k, ExplicitCopySpecifier{});
+    k_norefit.update(yu, Xu, false);
+    k.update(yu, Xu, true);
+    CHECK(k.X().n_rows == 150);
+    CHECK(k.nystrom_rank() == 25);
+    CHECK(k.nugget() > 0.0);
+    // the warm restart can only improve the likelihood over the extended data
+    CHECK(k.logLikelihood("nystrom") >= k_norefit.logLikelihood("nystrom") - 1e-6);
+    auto [m, s, c, d, e] = k.predict(Xt, true, false, false, "nystrom");
+    CHECK(std::sqrt(arma::mean(arma::square(m - yt))) < 0.2 * sdy);
+  }
+  SECTION("Heterogeneous: update needs the new noise") {
+    const arma::vec noise(120, arma::fill::value(0.01));
+    const arma::vec noise_u(30, arma::fill::value(0.01));
+    Kriging k = fit_hetero(y, noise, X, "BFGS", {}, "nystrom(25)");
+    CHECK_THROWS_AS(k.update(yu, Xu, false), std::invalid_argument);
+    k.update(yu, noise_u, Xu, false);
+    CHECK(k.X().n_rows == 150);
+    CHECK(k.is_nystrom_light());
+    CHECK(k.method() == "nystrom(25)");
+    auto [m, s, c, d, e] = k.predict(Xt, true, false, false, "nystrom");
+    CHECK(std::sqrt(arma::mean(arma::square(m - yt))) < 0.2 * sdy);
+    k.update(yu, noise_u, Xu, true);
+    CHECK(k.X().n_rows == 180);
+    CHECK(k.is_nystrom_light());
+  }
 }

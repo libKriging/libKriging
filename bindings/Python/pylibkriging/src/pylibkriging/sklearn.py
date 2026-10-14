@@ -122,8 +122,8 @@ class KrigingRegressor(_BaseKrigingEstimator):
         ``"exact"``, ``"vecchia"``/``"vecchia(m)"`` (Vecchia approximation,
         for large ``n``) or ``"nystrom"``/``"nystrom(k)"`` (Nystrom low-rank
         approximation, also for large ``n``). The approximate methods are
-        only available with ``objective="LL"`` and give mean / std only (no
-        ``return_cov``).
+        only available with ``objective="LL"`` (``"vecchia"`` without
+        ``noise``) and give mean / std only (no ``return_cov``).
     noise : None, "nugget", float, or array-like of shape (n_samples,), default=None
         ``None`` for noise-free (exact interpolation), ``"nugget"`` for
         an estimated homogeneous nugget, or a per-observation variance

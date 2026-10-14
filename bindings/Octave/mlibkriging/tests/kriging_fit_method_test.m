@@ -139,6 +139,35 @@ catch
 end
 assert(failed, "Vecchia LOO needs a Vecchia fit");
 
+% Nystrom with the noise models: Kriging(y, X, kernel, regmodel, normalize,
+% optim, objective, parameters, noise_model, noise, method)
+yn = y + 0.05 * sin(37 * (1:n)');  % deterministic "noise"
+knn = Kriging(yn, X, "matern5_2", "constant", false, "BFGS", "LL", [], "nugget", [], "nystrom(20)");
+assert(strcmp(knn.method(), "nystrom(20)"));
+assert(strcmp(knn.noise_model(), "nugget"));
+assert(knn.nugget() > 0);
+[mn, sn] = knn.predict(Xn, true, false, false, "nystrom");
+assert(all(isfinite(mn)));
+assert(all(sn > 0));
+assert(isequal(size(knn.simulate(int32(3), int32(1), Xn, false, false, "nystrom")), [3, 3]));
+failed = false;
+try
+  knn.simulate(int32(3), int32(1), Xn, true, false, "nystrom");  % with_nugget: exact only
+catch
+  failed = true;
+end
+assert(failed, "with_nugget should raise with method nystrom");
+assert(isfinite(knn.logLikelihood("nystrom")));
+knh = Kriging(yn, X, "matern5_2", "constant", false, "BFGS", "LL", [], "heterogeneous", 0.0025 * ones(n, 1), "nystrom(20)");
+assert(strcmp(knh.noise_model(), "heterogeneous"));
+mh = knh.predict(Xn, false, false, false, "nystrom");
+assert(all(isfinite(mh)));
+f = [tempname() ".json"];
+knh.save(f);
+khl = Kriging.load(f);
+assert(max(abs(khl.predict(Xn, false, false, false, "nystrom") - mh)) < 1e-12);
+delete(f);
+
 % NestedKriging: common prior from one global Vecchia fit
 Xl = [mod(0.3819660 * (1:200)', 1), mod(0.7548777 * (1:200)', 1)];
 yl = sin(3 * Xl(:, 1)) + Xl(:, 2);
@@ -178,10 +207,14 @@ assert(all(sh > 0));
 assert(isequal(size(kh.simulate(int32(4), int32(123), Xn, [0.1; 0.1; 0.1], false, "vecchia")), [3, 4]));
 kh.update(yn(1:3), noise(1:3), X(1:3, :) + 0.01, false);
 assert(size(kh.X(), 1) == n + 3);
+% a heterogeneous Nystrom fit simulates the latent process only: a zero
+% with_noise is accepted, a non-zero one raises (method "vecchia" accepts it)
+khn = Kriging(yn, X, "matern5_2", "constant", false, "BFGS", "LL", [], "heterogeneous", noise, "nystrom(15)");
+assert(isequal(size(khn.simulate(int32(4), int32(123), Xn, zeros(3, 1), false, "nystrom")), [3, 4]));
 failed = false;
 try
-  kx = Kriging(yn, X, "matern5_2", "constant", false, "BFGS", "LL", [], "nugget", [], "nystrom(8)");
+  khn.simulate(int32(4), int32(123), Xn, [0.1; 0.1; 0.1], false, "nystrom");
 catch
   failed = true;
 end
-assert(failed, "method nystrom has no noise model");
+assert(failed, "with_noise should raise with method nystrom");

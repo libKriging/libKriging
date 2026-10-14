@@ -55,8 +55,9 @@ Ask, in order:
    [Scalability.md](../../docs/math/Scalability.md) for the full method
    inventory and combinability notes.)
    → Keep `Kriging` (not `WarpKriging` / `MLPKriging`: they accept
-   `method` but only implement `"exact"`), noise-free, any `objective`
-   (`"LL"` by default; `"LOO"` and `"LMP"` have approximate versions too),
+   `method` but only implement `"exact"`), any `objective`
+   (`"LL"` by default; `"LOO"` and `"LMP"` have approximate versions too,
+   noise-free only; `"LL"` also with a noise model),
    but switch the fit `method` to one of the two scalable approximations
    (O(n·m³) / O(n·k²) instead of O(n³); each approximates the
    criterion, so don't expect bit-identical results to the exact fit):
@@ -73,7 +74,10 @@ Ask, in order:
      `method="nystrom"` or `"nystrom(k)"` (default `k=50`
      landmarks): a global low-rank approximation, dimension-robust in the
      same way `NestedKriging`'s `NK` aggregation is, but a single model
-     rather than a partition; noise-free data only. See
+     rather than a partition. Works with noisy data too (same `noise=`
+     argument as the exact fit; `simulate` with `method="nystrom"` draws
+     the latent process, no `with_noise`; a heterogeneous model's `update`
+     needs the new points' `noise`). See
      [Nystrom.md](../../docs/math/Nystrom.md).
    - The method is explicit at every later step, never inferred from the
      fit: `predict` / `simulate` / `logLikelihood` / `leaveOneOut` /
@@ -116,7 +120,7 @@ is both simpler and, for NestedKriging's NK aggregation, actually a
 | `kernel` / `covType` | `"gauss"`, `"exp"`, `"matern3_2"`, `"matern5_2"` (`"whitenoise"` exists but is an internal building block, not a modelling choice) | `"matern5_2"` is the sane general-purpose default (smoother than Matérn 3/2, less rigid than Gaussian, which tends to numerical ill-conditioning). Use `"gauss"` only if the underlying function is known to be very smooth/analytic. See [Kernels.md](../../docs/math/Kernels.md) for formulas. |
 | `regmodel` / trend | `"constant"`, `"linear"`, `"interactive"`, `"quadratic"` (`"none"` = zero mean) | `"constant"` (ordinary kriging) is the default and usually the right start. Move to `"linear"` if the response has an obvious global trend the GP should not have to explain via short-range correlation. Avoid `"quadratic"`/`"interactive"` in high dimension — parameter count grows fast and can overfit the trend, starving the covariance part. |
 | `objective` | `"LL"` (log-likelihood, default), `"LOO"` (leave-one-out, [details](../../docs/math/LOO.md)), `"LMP"` (log marginal posterior, [details](../../docs/math/LMP.md)) | `"LL"` by default. `"LOO"` is a reasonable alternative when you specifically care about predictive accuracy at the design points rather than the full likelihood. `"LMP"` is a good alternative with few observations, where `"LL"` can drift θ into a degenerate (too small/too large) range. |
-| `method` | `"exact"` (default), `"vecchia"` / `"vecchia(m)"`, `"nystrom"` / `"nystrom(k)"` | How the covariance is evaluated, for the fit and afterwards. Approximate methods only for scaling, with any `objective` (see §1.5; the approximate `"LOO"` is the leave-one-out of the approximate joint law, not of the local Vecchia predictor); noise models only with `"vecchia"` and `objective="LL"`, else noise-free — they approximate the criterion, so don't use them on small problems expecting identical results to the exact fit. |
+| `method` | `"exact"` (default), `"vecchia"` / `"vecchia(m)"`, `"nystrom"` / `"nystrom(k)"` | How the covariance is evaluated, for the fit and afterwards. Approximate methods only for scaling, with any `objective` (see §1.5; the approximate `"LOO"` is the leave-one-out of the approximate joint law, not of the local Vecchia predictor); noise models (both methods) only with `objective="LL"`, `"LOO"` / `"LMP"` noise-free — they approximate the criterion, so don't use them on small problems expecting identical results to the exact fit. |
 | `optim` | `"BFGS"` (default), `"BFGSk"` for k random restarts (e.g. `"BFGS10"`), `"none"` | Use `"none"` only when supplying fixed/known hyperparameters via `parameters` (e.g. reusing a fit, or a controlled experiment). For a difficult/multimodal likelihood (many inputs, clustered design), multistart (`"BFGS10"`+) is cheap insurance against a bad local optimum — recommend it over blindly trusting a single `"BFGS"` run when the user reports an unstable or suspicious fit. |
 | `normalize` | boolean, default off | Turn on when input dimensions have very different scales/units — it rescales `X`/`y` to `[0,1]` internally, which helps the optimizer's bounds and starting values. On `Kriging` everything public stays in the original scale of `X`/`y`: `parameters` in, `theta()`/`sigma2()`/`nugget()`/`noise()`/`beta()` and the `*Fun(theta)` objectives (values and gradients) out, so they round-trip and match a `normalize=false` fit (`X()`/`y()` are the internal normalized data). Not on `WarpKriging`/`MLPKriging` (warped feature space); not supported yet on `NestedKriging`. |
 | `noise` | vector, `"nugget"`, or absent | See §1.2. |

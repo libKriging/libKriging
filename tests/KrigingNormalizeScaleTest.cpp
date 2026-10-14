@@ -641,6 +641,151 @@ TEST_CASE("normalize=true: Vecchia noise-model BFGS fit, objective at the access
   CHECK(std::get<0>(kl.logLikelihoodVecchiaFun(g, false)) == Approx(k.logLikelihood("vecchia")).epsilon(1e-9));
 }
 
+TEST_CASE("normalize=true: Nystrom noise models agree with normalize=false", "[normalize][kriging][nystrom]") {
+  const Data D = make_data();
+  const arma::uword n = D.X.n_rows;
+  // k = n + nu (even after the update below, which adds nu points): every
+  // observation is a landmark, so the Nystrom correlation is the exact one
+  // (up to the num_nugget jitter), and the landmark ranking (at a reference
+  // kernel scaled to the data extent) does not depend on normalize.
+  const arma::uword nu = 6;
+  const std::string method = "nystrom(" + std::to_string(n + nu) + ")";
+  const RM rm = GENERATE(RM::Constant, RM::Linear);
+  const NM nm = GENERATE(NM::Nugget, NM::Heterogeneous);
+  const bool est_sigma2 = GENERATE(false, true);
+  CAPTURE(Trend::toString(rm), static_cast<int>(nm), est_sigma2);
+
+  Kriging::Parameters p;
+  p.theta = arma::mat{{9.0, 2.1}};
+  p.is_theta_estim = false;
+  p.sigma2 = 450.0;
+  p.is_sigma2_estim = est_sigma2;
+  if (nm == NM::Nugget) {
+    p.nugget = 3.0;
+    p.is_nugget_estim = est_sigma2;
+  }
+
+  auto nfit = [&](bool normalize) {
+    Kriging k = make_model(nm);
+    if (nm == NM::Heterogeneous)
+      k.fit(D.y, D.noise, D.X, rm, normalize, "none", "LL", p, method);
+    else
+      k.fit(D.y, D.X, rm, normalize, "none", "LL", p, method);
+    return k;
+  };
+  Kriging kn = nfit(true), ko = nfit(false);
+  REQUIRE(kn.is_nystrom_light());
+  REQUIRE(ko.is_nystrom_light());
+
+  const double tol = 1e-6;
+  require_close(kn.theta(), ko.theta(), tol);
+  CHECK(kn.sigma2() == Approx(ko.sigma2()).epsilon(tol));
+  require_close(kn.beta(), ko.beta(), tol);
+  if (nm == NM::Nugget) {
+    CHECK(kn.nugget() == Approx(ko.nugget()).epsilon(tol));
+    CHECK(kn.alpha() == Approx(ko.alpha()).epsilon(tol));  // scale-free
+  } else {
+    require_close(kn.noise(), ko.noise(), tol);
+    require_close(kn.noise(), D.noise, 1e-12);  // round-trip of the given noise
+  }
+
+  // likelihood value and gradient at original-scale gamma
+  CHECK(kn.logLikelihood("nystrom") == Approx(ko.logLikelihood("nystrom")).epsilon(tol));
+  const arma::vec g0 = public_gamma(ko);
+  CHECK(std::get<0>(kn.logLikelihoodNystromFun(g0, false)) == Approx(kn.logLikelihood("nystrom")).epsilon(1e-10));
+  for (const arma::vec& g : {g0, arma::vec(g0 % arma::vec{1.3, 0.8, nm == NM::Nugget ? 0.97 : 1.5})}) {
+    CAPTURE(g);
+    auto [vn, gn] = kn.logLikelihoodNystromFun(g, true);
+    auto [vo, go] = ko.logLikelihoodNystromFun(g, true);
+    CHECK(vn == Approx(vo).epsilon(tol));
+    require_close(gn, go, 1e-5);
+    // theta-only argument: the committed alpha / sigma2
+    CHECK(std::get<0>(kn.logLikelihoodNystromFun(g.head(2), false))
+          == Approx(std::get<0>(ko.logLikelihoodNystromFun(g.head(2), false))).epsilon(tol));
+    // finite differences of the original-scale objective (the Nystrom
+    // likelihood is only smooth to ~1e-7 relative: larger steps/tolerance)
+    const arma::vec fd
+        = fd_grad([&](const arma::vec& x) { return std::get<0>(kn.logLikelihoodNystromFun(x, false)); }, g, 1e-3);
+    require_close(gn, fd, 2e-2);
+  }
+
+  // exact model at the same parameters: full-rank Nystrom is (near) exact
+  Kriging ke = make_model(nm);
+  fit(ke, D, rm, /*normalize=*/true, "none", "LL", p);
+  CHECK(std::get<0>(kn.logLikelihoodNystromFun(g0, false))
+        == Approx(std::get<0>(ke.logLikelihoodFun(g0, false, false))).epsilon(1e-5));
+
+  // predictions and simulations (latent process)
+  const arma::mat Xn = arma::join_cols(D.X.rows(0, 3) + 0.3, D.X.rows(5, 6));
+  auto [mn, sn] = kn.predictNystrom(Xn, true);
+  auto [mo, so] = ko.predictNystrom(Xn, true);
+  require_close(mn, mo, tol);
+  require_close(sn, so, 1e-5);
+  require_close(arma::vectorise(kn.simulateNystrom(7, 123, Xn)), arma::vectorise(ko.simulateNystrom(7, 123, Xn)), 1e-5);
+  require_close(
+      arma::vectorise(kn.simulate(7, 123, Xn, "nystrom")), arma::vectorise(kn.simulateNystrom(7, 123, Xn)), 0.0);
+
+  // update without refit (new data in the original scale): both stay equal
+  const Data U = make_data(nu);
+  const arma::mat Xu = U.X + 0.7;
+  if (nm == NM::Heterogeneous) {
+    kn.update(U.y, U.noise, Xu, false);
+    ko.update(U.y, U.noise, Xu, false);
+    require_close(kn.noise(), ko.noise(), tol);
+    require_close(kn.noise(), arma::join_cols(D.noise, U.noise), 1e-12);
+  } else {
+    kn.update(U.y, Xu, false);
+    ko.update(U.y, Xu, false);
+    CHECK(kn.nugget() == Approx(ko.nugget()).epsilon(tol));
+    CHECK(kn.alpha() == Approx(ko.alpha()).epsilon(tol));
+  }
+  REQUIRE(kn.is_nystrom_light());
+  require_close(kn.theta(), ko.theta(), tol);
+  CHECK(kn.sigma2() == Approx(ko.sigma2()).epsilon(tol));
+  require_close(kn.beta(), ko.beta(), tol);
+  CHECK(kn.logLikelihood("nystrom") == Approx(ko.logLikelihood("nystrom")).epsilon(tol));
+  auto [mun, sun] = kn.predictNystrom(Xn, true);
+  auto [muo, suo] = ko.predictNystrom(Xn, true);
+  require_close(mun, muo, tol);
+  require_close(sun, suo, 1e-5);
+}
+
+TEST_CASE("normalize=true: Nystrom noise-model BFGS fit, objective at the accessors", "[normalize][kriging][nystrom]") {
+  const Data D = make_data(40);
+  const NM nm = GENERATE(NM::Nugget, NM::Heterogeneous);
+  CAPTURE(static_cast<int>(nm));
+  Kriging k = make_model(nm);
+  if (nm == NM::Heterogeneous)
+    k.fit(D.y, D.noise, D.X, RM::Constant, /*normalize=*/true, "BFGS", "LL", {}, "nystrom(20)");
+  else
+    k.fit(D.y, D.X, RM::Constant, /*normalize=*/true, "BFGS", "LL", {}, "nystrom(20)");
+  REQUIRE(k.is_nystrom_light());
+  const arma::vec g = public_gamma(k);
+  CHECK(std::get<0>(k.logLikelihoodNystromFun(g, false)) == Approx(k.logLikelihood("nystrom")).epsilon(1e-9));
+  // the original-scale optimum: no better value nearby, gradient = finite differences
+  const arma::vec g1 = g % arma::vec{1.2, 0.8, nm == NM::Nugget ? 0.99 : 1.3};
+  auto [v1, grad1] = k.logLikelihoodNystromFun(g1, true);
+  const arma::vec fd
+      = fd_grad([&](const arma::vec& x) { return std::get<0>(k.logLikelihoodNystromFun(x, false)); }, g1, 1e-3);
+  CAPTURE(grad1, fd);
+  require_close(grad1, fd, 2e-2);
+  CHECK(v1 <= k.logLikelihood("nystrom") + 1e-6);
+
+  // save / load keeps the original-scale accessors, objective and predictor
+  const std::string f = "KrigingNormalizeScaleTest_nystrom_saved.json";
+  k.save(f);
+  Kriging kl = Kriging::load(f);
+  require_close(kl.theta(), k.theta(), 1e-12);
+  CHECK(kl.sigma2() == Approx(k.sigma2()).epsilon(1e-12));
+  if (nm == NM::Heterogeneous)
+    require_close(kl.noise(), D.noise, 1e-12);
+  else
+    CHECK(kl.nugget() == Approx(k.nugget()).epsilon(1e-12));
+  CHECK(std::get<0>(kl.logLikelihoodNystromFun(g, false)) == Approx(k.logLikelihood("nystrom")).epsilon(1e-9));
+  const arma::mat Xn = D.X.rows(0, 4) + 0.3;
+  require_close(std::get<0>(kl.predictNystrom(Xn, false)), std::get<0>(k.predictNystrom(Xn, false)), 1e-12);
+}
+
 TEST_CASE("normalize=false: accessors are the internal members, bit for bit", "[normalize][kriging]") {
   const Data D = make_data();
   const NM nm = GENERATE(NM::None, NM::Nugget, NM::Heterogeneous);

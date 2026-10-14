@@ -67,13 +67,13 @@ TEST_CASE("Vecchia method spec parsing and validation", "[vecchia][kriging]") {
     CHECK(ko.is_vecchia_light());
   }
 
-  // Vecchia is available with a nugget/noise channel (Nystrom is not)
+  // Vecchia is available with a nugget/noise channel (Nystrom too)
   Kriging knug("matern5_2", Kriging::NoiseModel::Nugget);
   CHECK_NOTHROW(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "vecchia(10)"));
   CHECK(knug.is_vecchia_light());
   CHECK_NOTHROW(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(10)", {}));
-  CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)"),
-                  std::invalid_argument);
+  CHECK_NOTHROW(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)"));
+  CHECK(knug.is_nystrom_light());
   // LOO / LMP with an approximate method: noise model None only
   CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LMP", {}, "vecchia(10)"),
                   std::invalid_argument);
