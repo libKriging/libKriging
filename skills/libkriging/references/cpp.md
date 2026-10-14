@@ -74,6 +74,11 @@ auto [mean, stdev] = model.predictNystrom(Xnew, /*return_stdev=*/true);   // = p
 arma::mat sims = model.simulateNystrom(/*nsim=*/10, /*seed=*/123, Xnew);  // = simulate(..., "nystrom")
 // no exact factorization after a Nystrom fit: predict(Xnew, ...) (method "exact") raises
 double ll_nys = model.logLikelihood("nystrom");
+// noise models work with "nystrom(k)" (not "vecchia(m)"): same fit calls as the exact ones
+Kriging knug("matern5_2", Kriging::NoiseModel::Nugget);
+knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(50)");
+Kriging khet("matern5_2", Kriging::NoiseModel::Heterogeneous);
+khet.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(50)");
 ```
 
 Exact model at the Vecchia / Nystrom estimate (separate exact fit, θ fixed):
@@ -84,8 +89,9 @@ params.is_theta_estim = false;
 Kriging exact(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", params);
 ```
 Approximate methods: any objective (`"LL"`, `"LOO"`, `"LMP"`) with
-`NoiseModel::None`; `"vecchia(m)"` with `objective="LL"` also supports
-the Nugget / Heterogeneous `NoiseModel` (response Vecchia); other
+`NoiseModel::None`; with `objective="LL"` both `"vecchia(m)"` (response
+Vecchia) and `"nystrom(k)"` also support the Nugget / Heterogeneous
+`NoiseModel`; other
 combinations raise `std::invalid_argument`. `leaveOneOut(method)`,
 `leaveOneOutVec(theta, method)`, `logMargPost(method)` evaluate the approximate
 criteria (C++ also `leaveOneOutVecchiaFun` / `logMargPostNystromFun` etc. at a

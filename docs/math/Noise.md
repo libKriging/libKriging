@@ -67,6 +67,14 @@ training point sits between the observation and the trend, weighted by
 how much noise variance was attributed to that point), unlike the
 noiseless case.
 
+**Large n**: both noise models can be fitted with the rank-k Nystrom
+approximation, `method="nystrom(k)"` (objective `"LL"`, O(n·k²) per
+evaluation): ρ(θ) is replaced by its Nystrom approximation, R_nugget /
+R_heterogeneous keep the low-rank-plus-diagonal structure, and the
+profiling, gradient and predict/simulate semantics are those above — see
+[Nystrom.md](Nystrom.md)'s "Noise models" section (the Vecchia
+approximation also supports both noise models, see below).
+
 ## Simple example
 
 ```python
@@ -97,7 +105,7 @@ profiling and prediction / simulation conventions as above; see
 [Vecchia.md](Vecchia.md#noise-models-noisemodelnugget-noisemodelheterogeneous)
 for the formulas and the accuracy caveat (the approximation degrades
 when the noise is large relative to the signal). `method="nystrom(k)"`
-is not available with a noise model.
+supports both noise models too (see "Large n" above).
 
 ## References
 

@@ -18,7 +18,7 @@ k <- Kriging(y, X, kernel = "matern5_2",
              objective = "LL",            # "LL" | "LOO" | "LMP"
              parameters = NULL,
              noise = NULL,                # NULL | "nugget" | numeric vector
-             method = "exact")            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (noise: vecchia + LL only)
+             method = "exact")            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (noise models: LL only)
 
 p <- predict(k, x = Xnew, return_stdev = TRUE, return_cov = FALSE)
 #   predict / simulate / logLikelihood also take method = "exact" (default) |
@@ -101,6 +101,9 @@ kn <- Kriging(y, X, "matern5_2", method = "nystrom(50)")
 p <- kn$predict(Xnew, method = "nystrom")                        # "exact" would raise
 s <- kn$simulate(nsim = 10, seed = 123, x = Xnew, method = "nystrom")
 kn$logLikelihood(method = "nystrom")                             # the fitted objective
+# noisy data: Nystrom (not Vecchia) supports both noise models
+knn <- Kriging(y, X, "matern5_2", noise = "nugget", method = "nystrom(50)")
+knh <- Kriging(y, X, "matern5_2", noise = noise_var, method = "nystrom(50)")
 kv <- Kriging(y, X, "matern5_2", method = "vecchia(30)")
 p <- kv$predict(Xnew, method = "vecchia")                        # or method = kv$method()
 kv$update(y_u, X_u)                                              # Vecchia refit, still approximate

@@ -194,7 +194,8 @@ end
     @test jlibkriging.method(kb) == "nystrom(5)"
     @test objective(Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia(10)")) == "LOO"
     @test_throws ErrorException Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia", noise="nugget")
-    @test_throws ErrorException Kriging(y, X, "matern5_2"; method="nystrom", noise="nugget")
+    @test_throws ErrorException Kriging(y, X, "matern5_2"; objective="LMP", method="nystrom(10)", noise="nugget")
+    @test jlibkriging.method(Kriging(y, X, "matern5_2"; method="nystrom(10)", noise="nugget")) == "nystrom(10)"
 
     # method="vecchia" with noise models (response Vecchia)
     noise = 0.005 .+ 0.02 .* X[:, 1]
@@ -262,6 +263,27 @@ end
     @test size(simulate(kn, 3, 1, Xn; method="nystrom")) == (3, 3)
     @test isfinite(log_likelihood(kn; method="nystrom"))
     @test_throws ErrorException log_likelihood(kn; method="vecchia")
+
+    # Nystrom with the noise models (nugget / heterogeneous)
+    yn = y .+ 0.05 .* sin.(37.0 .* (1:60))  # deterministic "noise"
+    knn = Kriging(yn, X, "matern5_2"; noise="nugget", method="nystrom(20)")
+    @test jlibkriging.method(knn) == "nystrom(20)"
+    @test noise_model(knn) == "nugget"
+    @test nugget(knn) > 0
+    @test_throws ErrorException predict(knn, Xn)
+    pn = predict(knn, Xn; return_stdev=true, method="nystrom")
+    @test all(isfinite, pn.mean)
+    @test all(pn.stdev .> 0)
+    @test size(simulate(knn, 3, 1, Xn; method="nystrom")) == (3, 3)
+    @test_throws ErrorException simulate(knn, 3, 1, Xn; with_nugget=true, method="nystrom")
+    @test isfinite(log_likelihood(knn; method="nystrom"))
+    knh = Kriging(yn, X, "matern5_2"; noise=fill(0.0025, 60), method="nystrom(20)")
+    @test noise_model(knh) == "heterogeneous"
+    ph = predict(knh, Xn; method="nystrom")
+    @test all(isfinite, ph.mean)
+    fh = tempname() * ".json"
+    save(knh, fh)
+    @test maximum(abs.(predict(load_kriging(fh), Xn; method="nystrom").mean .- ph.mean)) < 1e-12
 
     # LOO / LMP objectives with an approximate method
     for m in ("vecchia(10)", "nystrom(20)")

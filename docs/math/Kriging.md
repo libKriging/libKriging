@@ -97,8 +97,9 @@ evaluated, for the fit and for what the model keeps afterwards:
   [Nystrom.md](Nystrom.md).
 
 The approximate methods exist for every objective (`"LL"`, `"LOO"`,
-`"LMP"`; see [LOO.md](LOO.md), [LMP.md](LMP.md)) without noise
-model, and keep no exact factorization. `method()` returns the canonical
+`"LMP"`; see [LOO.md](LOO.md), [LMP.md](LMP.md)) without noise model,
+for `"LL"` also with `noise="nugget"` or a heterogeneous `noise` (both
+methods), and keep no exact factorization. `method()` returns the canonical
 string (`"exact"`, `"vecchia(30)"`, `"nystrom(50)"`). The former
 objectives `"LLVecchia(m)"` / `"LLNystrom(k)"` are deprecated aliases of
 `objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"`.

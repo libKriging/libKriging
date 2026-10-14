@@ -191,11 +191,11 @@ class Kriging : public KrigingImpl {
    *        (objective='LL', method='exact', optim='none', theta given).
    *        Approximate methods are implemented for the objectives 'LL',
    *        'LOO' (LOO under the approximate joint law) and 'LMP' (approximate
-   *        log det R and R^-1). 'vecchia(m)' with objective 'LL' also
-   *        supports the Nugget / Heterogeneous noise models (response
-   *        Vecchia); 'LOO' / 'LMP' with an approximate method and
-   *        'nystrom(k)' with any objective require noise model None: other
-   *        combinations raise std::invalid_argument.
+   *        log det R and R^-1). With objective 'LL', both 'vecchia(m)'
+   *        (response Vecchia) and 'nystrom(k)' support every noise model
+   *        (None, Nugget, Heterogeneous); 'LOO' / 'LMP' with an approximate
+   *        method require noise model None: other combinations raise
+   *        std::invalid_argument.
    */
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
@@ -367,7 +367,13 @@ class Kriging : public KrigingImpl {
    * @return (ll, gradient) ; gradient empty if return_grad=false. Gradient is
    *         analytic (envelope theorem + Woodbury trace identities, same
    *         principle as the Vecchia gradient) -- see the derivation inside
-   *         _logLikelihoodNystrom's grad_out block in Kriging.cpp. */
+   *         _logLikelihoodNystrom's grad_out block in Kriging.cpp.
+   * For the Nugget / Heterogeneous noise models `theta` may also be the full
+   * gamma = [theta, alpha] / [theta, sigma2] (gradient then of size d+1,
+   * like logLikelihoodFun); with theta only, the committed alpha / sigma2 is
+   * used. Original scale, like logLikelihoodFun: with normalize=true, theta
+   * (and a heterogeneous sigma2) are converted to the internal scale, the
+   * value is that of the original y and the gradient is chain-ruled back. */
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodNystromFun(const arma::vec& theta, bool return_grad);
 
   /// Nystrom rank used at fit time (0 = not fitted with method "nystrom")
@@ -445,7 +451,9 @@ class Kriging : public KrigingImpl {
                                        const std::string& method,
                                        const bool will_update = false);
   /// Nugget-mode simulation with an explicit method ("exact": simulate with
-  /// with_nugget above; "vecchia" / "vecchia(m)": simulateVecchia)
+  /// with_nugget above; "vecchia" / "vecchia(m)": simulateVecchia;
+  /// "nystrom": simulateNystrom, latent process only, so with_nugget=true
+  /// raises std::invalid_argument)
   LIBKRIGING_EXPORT arma::mat simulate(int nsim,
                                        int seed,
                                        const arma::mat& X_n,
@@ -453,7 +461,9 @@ class Kriging : public KrigingImpl {
                                        const bool will_update,
                                        const std::string& method);
   /// Heterogeneous-mode simulation with an explicit method ("exact": simulate
-  /// with with_noise above; "vecchia" / "vecchia(m)": simulateVecchia)
+  /// with with_noise above; "vecchia" / "vecchia(m)": simulateVecchia;
+  /// "nystrom": simulateNystrom, latent process only, so a non-zero
+  /// with_noise raises std::invalid_argument)
   LIBKRIGING_EXPORT arma::mat simulate(int nsim,
                                        int seed,
                                        const arma::mat& X_n,
@@ -580,7 +590,7 @@ class Kriging : public KrigingImpl {
   // likelihood evaluation at theta*, so predict/simulate/update behave like a
   // permanent "light" fit (see m_nystrom_light below).
   arma::uword m_nystrom_k = 0;  ///< rank k (0 = Nystrom mode off)
-  arma::mat m_nystrom_U;        ///< committed low-rank factor (n x k): R ~= U*U.t() + diag(D)
+  arma::mat m_nystrom_U;        ///< committed low-rank factor (n x k): R ~= U*U.t() + diag(D) (noise included)
   arma::vec m_nystrom_D;        ///< committed residual diagonal (n), jittered to stay > 0
   /// Landmark row-indices (into m_X), chosen ONCE per fit and held fixed
   /// across every theta evaluation during optimization. Fixing the landmark
@@ -605,12 +615,30 @@ class Kriging : public KrigingImpl {
   /// grad_out is non-null -- see the derivation in the .cpp file-level
   /// comment above this function. Optional out-params expose the profiled
   /// beta/sigma2/factors (used by the commit step and by tests).
-  double _logLikelihoodNystrom(const arma::vec& _theta,
+  ///
+  /// `_gamma` is theta (d) or, for the Nugget / Heterogeneous noise models,
+  /// [theta, alpha] / [theta, sigma2] (d+1; when only theta is given the
+  /// committed alpha / sigma2 is used), exactly as the exact _logLikelihood.
+  /// The approximated correlation matrix of the observations is
+  /// Rhat = U*U.t() + diag(D) for every noise model (Nugget:
+  /// alpha*Ct + (1-alpha)*I, Heterogeneous: Ct + diag(noise/sigma2), with
+  /// Ct = U0*U0.t() + diag(1 - diag(U0*U0.t())) the Nystrom correlation):
+  /// U_out / D_out are the factors of Rhat. sigma2_out is the variance scale
+  /// tv of Cov(y) = tv * Rhat (None: sigma2; Nugget: sigma2 + nugget;
+  /// Heterogeneous: sigma2), sse_out the GLS residual quadratic form
+  /// (y - F beta)' Rhat^-1 (y - F beta).
+  double _logLikelihoodNystrom(const arma::vec& _gamma,
                                arma::vec* grad_out = nullptr,
                                arma::vec* beta_out = nullptr,
                                double* sigma2_out = nullptr,
                                arma::mat* U_out = nullptr,
-                               arma::vec* D_out = nullptr) const;
+                               arma::vec* D_out = nullptr,
+                               double* sse_out = nullptr) const;
+  /// Commit a Nystrom fit at gamma (theta [, alpha | sigma2]) as an optimizer
+  /// would (BFGS / update conventions of the exact noise-model fits): theta,
+  /// beta, sigma2 (and alpha / nugget for the Nugget model) and the rank-k
+  /// factors of Rhat, profiled by the Nystrom likelihood at gamma.
+  void commit_nystrom(const arma::vec& gamma);
   bool m_nystrom_light = false;  ///< true whenever m_nystrom_k > 0 (no exact factorization ever exists)
 
   // --- LOO / LMP with an approximate method (see docs/math/LOO.md, LMP.md) ---

@@ -72,7 +72,8 @@ past release, see the corresponding entry on the
     neighbors, default 30) or `"nystrom"` / `"nystrom(k)"` (rank-k
     Nystrom, default 50). `objective` is now only the criterion (`"LL"`,
     `"LOO"`, `"LMP"`); the approximate methods exist for every objective
-    (see Added) without a noise model, a noise model raises. `method()` returns the fitted
+    (see Added) without a noise model, and for `"LL"` with the noise models
+    too; other combinations raise. `method()` returns the fitted
     method with its explicit size (`"vecchia(30)"`), and is saved / loaded.
     C++ trailing `method` argument of `fit` and of the constructor; Python /
     R / Julia `method=` keyword; Octave/Matlab trailing argument.
@@ -126,8 +127,9 @@ past release, see the corresponding entry on the
   have analytic gradients (finite-difference verified) and are exact for
   m = n − 1 / k = n. Fits commit β (GLS under the approximation) and σ²
   (SSE/n, SSE/(n − p) for LMP) like the exact ones, keep no exact
-  factorization, and survive `update` and `save` / `load`. New
-  `leaveOneOut(method)`, `logMargPost(method)`, `leaveOneOutVec(theta,
+  factorization, and survive `update` and `save` / `load`; `predictNystrom`
+  applies the LMP variance factor (n−p)/(n−p−2) like `predict` /
+  `predictVecchia`. New `leaveOneOut(method)`, `logMargPost(method)`, `leaveOneOutVec(theta,
   method)` overloads (C++ also `leaveOneOutVecchiaFun`,
   `leaveOneOutNystromFun`, `logMargPostVecchiaFun`,
   `logMargPostNystromFun`); `method` argument in every binding (Python /
@@ -138,6 +140,22 @@ past release, see the corresponding entry on the
   and they match a `normalize=false` model at the same θ (Vecchia with all
   predecessors as neighbors; Nystrom up to its numerical jitter). See
   docs/math/LOO.md and docs/math/LMP.md.
+- `method="nystrom(k)"` with the noise models and `objective="LL"`
+  (`noise="nugget"` and a heterogeneous `noise` vector; C++
+  `NoiseModel::Nugget` / `NoiseModel::Heterogeneous`; `"LOO"` / `"LMP"` with
+  an approximate method still need the noise-free model): the Nystrom correlation C̃ = U Uᵀ + diag(D)
+  replaces ρ(θ) in R = α C̃ + (1 − α) I (nugget) or R = C̃ + diag(noise)/σ²
+  (heterogeneous), still "rank k + diagonal" (Woodbury, O(n k²)), with the
+  same profiling as the exact noise-model likelihoods and an analytic
+  gradient in θ and α / σ². `predict` / `simulate` / `logLikelihood` with
+  `method="nystrom"`, `update` and `save` / `load` follow the exact
+  noise-model conventions (see docs/math/Nystrom.md, "Noise models").
+  With `normalize=true` they follow the original-scale convention:
+  `logLikelihoodNystromFun` takes an original-scale `[theta, alpha]` /
+  `[theta, sigma2]`. `simulate` with `method="nystrom"` draws the latent
+  process only: the C++ `simulate(…, with_nugget | with_noise, will_update,
+  method)` overloads and the bindings raise for `with_nugget=true` / a
+  non-zero `with_noise` with it.
 - Kriging: `method="vecchia(m)"` with the noise models (`NoiseModel::Nugget`
   / `noise="nugget"` and `NoiseModel::Heterogeneous` / known noise
   variances), by response Vecchia (Katzfuss & Guinness 2021): Vecchia
@@ -158,8 +176,7 @@ past release, see the corresponding entry on the
   and simulations as a `normalize=false` one (with fewer neighbors they
   differ by design: the neighbors are searched in the normalized inputs).
   Accuracy degrades when the noise is large relative to the signal (latent
-  Vecchia is not implemented); `method="nystrom(k)"` still has no noise
-  model. `predictVecchia` now also applies the LMP variance rescaling of
+  Vecchia is not implemented); `predictVecchia` now also applies the LMP variance rescaling of
   `predict` after an exact LMP fit.
 - `Kriging::simulateVecchia(nsim, seed, X_n, m)` (C++): sequential
   (response-first) Vecchia conditional simulation, O(q (n + q) d + q m³)

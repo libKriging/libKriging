@@ -178,7 +178,9 @@ py::array_t<double> PyKriging::simulate(const int nsim,
 
   if (with_noise.is_none()) {
     // Plain simulate (latent process for noise models); method: "exact",
-    // "vecchia", "vecchia(m)" or "nystrom"
+    // "vecchia", "vecchia(m)" or "nystrom" (the noise-model overloads below
+    // raise with "nystrom" for with_nugget=True / a non-zero with_noise:
+    // Nystrom simulates the latent process only)
     auto result = m_internal->simulate(nsim, seed, mat_X, method, will_update);
     return carma::mat_to_arr(result, true);
   } else if (py::isinstance<py::bool_>(with_noise)) {

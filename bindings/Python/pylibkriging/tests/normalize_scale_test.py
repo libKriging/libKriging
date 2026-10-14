@@ -114,6 +114,65 @@ def test_vecchia_noise_normalize_true_matches_false(noise):
     np.testing.assert_allclose(sim[0], sim[1], rtol=1e-7)
 
 
+@pytest.mark.parametrize("noise", ["nugget", "vector"])
+def test_nystrom_noise_normalize_true_matches_false(noise, tmp_path):
+    # nystrom(n): every observation is a landmark, so the normalize=True and
+    # False models are the same one (up to the jitter of the factorization)
+    X, y, nvec = make_data()
+    n = X.shape[0]
+    params = {"theta": np.array([[9.0, 2.1]]), "is_theta_estim": False,
+              "sigma2": 450.0, "is_sigma2_estim": False}
+    if noise == "nugget":
+        params.update({"nugget": 3.0, "is_nugget_estim": False})
+    nz = nvec if noise == "vector" else noise
+    ks = [lk.Kriging(y, X, "matern5_2", regmodel="linear", normalize=norm, optim="none",
+                     parameters=params, noise=nz, method="nystrom(%d)" % n) for norm in (True, False)]
+    kn, ko = ks
+    np.testing.assert_allclose(kn.theta(), [9.0, 2.1], rtol=1e-12)
+    np.testing.assert_allclose(kn.sigma2(), ko.sigma2(), rtol=1e-10)
+    np.testing.assert_allclose(kn.beta(), ko.beta(), rtol=1e-6)
+    if noise == "nugget":
+        np.testing.assert_allclose(kn.nugget(), 3.0, rtol=1e-12)
+    else:
+        np.testing.assert_allclose(kn.noise(), nvec, rtol=1e-12)
+    np.testing.assert_allclose(kn.logLikelihood(method="nystrom"), ko.logLikelihood(method="nystrom"), rtol=1e-6)
+    # full rank: the exact model at the same (original-scale) parameters
+    ke = lk.Kriging(y, X, "matern5_2", regmodel="linear", normalize=True, optim="none",
+                    parameters=params, noise=nz)
+    np.testing.assert_allclose(kn.logLikelihood(method="nystrom"), ke.logLikelihood(), rtol=1e-5)
+    Xn = X[:4] + 0.3
+    mn, sn, _, _, _ = kn.predict(Xn, method="nystrom")
+    mo, so, _, _, _ = ko.predict(Xn, method="nystrom")
+    np.testing.assert_allclose(mn, mo, rtol=1e-6)
+    np.testing.assert_allclose(sn, so, rtol=1e-5)
+    sim = [k.simulate(3, 7, Xn, method="nystrom") for k in ks]
+    np.testing.assert_allclose(sim[0], sim[1], rtol=1e-5)
+    # Nystrom simulates the latent process only
+    with pytest.raises(ValueError):
+        kn.simulate(3, 7, Xn, with_noise=True if noise == "nugget" else np.full(4, 0.7), method="nystrom")
+    # save / load keeps the original-scale model
+    f = str(tmp_path / "nystrom_noise_normalize.json")
+    kn.save(f)
+    kl = lk.Kriging.load(f)
+    np.testing.assert_allclose(kl.sigma2(), kn.sigma2(), rtol=1e-12)
+    np.testing.assert_allclose(kl.predict(Xn, method="nystrom")[0], mn, rtol=1e-12)
+
+
+@pytest.mark.parametrize("noise", ["nugget", "vector"])
+def test_nystrom_noise_bfgs_fit(noise):
+    X, y, nvec = make_data(40)
+    nz = nvec if noise == "vector" else noise
+    k = lk.Kriging(y, X, "matern5_2", normalize=True, noise=nz, method="nystrom(20)")
+    assert k.method() == "nystrom(20)"
+    assert np.all(k.theta() > 0) and k.sigma2() > 0
+    if noise == "vector":
+        np.testing.assert_allclose(k.noise(), nvec, rtol=1e-12)  # original-scale noise round-trip
+    assert np.isfinite(k.logLikelihood(method="nystrom"))
+    m, s, _, _, _ = k.predict(X[:5], method="nystrom")
+    # interpolates the data up to the noise level (y in the original scale)
+    assert np.max(np.abs(m - y[:5])) < 0.2 * np.std(y)
+
+
 @pytest.mark.parametrize("method", ["vecchia(29)", "nystrom(15)"])
 @pytest.mark.parametrize("objective", ["LOO", "LMP"])
 def test_approx_loo_lmp_original_scale(method, objective):

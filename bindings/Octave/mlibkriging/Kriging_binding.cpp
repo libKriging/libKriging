@@ -206,18 +206,30 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
     const auto method = input.getOptional<std::string>(5, "method").value_or("exact");
     auto result = km->simulate(nsim, seed, X_n, method, input.get<bool>(4, "will_update"));
     output.set(0, result, "simulated response");
+    return;
+  }
+  // noise models: simulate(nsim, seed, X_n, with_nugget|with_noise,
+  // will_update [, method]); method "exact" (default), "vecchia" /
+  // "vecchia(m)" (with_nugget / with_noise passed through) or "nystrom"
+  // (latent process only: no with_nugget / with_noise, as in the Python binding)
+  const auto method = input.getOptional<std::string>(6, "method").value_or("exact");
+  const bool will_update = input.get<bool>(5, "will_update");
+  if (method.rfind("nystrom", 0) == 0) {
+    const bool with_noise = (km->noise_model() == Kriging::NoiseModel::Nugget)
+                                ? input.get<bool>(4, "with_nugget")
+                                : arma::any(input.get<arma::vec>(4, "with_noise") != 0);
+    if (with_noise)
+      throw MxException(LOCATION(),
+                        "mLibKriging:badArgument",
+                        "simulate: with_nugget / with_noise is not available with method \"nystrom\" (latent "
+                        "process only); use method \"exact\" or \"vecchia\"");
+    auto result = km->simulate(nsim, seed, X_n, method, will_update);
+    output.set(0, result, "simulated response");
   } else if (km->noise_model() == Kriging::NoiseModel::Nugget) {
-    // simulate(nsim, seed, X_n, with_nugget, will_update [, method]); method:
-    // "exact" (default), "vecchia" or "vecchia(m)"
-    const auto method = input.getOptional<std::string>(6, "method").value_or("exact");
-    auto result
-        = km->simulate(nsim, seed, X_n, input.get<bool>(4, "with_nugget"), input.get<bool>(5, "will_update"), method);
+    auto result = km->simulate(nsim, seed, X_n, input.get<bool>(4, "with_nugget"), will_update, method);
     output.set(0, result, "simulated response");
   } else {
-    // Heterogeneous: simulate(nsim, seed, X_n, with_noise, will_update [, method])
-    const auto method = input.getOptional<std::string>(6, "method").value_or("exact");
-    auto result = km->simulate(
-        nsim, seed, X_n, input.get<arma::vec>(4, "with_noise"), input.get<bool>(5, "will_update"), method);
+    auto result = km->simulate(nsim, seed, X_n, input.get<arma::vec>(4, "with_noise"), will_update, method);
     output.set(0, result, "simulated response");
   }
 }

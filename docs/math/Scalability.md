@@ -13,8 +13,8 @@ method has its own page with the full derivation.
 
 | Method | Axis | Cost | Approximates | Dimension sensitivity | Doc |
 |---|---|---|---|---|---|
-| `method="vecchia(m)"` | fit method (`objective="LL"`) | O(n·m³)/eval | *local* conditioning (m neighbors) | degrades for d ≳ 5 (nearest neighbors less informative) | [Vecchia.md](Vecchia.md) |
-| `method="nystrom(k)"` | fit method (`objective="LL"`) | O(n·k²)/eval | *global* low-rank covariance (k landmarks) | dimension-robust | [Nystrom.md](Nystrom.md) |
+| `method="vecchia(m)"` | fit method (any `objective`; noise models with `"LL"`) | O(n·m³)/eval | *local* conditioning (m neighbors) | degrades for d ≳ 5 (nearest neighbors less informative) | [Vecchia.md](Vecchia.md) |
+| `method="nystrom(k)"` | fit method (any `objective`; noise models with `"LL"`) | O(n·k²)/eval | *global* low-rank covariance (k landmarks) | dimension-robust | [Nystrom.md](Nystrom.md) |
 | `NestedKriging` | fit + predict, whole model | O(n³/p²) fit, O(q·n²/p) or O(q·n²) predict | divide-and-conquer (p groups) + aggregation | dimension-robust (submodels are exact Kriging) | [Nested.md](Nested.md) |
 | `subsetOfData` | pre-fit data reduction | O(n_max) k-means pass, then ordinary O(n_max³) fit | *nothing* — exact fit, just on fewer points | none (discards points outright rather than approximating structure) | [SubsetOfData.md](SubsetOfData.md) |
 | OpenMP | fit + predict, cross-cutting | same asymptotic cost, smaller constant | *nothing* — exact, just parallel | none | — (build-time; no dedicated objective/method, always on when available) |
@@ -25,8 +25,9 @@ opting out of the others.
 
 For `Kriging`, the method is explicit at every step, never inferred from
 the fit: `fit` takes `method="exact"` (default), `"vecchia(m)"` or
-`"nystrom(k)"` (with `objective="LL"`), and `predict` / `simulate` /
-`logLikelihood` take `method="exact"` (default, needs an exact fit),
+`"nystrom(k)"` (any `objective`: `"LOO"` / `"LMP"` noise-free, `"LL"` also
+with a noise model), and `predict` / `simulate` / `logLikelihood` /
+`leaveOneOut` / `logMargPost` take `method="exact"` (default, needs an exact fit),
 `"vecchia"` / `"vecchia(m)"` (local predictor / sequential simulator,
 usable after any fit, O(q·m³)) or `"nystrom"` (after a Nystrom fit). A
 Vecchia or Nystrom fit holds no exact factorization, so `"exact"` raises
@@ -109,9 +110,12 @@ target* it converges to as group size grows.
   other method here — reduce `(X, y)` first, then fit with
   Vecchia / Nystrom / `NestedKriging` / exact `"LL"` on the reduced
   design if it's still large enough to warrant one of them.
-- **Vecchia/Nystrom + `NoiseModel`**: neither supports a nugget/noise
-  channel yet (`NoiseModel::None` only) — see each method's own
-  "Current limitations" section.
+- **Vecchia/Nystrom + `NoiseModel`**: both support the two noise
+  models (`noise="nugget"` and heterogeneous `noise`): see the "Noise
+  models" sections of [Nystrom.md](Nystrom.md) and
+  [Vecchia.md](Vecchia.md) (response Vecchia: accuracy degrades when the
+  noise is large relative to the signal). Nystrom simulates the latent
+  process only (no `with_nugget` / `with_noise`).
 
 ## Not implemented (deferred)
 

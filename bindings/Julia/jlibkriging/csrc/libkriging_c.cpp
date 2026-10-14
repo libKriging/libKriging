@@ -268,7 +268,8 @@ int lk_kriging_simulate(void* ptr,
     arma::mat sim;
     const std::string meth = method ? method : "exact";
     // method: "exact", "vecchia", "vecchia(m)" or "nystrom"; with_noise and
-    // with_nugget need "exact" or "vecchia"
+    // with_nugget need "exact" or "vecchia" (the C++ overloads raise with
+    // "nystrom" for with_nugget / a non-zero with_noise: latent process only)
     if (with_noise && noise_n > 0) {
       arma::vec noise_v(const_cast<double*>(with_noise), noise_n, false, true);
       sim = k->simulate(nsim, seed, X_m, noise_v, will_update != 0, meth);

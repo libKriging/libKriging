@@ -105,8 +105,8 @@ default 30: O(n m^3) per evaluation instead of O(n^3), for large designs in
 low dimension) or `"nystrom"` / `"nystrom(k)"` (Nystrom global low-rank
 approximation of rank `k`, default 50: O(n k^2)). An approximate fit keeps
 no exact factorization: `predict`, `simulate` and `log_likelihood` then take
-the same `method`. Approximate methods exist only for `objective="LL"` and
-without `noise`. `objective="LLVecchia(m)"` / `"LLNystrom(k)"` are deprecated
+the same `method`. Approximate methods exist only for `objective="LL"`;
+both work with `noise` (nugget or heterogeneous). `objective="LLVecchia(m)"` / `"LLNystrom(k)"` are deprecated
 aliases of `objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"`.
 
 Initial or fixed hyper-parameters can be passed either via the `sigma2`,
@@ -320,17 +320,23 @@ function subsetOfData(X::Matrix{Float64}, n_max::Int; method::String="kmeans", s
 end
 
 """
-    simulate(k::Kriging, nsim, seed, X_n; with_nugget=true, with_noise=nothing, will_update=false, method="exact")
+    simulate(k::Kriging, nsim, seed, X_n; with_nugget=nothing, with_noise=nothing, will_update=false, method="exact")
 
 `method`: `"exact"` (default), `"vecchia"` / `"vecchia(m)"` or `"nystrom"`
 (see `predict`); `will_update` needs `"exact"`, `with_nugget` / `with_noise`
-(noise standard deviations) need `"exact"` or `"vecchia"`.
+(noise standard deviations) need `"exact"` or `"vecchia"`: `"nystrom"`
+simulates the latent process only (`with_nugget=true` or a non-zero
+`with_noise` raises). `with_nugget` (nugget model) defaults to `true`, except
+with `"nystrom"`.
 """
 function simulate(k::Kriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
-                  with_nugget::Bool=true,
+                  with_nugget::Union{Nothing,Bool}=nothing,
                   with_noise::Union{Nothing,Vector{Float64}}=nothing,
                   will_update::Bool=false,
                   method::String="exact")
+    if with_nugget === nothing
+        with_nugget = !startswith(method, "nystrom")
+    end
     m, d = size(X_n)
     sim_out = Matrix{Float64}(undef, m, nsim)
     noise_ptr = with_noise === nothing ? C_NULL : pointer(with_noise)
