@@ -1,0 +1,14 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Public dependencies of the Kriging target
+find_dependency(Armadillo CONFIG)
+find_dependency(lbfgsb_cpp)
+if (@OpenMP_CXX_FOUND@)
+    find_dependency(OpenMP COMPONENTS CXX)
+endif ()
+
+include("${CMAKE_CURRENT_LIST_DIR}/libKrigingTargets.cmake")
+
+check_required_components(libKriging)
