@@ -25,7 +25,7 @@ This document lists all methods exposed by each language binding for accessing t
 | Predict | `kriging_predict(obj,x,…,method)` | `obj$predict(x,…,method=)` | `obj.predict(x,…,method=)` | `predict(obj,x,stdev,cov,deriv[,method])` | `predict(obj,X;…,method=)` |
 | Simulate | `kriging_simulate(obj,nsim,seed,x,…,method)` | `obj$simulate(nsim,seed,x,…,method=)` | `obj.simulate(nsim,seed,x,…,method=)` | `simulate(obj,nsim,seed,x,will_update[,method])` | `simulate(obj,nsim,seed,X;…,method=)` |
 | Update | `kriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u;…)` |
-| Update simulate | `kriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
+| Update simulate | `kriging_update_simulate(obj,y_u,noise_u,X_u)` | `obj$update_simulate(y_u,X_u)` / `obj$update_simulate(y_u,noise_u,X_u)` | `obj.update_simulate(y_u,X_u,noise_u=)` | `update_simulate(obj,y_u,X_u)` / `update_simulate(obj,y_u,noise_u,X_u)` | `update_simulate(obj,y_u,X_u;noise_u=)` |
 | Save | `kriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
 | Load | `kriging_load(file)` | `load.Kriging(file)` / `load(file)` | `Kriging.load(file)` / `pylibkriging.load(file)` | `Kriging.load(file)` / `load_kriging(file)` | `load_kriging(file)` / `load(file)` |
 | Summary | `kriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
@@ -104,9 +104,9 @@ fit:
 | `predict(…, method=)` | `"exact"` (default): after an exact fit | `"vecchia"` / `"vecchia(m)"`: after any fit (m = fitted m, or 30) | `"nystrom"` / fitted `"nystrom(k)"`: after a Nystrom fit |
 | `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit; `with_noise` / nugget | `"nystrom"`: after a Nystrom fit (latent process; `with_noise` / nugget raise) |
 | `logLikelihood(method=)` | `"exact"` (default; after an approximate fit, recomputed in O(n³) at the fitted θ) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
-| `leaveOneOut(method=)`, `leaveOneOutVec(θ, method=)`, `logMargPost(method=)` | `"exact"` (default; O(n³), on any fit) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
-| `update` | exact refit | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks; with heterogeneous noise, `update` with `noise` refits on the joined data) |
-| `update_simulate` | yes | — | — |
+| `leaveOneOut(method=)`, `leaveOneOutVec(θ, method=)`, `logMargPost(method=)` | `"exact"` (default; O(n³), on any fit) | `"vecchia"`: after a Vecchia fit, noise model none only (raises otherwise) | `"nystrom"`: after a Nystrom fit, noise model none only (raises otherwise) |
+| `update` | exact refit (heterogeneous noise: `update` needs the new `noise`, raises without it) | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks; with heterogeneous noise, `update` with `noise` refits on the joined data) |
+| `update_simulate` | yes (heterogeneous noise: needs `noise_u`, raises without it; `fit` / `update` drop the last `simulate(…, will_update=true)`) | — | — |
 | `save` / `load` | yes | yes (`"method"` saved) | yes (`"method"` saved) |
 
 On a Vecchia or Nystrom fit, `predict` / `simulate` with `method="exact"` (the default) raise an error naming the method to use; the approximate
@@ -122,7 +122,8 @@ argument, `predict(X, stdev, cov, deriv, "vecchia")`, `simulate(nsim, seed, X, w
 noise model `simulate(nsim, seed, X, with_nugget, will_update, "vecchia")` /
 `simulate(nsim, seed, X, with_noise, will_update, "vecchia")` --, `logLikelihood("vecchia")`). With a noise model
 the Vecchia predictor / simulator follow the exact noise-model conventions (nugget: noisy-observation prediction,
-latent simulation unless `with_nugget` / `with_noise=TRUE`; heterogeneous: latent process, `with_noise` adds noise);
+latent simulation unless `with_nugget` / `with_noise=TRUE`; heterogeneous: latent process, `with_noise` -- noise
+variances, like `noise` -- adds N(0, `with_noise`) noise);
 response Vecchia loses accuracy when the noise is large relative to the signal (see
 [docs/math/Vecchia.md](../docs/math/Vecchia.md)).
 
@@ -143,7 +144,7 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 | Fit | `warpKriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `warpKriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `warpKriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
-| Simulate | `warpKriging_simulate(obj,nsim,seed,x)` | `obj$simulate(nsim,seed,x)` | `obj.simulate(nsim,seed,x)` | `simulate(obj,nsim,seed,x)` | `simulate(obj,nsim,seed,X)` |
+| Simulate | `warpKriging_simulate(obj,nsim,seed,x,will_update,with_noise)` | `obj$simulate(nsim,seed,x,will_update,with_noise)` | `obj.simulate(nsim,seed,x,will_update,with_noise)` | `simulate(obj,nsim,seed,x[,will_update[,with_noise]])` | `simulate(obj,nsim,seed,X;will_update,with_noise)` |
 | Update | `warpKriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u)` |
 | Update simulate | `warpKriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
 | Save | `warpKriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
@@ -170,8 +171,13 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 > `WarpKriging` constructor / `fit` accept `noise=` as a per-observation variance vector (there is no `"nugget"` mode),
 > and `parameters=` with numeric `theta`, `warp_params` and `noise` seeds; with `optim="none"` they freeze the
 > hyper-parameters. `update` and `update_simulate` accept `noise_u=` (variances of the new points) when the model was
-> fitted with noise. `WarpKriging` always fits with `objective="LL"`. `WarpKriging` and `MLPKriging` accept `method=`
-> for API consistency, but only `"exact"` is implemented.
+> fitted with noise, and require it then (without it: Python `ValueError`, an error elsewhere). `simulate(nsim, seed, X, will_update, with_noise)` (`WarpKriging` and `MLPKriging`, every
+> binding) draws the latent process by default; `with_noise` (Python `None`, R `NULL`, Julia `nothing`, Octave `[]`
+> or omitted: no noise) holds observation-noise VARIANCES (like `noise` / `noise_u`, as `Kriging`), a scalar or one
+> per row of `X`, added as independent N(0, `with_noise`) draws (and again by `update_simulate` after a
+> `will_update=true` simulate); negative / NaN values raise (Python `ValueError`). Unlike `Kriging`, there is no
+> "fitted nugget" shortcut: a logical `TRUE` / `True` raises. `WarpKriging` always fits with `objective="LL"`.
+> `WarpKriging` and `MLPKriging` accept `method=` for API consistency, but only `"exact"` is implemented.
 
 ---
 
@@ -183,7 +189,7 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 | Fit | `mlpKriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `mlpKriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `mlpKriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
-| Simulate | `mlpKriging_simulate(obj,nsim,seed,x)` | `obj$simulate(nsim,seed,x)` | `obj.simulate(nsim,seed,x)` | `simulate(obj,nsim,seed,x)` | `simulate(obj,nsim,seed,X)` |
+| Simulate | `mlpKriging_simulate(obj,nsim,seed,x,will_update,with_noise)` | `obj$simulate(nsim,seed,x,will_update,with_noise)` | `obj.simulate(nsim,seed,x,will_update,with_noise)` | `simulate(obj,nsim,seed,x[,will_update[,with_noise]])` | `simulate(obj,nsim,seed,X;will_update,with_noise)` |
 | Update | `mlpKriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u)` |
 | Update simulate | `mlpKriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
 | Save | `mlpKriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |

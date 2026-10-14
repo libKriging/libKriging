@@ -193,7 +193,11 @@ sims_ref <- simulate(k2, nsim = 10, seed = 123, x = Xnew)
   and `MLPKriging`.
 - `update_simulate` requires a preceding `simulate(..., will_update=TRUE)`
   call on the same model — it reuses that call's cached factors and
-  random stream.
+  random stream. `fit` and `update` (any method, refit or not) drop that
+  state, which was built for the previous model: `update_simulate` then
+  raises "No previous simulation data available" until a new
+  `simulate(..., will_update=TRUE)`. A call rejected on its input (e.g.
+  `update(y_u, X_u)` on a heterogeneous model) leaves it unchanged.
 - Fits without an exact factorization (`method="vecchia(m)"` and
   `method="nystrom(k)"`) simulate only with an explicit approximate
   method (`simulate(…, method="nystrom")` / `method="vecchia"`), with no

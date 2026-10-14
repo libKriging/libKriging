@@ -1521,14 +1521,14 @@ static void test_simulate_and_update_simulate_with_noise() {
   assert(sim0.n_cols == (arma::uword)nsim);
   assert(sim0.is_finite());
 
-  // Case B: scalar sampling std-dev at X_n, with_noise = 0.1.
-  arma::mat sim1 = wk.simulate(nsim, 1234, X_n, /*will_update=*/true, arma::vec{0.1});
+  // Case B: scalar sampling noise variance at X_n, with_noise = 0.01.
+  arma::mat sim1 = wk.simulate(nsim, 1234, X_n, /*will_update=*/true, arma::vec{0.01});
   assert(sim1.n_rows == m);
   assert(sim1.is_finite());
 
-  // Case C: per-point std-dev vector.
-  arma::vec per_point_sd = 0.05 + 0.05 * arma::randu<arma::vec>(m);
-  arma::mat sim2 = wk.simulate(nsim, 1234, X_n, /*will_update=*/true, per_point_sd);
+  // Case C: per-point noise variance vector.
+  arma::vec per_point_var = arma::square(0.05 + 0.05 * arma::randu<arma::vec>(m));
+  arma::mat sim2 = wk.simulate(nsim, 1234, X_n, /*will_update=*/true, per_point_var);
   assert(sim2.n_rows == m);
   assert(sim2.is_finite());
 
@@ -1556,11 +1556,12 @@ static void test_simulate_and_update_simulate_with_noise() {
   }
   assert(reuse_diff < 1e-8);
 
-  // Missing noise_u when model has noise should throw.
+  // Missing noise_u when model has noise should throw (std::invalid_argument,
+  // as Kriging::update_simulate(y_u, X_u) on a heterogeneous model).
   bool threw_empty = false;
   try {
     wk.update_simulate(y_u, X_u, arma::vec{});
-  } catch (const std::runtime_error&) {
+  } catch (const std::invalid_argument&) {
     threw_empty = true;
   }
   assert(threw_empty);

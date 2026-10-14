@@ -32,6 +32,14 @@ s = k.simulate(int32(10), int32(123), Xnew, true);   % size(Xnew,1) x nsim
 %              (nsim, seed, X, will_update)
 s_u = k.update_simulate(y_u, X_u);   % condition those paths on new observations
 k.update(y_u, X_u, true);   % (y_u, X_u, refit)
+% update_simulate dispatches on its argument count: (y_u, X_u) or
+% (y_u, noise_u, X_u); a heterogeneous model needs the latter ((y_u, X_u)
+% raises, as update). fit / update drop the last simulate(..., true)
+% heterogeneous noise model: with_noise / noise_u are noise VARIANCES, like the
+% fit's noise; update without noise_u raises an error
+%   s = k.simulate(int32(10), int32(123), Xnew, noise_var_new, false);   % (nsim, seed, X, with_noise, will_update)
+%   k.update(y_u, noise_var_u, X_u, true);   % (y_u, noise_u, X_u, refit)
+% [ll, llgrad, llhess] = k.logLikelihoodFun(theta, return_grad, return_hess, bench): llhess is empty
 
 k.save("k.json");              % JSON, any libKriging class
 k = load_kriging("k.json");    % auto-detects the class
@@ -56,6 +64,10 @@ legacy saved models via `load_kriging(...)`.
 %   method: only "exact" is implemented (same for MLPKriging)
 k = WarpKriging(y, X, {"kumaraswamy", "categorical(3,2)"}, "matern5_2");
 [p_mean, p_stdev] = k.predict(Xnew, true);
+s = k.simulate(int32(10), int32(123), Xnew, true, noise_var_new);   % (nsim, seed, X, will_update, with_noise)
+%   with_noise: noise VARIANCES (column vector, one per row of Xnew, or a scalar;
+%   [] / omitted: latent process); same for MLPKriging
+s_u = k.update_simulate(y_u, X_u);   % (y_u, X_u [, noise_u]): noise_u required iff fitted with noise
 ```
 `warping` is a cell array with one spec string per column of `X` (see
 `SKILL.md` §4). `noise` is a variance vector (no `"nugget"` mode) and `objective`

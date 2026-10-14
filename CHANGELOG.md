@@ -12,6 +12,54 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Kriging (breaking): `simulate(…, with_noise, …)` takes noise VARIANCES**,
+  consistent with the `noise` of `fit` / `update(y_u, noise_u, X_u)` /
+  `update_simulate(y_u, noise_u, X_u)` (which already were variances):
+  the exact `simulate`, `simulateVecchia` / `simulate(…, method="vecchia")`
+  and the noise `update_simulate` re-adds now draw N(0, `with_noise`)
+  observation noise, where they used `with_noise` as a standard deviation.
+  Existing code passing standard deviations must pass their squares. Negative
+  (or NaN) values raise `std::invalid_argument`. Applies to every binding
+  (Python `with_noise=` array, R numeric `with_noise`, Julia `with_noise=`,
+  Octave / MATLAB `simulate(nsim, seed, X_n, with_noise, …)`). An empty
+  `with_noise` in the exact path no longer adds an uninitialized matrix.
+  R: a numeric scalar `with_noise` (e.g. `0.3`) is now a noise variance for
+  every point; it was taken as the logical nugget flag `TRUE`.
+  Same for **WarpKriging and MLPKriging**: `simulate(nsim, seed, X_n,
+  will_update, with_noise)` and the `update_simulate` re-add take noise
+  VARIANCES (like `WarpKriging`'s fit `noise` / `noise_u`), where the C++
+  `WarpKriging` used standard deviations; negative / NaN values raise
+  `std::invalid_argument` (was `std::runtime_error` for negative values).
+  `MLPKriging::simulate` gains the optional trailing `with_noise` argument
+  (forwarded to `WarpKriging`). The bindings now expose `with_noise` for
+  both classes with these semantics (see Added). `NestedKriging` has no
+  `simulate`.
+- **Kriging: LOO / LMP with an approximate method reject noise models.**
+  `leaveOneOut(method)`, `logMargPost(method)`, `leaveOneOutVec(theta,
+  method)` with `"vecchia"` / `"nystrom"`, and `leaveOneOutVecchiaFun`,
+  `leaveOneOutNystromFun`, `logMargPostVecchiaFun`, `logMargPostNystromFun`
+  raise `std::invalid_argument` (Python `ValueError`, R / Julia / Octave
+  error; same wording as the `fit` check) on a Nugget / Heterogeneous model,
+  where they silently returned the noise-free approximate criterion. The
+  exact `leaveOneOut()` / `logMargPost()` and their `*Fun` are unchanged
+  (they use the noisy covariance at the committed nugget / noise).
+- **Kriging: `update(y_u, X_u)` on a Heterogeneous model** raises
+  `std::invalid_argument("heterogeneous noise model: use update(y_u,
+  noise_u, X_u)")` before any state change (Python `ValueError`, R / Julia /
+  Octave error), for every method; the exact path used to fail with an
+  unclear dimension error after extending the data.
+- **Kriging (breaking): `update_simulate(y_u, X_u)` on a Heterogeneous model**
+  raises `std::invalid_argument("heterogeneous noise model: use
+  update_simulate(y_u, noise_u, X_u)")` before any state change (Python
+  `ValueError`, R / Julia / Octave error), as `update(y_u, X_u)`; it used to
+  condition on the update points as noise-free observations of the latent
+  process. Use `update_simulate(y_u, noise_u, X_u)` (Octave / MATLAB: the
+  4-argument form). Nugget and None models are unchanged. Likewise,
+  `WarpKriging::update_simulate` / `update` on a model fitted with `noise`
+  and an empty `noise_u` raise `std::invalid_argument` ("heterogeneous noise
+  model: use update_simulate(y_u, X_u, noise_u)" / "use update(y_u, X_u,
+  refit, noise_u)"), where they raised `std::runtime_error`; a `noise_u` of
+  the wrong length or with negative values still raises `std::runtime_error`.
 - **Kriging (breaking): with `normalize=true`, every parameter accessor and
   objective function is in the ORIGINAL scale of `X` and `y`**, like the
   `parameters` given to `fit` (which already were), so that input and output
@@ -119,6 +167,20 @@ past release, see the corresponding entry on the
     uniform API (only `"exact"` is implemented).
 
 ### Added
+- **WarpKriging / MLPKriging bindings: `simulate(…, will_update, with_noise)`**
+  in Python, R, Julia and Octave / MATLAB, after `will_update` (its existing
+  position is kept): `with_noise` holds observation-noise VARIANCES (a
+  scalar or one per row of `X`), added as independent N(0, `with_noise`)
+  draws to the simulated latent process (and again by `update_simulate`
+  after a `will_update=true` simulate). Default (Python `None`, R `NULL`,
+  Julia `nothing`, Octave omitted / `[]`): no noise, unchanged. Negative /
+  NaN values raise (Python `ValueError`). There is no "fitted nugget"
+  shortcut as with `Kriging`: a logical `TRUE` / `True` raises. Julia C
+  shim: `lk_warp_kriging_simulate` / `lk_mlp_kriging_simulate` take
+  `(…, with_noise, noise_n, will_update, sim_out)`. R:
+  `simulate.WarpKriging` / `simulate.MLPKriging` warn about unused
+  arguments instead of silently ignoring them (e.g. a `with_noise=` passed
+  through `...` was dropped).
 - **Kriging: `objective="LOO"` and `"LMP"` with `method="vecchia(m)"` /
   `"nystrom(k)"`** (noise-free models). The LOO criterion is the virtual
   leave-one-out of the approximate joint law (Vecchia precision BᵀD⁻¹B,
@@ -170,8 +232,8 @@ past release, see the corresponding entry on the
   binding) accept `"vecchia"`. New C++ accessor `Kriging::alpha()`
   (scale-free). With `normalize=true` these follow the original-scale
   convention above: `logLikelihoodVecchiaFun` takes an original-scale
-  `[theta, alpha]` / `[theta, sigma2]`, `with_noise` standard deviations are
-  in the scale of `y`, and a Vecchia noise-model fit with all predecessors as
+  `[theta, alpha]` / `[theta, sigma2]`, `with_noise` (noise variances since
+  the breaking change above) is in the scale of `y`, and a Vecchia noise-model fit with all predecessors as
   neighbors reports the same parameters, likelihood, gradient, predictions
   and simulations as a `normalize=false` one (with fewer neighbors they
   differ by design: the neighbors are searched in the normalized inputs).
@@ -209,6 +271,42 @@ past release, see the corresponding entry on the
   dispatches to it.
 
 ### Fixed
+- **`fit` / `update` now drop the state of the last `simulate(…,
+  will_update=true)`** (and the update-points cache) for `Kriging` (every
+  noise model and method, refit or not), `WarpKriging` and `MLPKriging`: a
+  later `update_simulate` mixed matrices built for the previous model with
+  the new one, failing with a dimension error ("matrix multiplication:
+  incompatible matrix dimensions") or, after a refit on as many points or
+  when the update-points cache was already filled, silently returning paths
+  of the previous model. `update_simulate` now raises `std::runtime_error("No
+  previous simulation data available")` until a new `simulate(…,
+  will_update=true)`; a call rejected on its input (e.g. `update(y_u, X_u)`
+  on a heterogeneous model) leaves the state unchanged. Also,
+  `Kriging::simulate(…, will_update=true)` without `with_noise` dropped
+  nothing of an earlier `simulate(…, with_noise, true)`, whose with_noise
+  draws `update_simulate(y_u, noise_u, X_u)` then added again.
+- **`Kriging::update_simulate(y_u, X_u)` after `update_simulate(y_u, noise_u,
+  X_u)`** with the same `X_u` reused the noisy factorisation left in the
+  update-points cache (keyed on `X_u` only) and returned the noisy result. The
+  cache is now keyed on `(X_u, noise_u)`: it is reused across `y_u` for the
+  same `X_u` and `noise_u` (as for WarpKriging), and never between the noisy
+  and noise-free forms.
+- **Octave / MATLAB `Kriging.update_simulate`** dispatches on its argument
+  count, as `update`: `update_simulate(y_u, X_u)` and
+  `update_simulate(y_u, noise_u, X_u)`, whatever the noise model. On a
+  heterogeneous model the 3-argument form failed with an unclear
+  missing-argument error; it now reaches the C++ `update_simulate(y_u, X_u)`,
+  which raises the explicit heterogeneous-noise error (see Changed).
+  `WarpKriging.update_simulate` with a
+  cell (categorical) `X_u` forwards `noise_u` (it was dropped).
+- **Octave / MATLAB `Kriging.logLikelihoodFun`**: the 4th argument
+  (`want_hess`) was passed to the C++ `logLikelihoodFun(theta, return_grad,
+  bench)` as `bench` (printing timings instead of returning a hessian). The
+  signature is now `[ll, llgrad, llhess] = logLikelihoodFun(theta,
+  return_grad, return_hess, bench)`, as in Python / R: `Kriging` computes no
+  hessian, so `llhess` is empty (as in Python / R), and `bench` is the 5th
+  argument. Julia `log_likelihood_fun(::Kriging; return_hess=true)` returns
+  an empty hessian instead of an uninitialized `n × n` matrix.
 - `Kriging::simulate` nugget (`with_nugget`) and heterogeneous-noise
   (`with_noise`) overloads skipped the light-fit checks: on a Nystrom or
   Vecchia fit without factorization they went to the exact simulator, which has no

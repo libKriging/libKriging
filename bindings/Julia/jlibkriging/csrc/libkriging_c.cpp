@@ -1067,11 +1067,16 @@ int lk_warp_kriging_simulate(void* ptr,
                              const double* X_n,
                              int m,
                              int d,
+                             const double* with_noise,
+                             int noise_n,
                              int will_update,
                              double* sim_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
-    auto result = static_cast<WarpKriging*>(ptr)->simulate(nsim, seed, X_mat, will_update != 0);
+    arma::vec noise_vec;  // empty: no observation noise
+    if (with_noise && noise_n > 0)
+      noise_vec = arma::vec(const_cast<double*>(with_noise), noise_n, false, true);
+    auto result = static_cast<WarpKriging*>(ptr)->simulate(nsim, seed, X_mat, will_update != 0, noise_vec);
     if (sim_out)
       std::memcpy(sim_out, result.memptr(), result.n_elem * sizeof(double));
     return 0;
@@ -1573,11 +1578,16 @@ int lk_mlp_kriging_simulate(void* ptr,
                             const double* X_n,
                             int m,
                             int d,
+                            const double* with_noise,
+                            int noise_n,
                             int will_update,
                             double* sim_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
-    auto result = static_cast<MLPKriging*>(ptr)->simulate(nsim, seed, X_mat, will_update != 0);
+    arma::vec noise_vec;  // empty: no observation noise
+    if (with_noise && noise_n > 0)
+      noise_vec = arma::vec(const_cast<double*>(with_noise), noise_n, false, true);
+    auto result = static_cast<MLPKriging*>(ptr)->simulate(nsim, seed, X_mat, will_update != 0, noise_vec);
     if (sim_out)
       std::memcpy(sim_out, result.memptr(), result.n_elem * sizeof(double));
     return 0;

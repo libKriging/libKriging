@@ -26,6 +26,13 @@ p <- predict(k, x = Xnew, return_stdev = TRUE, return_cov = FALSE)
 s <- simulate(k, nsim = 10, seed = 123, x = Xnew, will_update = TRUE)   # length(Xnew) x nsim
 s_u <- update_simulate(k, y_u, X_u)   # condition those paths on new observations
 update(k, y_u, X_u, refit = TRUE)
+# heterogeneous noise model (noise = <variance vector>): with_noise / noise_u are
+# noise VARIANCES, like the fit's noise; update / update_simulate without
+# noise_u raise an error
+# s <- simulate(k, nsim = 10, seed = 123, x = Xnew, with_noise = noise_var_new, will_update = TRUE)
+# s_u <- update_simulate(k, y_u, noise_var_u, X_u)
+# update(k, y_u, noise_var_u, X_u, refit = TRUE)
+# fit / update drop the last simulate: simulate(..., will_update = TRUE) again
 
 save(k, "k.json")      # JSON, any libKriging class
 k <- load("k.json")    # auto-detects the class
@@ -56,6 +63,10 @@ wk <- WarpKriging(y, X, warping = c("kumaraswamy", "categorical(5,2)", "none"),
                   noise = NULL,        # NULL | numeric variance vector (no "nugget" mode)
                   method = "exact")    # only "exact" is implemented (same for MLPKriging)
 predict(wk, x = Xnew, return_stdev = TRUE)
+s <- simulate(wk, nsim = 10, seed = 123, x = Xnew, will_update = FALSE, with_noise = NULL)
+# with_noise: NULL / FALSE (latent process) | numeric noise VARIANCES, a scalar or
+# one per row of x (same for MLPKriging; negative/NA raise; TRUE raises: no
+# "fitted nugget" shortcut as in simulate.Kriging)
 ```
 One spec string per column of `X` (see `SKILL.md` §4). If `X` has string
 columns, `WarpKriging` can auto-encode them — but being explicit about the

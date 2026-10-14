@@ -327,6 +327,16 @@ endif()
 catch_discover_tests(WarpKrigingUpdateSimulateTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
+add_executable(SimulateStateResetTest SimulateStateResetTest.cpp)
+target_link_libraries(SimulateStateResetTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries SimulateStateResetTest)
+catch_discover_tests(SimulateStateResetTest)
+
+add_executable(WarpKrigingSimulateNoiseTest WarpKrigingSimulateNoiseTest.cpp)
+target_link_libraries(WarpKrigingSimulateNoiseTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries WarpKrigingSimulateNoiseTest)
+catch_discover_tests(WarpKrigingSimulateNoiseTest)
+
 add_executable(WarpKrigingPerWarpTest WarpKrigingPerWarpTest.cpp)
 target_link_libraries(WarpKrigingPerWarpTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries WarpKrigingPerWarpTest)

@@ -63,7 +63,9 @@ finite differences.
 
 ### Approximate versions (`method="vecchia(m)"` / `"nystrom(k)"`)
 
-With an approximate fit method (noise-free models only),
+With an approximate fit method (noise-free models only: on a nugget /
+heterogeneous-noise model, the fit and every approximate evaluation —
+`leaveOneOut("vecchia")`, `logMargPostNystromFun`, … — raise),
 `objective="LOO"` is the leave-one-out criterion **of the approximate
 Gaussian model**: the approximation replaces the correlation precision
 R⁻¹ by a precision P that is cheap to apply, and the virtual-LOO

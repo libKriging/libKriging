@@ -144,6 +144,15 @@ class KrigingImpl {
   arma::mat lastsimup_R_un;
   arma::mat lastsimup_R_uu;
 
+  /// Drop the state of the last simulate(..., will_update=true) (lastsim_*)
+  /// and the update-points cache (lastsimup_*): both are built for the model
+  /// of that simulate, so fit() and update() call this (once their input is
+  /// validated) and a later update_simulate() raises "No previous simulation
+  /// data available" until a new simulate(..., will_update=true). Derived
+  /// classes with extra simulate state hide it with their own
+  /// clear_simulate_state() that calls this one.
+  void clear_simulate_state();
+
   // Covariance functor bundle
   std::function<double(const arma::vec&, const arma::vec&)> _Cov;
   std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDtheta;
@@ -233,11 +242,23 @@ class KrigingImpl {
                           double Sigma_divisor,
                           const FeatureMap& phi = {});
 
+  /// Observation-noise draws for simulate(..., with_noise) (Kriging and
+  /// WarpKriging, and their update_simulate re-add): `noise_var` holds noise
+  /// VARIANCES in the original y scale (like fit's / update's noise), empty
+  /// (no-op), a scalar (same for all rows) or one value per row of `y_n`;
+  /// adds sqrt(variance) * N(0, 1) to every column of `y_n`.
+  /// check_noise_variances throws std::invalid_argument("<what>: with_noise
+  /// must hold non-negative noise variances") on a negative or NaN value.
+  static void check_noise_variances(const arma::vec& noise_var, const char* what);
+  static void add_noise_draws(arma::mat& y_n, const arma::vec& noise_var, const char* what);
+
   /// Unified update_simulate shared by the three variants. The wrapper is
   /// responsible for class-specific input validation (Noise: noise_u length)
   /// and post-hoc adjustments (Noise: += eps using lastsim_with_noise). When
-  /// `allow_cache=false` the impl forces a full recompute — used by Noise to
-  /// preserve existing behavior where `lastsimup_noise_u` is never written.
+  /// `allow_cache=false` the impl forces a full recompute (and refills the
+  /// cache); the wrapper must pass false whenever R_uu_diag (the update-point
+  /// noise) differs from the one the cache was built with, since the cache
+  /// is keyed on X_u only.
   ///
   /// Parameters mirror `simulate_impl`:
   ///   * `R_uu_factor` / `R_uu_diag`: passed through to `covMat_sym_X`.

@@ -241,14 +241,16 @@ void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Range{4, 5}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  if (km->noise_model() == Kriging::NoiseModel::Heterogeneous) {
-    // update(ref, y_u, noise_u, X_u, refit)
+  if (nrhs == 5) {
+    // update(ref, y_u, noise_u, X_u, refit): heterogeneous noise model only
     km->update(input.get<arma::vec>(1, "y_u"),
                input.get<arma::vec>(2, "noise_u"),
                input.get<arma::mat>(3, "X_u"),
                input.get<bool>(4, "refit"));
   } else {
-    // update(ref, y_u, X_u, refit)
+    // update(ref, y_u, X_u, refit); on a heterogeneous model (no noise_u
+    // given) the C++ core raises "heterogeneous noise model: use
+    // update(y_u, noise_u, X_u)"
     km->update(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"), input.get<bool>(3, "refit"));
   }
 }
@@ -260,13 +262,18 @@ void update_simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Range{3, 4}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  if (km->noise_model() == Kriging::NoiseModel::Heterogeneous) {
-    // update_simulate(ref, y_u, noise_u, X_u)
+  // dispatch on the number of arguments (as update), whatever the noise model
+  if (nrhs == 4) {
+    // update_simulate(ref, y_u, noise_u, X_u): the update points carry the
+    // observation-noise variances noise_u; the with_noise draws of the last
+    // simulate(..., will_update=true) are added again
     auto result = km->update_simulate(
         input.get<arma::vec>(1, "y_u"), input.get<arma::vec>(2, "noise_u"), input.get<arma::mat>(3, "X_u"));
     output.set(0, result, "updated simulated values");
   } else {
-    // update_simulate(ref, y_u, X_u)
+    // update_simulate(ref, y_u, X_u). On a heterogeneous model the C++ core
+    // raises (the noise of the update points is needed: use the 4-argument
+    // form), before any state change, as update(ref, y_u, X_u)
     auto result = km->update_simulate(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"));
     output.set(0, result, "updated simulated values");
   }
@@ -347,14 +354,21 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 4}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
+                 RequiresArg::Range{2, 5}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  // [ll, llgrad, llhess] = logLikelihoodFun(theta, return_grad, return_hess, bench),
+  // as in the Python / R bindings. The C++ signature is
+  // logLikelihoodFun(theta, return_grad, bench): Kriging computes no hessian,
+  // so llhess is an empty matrix (as in Python / R); bench only prints timings
   const bool return_grad = flag_output_compliance(input, 2, "return_grad", output, 1);
-  const bool want_hess = input.getOptional<bool>(3, "want_hess").value_or(false);
-  auto [ll, llgrad] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, want_hess);
+  const bool return_hess = flag_output_compliance(input, 3, "return_hess", output, 2);
+  const bool bench = input.getOptional<bool>(4, "bench").value_or(false);
+  auto [ll, llgrad] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, bench);
   output.set(0, ll, "ll");                  // FIXME better name
   output.setOptional(1, llgrad, "llgrad");  // FIXME better name
+  if (return_hess)
+    output.setOptional(2, arma::mat(), "llhess");
 }
 
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

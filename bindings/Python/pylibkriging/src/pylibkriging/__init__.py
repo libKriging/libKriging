@@ -304,10 +304,16 @@ class WarpKriging:
         return self._impl.predict(self._encode_X(X),
                                   return_stdev, return_cov, return_deriv)
 
-    def simulate(self, nsim=1, seed=123, X=None, will_update=False):
+    def simulate(self, nsim=1, seed=123, X=None, will_update=False, with_noise=None):
+        """Conditional simulations at X. with_noise (default None: no noise):
+        observation-noise VARIANCES (raw y scale, like fit's noise), a scalar
+        or one per row of X, added as N(0, with_noise) draws; negative / NaN
+        values raise ValueError."""
         if X is not None:
             X = self._encode_X(X)
-        return self._impl.simulate(nsim, seed, X, will_update)
+        if with_noise is not None and not isinstance(with_noise, (bool, int, float)):
+            with_noise = _np.atleast_1d(_np.asarray(with_noise, dtype=_np.float64)).ravel()
+        return self._impl.simulate(nsim, seed, X, will_update, with_noise)
 
     def update(self, y_u, X_u, refit=True, noise_u=None):
         self._impl.update(

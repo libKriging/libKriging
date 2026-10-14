@@ -112,10 +112,21 @@ Rcpp::List mlpKriging_predict(SEXP model_ptr,
 //  simulate
 // ---------------------------------------------------------------------------
 
+// with_noise: NULL (no noise) or observation-noise VARIANCES (raw y scale,
+// like fit's noise), a scalar or one per row of x_new; negative / NaN values
+// raise (std::invalid_argument -> R error)
 // [[Rcpp::export]]
-arma::mat mlpKriging_simulate(SEXP model_ptr, int nsim, int seed, const arma::mat& x_new, bool will_update = false) {
+arma::mat mlpKriging_simulate(SEXP model_ptr,
+                              int nsim,
+                              int seed,
+                              const arma::mat& x_new,
+                              bool will_update = false,
+                              Rcpp::Nullable<Rcpp::NumericVector> with_noise = R_NilValue) {
   MLPKrigingPtr model(model_ptr);
-  return model->simulate(nsim, seed, x_new, will_update);
+  arma::vec noise_var;
+  if (with_noise.isNotNull())
+    noise_var = Rcpp::as<arma::vec>(with_noise.get());
+  return model->simulate(nsim, seed, x_new, will_update, noise_var);
 }
 
 // ---------------------------------------------------------------------------

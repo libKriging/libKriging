@@ -35,11 +35,18 @@ mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(
 sims = model.simulate(nsim=10, seed=123, X=Xnew, will_update=True)   # shape (q, nsim)
 sims_u = model.update_simulate(y_u, X_u)   # condition those paths on new observations
 model.update(y_u, X_u, refit=True)
+# heterogeneous noise model (noise=<variance vector>): with_noise= / noise_u= are
+# noise VARIANCES, like the fit's noise; update / update_simulate without
+# noise_u raise ValueError
+# sims = model.simulate(10, 123, Xnew, with_noise=noise_var_new, will_update=True)
+# sims_u = model.update_simulate(y_u, X_u, noise_u=noise_var_u)
+# model.update(y_u, X_u, refit=True, noise_u=noise_var_u)
+# fit / update drop the last simulate: simulate(..., will_update=True) again
 
 model.logLikelihood()
 model.leaveOneOut()
 model.logMargPost()
-ll, grad, _hess = model.logLikelihoodFun(theta, return_grad=True, want_hess=False)  # (ll, grad, hess)
+ll, grad, _hess = model.logLikelihoodFun(theta, return_grad=True, want_hess=False)  # (ll, grad, hess: always empty)
 ```
 
 Do **not** instantiate `NuggetKriging`/`NoiseKriging` — pass `noise=` to
@@ -66,6 +73,10 @@ model = lk.WarpKriging(
     method="exact",       # only "exact" is implemented (same for MLPKriging)
 )
 mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(Xnew, return_stdev=True)
+sims = model.simulate(10, 123, Xnew, will_update=False, with_noise=None)
+# with_noise: None (latent process) | noise VARIANCES, a scalar or one per row of Xnew
+# (same for MLPKriging; negative/NaN -> ValueError; no True "fitted nugget" shortcut)
+sims_u = model.update_simulate(y_u, X_u, noise_u=None)   # noise_u required iff fitted with noise
 ```
 One spec string per column of `X` (see `SKILL.md` §4). If `X` has string
 columns, `WarpKriging` can auto-encode them — but being explicit about the

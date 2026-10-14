@@ -870,12 +870,13 @@ TEST_CASE("simulateVecchia with all predecessors matches the exact noise-model l
     Kriging k = fit_hetero(y, noise, X, "exact", "none", params, Trend::RegressionModel::None);
     auto [mean, stdev, cov, dm, ds] = k.predict(Xt, true, true, false);
     check_law(k.simulateVecchia(nsim, 42, Xt, m_all), mean, cov);
-    // with_noise (standard deviations) adds independent noise
-    const arma::vec sdn = arma::linspace(0.1, 0.3, Xt.n_rows);
-    check_law(k.simulateVecchia(nsim, 44, Xt, m_all, false, sdn), mean, cov + arma::diagmat(arma::square(sdn)));
+    // with_noise (variances, like fit's noise) adds independent noise
+    const arma::vec varn = arma::square(arma::linspace(0.1, 0.3, Xt.n_rows));
+    check_law(k.simulateVecchia(nsim, 44, Xt, m_all, false, varn), mean, cov + arma::diagmat(varn));
     CHECK(arma::approx_equal(
-        k.simulate(5, 7, Xt, sdn, false, "vecchia"), k.simulateVecchia(5, 7, Xt, 0, false, sdn), "absdiff", 0.0));
-    CHECK_THROWS_AS(k.simulate(5, 7, Xt, sdn, false, "nystrom"), std::invalid_argument);
+        k.simulate(5, 7, Xt, varn, false, "vecchia"), k.simulateVecchia(5, 7, Xt, 0, false, varn), "absdiff", 0.0));
+    CHECK_THROWS_AS(k.simulate(5, 7, Xt, varn, false, "nystrom"), std::invalid_argument);
+    CHECK_THROWS_AS(k.simulateVecchia(5, 7, Xt, 0, false, -varn), std::invalid_argument);
   }
 }
 
@@ -939,7 +940,7 @@ TEST_CASE("Vecchia noise-model fits support save/load and update", "[vecchia][kr
     CHECK(std::abs(kl.logLikelihood("vecchia") - k.logLikelihood("vecchia")) < 1e-9);
 
     // update needs the noise of the new data
-    CHECK_THROWS_AS(k.update(yu, Xu, false), std::runtime_error);
+    CHECK_THROWS_AS(k.update(yu, Xu, false), std::invalid_argument);
     k.update(yu, noise_u, Xu, false);
     CHECK(k.is_vecchia_light());
     CHECK(k.X().n_rows == 140);

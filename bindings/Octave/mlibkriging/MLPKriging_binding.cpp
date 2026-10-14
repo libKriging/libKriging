@@ -159,13 +159,18 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{4, 5}};
+                 RequiresArg::Range{4, 6}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
   auto nsim = input.get<int32_t>(1, "nsim");
   auto seed = input.get<int32_t>(2, "seed");
   bool will_update = input.getOptional<bool>(4, "will_update").value_or(false);
-  auto result = mk->simulate(nsim, seed, input.get<arma::mat>(3, "X_n matrix"), will_update);
+  // simulate(ref, nsim, seed, X_n [, will_update [, with_noise]]): with_noise
+  // holds observation-noise VARIANCES (raw y scale, like the fit's noise), a
+  // scalar or one per row of X_n; empty / omitted: no noise. Negative / NaN
+  // values raise (std::invalid_argument)
+  auto with_noise = input.getOptional<arma::vec>(5, "with_noise").value_or(arma::vec{});
+  auto result = mk->simulate(nsim, seed, input.get<arma::mat>(3, "X_n matrix"), will_update, with_noise);
   output.set(0, result, "simulated values");
 }
 

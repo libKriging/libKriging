@@ -16,6 +16,8 @@
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 
+#include <stdexcept>
+#include <string>
 #include <tuple>
 #include <utility>
 
@@ -404,6 +406,23 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
                          std::move(Dysd2_n / (2 * arma::sqrt(ysd2_n) * arma::mat(1, d_input, arma::fill::ones))));
 }
 
+void KrigingImpl::check_noise_variances(const arma::vec& noise_var, const char* what) {
+  if (noise_var.has_nan() || arma::any(noise_var < 0.0))
+    throw std::invalid_argument(std::string(what) + ": with_noise must hold non-negative noise variances");
+}
+
+void KrigingImpl::add_noise_draws(arma::mat& y_n, const arma::vec& noise_var, const char* what) {
+  if (noise_var.n_elem == 0)
+    return;
+  check_noise_variances(noise_var, what);
+  arma::mat eps = Random::randn_mat(y_n.n_rows, y_n.n_cols);
+  if (noise_var.n_elem == 1)
+    eps *= std::sqrt(noise_var.at(0));
+  else
+    eps.each_col() %= arma::sqrt(noise_var);
+  y_n += eps;
+}
+
 arma::mat KrigingImpl::simulate_impl(int nsim,
                                      int seed,
                                      const arma::mat& X_n,
@@ -508,6 +527,22 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
   }
 
   return y_n;
+}
+
+void KrigingImpl::clear_simulate_state() {
+  lastsim_Xn_n.reset();
+  lastsim_y_n.reset();
+  lastsim_nsim = 0;
+  lastsim_seed = 0;
+  lastsim_L_oCn.reset();
+  lastsim_Ecirc_nKo.reset();
+  lastsim_LSigma_nKo.reset();
+  lastsimup_Xn_u.reset();
+  lastsimup_y_u.reset();
+  lastsimup_Wtild_nKu.reset();
+  lastsimup_R_uo.reset();
+  lastsimup_R_un.reset();
+  lastsimup_R_uu.reset();
 }
 
 arma::mat KrigingImpl::update_simulate_impl(const arma::vec& y_u,

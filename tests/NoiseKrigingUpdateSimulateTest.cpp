@@ -63,7 +63,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     // Method 1: Use update_simulate
     const int n_sims = 1000;
     const int seed = 789;
-    nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), true);  // Store for update_simulate
+    nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), true);  // Store for update_simulate
     arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
 
     // Method 2: Build nk2 with same fixed parameters on full data
@@ -72,7 +72,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     arma::colvec y_full = arma::join_cols(y_old, y_new);
     arma::colvec noise_full = arma::join_cols(noise_old, noise_new);
     nk2.fit(y_full, noise_full, X_full, Trend::RegressionModel::Constant, false, "none", "LL", params_fixed);
-    arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), false);
+    arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), false);
 
     // Save simulations to CSV for debugging
     sims1.save("sims1_noise_update_simulate.csv", arma::csv_ascii);
@@ -121,7 +121,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     const int seed = 999;
 
     // Use update_simulate with multiple new points
-    nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), true);
+    nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), true);
     arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
 
     // Build nk2 with same fixed parameters on full data
@@ -130,7 +130,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     arma::colvec y_full = arma::join_cols(y_old, y_new);
     arma::colvec noise_full = arma::join_cols(noise_old, noise_new);
     nk2.fit(y_full, noise_full, X_full, Trend::RegressionModel::Constant, false, "none", "LL", params_fixed);
-    arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), false);
+    arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), false);
 
     // KS test
     int ks_failures = 0;
@@ -175,7 +175,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       const int n_sims = 1000;
       const int seed = 111;
 
-      nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), true);
+      nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), true);
       arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
 
       // Build nk2 with same fixed parameters on full data
@@ -184,7 +184,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       arma::colvec y_full = arma::join_cols(y_old, y_new);
       arma::colvec noise_full = arma::join_cols(noise_old, noise_new);
       nk2.fit(y_full, noise_full, X_full, Trend::RegressionModel::Constant, false, "none", "LL", params_fixed);
-      arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), false);
+      arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), false);
 
       // KS test
       int ks_failures = 0;
@@ -238,7 +238,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       const int n_sims = 1000;
       const int seed = 222;
 
-      nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), true);
+      nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), true);
       arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
 
       // Build nk2 with same fixed parameters on full data
@@ -247,7 +247,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       arma::colvec y_full = arma::join_cols(y_old, y_new);
       arma::colvec noise_full = arma::join_cols(noise_old, noise_new);
       nk2.fit(y_full, noise_full, X_full, trend, false, "none", "LL", params_fixed);
-      arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), false);
+      arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), false);
 
       // KS test
       int ks_failures = 0;
@@ -265,4 +265,95 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       CHECK(ks_failures == 0);
     }
   }
+}
+
+TEST_CASE("NoiseKrigingUpdateSimulateTest - noisy update_simulate does not leak into the noise-free form",
+          "[update_simulate][noisekriging]") {
+  // Both forms are available on a model without a heterogeneous noise (the
+  // noise-free one raises on a heterogeneous model, see below): the
+  // update-points cache is keyed on (X_u, noise_u).
+  arma::arma_rng::set_seed(321);
+  const arma::uword d = 2;
+  arma::mat X_old(15, d, arma::fill::randu);
+  arma::vec y_old = arma::sin(3.0 * X_old.col(0)) + arma::cos(5.0 * X_old.col(1));
+  arma::mat X_new(4, d, arma::fill::randu);
+  arma::vec y_new = arma::sin(3.0 * X_new.col(0)) + arma::cos(5.0 * X_new.col(1));
+  arma::mat X_sim(6, d, arma::fill::randu);
+
+  Kriging::Parameters params;
+  params.sigma2 = 1.0;
+  params.is_sigma2_estim = false;
+  params.theta = arma::mat(arma::vec(d).fill(0.5));
+  params.is_theta_estim = false;
+  Kriging k("gauss");
+  k.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "none", "LL", params);
+
+  k.simulate(50, 7, X_sim, true);
+  const arma::mat free_first = k.update_simulate(y_new, X_new);
+  const arma::mat noisy = k.update_simulate(y_new, arma::vec(4).fill(0.5), X_new);
+  REQUIRE(arma::abs(noisy - free_first).max() > 1e-6);  // the noise_u does change the result
+  // Same X_u as the noisy call: must not reuse its (noisy) cached factorisation
+  const arma::mat free_after = k.update_simulate(y_new, X_new);
+  CHECK(arma::approx_equal(free_after, free_first, "absdiff", 1e-10));
+
+  // Same (X_u, noise_u), another y_u: the cache built by the first noisy call is
+  // reused and gives the same result as a full recompute
+  const arma::vec noise_u = arma::vec(4).fill(0.5);
+  const arma::vec y_new2 = y_new + 0.3;
+  k.update_simulate(y_new, noise_u, X_new);                            // builds the cache
+  const arma::mat cached = k.update_simulate(y_new2, noise_u, X_new);  // reuses it
+  k.update_simulate(y_new, X_new);                                     // noise-free: rebuilds it
+  const arma::mat recomputed = k.update_simulate(y_new2, noise_u, X_new);
+  CHECK(arma::approx_equal(cached, recomputed, "absdiff", 1e-10));
+  // another noise_u at the same X_u must not reuse the cache
+  const arma::mat other_noise = k.update_simulate(y_new2, arma::vec(4).fill(0.05), X_new);
+  CHECK(arma::abs(other_noise - cached).max() > 1e-6);
+  k.update_simulate(y_new, X_new);
+  const arma::mat other_noise_fresh = k.update_simulate(y_new2, arma::vec(4).fill(0.05), X_new);
+  CHECK(arma::approx_equal(other_noise, other_noise_fresh, "absdiff", 1e-10));
+}
+
+TEST_CASE("NoiseKrigingUpdateSimulateTest - update_simulate(y_u, X_u) raises on a heterogeneous model",
+          "[update_simulate][noisekriging]") {
+  arma::arma_rng::set_seed(321);
+  const arma::uword d = 2;
+  arma::mat X_old(15, d, arma::fill::randu);
+  arma::vec y_old = arma::sin(3.0 * X_old.col(0)) + arma::cos(5.0 * X_old.col(1));
+  arma::mat X_new(4, d, arma::fill::randu);
+  arma::vec y_new = arma::sin(3.0 * X_new.col(0)) + arma::cos(5.0 * X_new.col(1));
+  arma::mat X_sim(6, d, arma::fill::randu);
+  const arma::vec noise_u = arma::vec(4).fill(0.5);
+  const arma::vec y_new2 = y_new + 0.3;
+
+  Kriging::Parameters params;
+  params.sigma2 = 1.0;
+  params.is_sigma2_estim = false;
+  params.theta = arma::mat(arma::vec(d).fill(0.5));
+  params.is_theta_estim = false;
+  auto make = [&] {
+    Kriging k("gauss", Kriging::NoiseModel::Heterogeneous);
+    k.fit(y_old, arma::vec(15).fill(0.01), X_old, Trend::RegressionModel::Constant, false, "none", "LL", params);
+    k.simulate(50, 7, X_sim, arma::vec{0.01}, true);
+    return k;
+  };
+
+  Kriging k = make();
+  // without any update_simulate yet, and once the update-points cache is built
+  REQUIRE_THROWS_WITH(k.update_simulate(y_new, X_new),
+                      "heterogeneous noise model: use update_simulate(y_u, noise_u, X_u)");
+  REQUIRE_THROWS_AS(k.update_simulate(y_new, X_new), std::invalid_argument);
+  const arma::mat first = k.update_simulate(y_new, noise_u, X_new);
+  REQUIRE_THROWS_AS(k.update_simulate(y_new, X_new), std::invalid_argument);
+  const arma::mat cached = k.update_simulate(y_new2, noise_u, X_new);  // reuses the cache
+
+  // the failed calls changed nothing: same results as without them
+  Kriging ref = make();
+  CHECK(arma::approx_equal(first, ref.update_simulate(y_new, noise_u, X_new), "absdiff", 1e-10));
+  CHECK(arma::approx_equal(cached, ref.update_simulate(y_new2, noise_u, X_new), "absdiff", 1e-10));
+  // another noise_u at the same X_u is not served from the cache
+  Kriging fresh = make();
+  CHECK(arma::approx_equal(k.update_simulate(y_new2, arma::vec(4).fill(0.05), X_new),
+                           fresh.update_simulate(y_new2, arma::vec(4).fill(0.05), X_new),
+                           "absdiff",
+                           1e-10));
 }

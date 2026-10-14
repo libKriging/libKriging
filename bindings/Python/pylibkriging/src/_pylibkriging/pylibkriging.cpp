@@ -299,19 +299,25 @@ discards n - n_max points outright.)pbdoc")
            py::arg("method") = "exact",
            R"pbdoc(Conditional simulations at X. method: "exact" (default), "vecchia" /
 "vecchia(m)" or "nystrom" (see predict); will_update needs "exact", with_noise
-(True: nugget, array: noise standard deviations) needs "exact" or "vecchia"
+(True: nugget; array or scalar: observation-noise VARIANCES, like fit's noise)
+needs "exact" or "vecchia"
 ("nystrom" simulates the latent process only and raises for it).)pbdoc")
       .def("update",
            &PyKriging::update,
            py::arg("y_u"),
            py::arg("X_u"),
            py::arg("refit") = true,
-           py::arg("noise_u") = py::none())
+           py::arg("noise_u") = py::none(),
+           "Add (y_u, X_u) to the data (refit: re-estimate the parameters). A heterogeneous noise model needs "
+           "noise_u (noise variances of the new points): without it, raises ValueError.")
       .def("update_simulate",
            &PyKriging::update_simulate,
            py::arg("y_u"),
            py::arg("X_u"),
-           py::arg("noise_u") = py::none())
+           py::arg("noise_u") = py::none(),
+           "Condition the paths of the last simulate(..., will_update=True) on (y_u, X_u). A heterogeneous noise "
+           "model needs noise_u (noise variances of the new points): without it, raises ValueError. fit / update "
+           "drop the last simulate: call simulate(..., will_update=True) again (otherwise raises RuntimeError).")
       .def("summary", &PyKriging::summary)
       .def("save", &PyKriging::save)
       .def_static("load", &PyKriging::load)
@@ -498,7 +504,12 @@ discards n - n_max points outright.)pbdoc")
            py::arg("nsim") = 1,
            py::arg("seed") = 123,
            py::arg("X"),
-           py::arg("will_update") = false)
+           py::arg("will_update") = false,
+           py::arg("with_noise") = py::none(),
+           R"pbdoc(Conditional simulations at X. with_noise (default None: no noise): observation-noise
+VARIANCES (raw y scale, like fit's noise), a scalar or one per row of X; N(0, with_noise) draws are added to
+the simulated latent process (and again by update_simulate when will_update=True). Negative or NaN values
+raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pbdoc")
       .def("update_simulate",
            &PyWarpKriging::update_simulate,
            py::arg("y_u"),
@@ -594,7 +605,12 @@ discards n - n_max points outright.)pbdoc")
            py::arg("nsim") = 1,
            py::arg("seed") = 123,
            py::arg("X"),
-           py::arg("will_update") = false)
+           py::arg("will_update") = false,
+           py::arg("with_noise") = py::none(),
+           R"pbdoc(Conditional simulations at X. with_noise (default None: no noise): observation-noise
+VARIANCES (raw y scale, like fit's noise), a scalar or one per row of X; N(0, with_noise) draws are added to
+the simulated latent process (and again by update_simulate when will_update=True). Negative or NaN values
+raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pbdoc")
       .def("update_simulate", &PyMLPKriging::update_simulate, py::arg("y_u"), py::arg("X_u"))
       .def("update", &PyMLPKriging::update, py::arg("y_u"), py::arg("X_u"), py::arg("refit") = true)
       .def("summary", &PyMLPKriging::summary)

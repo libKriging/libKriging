@@ -181,4 +181,29 @@ end
         @test length(result.mean) == 10
         @test all(isfinite.(result.mean))
     end
+
+    @testset "Simulate with_noise holds variances" begin
+        X = reshape(collect(range(0.01, 0.99; length=10)), :, 1)
+        y = [f_test(x) for x in X[:, 1]]
+        k = MLPKriging(y, X, [8], 2; activation="tanh", kernel="gauss",
+                       parameters=Dict("max_iter_adam" => "100"))
+        Xn = reshape([0.15, 0.45, 0.85], :, 1)
+        var_n = [0.02, 0.1, 0.3]
+        # default call unchanged (no noise); same seed: identical latent draws
+        s0 = simulate(k, 5000, 7, Xn)
+        @test size(s0) == (3, 5000)
+        @test simulate(k, 5000, 7, Xn; with_noise=nothing) == s0
+        d = simulate(k, 5000, 7, Xn; with_noise=var_n) .- s0
+        m = sum(d; dims=2) ./ size(d, 2)
+        emp_var = vec(sum((d .- m) .^ 2; dims=2) ./ (size(d, 2) - 1))
+        @test all(abs.(emp_var ./ var_n .- 1) .< 0.15)
+        d1 = simulate(k, 5000, 8, Xn; with_noise=0.2) .- simulate(k, 5000, 8, Xn)
+        m1 = sum(d1; dims=2) ./ size(d1, 2)
+        emp_var1 = vec(sum((d1 .- m1) .^ 2; dims=2) ./ (size(d1, 2) - 1))
+        @test all(abs.(emp_var1 ./ 0.2 .- 1) .< 0.15)
+        # invalid variances raise
+        @test_throws ErrorException simulate(k, 10, 7, Xn; with_noise=-var_n)
+        @test_throws ErrorException simulate(k, 10, 7, Xn; with_noise=[0.1, NaN, 0.1])
+        @test_throws ErrorException simulate(k, 10, 7, Xn; with_noise=true)
+    end
 end

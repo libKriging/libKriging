@@ -45,6 +45,8 @@ arma::mat sims = model.simulate(/*nsim=*/10, /*seed=*/123, Xnew, /*will_update=*
 // simulate(nsim, seed, X, method, will_update), logLikelihood(method),
 // method = "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (the fitted k)
 arma::mat sims_u = model.update_simulate(y_new, X_new);  // condition those paths on new observations
+// (Heterogeneous model: update_simulate(y_new, noise_new, X_new); fit / update
+// drop the last simulate: call simulate(..., will_update=true) again)
 model.update(y_new, X_new, /*refit=*/true);
 
 model.save("k.json");                        // JSON
@@ -101,7 +103,10 @@ Heterogeneous model needs `update(y_u, noise_u, X_u, refit)`), `save` /
 with_nugget, will_update, "vecchia")` (Nugget) /
 `simulate(nsim, seed, X_n, with_noise, will_update, "vecchia")`
 (Heterogeneous), or `simulateVecchia(nsim, seed, X_n, m, with_nugget,
-with_noise)`.
+with_noise)`. `with_noise` (exact and Vecchia `simulate`) holds noise
+VARIANCES, like the `noise` of `fit` / `update`. LOO / LMP with an
+approximate method (`leaveOneOut("vecchia")`, `logMargPostNystromFun`, …)
+raise `std::invalid_argument` on a Nugget / Heterogeneous model.
 `Kriging::fit_objective_method(objective, method)` returns the canonical
 (objective, method) pair. Deprecated: objective `"LLVecchia(m)"` /
 `"LLNystrom(k)"` (aliases of `"LL"` + `"vecchia(m)"` / `"nystrom(k)"`).
@@ -135,7 +140,10 @@ One spec string per column of `X`, in column order (see `SKILL.md` §4 for
 the spec vocabulary). `WarpKriging::fit` ignores its `objective` argument
 (always `"LL"`), takes a trailing `method` of which only `"exact"` is
 implemented (same for `MLPKriging`), and its noise is a per-observation variance vector (there is
-no nugget mode).
+no nugget mode). `simulate(nsim, seed, X_n, will_update, with_noise)` (`WarpKriging` and
+`MLPKriging`) adds N(0, `with_noise`) observation noise: `with_noise` holds noise VARIANCES
+(scalar or one per row of `X_n`, like `Kriging`; negative/NaN raise `std::invalid_argument`),
+re-added by `update_simulate` after a `will_update=true` simulate.
 
 ## MLPKriging
 

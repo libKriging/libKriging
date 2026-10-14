@@ -1,4 +1,5 @@
 #include "MLPKriging_binding.hpp"
+#include "WarpKriging_binding.hpp"  // with_noise_variances
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
@@ -104,9 +105,10 @@ PyMLPKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool re
 py::array_t<double> PyMLPKriging::simulate(const int nsim,
                                            const int seed,
                                            const py::array_t<double>& X_n,
-                                           const bool will_update) {
+                                           const bool will_update,
+                                           const py::object& with_noise) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
-  auto result = m_internal->simulate(nsim, seed, mat_X, will_update);
+  auto result = m_internal->simulate(nsim, seed, mat_X, will_update, with_noise_variances(with_noise));
   return carma::mat_to_arr(result, true);
 }
 

@@ -52,7 +52,8 @@ class PyMLPKriging {
   py::array_t<double> simulate(const int nsim,
                                const int seed,
                                const py::array_t<double>& X_n,
-                               const bool will_update = false);
+                               const bool will_update = false,
+                               const py::object& with_noise = py::none());
 
   py::array_t<double> update_simulate(const py::array_t<double>& y_u, const py::array_t<double>& X_u);
 

@@ -603,3 +603,79 @@ def test_sklearn_regressor_method():
     assert reg.model_.method() == "nystrom(8)"
     assert reg.predict(X[:3]).shape == (3,)
     assert reg.sample_y(X[:3], n_samples=2).shape == (3, 2)
+
+
+def test_heterogeneous_noise_api():
+    """with_noise holds noise variances; update without noise_u raises;
+    approximate LOO / LMP raise on noise models"""
+    rng = np.random.default_rng(5)
+    n = 30
+    X = rng.uniform(size=(n, 2))
+    noise = np.full(n, 0.01)
+    y = np.sin(3 * X[:, 0]) + np.cos(5 * X[:, 1]) + np.sqrt(noise) * rng.standard_normal(n)
+    Xn = rng.uniform(size=(3, 2))
+    kh = lk.Kriging(y, X, "matern5_2", noise=noise)
+
+    # same seed: the latent draws are identical, the difference is the noise
+    var_n = np.array([0.05, 0.2, 0.5])
+    for method in ("exact", "vecchia"):
+        s_noisy = kh.simulate(20000, 7, Xn, with_noise=var_n, method=method)
+        s_latent = kh.simulate(20000, 7, Xn, with_noise=np.zeros(3), method=method)
+        emp_var = np.var(s_noisy - s_latent, axis=1, ddof=1)
+        np.testing.assert_allclose(emp_var, var_n, rtol=0.05)
+    with pytest.raises(ValueError):
+        kh.simulate(10, 7, Xn, with_noise=-var_n)
+
+    # update needs the noise of the new points
+    with pytest.raises(ValueError, match="heterogeneous noise model: use update"):
+        kh.update(y[:2], X[:2] + 0.01, False)
+    assert kh.X().shape == (n, 2)
+    kh.update(y[:2], X[:2] + 0.01, False, noise[:2])
+    assert kh.X().shape == (n + 2, 2)
+
+    # update_simulate needs the noise of the new points too; the failed call
+    # changes nothing
+    Xu = X[:2] + 0.02
+    kh.simulate(10, 7, Xn, will_update=True)
+    with pytest.raises(ValueError, match="heterogeneous noise model: use update_simulate"):
+        kh.update_simulate(y[:2], Xu)
+    u1 = kh.update_simulate(y[:2], Xu, noise[:2])
+    with pytest.raises(ValueError):
+        kh.update_simulate(y[:2], Xu)
+    np.testing.assert_allclose(kh.update_simulate(y[:2], Xu, noise[:2]), u1, atol=1e-12)
+
+    # approximate LOO / LMP: noise model None only
+    kv = lk.Kriging(y, X, "matern5_2", noise="nugget", method="vecchia(10)")
+    assert np.isfinite(kv.logLikelihood(method="vecchia"))
+    with pytest.raises(ValueError, match="not implemented for Nugget/Heterogeneous"):
+        kv.leaveOneOut(method="vecchia")
+    with pytest.raises(ValueError):
+        kv.logMargPost(method="vecchia")
+
+
+def test_fit_and_update_drop_the_last_simulate():
+    """simulate(will_update=True) -> update / fit -> update_simulate raises
+    (the stored paths were built for the previous model); a new simulate works"""
+    rng = np.random.default_rng(11)
+    X = rng.uniform(size=(15, 2))
+    y = np.sin(3 * X[:, 0]) + np.cos(5 * X[:, 1])
+    Xn = rng.uniform(size=(4, 2))
+    Xu = rng.uniform(size=(3, 2))
+    yu = np.sin(3 * Xu[:, 0]) + np.cos(5 * Xu[:, 1])
+    k = lk.Kriging(y, X, "gauss")
+    k.simulate(10, 1, Xn, will_update=True)
+    k.update_simulate(yu, Xu)
+    k.update(yu, Xu, False)
+    with pytest.raises(RuntimeError, match="No previous simulation data available"):
+        k.update_simulate(yu, Xu)
+    k.simulate(10, 1, Xn, will_update=True)
+    assert k.update_simulate(yu, Xu).shape == (4, 10)
+    k.fit(y, X, "constant", False, "BFGS", "LL")
+    with pytest.raises(RuntimeError, match="No previous simulation data available"):
+        k.update_simulate(yu, Xu)
+
+    wk = lk.WarpKriging(y, X, ["affine", "affine"], "gauss", parameters={"max_iter_adam": "20"})
+    wk.simulate(10, 1, Xn, will_update=True)
+    wk.update(yu, Xu, refit=False)
+    with pytest.raises(RuntimeError, match="No previous simulation data available"):
+        wk.update_simulate(yu, Xu)

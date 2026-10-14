@@ -110,12 +110,30 @@ PyWarpKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool r
                          carma::mat_to_arr(stdev_deriv, true));
 }
 
+arma::vec with_noise_variances(const py::object& with_noise) {
+  // None: no observation noise. Otherwise noise VARIANCES (raw y scale, like
+  // fit's noise): a scalar (common to every point) or one per row of X_n.
+  // There is no "fitted nugget" shortcut (unlike Kriging's with_noise=True):
+  // a bool is rejected rather than silently read as 0 / 1.
+  if (with_noise.is_none())
+    return {};
+  if (py::isinstance<py::bool_>(with_noise))
+    throw std::invalid_argument("simulate: with_noise must hold noise variances (a number or an array), not a bool");
+  if (py::isinstance<py::float_>(with_noise) || py::isinstance<py::int_>(with_noise))
+    return arma::vec{with_noise.cast<double>()};
+  auto arr = py::cast<py::array_t<double, py::array::c_style | py::array::forcecast>>(with_noise);
+  if (arr.ndim() == 0)  // numpy scalar
+    return arma::vec{*arr.data()};
+  return to_owned_col(arr);
+}
+
 py::array_t<double> PyWarpKriging::simulate(const int nsim,
                                             const int seed,
                                             const py::array_t<double>& X_n,
-                                            const bool will_update) {
+                                            const bool will_update,
+                                            const py::object& with_noise) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
-  auto result = m_internal->simulate(nsim, seed, mat_X, will_update);
+  auto result = m_internal->simulate(nsim, seed, mat_X, will_update, with_noise_variances(with_noise));
   return carma::mat_to_arr(result, true);
 }
 

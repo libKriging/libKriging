@@ -92,6 +92,52 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test p_before.mean != p_after.mean
     end
 
+    @testset "Update without noise_u raises" begin
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
+        X_new = reshape([0.35], :, 1)
+        y_new = [f_test(0.35)]
+        err = try
+            update!(nk, y_new, X_new; refit=false)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ErrorException
+        @test occursin("heterogeneous noise model: use update(y_u, noise_u, X_u)", err.msg)
+        @test size(X(nk)) == (n_train, 1)  # unchanged
+    end
+
+    @testset "Update_simulate without noise_u raises" begin
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
+        X_new = reshape([0.35], :, 1)
+        y_new = [f_test(0.35)]
+        simulate(nk, 10, 7, X_test; will_update=true)
+        err = try
+            update_simulate(nk, y_new, X_new)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ErrorException
+        @test occursin("heterogeneous noise model: use update_simulate(y_u, noise_u, X_u)", err.msg)
+        u1 = update_simulate(nk, y_new, X_new; noise_u=[noise_level^2])
+        @test size(u1) == (n_test, 10)
+        # fit / update drop the last simulate
+        update!(nk, y_new, X_new; noise_u=[noise_level^2], refit=false)
+        @test_throws ErrorException update_simulate(nk, y_new, X_new; noise_u=[noise_level^2])
+    end
+
+    @testset "Simulate with_noise holds variances" begin
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
+        var_n = collect(range(0.05, 0.5; length=n_test))
+        s_noisy = simulate(nk, 20000, 7, X_test; with_noise=var_n)
+        s_latent = simulate(nk, 20000, 7, X_test; with_noise=zeros(n_test))
+        d = s_noisy .- s_latent
+        m = sum(d; dims=2) ./ size(d, 2)
+        emp_var = vec(sum((d .- m) .^ 2; dims=2) ./ (size(d, 2) - 1))
+        @test all(abs.(emp_var ./ var_n .- 1) .< 0.05)
+    end
+
     @testset "Summary" begin
         nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
         s = jlibkriging.summary(nk)

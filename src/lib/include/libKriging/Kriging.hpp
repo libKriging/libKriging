@@ -249,13 +249,17 @@ class Kriging : public KrigingImpl {
   /** Leave-one-out criterion at the committed theta, computed with an explicit
    * method: "exact" (= leaveOneOut()), "vecchia" (leaveOneOutVecchiaFun,
    * requires a method="vecchia(m)" fit) or "nystrom" (leaveOneOutNystromFun,
-   * requires a method="nystrom(k)" fit). See docs/math/LOO.md. */
+   * requires a method="nystrom(k)" fit). The approximate methods are noise
+   * model None only: on a Nugget / Heterogeneous model they raise
+   * std::invalid_argument (like fit with objective "LOO" and an approximate
+   * method). See docs/math/LOO.md. */
   LIBKRIGING_EXPORT double leaveOneOut(const std::string& method);
   LIBKRIGING_EXPORT double logMargPost();
   /** Log-marginal posterior at the committed theta, computed with an explicit
    * method: "exact" (= logMargPost()), "vecchia" (logMargPostVecchiaFun) or
    * "nystrom" (logMargPostNystromFun), with the same fit requirements as
-   * leaveOneOut(method). See docs/math/LMP.md. */
+   * leaveOneOut(method) (approximate methods: noise model None only). See
+   * docs/math/LMP.md. */
   LIBKRIGING_EXPORT double logMargPost(const std::string& method);
 
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> leaveOneOutVec(const arma::vec& theta);
@@ -273,7 +277,8 @@ class Kriging : public KrigingImpl {
    * leaveOneOut("vecchia") == leaveOneOutVecchiaFun(theta()) etc., and a
    * normalize=true model gives the normalize=false values whenever the
    * approximation itself is scale-free (all predecessors as Vecchia
-   * neighbors, all points as Nystrom landmarks). Noise model None only. */
+   * neighbors, all points as Nystrom landmarks). Noise model None only: on a
+   * Nugget / Heterogeneous model they raise std::invalid_argument. */
   /** Leave-one-out criterion under the Vecchia joint law (precision
    * B' D^-1 B) at given theta; requires a method="vecchia(m)" fit.
    * @return (loo, gradient) ; analytic gradient, empty if return_grad=false. */
@@ -346,13 +351,14 @@ class Kriging : public KrigingImpl {
    * conventions: the observations are noisy responses, the simulated values
    * are the latent process unless `with_nugget` (Nugget: noisy response, as
    * simulate(..., with_nugget, ...)); `with_noise` adds independent noise
-   * afterwards (standard deviations, as simulate(..., with_noise, ...)).
+   * afterwards (noise variances, as simulate(..., with_noise, ...)).
    * @param m number of conditioning neighbors (0 = vecchia_neighbors() if
    *          fitted with method "vecchia", else 30)
    * @param with_nugget Nugget model only: simulate the noisy response
-   * @param with_noise empty, a scalar or one standard deviation per row of
-   *          X_n, in the original scale of y (whatever normalize): Gaussian
-   *          noise added to the simulations
+   * @param with_noise empty, a scalar or one noise VARIANCE per row of X_n
+   *          (like fit's / update's noise), in the original scale of y
+   *          (whatever normalize): Gaussian noise N(0, with_noise) added to
+   *          the simulations; negative values raise std::invalid_argument
    * @return output is n_n*nsim matrix of simulations at X_n */
   LIBKRIGING_EXPORT arma::mat simulateVecchia(int nsim,
                                               int seed,
@@ -436,7 +442,10 @@ class Kriging : public KrigingImpl {
                                        const arma::mat& X_n,
                                        const bool with_nugget,
                                        const bool will_update);
-  // Heterogeneous-mode variant: with_noise is per-observation noise to add to simulations
+  // Heterogeneous-mode variant: with_noise holds observation-noise VARIANCES
+  // (original y scale, like fit's / update's noise: a scalar or one per row of
+  // X_n; negative values raise std::invalid_argument); N(0, with_noise) noise
+  // is added to the (latent) simulations. update_simulate reuses it.
   LIBKRIGING_EXPORT arma::mat simulate(int nsim,
                                        int seed,
                                        const arma::mat& X_n,
@@ -486,18 +495,28 @@ class Kriging : public KrigingImpl {
    * @return
    *
    * put is m*nsim matrix of simulations at X_n
+   * Needs a previous simulate(..., will_update=true) on the current model:
+   * fit() and update() drop it, after which this raises std::runtime_error
+   * ("No previous simulation data available"). A Heterogeneous model needs
+   * the noise of the new data: this overload raises std::invalid_argument
+   * (before any change) on it; use update_simulate(y_u, noise_u, X_u).
    */
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::mat& X_u);
-  // Heterogeneous-mode variant: noise_u is per-observation noise for new points
+  // Heterogeneous-mode variant: noise_u is per-observation noise VARIANCE for
+  // the new points (like update's noise_u); the with_noise variances of the
+  // last simulate(..., with_noise, true) are added to the result again
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::vec& noise_u, const arma::mat& X_u);
 
   /** Add new conditional data points to previous (X,y)
    * @param y_u is m length column vector of new output
    * @param X_u is m*d matrix of new input
    * @param refit is true if re-fit the model after data update
+   * A Heterogeneous model needs the noise of the new data: this overload
+   * raises std::invalid_argument (before any change) on it; use
+   * update(y_u, noise_u, X_u).
    */
   LIBKRIGING_EXPORT void update(const arma::vec& y_u, const arma::mat& X_u, const bool refit = true);
-  // Heterogeneous-mode variant: noise_u is per-observation noise for new points
+  // Heterogeneous-mode variant: noise_u is per-observation noise VARIANCE for new points
   LIBKRIGING_EXPORT void update(const arma::vec& y_u,
                                 const arma::vec& noise_u,
                                 const arma::mat& X_u,
@@ -530,6 +549,11 @@ class Kriging : public KrigingImpl {
   // Simulate state for Nugget/Heterogeneous modes (mirrors NuggetKriging/NoiseKriging)
   bool m_lastsim_with_nugget = false;
   arma::vec m_lastsim_with_noise;
+  // Update-points cache key complement: noise_u of the last update_simulate
+  // (empty for the noise-free form). The base cache is keyed on X_u only.
+  arma::vec m_lastsimup_noise_u;
+  /// KrigingImpl::clear_simulate_state plus the members above
+  void clear_simulate_state();
 
   using FitOfn = std::function<double(const arma::vec&, arma::vec*, KModel*)>;
   FitOfn make_fit_objective(const std::string& objective) const;
@@ -663,6 +687,10 @@ class Kriging : public KrigingImpl {
   /// Throw unless the model was fitted with the Vecchia (vecchia=true) /
   /// Nystrom method; rebuilds the Vecchia sets if needed (after load)
   void ensure_approx_sets(bool vecchia, const char* what);
+  /// Throw std::invalid_argument if the model has a noise model (Nugget /
+  /// Heterogeneous): LOO / LMP with an approximate method are noise-free only
+  /// (same restriction as fit with objective "LOO" / "LMP")
+  void check_approx_noise_free(bool loo, bool vecchia, const char* what) const;
   void check_approx_theta(const arma::vec& theta, const char* what) const;
   /// LOO value factor from the internal to the original scale (scaleY^2)
   [[nodiscard]] double loo_scale2() const;

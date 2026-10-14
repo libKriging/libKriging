@@ -220,8 +220,9 @@ exact factorization.
   will_update, "vecchia")` / `simulateVecchia(nsim, seed, X, m, true)`).
 - Heterogeneous: prediction and simulation are those of the latent
   process (variance scale σ², cross correlation C), `with_noise`
-  (standard deviations) adding independent noise to the simulations, as
-  the exact `simulate(…, with_noise, …)`.
+  (noise variances, like the fit's `noise`) adding independent
+  N(0, `with_noise`) noise to the simulations, as the exact
+  `simulate(…, with_noise, …)`.
 - `predictVecchia` / `simulateVecchia` are also usable after an exact
   noise-model fit (then exact for m = n, resp. m ≥ n + q − 1, with no
   trend: tested).

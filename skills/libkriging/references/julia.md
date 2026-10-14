@@ -30,6 +30,13 @@ p = predict(k, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
 s = simulate(k, 10, 123, Xnew; will_update=true)   # (k, nsim, seed, X) -> size(Xnew,1) x nsim
 s_u = update_simulate(k, y_u, X_u)   # condition those paths on new observations
 update!(k, y_u, X_u; refit=true)
+# heterogeneous noise model (noise=<variance vector>): with_noise= / noise_u= are
+# noise VARIANCES, like the fit's noise; update! / update_simulate without
+# noise_u raise an error
+# s = simulate(k, 10, 123, Xnew; with_noise=noise_var_new, will_update=true)
+# s_u = update_simulate(k, y_u, X_u; noise_u=noise_var_u)
+# update!(k, y_u, X_u; noise_u=noise_var_u, refit=true)
+# fit! / update! drop the last simulate: simulate(...; will_update=true) again
 
 save(k, "k.json")              # JSON, any libKriging class
 k = jlibkriging.load("k.json")  # auto-detects the class
@@ -60,6 +67,9 @@ wk = WarpKriging(y, X, ["kumaraswamy", "categorical(5,2)", "none"], "gauss";
                  noise=nothing,      # nothing | Vector{Float64} of variances (no "nugget" mode)
                  method="exact")     # only "exact" is implemented (same for MLPKriging)
 predict(wk, Xnew; return_stdev=true)
+s = simulate(wk, 10, 123, Xnew; will_update=false, with_noise=nothing)
+# with_noise: nothing (latent process) | noise VARIANCES, a scalar or a
+# Vector{Float64} with one per row of Xnew (same for MLPKriging; negative/NaN raise)
 ```
 
 ## MLPKriging
