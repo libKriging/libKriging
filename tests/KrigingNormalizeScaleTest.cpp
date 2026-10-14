@@ -83,6 +83,18 @@ void require_close(const arma::vec& a, const arma::vec& b, double rel) {
   }
 }
 
+// predicted standard deviations, compared as variances: at training points the
+// stdev is sqrt(~0), where round-off of order 1e-10 in the variance becomes 1e-5
+void require_close_stdev(const arma::vec& a, const arma::vec& b, double rel) {
+  REQUIRE(a.n_elem == b.n_elem);
+  const arma::vec va = arma::square(a), vb = arma::square(b);
+  const double margin = rel * std::max(va.max(), vb.max());
+  for (arma::uword i = 0; i < va.n_elem; i++) {
+    CAPTURE(i, a(i), b(i));
+    CHECK(va(i) == Approx(vb(i)).epsilon(rel).margin(margin));
+  }
+}
+
 // gamma = [theta] / [theta, alpha] / [theta, sigma2] of a fitted model, original scale
 arma::vec public_gamma(const Kriging& k) {
   if (k.noise_model() == NM::None)
@@ -720,7 +732,7 @@ TEST_CASE("normalize=true: Nystrom noise models agree with normalize=false", "[n
   auto [mn, sn] = kn.predictNystrom(Xn, true);
   auto [mo, so] = ko.predictNystrom(Xn, true);
   require_close(mn, mo, tol);
-  require_close(sn, so, 1e-5);
+  require_close_stdev(sn, so, 1e-5);
   require_close(arma::vectorise(kn.simulateNystrom(7, 123, Xn)), arma::vectorise(ko.simulateNystrom(7, 123, Xn)), 1e-5);
   require_close(
       arma::vectorise(kn.simulate(7, 123, Xn, "nystrom")), arma::vectorise(kn.simulateNystrom(7, 123, Xn)), 0.0);
@@ -747,7 +759,7 @@ TEST_CASE("normalize=true: Nystrom noise models agree with normalize=false", "[n
   auto [mun, sun] = kn.predictNystrom(Xn, true);
   auto [muo, suo] = ko.predictNystrom(Xn, true);
   require_close(mun, muo, tol);
-  require_close(sun, suo, 1e-5);
+  require_close_stdev(sun, suo, 1e-5);
 }
 
 TEST_CASE("normalize=true: Nystrom noise-model BFGS fit, objective at the accessors", "[normalize][kriging][nystrom]") {
