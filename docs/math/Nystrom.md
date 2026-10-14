@@ -76,10 +76,12 @@ that fit in the domain.
 - **Low-rank factor**: once S is fixed, R_ss (k×k) and R_ns (n×k) are
   ordinary, smooth functions of θ. With L_ss = chol(R_ss),
   U := R_ns · L_ss⁻ᵀ satisfies U·Uᵀ = R_ns · R_ss⁻¹ · R_ns.t() exactly.
-- **Woodbury identity**: R⁻¹ and log|R| are obtained from U (and a
-  small jittered residual diagonal keeping the factorization SPD)
-  through `LinearAlgebra::woodbury_solve` / `woodbury_logdet`, both
-  O(n·k²) — the dense n×n matrix R is never formed.
+- **Woodbury identity**: R⁻¹ and log|R| are obtained from U and the
+  residual diagonal D = max(1 − diag(U·Uᵀ), num_nugget) (which restores
+  a unit diagonal, the floor keeping D⁻¹ finite for points at or next to
+  a landmark) through `LinearAlgebra::woodbury_solve` /
+  `woodbury_logdet`, both O(n·k²) — the dense n×n matrix R is never
+  formed. See the illustration below.
 - **Profiling**: matches the exact `"LL"` objective — σ² has a closed
   form and β is profiled by generalized least squares, using the same
   GLS formulas as the exact objective, just solved via Woodbury instead
@@ -117,6 +119,32 @@ that fit in the domain.
   the committed rank-k factors (U, D) directly (and the method); `update_simulate`
   raises a clear error (no such path exists yet, see Current
   limitations).
+
+### Woodbury identity, illustrated
+
+![nystrom_woodbury](images/nystrom_woodbury.png)
+
+1. The approximated matrix is R̃ = D + U·Uᵀ: an *easy* part (D,
+   diagonal, inverted by n divisions) plus a *thin* part (U is n×k, so
+   U·Uᵀ has rank k ≪ n and only acts in a k-dimensional subspace).
+2. Woodbury inverts the easy part and corrects only inside that
+   subspace:
+
+   R̃⁻¹ = D⁻¹ − D⁻¹U · M⁻¹ · UᵀD⁻¹,   M = I_k + UᵀD⁻¹U  (k×k)
+
+   log|R̃| = Σ log Dᵢ + log|M|   (matrix determinant lemma, same M)
+
+   The only factorization is that of the k×k matrix M (O(k³)); the rest
+   is products with U (O(n·k²)). Memory: U and D, n·(k+1) numbers
+   instead of n².
+3. Same solution as a dense solve (relative difference ~1e-14 in the
+   figure), at a fraction of the cost; the timings are indicative (numpy,
+   one machine) and the gain shrinks as k approaches n.
+
+Woodbury itself is exact: the approximation error of Nystrom comes
+entirely from replacing R by D + U·Uᵀ (see the illustration at the top
+of this page), not from this identity. Regenerate the figure with
+`python3 docs/math/scalability_figures.py`.
 
 ## Usage
 
