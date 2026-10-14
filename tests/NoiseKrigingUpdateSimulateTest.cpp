@@ -266,3 +266,30 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     }
   }
 }
+
+TEST_CASE("NoiseKrigingUpdateSimulateTest - noisy update_simulate does not leak into the noise-free form",
+          "[update_simulate][noisekriging]") {
+  arma::arma_rng::set_seed(321);
+  const arma::uword d = 2;
+  arma::mat X_old(15, d, arma::fill::randu);
+  arma::vec y_old = arma::sin(3.0 * X_old.col(0)) + arma::cos(5.0 * X_old.col(1));
+  arma::mat X_new(4, d, arma::fill::randu);
+  arma::vec y_new = arma::sin(3.0 * X_new.col(0)) + arma::cos(5.0 * X_new.col(1));
+  arma::mat X_sim(6, d, arma::fill::randu);
+
+  Kriging::Parameters params;
+  params.sigma2 = 1.0;
+  params.is_sigma2_estim = false;
+  params.theta = arma::mat(arma::vec(d).fill(0.5));
+  params.is_theta_estim = false;
+  Kriging k("gauss", Kriging::NoiseModel::Heterogeneous);
+  k.fit(y_old, arma::vec(15).fill(0.01), X_old, Trend::RegressionModel::Constant, false, "none", "LL", params);
+
+  k.simulate(50, 7, X_sim, arma::vec(), true);
+  const arma::mat free_first = k.update_simulate(y_new, X_new);
+  const arma::mat noisy = k.update_simulate(y_new, arma::vec(4).fill(0.5), X_new);
+  REQUIRE(arma::abs(noisy - free_first).max() > 1e-6);  // the noise_u does change the result
+  // Same X_u as the noisy call: must not reuse its (noisy) cached factorisation
+  const arma::mat free_after = k.update_simulate(y_new, X_new);
+  CHECK(arma::approx_equal(free_after, free_first, "absdiff", 1e-10));
+}

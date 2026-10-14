@@ -4291,6 +4291,9 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
                                         /*R_un_factor=*/1.0,
                                         /*R_un_coincident_to_one=*/false,
                                         /*Sigma_divisor=*/1.0);
+  // The update-points cache (lastsimup_*) now holds a noisy R_uu, keyed on X_u
+  // only: invalidate it so that a later update_simulate(y_u, X_u) does not reuse it.
+  lastsimup_Xn_u.clear();
   if (m_lastsim_with_noise.n_elem == 1 || m_lastsim_with_noise.n_elem == n_n)
     add_noise_draws(y_up, m_lastsim_with_noise, "update_simulate");
   return y_up;
