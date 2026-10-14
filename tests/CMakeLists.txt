@@ -288,6 +288,23 @@ target_link_libraries(GetVersion LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries GetVersion)
 add_test(NAME GetVersion COMMAND GetVersion)
 
+# Check that the installed CMake package can be used with find_package(libKriging) (issue #127)
+# Needs `cmake --install` (CMake >= 3.15); installs only the library and its dependencies, not the tests
+if (NOT CMAKE_VERSION VERSION_LESS 3.15)
+    add_test(NAME cmake_package
+            COMMAND ${CMAKE_COMMAND}
+            -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cmake_package
+            -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/cmake_package
+            -DCONFIG=$<CONFIG>
+            -DGENERATOR=${CMAKE_GENERATOR}
+            -DPLATFORM=${CMAKE_GENERATOR_PLATFORM}
+            -DCXX_COMPILER=${CMAKE_CXX_COMPILER}
+            -DEXPECTED_VERSION=${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}
+            "-DINSTALL_DIRS=${PROJECT_BINARY_DIR}/dependencies/armadillo-code|${PROJECT_BINARY_DIR}/dependencies/lbfgsb_cpp|${PROJECT_BINARY_DIR}/src/lib"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake_package/run_test.cmake)
+    set_tests_properties(cmake_package PROPERTIES LABELS "install")
+endif ()
+
 add_executable(JsonTest demo/JsonTest.cpp)
 target_link_libraries(JsonTest LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries JsonTest)

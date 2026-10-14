@@ -3,7 +3,14 @@
 include(CMakeFindDependencyMacro)
 
 # Public dependencies of the Kriging target
-find_dependency(Armadillo CONFIG)
+# Armadillo's own ArmadilloConfig.cmake contains absolute paths (not relocatable): when Armadillo is installed
+# together with libKriging, import its (relocatable) export file directly
+if (NOT TARGET armadillo)
+    include("${PACKAGE_PREFIX_DIR}/share/Armadillo/CMake/ArmadilloLibraryDepends.cmake" OPTIONAL)
+endif ()
+if (NOT TARGET armadillo)
+    find_dependency(Armadillo CONFIG)
+endif ()
 find_dependency(lbfgsb_cpp)
 if (@OpenMP_CXX_FOUND@)
     find_dependency(OpenMP COMPONENTS CXX)
