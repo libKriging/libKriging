@@ -101,7 +101,10 @@ Heterogeneous model needs `update(y_u, noise_u, X_u, refit)`), `save` /
 with_nugget, will_update, "vecchia")` (Nugget) /
 `simulate(nsim, seed, X_n, with_noise, will_update, "vecchia")`
 (Heterogeneous), or `simulateVecchia(nsim, seed, X_n, m, with_nugget,
-with_noise)`.
+with_noise)`. `with_noise` (exact and Vecchia `simulate`) holds noise
+VARIANCES, like the `noise` of `fit` / `update`. LOO / LMP with an
+approximate method (`leaveOneOut("vecchia")`, `logMargPostNystromFun`, …)
+raise `std::invalid_argument` on a Nugget / Heterogeneous model.
 `Kriging::fit_objective_method(objective, method)` returns the canonical
 (objective, method) pair. Deprecated: objective `"LLVecchia(m)"` /
 `"LLNystrom(k)"` (aliases of `"LL"` + `"vecchia(m)"` / `"nystrom(k)"`).

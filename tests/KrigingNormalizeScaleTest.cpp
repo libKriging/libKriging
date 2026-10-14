@@ -574,23 +574,24 @@ TEST_CASE("normalize=true: Vecchia noise models agree with normalize=false", "[n
   require_close(mn, mo, tol);
   require_close(sn, so, tol);
   const arma::uword m_all = n + Xn.n_rows;
-  const arma::vec sdn = arma::linspace(0.5, 2.0, Xn.n_rows);  // original-scale standard deviations
+  const arma::vec varn = arma::square(arma::linspace(0.5, 2.0, Xn.n_rows));  // original-scale noise variances
+  const arma::vec sdn = arma::sqrt(varn);
   for (bool with_nugget : {false, true}) {
     if (with_nugget && nm != NM::Nugget)
       continue;
-    const arma::mat sim_n = kn.simulateVecchia(7, 123, Xn, m_all, with_nugget, sdn);
-    const arma::mat sim_o = ko.simulateVecchia(7, 123, Xn, m_all, with_nugget, sdn);
+    const arma::mat sim_n = kn.simulateVecchia(7, 123, Xn, m_all, with_nugget, varn);
+    const arma::mat sim_o = ko.simulateVecchia(7, 123, Xn, m_all, with_nugget, varn);
     CAPTURE(with_nugget);
     require_close(arma::vectorise(sim_n), arma::vectorise(sim_o), 1e-6);
   }
   // with_noise is in the original scale, as for the exact simulate(): the
   // added noise does not depend on normalize
   const arma::mat s0 = kn.simulateVecchia(4, 5, Xn, m_all);
-  const arma::mat s1 = kn.simulateVecchia(4, 5, Xn, m_all, false, sdn);
+  const arma::mat s1 = kn.simulateVecchia(4, 5, Xn, m_all, false, varn);
   arma::mat eps = s1 - s0;
   eps.each_col() /= sdn;
   Kriging ko2 = vfit(false);
-  arma::mat eps_o = ko2.simulateVecchia(4, 5, Xn, m_all, false, sdn) - ko2.simulateVecchia(4, 5, Xn, m_all);
+  arma::mat eps_o = ko2.simulateVecchia(4, 5, Xn, m_all, false, varn) - ko2.simulateVecchia(4, 5, Xn, m_all);
   eps_o.each_col() /= sdn;
   require_close(arma::vectorise(eps), arma::vectorise(eps_o), 1e-6);
 

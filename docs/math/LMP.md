@@ -69,7 +69,9 @@ nugget-to-signal ratio — one prior term regularizes both.
 
 ### Approximate versions (`method="vecchia(m)"` / `"nystrom(k)"`)
 
-With an approximate fit method (noise-free models only), the same
+With an approximate fit method (noise-free models only: on a nugget /
+heterogeneous-noise model, the fit and every approximate evaluation —
+`leaveOneOut("vecchia")`, `logMargPostNystromFun`, … — raise), the same
 formula is evaluated with the approximate correlation matrix R̃ and its
 precision P = R̃⁻¹:
 

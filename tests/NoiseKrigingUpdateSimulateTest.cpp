@@ -63,7 +63,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     // Method 1: Use update_simulate
     const int n_sims = 1000;
     const int seed = 789;
-    nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), true);  // Store for update_simulate
+    nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), true);  // Store for update_simulate
     arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
 
     // Method 2: Build nk2 with same fixed parameters on full data
@@ -72,7 +72,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     arma::colvec y_full = arma::join_cols(y_old, y_new);
     arma::colvec noise_full = arma::join_cols(noise_old, noise_new);
     nk2.fit(y_full, noise_full, X_full, Trend::RegressionModel::Constant, false, "none", "LL", params_fixed);
-    arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), false);
+    arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), false);
 
     // Save simulations to CSV for debugging
     sims1.save("sims1_noise_update_simulate.csv", arma::csv_ascii);
@@ -121,7 +121,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     const int seed = 999;
 
     // Use update_simulate with multiple new points
-    nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), true);
+    nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), true);
     arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
 
     // Build nk2 with same fixed parameters on full data
@@ -130,7 +130,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     arma::colvec y_full = arma::join_cols(y_old, y_new);
     arma::colvec noise_full = arma::join_cols(noise_old, noise_new);
     nk2.fit(y_full, noise_full, X_full, Trend::RegressionModel::Constant, false, "none", "LL", params_fixed);
-    arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), false);
+    arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), false);
 
     // KS test
     int ks_failures = 0;
@@ -175,7 +175,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       const int n_sims = 1000;
       const int seed = 111;
 
-      nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), true);
+      nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), true);
       arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
 
       // Build nk2 with same fixed parameters on full data
@@ -184,7 +184,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       arma::colvec y_full = arma::join_cols(y_old, y_new);
       arma::colvec noise_full = arma::join_cols(noise_old, noise_new);
       nk2.fit(y_full, noise_full, X_full, Trend::RegressionModel::Constant, false, "none", "LL", params_fixed);
-      arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), false);
+      arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), false);
 
       // KS test
       int ks_failures = 0;
@@ -238,7 +238,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       const int n_sims = 1000;
       const int seed = 222;
 
-      nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), true);
+      nk1.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), true);
       arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
 
       // Build nk2 with same fixed parameters on full data
@@ -247,7 +247,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       arma::colvec y_full = arma::join_cols(y_old, y_new);
       arma::colvec noise_full = arma::join_cols(noise_old, noise_new);
       nk2.fit(y_full, noise_full, X_full, trend, false, "none", "LL", params_fixed);
-      arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(0.01), false);
+      arma::mat sims2 = nk2.simulate(n_sims, seed, X_sim, arma::vec(X_sim.n_rows).fill(1e-4), false);
 
       // KS test
       int ks_failures = 0;

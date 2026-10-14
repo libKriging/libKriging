@@ -405,11 +405,12 @@ arma::mat kriging_simulate(Rcpp::List k,
   // "exact" or "vecchia"
   if (with_noise.isNotNull()) {
     Rcpp::NumericVector wn(with_noise);
-    if (wn.length() == 1 && Rcpp::as<bool>(wn)) {
+    if (TYPEOF(with_noise.get()) == LGLSXP && wn.length() == 1 && Rcpp::as<bool>(wn)) {
       // with_noise = TRUE means "include nugget" (nugget mode)
       return impl_ptr->simulate(nsim, seed, X_n, true, will_update, method);
     } else {
-      // with_noise is a numeric vector (heterogeneous noise)
+      // with_noise is a numeric vector (heterogeneous noise): noise
+      // VARIANCES (scalar or one per row of X_n), like fit's noise
       arma::vec noise_vec = Rcpp::as<arma::vec>(with_noise);
       return impl_ptr->simulate(nsim, seed, X_n, noise_vec, will_update, method);
     }

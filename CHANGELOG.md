@@ -12,6 +12,33 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Kriging (breaking): `simulate(…, with_noise, …)` takes noise VARIANCES**,
+  consistent with the `noise` of `fit` / `update(y_u, noise_u, X_u)` /
+  `update_simulate(y_u, noise_u, X_u)` (which already were variances):
+  the exact `simulate`, `simulateVecchia` / `simulate(…, method="vecchia")`
+  and the noise `update_simulate` re-adds now draw N(0, `with_noise`)
+  observation noise, where they used `with_noise` as a standard deviation.
+  Existing code passing standard deviations must pass their squares. Negative
+  (or NaN) values raise `std::invalid_argument`. Applies to every binding
+  (Python `with_noise=` array, R numeric `with_noise`, Julia `with_noise=`,
+  Octave / MATLAB `simulate(nsim, seed, X_n, with_noise, …)`). An empty
+  `with_noise` in the exact path no longer adds an uninitialized matrix.
+  R: a numeric scalar `with_noise` (e.g. `0.3`) is now a noise variance for
+  every point; it was taken as the logical nugget flag `TRUE`.
+- **Kriging: LOO / LMP with an approximate method reject noise models.**
+  `leaveOneOut(method)`, `logMargPost(method)`, `leaveOneOutVec(theta,
+  method)` with `"vecchia"` / `"nystrom"`, and `leaveOneOutVecchiaFun`,
+  `leaveOneOutNystromFun`, `logMargPostVecchiaFun`, `logMargPostNystromFun`
+  raise `std::invalid_argument` (Python `ValueError`, R / Julia / Octave
+  error; same wording as the `fit` check) on a Nugget / Heterogeneous model,
+  where they silently returned the noise-free approximate criterion. The
+  exact `leaveOneOut()` / `logMargPost()` and their `*Fun` are unchanged
+  (they use the noisy covariance at the committed nugget / noise).
+- **Kriging: `update(y_u, X_u)` on a Heterogeneous model** raises
+  `std::invalid_argument("heterogeneous noise model: use update(y_u,
+  noise_u, X_u)")` before any state change (Python `ValueError`, R / Julia /
+  Octave error), for every method; the exact path used to fail with an
+  unclear dimension error after extending the data.
 - **Kriging (breaking): with `normalize=true`, every parameter accessor and
   objective function is in the ORIGINAL scale of `X` and `y`**, like the
   `parameters` given to `fit` (which already were), so that input and output
@@ -170,8 +197,8 @@ past release, see the corresponding entry on the
   binding) accept `"vecchia"`. New C++ accessor `Kriging::alpha()`
   (scale-free). With `normalize=true` these follow the original-scale
   convention above: `logLikelihoodVecchiaFun` takes an original-scale
-  `[theta, alpha]` / `[theta, sigma2]`, `with_noise` standard deviations are
-  in the scale of `y`, and a Vecchia noise-model fit with all predecessors as
+  `[theta, alpha]` / `[theta, sigma2]`, `with_noise` (noise variances since
+  the breaking change above) is in the scale of `y`, and a Vecchia noise-model fit with all predecessors as
   neighbors reports the same parameters, likelihood, gradient, predictions
   and simulations as a `normalize=false` one (with fewer neighbors they
   differ by design: the neighbors are searched in the normalized inputs).
@@ -209,6 +236,14 @@ past release, see the corresponding entry on the
   dispatches to it.
 
 ### Fixed
+- **Octave / MATLAB `Kriging.logLikelihoodFun`**: the 4th argument
+  (`want_hess`) was passed to the C++ `logLikelihoodFun(theta, return_grad,
+  bench)` as `bench` (printing timings instead of returning a hessian). The
+  signature is now `[ll, llgrad, llhess] = logLikelihoodFun(theta,
+  return_grad, return_hess, bench)`, as in Python / R: `Kriging` computes no
+  hessian, so `llhess` is empty (as in Python / R), and `bench` is the 5th
+  argument. Julia `log_likelihood_fun(::Kriging; return_hess=true)` returns
+  an empty hessian instead of an uninitialized `n × n` matrix.
 - `Kriging::simulate` nugget (`with_nugget`) and heterogeneous-noise
   (`with_noise`) overloads skipped the light-fit checks: on a Nystrom or
   Vecchia fit without factorization they went to the exact simulator, which has no

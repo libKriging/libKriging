@@ -35,11 +35,15 @@ mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(
 sims = model.simulate(nsim=10, seed=123, X=Xnew, will_update=True)   # shape (q, nsim)
 sims_u = model.update_simulate(y_u, X_u)   # condition those paths on new observations
 model.update(y_u, X_u, refit=True)
+# heterogeneous noise model (noise=<variance vector>): with_noise= / noise_u= are
+# noise VARIANCES, like the fit's noise; update without noise_u raises ValueError
+# sims = model.simulate(10, 123, Xnew, with_noise=noise_var_new)
+# model.update(y_u, X_u, refit=True, noise_u=noise_var_u)
 
 model.logLikelihood()
 model.leaveOneOut()
 model.logMargPost()
-ll, grad, _hess = model.logLikelihoodFun(theta, return_grad=True, want_hess=False)  # (ll, grad, hess)
+ll, grad, _hess = model.logLikelihoodFun(theta, return_grad=True, want_hess=False)  # (ll, grad, hess: always empty)
 ```
 
 Do **not** instantiate `NuggetKriging`/`NoiseKriging` — pass `noise=` to

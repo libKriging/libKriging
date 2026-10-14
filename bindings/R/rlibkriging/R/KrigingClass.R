@@ -465,6 +465,10 @@ subsetOfData <- function(X, n_max, method = "kmeans", seed = 123) {
 #'     observation noise is included in the simulated paths. Use
 #'     \code{TRUE} to include fitted noise when available, \code{FALSE}
 #'     to exclude nugget noise, or \code{NULL} for the default behaviour.
+#'     For a heterogeneous noise model, a numeric value gives the
+#'     observation-noise \emph{variances} (a scalar or one per row of
+#'     \code{x}, in the units of \code{noise} in \code{Kriging()}) added to
+#'     the simulated latent process.
 #' @param will_update Set to \code{TRUE} if you plan to call
 #'     \code{update_simulate()} later (only with \code{method = "exact"}).
 #' @param method \code{Character}: \code{"exact"} (default),
@@ -616,7 +620,8 @@ update_simulate.Kriging <- function(object, y_u, ..., X_u = NULL, noise_u = NULL
 #' @param y_u Numeric vector of new responses (output).
 #' @param X_u Numeric matrix of new input points.
 #' @param noise_u Optional numeric vector of observation noise variances
-#'     attached to \code{y_u}.
+#'     attached to \code{y_u}. Required for a heterogeneous noise model
+#'     (an error is raised without it, and the model is left unchanged).
 #' @param refit Logical. If \code{TRUE} the model is refitted (default is \code{TRUE}).
 #' @param ... Ignored.
 #'

@@ -288,3 +288,46 @@ TEST_CASE("leaveOneOut / logMargPost method argument checks", "[approx][kriging]
   // the exact criteria remain available on an approximate fit (dense, O(n^3))
   CHECK(std::isfinite(kv.leaveOneOut("exact")));
 }
+
+TEST_CASE("approximate LOO / LMP evaluations reject noise models", "[approx][kriging][noise]") {
+  // fit raises for objective LOO / LMP with an approximate method and a noise
+  // model; the public approximate evaluations must not silently return the
+  // noise-free criterion on such a model (fitted with objective "LL")
+  arma::mat X;
+  arma::vec y;
+  make_data(60, X, y);
+  const arma::vec noise(y.n_elem, arma::fill::value(0.01));
+  Kriging::Parameters params;
+  params.theta = arma::mat{{0.3, 0.3}};
+  params.is_theta_estim = false;
+  for (const std::string method : {"vecchia(10)", "nystrom(15)"}) {
+    const bool vecchia = method[0] == 'v';
+    const std::string name = vecchia ? "vecchia" : "nystrom";
+    for (const auto nm : {Kriging::NoiseModel::Nugget, Kriging::NoiseModel::Heterogeneous}) {
+      Kriging k("matern5_2", nm);
+      if (nm == Kriging::NoiseModel::Nugget)
+        k.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL", params, method);
+      else
+        k.fit(y, noise, X, Trend::RegressionModel::Constant, false, "none", "LL", params, method);
+      CAPTURE(method, static_cast<int>(nm));
+      const arma::vec theta = k.theta();
+      CHECK_THROWS_AS(k.leaveOneOut(name), std::invalid_argument);
+      CHECK_THROWS_AS(k.logMargPost(name), std::invalid_argument);
+      CHECK_THROWS_AS(k.leaveOneOutVec(theta, name), std::invalid_argument);
+      if (vecchia) {
+        CHECK_THROWS_AS(k.leaveOneOutVecchiaFun(theta, false), std::invalid_argument);
+        CHECK_THROWS_AS(k.logMargPostVecchiaFun(theta, true), std::invalid_argument);
+      } else {
+        CHECK_THROWS_AS(k.leaveOneOutNystromFun(theta, false), std::invalid_argument);
+        CHECK_THROWS_AS(k.logMargPostNystromFun(theta, true), std::invalid_argument);
+      }
+      try {
+        k.leaveOneOut(name);
+      } catch (const std::invalid_argument& e) {
+        CHECK(std::string(e.what()).find("not implemented for Nugget/Heterogeneous noise models") != std::string::npos);
+      }
+      // the approximate LL stays available with a noise model
+      CHECK(std::isfinite(k.logLikelihood(name)));
+    }
+  }
+}

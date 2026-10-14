@@ -172,3 +172,38 @@ TEST_CASE("NoiseKrigingUpdateTest - Updated model equals combined fit", "[update
     }
   }
 }
+
+TEST_CASE("NoiseKrigingUpdateTest - update without noise raises a clear error", "[update][noisekriging]") {
+  arma::arma_rng::set_seed(42);
+  const arma::uword n = 12;
+  arma::mat X(n, 2, arma::fill::randu);
+  const arma::vec noise(n, arma::fill::value(0.01));
+  const arma::vec y = arma::sum(arma::square(X), 1) + 0.1 * arma::randn<arma::vec>(n);
+  arma::mat X_u(2, 2, arma::fill::randu);
+  const arma::vec y_u = arma::sum(arma::square(X_u), 1);
+
+  for (const std::string method : {"exact", "vecchia(5)", "nystrom(6)"}) {
+    for (const bool refit : {false, true}) {
+      CAPTURE(method, refit);
+      Kriging nk("matern3_2", Kriging::NoiseModel::Heterogeneous);
+      nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", Kriging::Parameters{}, method);
+      const arma::vec theta = nk.theta();
+      const double ll = nk.logLikelihood(method == "exact" ? "exact" : method.substr(0, 7));
+      try {
+        nk.update(y_u, X_u, refit);
+        FAIL("update(y_u, X_u) should raise on a Heterogeneous model");
+      } catch (const std::invalid_argument& e) {
+        CHECK(std::string(e.what()) == "heterogeneous noise model: use update(y_u, noise_u, X_u)");
+      }
+      // nothing changed
+      CHECK(nk.X().n_rows == n);
+      CHECK(nk.y().n_elem == n);
+      CHECK(nk.noise().n_elem == n);
+      CHECK(arma::approx_equal(nk.theta(), theta, "absdiff", 0.0));
+      CHECK(nk.logLikelihood(method == "exact" ? "exact" : method.substr(0, 7)) == ll);
+      // the noise-aware update works
+      nk.update(y_u, arma::vec(2, arma::fill::value(0.01)), X_u, refit);
+      CHECK(nk.X().n_rows == n + 2);
+    }
+  }
+}

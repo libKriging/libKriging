@@ -27,6 +27,8 @@ Ask, in order:
    → still `Kriging`, not a separate class (see
    [Noise.md](../../docs/math/Noise.md) for the math):
    - Known per-observation noise variance → pass it as `noise` (a vector).
+     The noise of new points (`update(y_u, noise_u, X_u)`, required for this
+     model) and `simulate`'s `with_noise` are variances too.
    - Unknown, but homogeneous noise → pass `noise="nugget"` (estimates one
      shared nugget term).
    - **Do not suggest `NuggetKriging` or `NoiseKriging`.** These used to be

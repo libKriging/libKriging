@@ -104,8 +104,8 @@ fit:
 | `predict(…, method=)` | `"exact"` (default): after an exact fit | `"vecchia"` / `"vecchia(m)"`: after any fit (m = fitted m, or 30) | `"nystrom"` / fitted `"nystrom(k)"`: after a Nystrom fit |
 | `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit; `with_noise` / nugget | `"nystrom"`: after a Nystrom fit (latent process; `with_noise` / nugget raise) |
 | `logLikelihood(method=)` | `"exact"` (default; after an approximate fit, recomputed in O(n³) at the fitted θ) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
-| `leaveOneOut(method=)`, `leaveOneOutVec(θ, method=)`, `logMargPost(method=)` | `"exact"` (default; O(n³), on any fit) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
-| `update` | exact refit | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks; with heterogeneous noise, `update` with `noise` refits on the joined data) |
+| `leaveOneOut(method=)`, `leaveOneOutVec(θ, method=)`, `logMargPost(method=)` | `"exact"` (default; O(n³), on any fit) | `"vecchia"`: after a Vecchia fit, noise model none only (raises otherwise) | `"nystrom"`: after a Nystrom fit, noise model none only (raises otherwise) |
+| `update` | exact refit (heterogeneous noise: `update` needs the new `noise`, raises without it) | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks; with heterogeneous noise, `update` with `noise` refits on the joined data) |
 | `update_simulate` | yes | — | — |
 | `save` / `load` | yes | yes (`"method"` saved) | yes (`"method"` saved) |
 
@@ -122,7 +122,8 @@ argument, `predict(X, stdev, cov, deriv, "vecchia")`, `simulate(nsim, seed, X, w
 noise model `simulate(nsim, seed, X, with_nugget, will_update, "vecchia")` /
 `simulate(nsim, seed, X, with_noise, will_update, "vecchia")` --, `logLikelihood("vecchia")`). With a noise model
 the Vecchia predictor / simulator follow the exact noise-model conventions (nugget: noisy-observation prediction,
-latent simulation unless `with_nugget` / `with_noise=TRUE`; heterogeneous: latent process, `with_noise` adds noise);
+latent simulation unless `with_nugget` / `with_noise=TRUE`; heterogeneous: latent process, `with_noise` -- noise
+variances, like `noise` -- adds N(0, `with_noise`) noise);
 response Vecchia loses accuracy when the noise is large relative to the signal (see
 [docs/math/Vecchia.md](../docs/math/Vecchia.md)).
 

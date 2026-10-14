@@ -32,6 +32,11 @@ s = k.simulate(int32(10), int32(123), Xnew, true);   % size(Xnew,1) x nsim
 %              (nsim, seed, X, will_update)
 s_u = k.update_simulate(y_u, X_u);   % condition those paths on new observations
 k.update(y_u, X_u, true);   % (y_u, X_u, refit)
+% heterogeneous noise model: with_noise / noise_u are noise VARIANCES, like the
+% fit's noise; update without noise_u raises an error
+%   s = k.simulate(int32(10), int32(123), Xnew, noise_var_new, false);   % (nsim, seed, X, with_noise, will_update)
+%   k.update(y_u, noise_var_u, X_u, true);   % (y_u, noise_u, X_u, refit)
+% [ll, llgrad, llhess] = k.logLikelihoodFun(theta, return_grad, return_hess, bench): llhess is empty
 
 k.save("k.json");              % JSON, any libKriging class
 k = load_kriging("k.json");    % auto-detects the class

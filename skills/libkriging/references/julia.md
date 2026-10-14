@@ -30,6 +30,10 @@ p = predict(k, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
 s = simulate(k, 10, 123, Xnew; will_update=true)   # (k, nsim, seed, X) -> size(Xnew,1) x nsim
 s_u = update_simulate(k, y_u, X_u)   # condition those paths on new observations
 update!(k, y_u, X_u; refit=true)
+# heterogeneous noise model (noise=<variance vector>): with_noise= / noise_u= are
+# noise VARIANCES, like the fit's noise; update! without noise_u raises an error
+# s = simulate(k, 10, 123, Xnew; with_noise=noise_var_new)
+# update!(k, y_u, X_u; noise_u=noise_var_u, refit=true)
 
 save(k, "k.json")              # JSON, any libKriging class
 k = jlibkriging.load("k.json")  # auto-detects the class

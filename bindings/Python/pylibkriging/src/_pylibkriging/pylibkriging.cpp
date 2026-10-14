@@ -299,14 +299,17 @@ discards n - n_max points outright.)pbdoc")
            py::arg("method") = "exact",
            R"pbdoc(Conditional simulations at X. method: "exact" (default), "vecchia" /
 "vecchia(m)" or "nystrom" (see predict); will_update needs "exact", with_noise
-(True: nugget, array: noise standard deviations) needs "exact" or "vecchia"
+(True: nugget; array or scalar: observation-noise VARIANCES, like fit's noise)
+needs "exact" or "vecchia"
 ("nystrom" simulates the latent process only and raises for it).)pbdoc")
       .def("update",
            &PyKriging::update,
            py::arg("y_u"),
            py::arg("X_u"),
            py::arg("refit") = true,
-           py::arg("noise_u") = py::none())
+           py::arg("noise_u") = py::none(),
+           "Add (y_u, X_u) to the data (refit: re-estimate the parameters). A heterogeneous noise model needs "
+           "noise_u (noise variances of the new points): without it, raises ValueError.")
       .def("update_simulate",
            &PyKriging::update_simulate,
            py::arg("y_u"),

@@ -67,6 +67,13 @@ training point sits between the observation and the trend, weighted by
 how much noise variance was attributed to that point), unlike the
 noiseless case.
 
+For `heterogeneous`, every noise argument is a vector of **variances** in
+the units of `y`: the fit's `noise`, `update(y_u, noise_u, X_u)` (the
+only `update` such a model accepts: `update(y_u, X_u)` raises),
+`update_simulate(y_u, noise_u, X_u)`, and `simulate(…, with_noise, …)`,
+which simulates the latent process and adds independent
+N(0, `with_noise`ᵢ) observation noise (a scalar applies to every point).
+
 **Large n**: both noise models can be fitted with the rank-k Nystrom
 approximation, `method="nystrom(k)"` (objective `"LL"`, O(n·k²) per
 evaluation): ρ(θ) is replaced by its Nystrom approximation, R_nugget /
