@@ -292,4 +292,20 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - noisy update_simulate does not leak 
   // Same X_u as the noisy call: must not reuse its (noisy) cached factorisation
   const arma::mat free_after = k.update_simulate(y_new, X_new);
   CHECK(arma::approx_equal(free_after, free_first, "absdiff", 1e-10));
+
+  // Same (X_u, noise_u), another y_u: the cache built by the first noisy call is
+  // reused and gives the same result as a full recompute
+  const arma::vec noise_u = arma::vec(4).fill(0.5);
+  const arma::vec y_new2 = y_new + 0.3;
+  k.update_simulate(y_new, noise_u, X_new);                            // builds the cache
+  const arma::mat cached = k.update_simulate(y_new2, noise_u, X_new);  // reuses it
+  k.update_simulate(y_new, X_new);                                     // noise-free: rebuilds it
+  const arma::mat recomputed = k.update_simulate(y_new2, noise_u, X_new);
+  CHECK(arma::approx_equal(cached, recomputed, "absdiff", 1e-10));
+  // another noise_u at the same X_u must not reuse the cache
+  const arma::mat other_noise = k.update_simulate(y_new2, arma::vec(4).fill(0.05), X_new);
+  CHECK(arma::abs(other_noise - cached).max() > 1e-6);
+  k.update_simulate(y_new, X_new);
+  const arma::mat other_noise_fresh = k.update_simulate(y_new2, arma::vec(4).fill(0.05), X_new);
+  CHECK(arma::approx_equal(other_noise, other_noise_fresh, "absdiff", 1e-10));
 }

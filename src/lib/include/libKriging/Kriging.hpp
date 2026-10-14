@@ -544,6 +544,9 @@ class Kriging : public KrigingImpl {
   // Simulate state for Nugget/Heterogeneous modes (mirrors NuggetKriging/NoiseKriging)
   bool m_lastsim_with_nugget = false;
   arma::vec m_lastsim_with_noise;
+  // Update-points cache key complement: noise_u of the last update_simulate
+  // (empty for the noise-free form). The base cache is keyed on X_u only.
+  arma::vec m_lastsimup_noise_u;
 
   using FitOfn = std::function<double(const arma::vec&, arma::vec*, KModel*)>;
   FitOfn make_fit_objective(const std::string& objective) const;

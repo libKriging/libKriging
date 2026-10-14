@@ -262,7 +262,9 @@ past release, see the corresponding entry on the
 - **`Kriging::update_simulate(y_u, X_u)` after `update_simulate(y_u, noise_u,
   X_u)`** with the same `X_u` reused the noisy factorisation left in the
   update-points cache (keyed on `X_u` only) and returned the noisy result. The
-  noise overload now invalidates that cache.
+  cache is now keyed on `(X_u, noise_u)`: it is reused across `y_u` for the
+  same `X_u` and `noise_u` (as for WarpKriging), and never between the noisy
+  and noise-free forms.
 - **Octave / MATLAB `Kriging.update_simulate`** dispatches on its argument
   count, as `update`: `update_simulate(y_u, X_u)` and
   `update_simulate(y_u, noise_u, X_u)`, whatever the noise model. On a

@@ -4248,11 +4248,14 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
   check_not_vecchia_light("update_simulate");
   check_not_nystrom_light("update_simulate");
+  // reuse the update-points cache only if it was built by the noise-free form
+  const bool allow_cache = m_lastsimup_noise_u.is_empty();
+  m_lastsimup_noise_u.reset();
   if (m_noise_model == NoiseModel::Nugget) {
     const double alpha = m_alpha;
     return update_simulate_impl(y_u,
                                 X_u,
-                                /*allow_cache=*/true,
+                                allow_cache,
                                 /*R_uu_factor=*/alpha,
                                 /*R_uu_diag=*/arma::vec(y_u.n_elem, arma::fill::ones),
                                 /*R_uo_factor=*/alpha,
@@ -4262,7 +4265,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
   }
   return update_simulate_impl(y_u,
                               X_u,
-                              /*allow_cache=*/true,
+                              allow_cache,
                               /*R_uu_factor=*/1.0,
                               /*R_uu_diag=*/arma::vec(),
                               /*R_uo_factor=*/1.0,
@@ -4282,18 +4285,21 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
     throw std::runtime_error("Noise vector length must match X_u rows");
   const arma::vec diag_uu = 1.0 + noise_u / (m_scaleY * m_scaleY * m_sigma2);
   const arma::uword n_n = lastsim_Xn_n.n_cols;
+  // The update-points cache (lastsimup_*, keyed on X_u by the base) holds R_uu
+  // with the noise of the call that built it: reuse it only for the same noise_u
+  // (e.g. several y_u at the same (X_u, noise_u)), never for the noise-free form.
+  const bool allow_cache = !noise_u.is_empty() && m_lastsimup_noise_u.n_elem == noise_u.n_elem
+                           && arma::approx_equal(m_lastsimup_noise_u, noise_u, "absdiff", arma::datum::eps);
+  m_lastsimup_noise_u = noise_u;
   arma::mat y_up = update_simulate_impl(y_u,
                                         X_u,
-                                        /*allow_cache=*/false,
+                                        allow_cache,
                                         /*R_uu_factor=*/1.0,
                                         /*R_uu_diag=*/diag_uu,
                                         /*R_uo_factor=*/1.0,
                                         /*R_un_factor=*/1.0,
                                         /*R_un_coincident_to_one=*/false,
                                         /*Sigma_divisor=*/1.0);
-  // The update-points cache (lastsimup_*) now holds a noisy R_uu, keyed on X_u
-  // only: invalidate it so that a later update_simulate(y_u, X_u) does not reuse it.
-  lastsimup_Xn_u.clear();
   if (m_lastsim_with_noise.n_elem == 1 || m_lastsim_with_noise.n_elem == n_n)
     add_noise_draws(y_up, m_lastsim_with_noise, "update_simulate");
   return y_up;

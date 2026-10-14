@@ -246,8 +246,10 @@ class KrigingImpl {
   /// Unified update_simulate shared by the three variants. The wrapper is
   /// responsible for class-specific input validation (Noise: noise_u length)
   /// and post-hoc adjustments (Noise: += eps using lastsim_with_noise). When
-  /// `allow_cache=false` the impl forces a full recompute — used by Noise to
-  /// preserve existing behavior where `lastsimup_noise_u` is never written.
+  /// `allow_cache=false` the impl forces a full recompute (and refills the
+  /// cache); the wrapper must pass false whenever R_uu_diag (the update-point
+  /// noise) differs from the one the cache was built with, since the cache
+  /// is keyed on X_u only.
   ///
   /// Parameters mirror `simulate_impl`:
   ///   * `R_uu_factor` / `R_uu_diag`: passed through to `covMat_sym_X`.
