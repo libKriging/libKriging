@@ -17,6 +17,12 @@ endfunction()
 
 string(REPLACE "|" ";" INSTALL_DIRS "${INSTALL_DIRS}")
 foreach (dir IN LISTS INSTALL_DIRS)
+  if (NOT EXISTS "${dir}/cmake_install.cmake")
+    file(GLOB children "${dir}/*")
+    get_filename_component(parent "${dir}" DIRECTORY)
+    file(GLOB siblings "${parent}/*")
+    message(FATAL_ERROR "No cmake_install.cmake in '${dir}'\n  content: ${children}\n  parent content: ${siblings}")
+  endif ()
   run_step("install ${dir}" ${CMAKE_COMMAND} --install "${dir}" --prefix "${prefix}" --config "${CONFIG}")
 endforeach ()
 
