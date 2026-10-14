@@ -50,7 +50,7 @@ classMLPKriging <- function(obj) {
 #' @param kernel covariance kernel: "gauss", "matern3_2", "matern5_2", "exp"
 #' @param regmodel trend: "constant", "linear", "quadratic"
 #' @param normalize logical; normalise inputs?
-#' @param optim optimiser (default "BFGS+Adam")
+#' @param optim optimiser (default "BFGS")
 #' @param objective "LL" (log-likelihood)
 #' @param parameters optional named list of tuning parameters, e.g.
 #'   \code{list(max_iter_adam = "300", adam_lr = "0.001", max_iter_bfgs = "50")}
@@ -74,7 +74,7 @@ MLPKriging <- function(y, X, hidden_dims,
                        kernel = "gauss",
                        regmodel = "constant",
                        normalize = FALSE,
-                       optim = "BFGS+Adam",
+                       optim = "BFGS",
                        objective = "LL",
                        parameters = NULL,
                        method = "exact") {
@@ -129,7 +129,7 @@ summary.MLPKriging <- function(object, ...) {
 fit.MLPKriging <- function(object, y, X,
                            regmodel = "constant",
                            normalize = FALSE,
-                           optim = "BFGS+Adam",
+                           optim = "BFGS",
                            objective = "LL",
                            parameters = NULL,
                            method = "exact", ...) {

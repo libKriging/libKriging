@@ -904,7 +904,10 @@ class WarpKriging : protected KrigingImpl {
   bool m_fitted = false;
 
   // ---- optimiser ----------------------------------------------------------
-  arma::uword m_max_iter_bfgs = 100;
+  // 0 = automatic: 100 for the inner θ L-BFGS of "BFGS+Adam", and a budget
+  // growing with the number of parameters for the joint "BFGS" (see
+  // joint_bfgs_max_iter()). A positive value is used as-is for both.
+  arma::uword m_max_iter_bfgs = 0;
   arma::uword m_max_iter_adam = 10;
   double m_adam_lr = 1e-3;
 
@@ -928,6 +931,11 @@ class WarpKriging : protected KrigingImpl {
 
   /// Instantiate m_joint_warp for the given input dimension (no-op if already set).
   void ensure_joint_warp(arma::uword d_in);
+  // Iteration budget of the joint (warp params + θ) L-BFGS-B.
+  unsigned int joint_bfgs_max_iter(arma::uword n_total) const;
+  // Freshly drawn warp parameters (MLP weights re-initialised with `seed`,
+  // other warps kept at their current values), used as multistart seeds.
+  arma::vec random_warp_params(uint64_t seed) const;
 
   // ---- Correlation matrix (σ²=1) -----------------------------------------
   /// Build cross-correlation  r(Φ_new, Φ_train)  →  (m × n)

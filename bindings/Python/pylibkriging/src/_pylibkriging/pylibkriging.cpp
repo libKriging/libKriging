@@ -382,6 +382,7 @@ needs "exact" or "vecchia"
       .def("noise", &PyKriging::noise);
 
   const std::string default_warp_optim = "BFGS+Adam";
+  const std::string default_mlp_optim = "BFGS";
 
   /* --- NestedKriging --- */
   py::class_<PyNestedKriging>(m,
@@ -580,7 +581,7 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
            py::arg("kernel") = "gauss",
            py::arg("regmodel") = default_regmodel,
            py::arg("normalize") = default_normalize,
-           py::arg("optim") = default_warp_optim,
+           py::arg("optim") = default_mlp_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
            py::arg("method") = "exact")
@@ -590,7 +591,7 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
            py::arg("X"),
            py::arg("regmodel") = default_regmodel,
            py::arg("normalize") = default_normalize,
-           py::arg("optim") = default_warp_optim,
+           py::arg("optim") = default_mlp_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
            py::arg("method") = "exact")

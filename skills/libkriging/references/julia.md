@@ -80,7 +80,7 @@ mk = MLPKriging(y, X, [16, 8], 2;    # hidden_dims, d_out
                 kernel="gauss",
                 regmodel="constant",
                 normalize=false,
-                optim="BFGS+Adam",
+                optim="BFGS",        # default: joint L-BFGS-B on MLP weights + θ
                 objective="LL")
 ```
 Prefer `activation="tanh"` over the default `"selu"` if a single-start fit
@@ -151,8 +151,8 @@ jlibkriging.method(nk), objective(nk)
 - Using a `NuggetKriging`/`NoiseKriging` constructor for a new fit.
 - Passing `X`/`y` as `Vector{Vector{Float64}}` or a non-`Float64` matrix —
   the ccall FFI layer expects `Matrix{Float64}`/`Vector{Float64}` exactly.
-- Assuming `WarpKriging`/`MLPKriging` default to `optim="BFGS"` — their
-  default is `"BFGS+Adam"`.
+- Assuming `WarpKriging` defaults to `optim="BFGS"` — its default is
+  `"BFGS+Adam"` (`MLPKriging` defaults to `"BFGS"`).
 - `aggregation="NK"` with `regmodel != "constant"` on `NestedKriging`.
 - **Name clashes with other loaded packages**: `jlibkriging` exports common
   names (`predict`, `update`, `simulate`, ...) that many other Julia

@@ -1181,7 +1181,7 @@ function MLPKriging(y::Vector{Float64}, X::Matrix{Float64},
                     activation::String="selu", kernel::String="gauss",
                     regmodel::String="constant",
                     normalize::Bool=false,
-                    optim::String="BFGS+Adam",
+                    optim::String="BFGS",
                     objective::String="LL",
                     parameters::Union{Nothing,Dict{String,String}}=nothing,
                     method::String="exact")
@@ -1229,7 +1229,7 @@ end
 function fit!(mk::MLPKriging, y::Vector{Float64}, X::Matrix{Float64};
               regmodel::String="constant",
               normalize::Bool=false,
-              optim::String="BFGS+Adam",
+              optim::String="BFGS",
               objective::String="LL",
               parameters::Union{Nothing,Dict{String,String}}=nothing,
               method::String="exact")

@@ -32,6 +32,17 @@
 
 namespace libKriging {
 
+namespace {
+// Inner θ L-BFGS budget of the bi-level "BFGS+Adam" optimiser (max_iter_bfgs = 0).
+constexpr arma::uword kDefaultInnerMaxIterBFGS = 100;
+// Automatic budget of the joint "BFGS" optimiser when warp params are present:
+// kJointIterPerParam iterations per optimised parameter, capped. The global
+// Optim::max_iteration (20 by default) is sized for a handful of θ and stops a
+// joint MLP+θ problem with tens of parameters far from its optimum (#382).
+constexpr arma::uword kJointIterPerParam = 20;
+constexpr arma::uword kJointMaxIterCap = 1000;
+}  // namespace
+
 // *************************************************************************
 //  WarpSpec  factories
 // *************************************************************************
@@ -2212,6 +2223,38 @@ arma::uword WarpKriging::total_warp_params() const {
   return total;
 }
 
+unsigned int WarpKriging::joint_bfgs_max_iter(arma::uword n_total) const {
+  if (m_max_iter_bfgs > 0)
+    return static_cast<unsigned int>(m_max_iter_bfgs);
+  const arma::uword base = static_cast<arma::uword>(std::max(Optim::max_iteration, 1));
+  if (total_warp_params() == 0)
+    return static_cast<unsigned int>(base);
+  return static_cast<unsigned int>(std::max(base, std::min(kJointIterPerParam * n_total, kJointMaxIterCap)));
+}
+
+arma::vec WarpKriging::random_warp_params(uint64_t seed) const {
+  if (m_is_joint) {
+    if (!m_joint_warp)
+      return {};
+    const auto& spec = m_warp_specs[0];
+    WarpMLPJoint fresh(
+        m_joint_warp->input_dim(), spec.hidden_dims, spec.d_out, WarpMLP::parse_act(spec.activation), seed);
+    return fresh.get_params();
+  }
+  arma::vec wp = pack_warp_params();
+  arma::uword idx = 0;
+  for (arma::uword k = 0; k < m_warps.size(); ++k) {
+    arma::uword np = m_warps[k]->n_params();
+    if (np > 0 && m_warp_specs[k].type == WarpType::MLP) {
+      const auto& spec = m_warp_specs[k];
+      WarpMLP fresh(spec.hidden_dims, spec.d_out, WarpMLP::parse_act(spec.activation), seed + k);
+      wp.subvec(idx, idx + np - 1) = fresh.get_params();
+    }
+    idx += np;
+  }
+  return wp;
+}
+
 arma::vec WarpKriging::pack_warp_params() const {
   if (m_is_joint)
     return m_joint_warp ? m_joint_warp->get_params() : arma::vec();
@@ -2343,7 +2386,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
     arma::uword n_total = nw + dt;
     lbfgsb::Optimizer optimizer{static_cast<unsigned int>(n_total)};
     optimizer.iprint = -1;
-    optimizer.max_iter = Optim::max_iteration;
+    optimizer.max_iter = wk.joint_bfgs_max_iter(n_total);
     optimizer.pgtol = Optim::gradient_tolerance;
     optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
 
@@ -2367,6 +2410,12 @@ void WarpKriging::optimise_joint(const std::string& method) {
     ub.tail(dt) = gamma_upper;
     btype.tail(dt).fill(2);
 
+    // Best point evaluated so far: a long joint run can step into a region
+    // where the correlation matrix cannot be factorised (the objective then
+    // throws); fall back to this point instead of failing the whole fit.
+    double eval_best_f = std::numeric_limits<double>::infinity();
+    arma::vec eval_best_x;
+
     auto obj_fn = [&](const arma::vec& x, arma::vec& grad) -> double {
       if (nw > 0)
         wk.unpack_warp_params(x.head(nw));
@@ -2377,6 +2426,10 @@ void WarpKriging::optimise_joint(const std::string& method) {
       grad.tail(dt) = -grad_theta_to_gamma(wk.m_theta, g_theta);
       if (nw > 0)
         grad.head(nw) = -wk.warp_gradient();
+      if (std::isfinite(ll) && -ll < eval_best_f) {
+        eval_best_f = -ll;
+        eval_best_x = x;
+      }
       return -ll;
     };
 
@@ -2387,10 +2440,35 @@ void WarpKriging::optimise_joint(const std::string& method) {
     arma::vec best_x = x0;
     arma::vec x = x0;
     while (retry <= Optim::max_restart) {
-      auto res = optimizer.minimize(obj_fn, x, lb.memptr(), ub.memptr(), btype.memptr());
+      const double prev_best_f = best_f;
+      lbfgsb::OptimizeResult res{};
+      try {
+        res = optimizer.minimize(obj_fn, x, lb.memptr(), ub.memptr(), btype.memptr());
+      } catch (const std::exception& e) {
+        if (!std::isfinite(eval_best_f))
+          throw;
+        if (Optim::log_level > Optim::log_none)
+          arma::cout << "Warning: WarpKriging joint BFGS stopped at the best evaluated point: " << e.what()
+                     << arma::endl;
+        if (eval_best_f < best_f) {
+          best_f = eval_best_f;
+          best_x = eval_best_x;
+        }
+        break;
+      }
       if (res.f_opt < best_f) {
         best_f = res.f_opt;
         best_x = x;
+      }
+      // Iteration budget exhausted while still making progress: resume from
+      // the point reached instead of contracting θ back toward its lower
+      // bound (which would discard the warp params learnt so far).
+      if ((retry < Optim::max_restart) && (nw > 0) && (res.task.rfind("STOP: TOTAL NO. of ITERATIONS", 0) == 0)
+          && (!std::isfinite(prev_best_f)
+              || (prev_best_f - res.f_opt) > Optim::objective_rel_tolerance * std::max(1.0, std::abs(res.f_opt)))) {
+        x = best_x;
+        retry++;
+        continue;
       }
       arma::vec theta_cur = from_gamma(x.tail(dt));
       double sol_to_lb = arma::min(arma::abs(theta_cur - theta_lower));
@@ -2422,7 +2500,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
     AdamBFGS opt(nw, dt);
     opt.max_iter_adam = wk.m_max_iter_adam;
     opt.adam_lr = wk.m_adam_lr;
-    opt.max_iter_bfgs = (wk.m_max_iter_bfgs > 0) ? wk.m_max_iter_bfgs : Optim::max_iteration;
+    opt.max_iter_bfgs = (wk.m_max_iter_bfgs > 0) ? wk.m_max_iter_bfgs : kDefaultInnerMaxIterBFGS;
     opt.bfgs_pgtol = Optim::gradient_tolerance;
     opt.bfgs_factr = Optim::objective_rel_tolerance / 1E-13;
     opt.maximize = true;
@@ -2539,7 +2617,15 @@ void WarpKriging::optimise_joint(const std::string& method) {
     // First start uses the current theta
     theta0_rand.row(0) = m_theta.t();
 
+    // First start uses the current warp params; the others re-draw the MLP
+    // weights (if any), so that restarts also explore the network's
+    // parameter space instead of only θ. Drawn here, before the workers
+    // start, since the warp constructors reseed the global RNG.
     arma::vec wp_init = pack_warp_params();
+    std::vector<arma::vec> wp_starts(multistart, wp_init);
+    if (n_warp > 0)
+      for (int i = 1; i < multistart; ++i)
+        wp_starts[i] = random_warp_params(static_cast<uint64_t>(42 + 1000 * i));
 
     std::vector<OptimizationResult> results(multistart);
     std::mutex results_mutex;
@@ -2556,7 +2642,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
         WarpKriging& wk = clones[task_id];
         // Reset to initial warp params and set starting theta
         if (n_warp > 0)
-          wk.unpack_warp_params(wp_init);
+          wk.unpack_warp_params(wp_starts[task_id]);
         wk.m_theta = theta0_rand.row(task_id).t();
         wk.refresh_cache();
 
@@ -3018,10 +3104,15 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
       m_noise /= (m_scaleY * m_scaleY);
     refresh_cache();
 
-    arma::uword saved_adam = m_max_iter_adam;
-    m_max_iter_adam /= 5;
-    optimise_joint("BFGS+Adam");
-    m_max_iter_adam = saved_adam;
+    if (Optim::parse_method(m_optim, "BFGS").first == "BFGS") {
+      // Joint L-BFGS-B warm-started from the current fit (single start).
+      optimise_joint("BFGS");
+    } else {
+      arma::uword saved_adam = m_max_iter_adam;
+      m_max_iter_adam /= 5;
+      optimise_joint("BFGS+Adam");
+      m_max_iter_adam = saved_adam;
+    }
   } else {
     // Fast incremental update: keep all hyperparameters fixed, use Cholesky
     // update via KrigingImpl::update_no_refit_impl. Warp's per-dim

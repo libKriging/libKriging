@@ -382,7 +382,7 @@ class MLPKrigingRegressor(_BaseKrigingEstimator):
     kernel : str, default="gauss"
     regmodel : str, default="constant"
     normalize : bool, default=False
-    optim : str, default="BFGS+Adam"
+    optim : str, default="BFGS"
     objective : str, default="LL"
     parameters : dict or None, default=None
 
@@ -401,7 +401,7 @@ class MLPKrigingRegressor(_BaseKrigingEstimator):
 
     def __init__(self, hidden_dims=(8,), d_out=2, activation="selu",
                  kernel="gauss", regmodel="constant", normalize=False,
-                 optim="BFGS+Adam", objective="LL", parameters=None):
+                 optim="BFGS", objective="LL", parameters=None):
         self.hidden_dims = hidden_dims
         self.d_out = d_out
         self.activation = activation

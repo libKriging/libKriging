@@ -76,6 +76,27 @@ past release, see the corresponding entry on the
   model: use update_simulate(y_u, X_u, noise_u)" / "use update(y_u, X_u,
   refit, noise_u)"), where they raised `std::runtime_error`; a `noise_u` of
   the wrong length or with negative values still raises `std::runtime_error`.
+- **MLPKriging: the default optimiser is now `"BFGS"`** (joint L-BFGS-B on
+  the MLP weights and θ) in C++ and every binding, instead of `"BFGS+Adam"`,
+  whose 10 Adam steps of size 1e-3 left the network at its random
+  initialisation (#382). `WarpKriging` keeps `"BFGS+Adam"` as default.
+- WarpKriging/MLPKriging `update(refit=true)` of a model fitted with
+  `"BFGS"`/`"BFGSk"` re-runs the joint L-BFGS-B (warm start) instead of
+  always using the bi-level `"BFGS+Adam"` path.
+- WarpKriging/MLPKriging joint `"BFGS"`: the iteration budget grows with the
+  number of optimised parameters (20 per parameter, capped at 1000, never
+  below `Optim::max_iteration`) instead of the global `Optim::max_iteration`
+  (20), sized for a handful of θ; a run that hits the budget while still
+  improving is resumed from the point reached rather than restarted from a
+  contracted θ. The `max_iter_bfgs` tuning knob now defaults to 0 (automatic:
+  100 for the inner θ L-BFGS of `"BFGS+Adam"`, the budget above for the
+  joint L-BFGS-B) and, when set, applies to both (models saved by earlier
+  versions carry `max_iter_bfgs = 100`, used as-is after `load`). Fits get slower but reach
+  the optimum: ~0.2 s instead of ~5 ms on the #382 case (Branin, n = 30,
+  `hidden_dims=[8]`), with log-likelihood -80 instead of -172.
+- WarpKriging/MLPKriging multistart (`"BFGSk"`, `"BFGSk+Adam"`): starts
+  2..k also re-draw the MLP weights (`mlp_joint`, per-dimension `mlp`), not
+  only θ; start 1 still uses the current parameters.
 - **Kriging (breaking): with `normalize=true`, every parameter accessor and
   objective function is in the ORIGINAL scale of `X` and `y`**, like the
   `parameters` given to `fit` (which already were), so that input and output
@@ -327,6 +348,11 @@ past release, see the corresponding entry on the
   hessian, so `llhess` is empty (as in Python / R), and `bench` is the 5th
   argument. Julia `log_likelihood_fun(::Kriging; return_hess=true)` returns
   an empty hessian instead of an uninitialized `n × n` matrix.
+- WarpKriging/MLPKriging joint `"BFGS"`: when the objective cannot be
+  evaluated (correlation matrix not factorisable even with the numerical
+  nugget), the fit keeps the best point evaluated so far instead of throwing.
+- `skills/libkriging/references/python.md` documented `"BFGS"` as the
+  `WarpKriging` default optimiser (it is `"BFGS+Adam"`).
 - `Kriging::simulate` nugget (`with_nugget`) and heterogeneous-noise
   (`with_noise`) overloads skipped the light-fit checks: on a Nystrom or
   Vecchia fit without factorization they went to the exact simulator, which has no

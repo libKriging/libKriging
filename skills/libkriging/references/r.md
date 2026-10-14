@@ -81,7 +81,7 @@ mk <- MLPKriging(y, X, hidden_dims = c(16, 8),
                  kernel = "gauss",
                  regmodel = "constant",
                  normalize = FALSE,
-                 optim = "BFGS+Adam",
+                 optim = "BFGS",       # default: joint L-BFGS-B on MLP weights + theta
                  objective = "LL",
                  parameters = NULL)
 ```
@@ -155,8 +155,8 @@ other classes.
 - Forgetting `X <- as.matrix(X)` when `X` comes from a `data.frame` — the
   bindings expect a plain numeric matrix.
 - `aggregation = "NK"` with `regmodel` other than `"constant"`.
-- Assuming `WarpKriging`/`MLPKriging` default to `optim = "BFGS"` like plain
-  `Kriging` — their default is `"BFGS+Adam"`.
+- Assuming `WarpKriging` defaults to `optim = "BFGS"` like plain `Kriging` —
+  its default is `"BFGS+Adam"` (`MLPKriging` defaults to `"BFGS"`).
 - Forgetting `y <- as.numeric(y)` when `y` comes from a single-column
   `data.frame`/`matrix` (e.g. from a DOE package) — the bindings expect a
   plain numeric vector, not an `n × 1` object.
