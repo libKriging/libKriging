@@ -908,8 +908,12 @@ class WarpKriging : protected KrigingImpl {
   // growing with the number of parameters for the joint "BFGS" (see
   // joint_bfgs_max_iter()). A positive value is used as-is for both.
   arma::uword m_max_iter_bfgs = 0;
-  arma::uword m_max_iter_adam = 10;
-  double m_adam_lr = 1e-3;
+  // Adam phase of "BFGS+Adam": with bias correction each step moves a warp
+  // parameter by about adam_lr, so max_iter_adam * adam_lr bounds how far the
+  // warp can travel (the former 10 x 1e-3 left it at its initialisation).
+  // The loop stops early once the likelihood stalls (see run_adam_bfgs).
+  arma::uword m_max_iter_adam = 200;
+  double m_adam_lr = 3e-2;
 
   // ---- private helpers ----------------------------------------------------
   static WarpBaseKernel parse_kernel(const std::string& name);

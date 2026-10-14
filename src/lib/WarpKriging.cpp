@@ -16,6 +16,8 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
 
+#include "BlasThreads.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <cassert>
@@ -41,6 +43,9 @@ constexpr arma::uword kDefaultInnerMaxIterBFGS = 100;
 // joint MLP+θ problem with tens of parameters far from its optimum (#382).
 constexpr arma::uword kJointIterPerParam = 20;
 constexpr arma::uword kJointMaxIterCap = 1000;
+// Early stop of the Adam phase: steps without a relative LL gain > tol.
+constexpr arma::uword kAdamPatience = 20;
+constexpr double kAdamRelTol = 1e-6;
 }  // namespace
 
 // *************************************************************************
@@ -2500,6 +2505,8 @@ void WarpKriging::optimise_joint(const std::string& method) {
     AdamBFGS opt(nw, dt);
     opt.max_iter_adam = wk.m_max_iter_adam;
     opt.adam_lr = wk.m_adam_lr;
+    opt.patience = kAdamPatience;
+    opt.rel_tol = kAdamRelTol;
     opt.max_iter_bfgs = (wk.m_max_iter_bfgs > 0) ? wk.m_max_iter_bfgs : kDefaultInnerMaxIterBFGS;
     opt.bfgs_pgtol = Optim::gradient_tolerance;
     opt.bfgs_factr = Optim::objective_rel_tolerance / 1E-13;
@@ -2673,9 +2680,18 @@ void WarpKriging::optimise_joint(const std::string& method) {
         pool_size = std::max(1u, n_cpu);
       pool_size = std::min(pool_size, multistart);
 
+      // Give each worker its share of the BLAS/OMP threads: left at the
+      // default, every worker's BLAS calls spawn all-core thread teams that
+      // contend with the other workers (≈2x slower at n = 500, mostly in
+      // system time). Declared before the joiner below, so that it is reset
+      // only once all workers have joined.
+      detail::BlasThreadGuard blas_guard;
+      const unsigned int blas_threads = std::max(1u, n_cpu / static_cast<unsigned int>(pool_size));
+      blas_guard.set(blas_threads);
+
       if (Optim::log_level > Optim::log_none) {
-        arma::cout << "WarpKriging thread pool: " << pool_size << " workers (ncpu=" << n_cpu
-                   << ", multistart=" << multistart << ")" << arma::endl;
+        arma::cout << "WarpKriging thread pool: " << pool_size << " workers x " << blas_threads
+                   << " BLAS threads (ncpu=" << n_cpu << ", multistart=" << multistart << ")" << arma::endl;
       }
 
       // Thread pool with atomic task counter
@@ -2702,9 +2718,13 @@ void WarpKriging::optimise_joint(const std::string& method) {
             if (task_id >= multistart)
               break;
 
-            // Staggered startup delay
-            int delay_ms = task_id * Optim::thread_start_delay_ms;
-            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+            // Staggered startup delay: only for each worker's first task
+            // (applied to every task, it added up to ~(multistart/pool)^2
+            // delays with no benefit once the pool is running).
+            if (task_id < pool_size) {
+              int delay_ms = task_id * Optim::thread_start_delay_ms;
+              std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+            }
 
             worker(task_id);
           }
