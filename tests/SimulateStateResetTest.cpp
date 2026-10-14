@@ -23,8 +23,8 @@ namespace {
 const char* const no_sim = "No previous simulation data available";
 
 struct Data {
-  arma::mat X, X_u, X_n, X2;
-  arma::vec y, y_u, y2;
+  arma::mat X, X_u, X_n, X2, X_v;
+  arma::vec y, y_u, y2, y_v;
 };
 
 Data make_data(arma::uword d) {
@@ -43,6 +43,10 @@ Data make_data(arma::uword d) {
   D.X_n = arma::mat(5, d, arma::fill::randu);
   D.X2 = arma::mat(12, d, arma::fill::randu);  // same n as X: a refit on other data
   D.y2 = f(D.X2) + 1.0;
+  // update points for an update_simulate after update(y_u, X_u): X_u is then part
+  // of the observations (conditioning on it again is degenerate, platform-dependent)
+  D.X_v = arma::mat(3, d, arma::fill::randu);
+  D.y_v = f(D.X_v);
   return D;
 }
 
@@ -74,7 +78,7 @@ TEST_CASE("SimulateStateResetTest - Kriging update() invalidates the last simula
       REQUIRE_THROWS_WITH(k.update_simulate(D.y_u, D.X_u), Contains(no_sim));
       // a new simulate on the updated model works again
       k.simulate(20, 1, D.X_n, true);
-      REQUIRE(k.update_simulate(D.y_u, D.X_u).n_rows == D.X_n.n_rows);
+      REQUIRE(k.update_simulate(D.y_v, D.X_v).n_rows == D.X_n.n_rows);
     }
   }
 }
@@ -186,7 +190,7 @@ TEST_CASE("SimulateStateResetTest - WarpKriging / MLPKriging fit() and update() 
         wk.update(D.y_u, D.X_u, refit);
         REQUIRE_THROWS_WITH(wk.update_simulate(D.y_u, D.X_u), Contains(no_sim));
         wk.simulate(20, 1, D.X_n, true);
-        REQUIRE(wk.update_simulate(D.y_u, D.X_u).n_rows == D.X_n.n_rows);
+        REQUIRE(wk.update_simulate(D.y_v, D.X_v).n_rows == D.X_n.n_rows);
       }
     }
   }
