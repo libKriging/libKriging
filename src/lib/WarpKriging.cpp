@@ -2857,8 +2857,7 @@ arma::mat WarpKriging::simulate(int nsim,
   if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
     throw std::runtime_error("Noise vector should have same length as X_n: " + std::to_string(with_noise.n_elem)
                              + " instead of " + std::to_string(n_n));
-  if (arma::any(with_noise < 0))
-    throw std::runtime_error("simulate: with_noise contains negative values");
+  check_noise_variances(with_noise, "simulate");
 
   if (!m_is_joint)
     validate_discrete_columns(X_n, "simulate");
@@ -2882,16 +2881,11 @@ arma::mat WarpKriging::simulate(int nsim,
     lastsim_with_noise = with_noise;
   }
 
-  // Optional observation noise (std-dev in raw y-space, applied after denormalisation).
-  arma::mat eps(n_n, nsim, arma::fill::zeros);
-  if (with_noise.n_elem == 1) {
-    eps = with_noise.at(0) * Random::randn_mat(n_n, nsim);
-  } else if (with_noise.n_elem == n_n) {
-    eps.each_col() = with_noise;
-    eps = eps % Random::randn_mat(n_n, nsim);
-  }
-
-  return y_n + eps;
+  // Optional observation noise: with_noise holds noise VARIANCES in raw
+  // y-space (like fit's / update's noise), N(0, with_noise) added after
+  // denormalisation (as Kriging::simulate).
+  add_noise_draws(y_n, with_noise, "simulate");
+  return y_n;
 }
 
 // -------------------------------------------------------------------------
@@ -2947,16 +2941,10 @@ LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u,
 
   lastsimup_noise_u = noise_u_norm;
 
-  const arma::uword n_n = y_n.n_rows;
-  arma::mat eps(n_n, lastsim_nsim, arma::fill::zeros);
-  if (lastsim_with_noise.n_elem == 1) {
-    eps = lastsim_with_noise.at(0) * Random::randn_mat(n_n, lastsim_nsim);
-  } else if (lastsim_with_noise.n_elem == n_n) {
-    eps.each_col() = lastsim_with_noise;
-    eps = eps % Random::randn_mat(n_n, lastsim_nsim);
-  }
-
-  return y_n + eps;
+  // re-add the with_noise (variances) of the last simulate(..., will_update=true)
+  if (lastsim_with_noise.n_elem == 1 || lastsim_with_noise.n_elem == y_n.n_rows)
+    add_noise_draws(y_n, lastsim_with_noise, "update_simulate");
+  return y_n;
 }
 
 // -------------------------------------------------------------------------

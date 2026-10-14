@@ -707,10 +707,15 @@ class WarpKriging : protected KrigingImpl {
   // -----------------------------------------------------------------------
 
   /** Draw observed trajectories of kriging at given points X_n.
-   * @param with_noise   optional per-point observation noise standard deviation
-   *                     in raw y-space (length n_n, or length 1 for a common
-   *                     noise, or empty for noiseless sampling). Independent of
-   *                     m_noise. Matches NoiseKriging::simulate convention.
+   * @param with_noise   optional per-point observation noise VARIANCE in raw
+   *                     y-space (like fit's Parameters::noise and update's
+   *                     noise_u): length n_n, or length 1 for a common noise,
+   *                     or empty for noiseless sampling. Independent of
+   *                     m_noise. N(0, with_noise) noise is added to the
+   *                     simulated latent process (as Kriging::simulate);
+   *                     negative/NaN values raise std::invalid_argument. With
+   *                     will_update=true, update_simulate adds fresh
+   *                     N(0, with_noise) draws to its result again.
    */
   LIBKRIGING_EXPORT arma::mat simulate(int nsim,
                                        int seed,
@@ -863,7 +868,7 @@ class WarpKriging : protected KrigingImpl {
   // ---- Simulation cached data (WarpKriging-specific) -----------------------
   // All standard lastsim_*/lastsimup_* caches live in the KrigingImpl base.
   // WarpKriging only needs the two fields below that the base does not carry.
-  arma::vec lastsim_with_noise;  ///< per-point sampling noise stdev cached from simulate()
+  arma::vec lastsim_with_noise;  ///< per-point sampling noise variance cached from simulate()
   arma::vec lastsimup_noise_u;   ///< normalized per-point noise at update points (for cache check)
 
   // MLPKriging is a thin facade that needs access to private members for save/load.

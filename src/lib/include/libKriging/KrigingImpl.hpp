@@ -233,6 +233,16 @@ class KrigingImpl {
                           double Sigma_divisor,
                           const FeatureMap& phi = {});
 
+  /// Observation-noise draws for simulate(..., with_noise) (Kriging and
+  /// WarpKriging, and their update_simulate re-add): `noise_var` holds noise
+  /// VARIANCES in the original y scale (like fit's / update's noise), empty
+  /// (no-op), a scalar (same for all rows) or one value per row of `y_n`;
+  /// adds sqrt(variance) * N(0, 1) to every column of `y_n`.
+  /// check_noise_variances throws std::invalid_argument("<what>: with_noise
+  /// must hold non-negative noise variances") on a negative or NaN value.
+  static void check_noise_variances(const arma::vec& noise_var, const char* what);
+  static void add_noise_draws(arma::mat& y_n, const arma::vec& noise_var, const char* what);
+
   /// Unified update_simulate shared by the three variants. The wrapper is
   /// responsible for class-specific input validation (Noise: noise_u length)
   /// and post-hoc adjustments (Noise: += eps using lastsim_with_noise). When

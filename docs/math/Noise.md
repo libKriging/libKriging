@@ -73,6 +73,10 @@ only `update` such a model accepts: `update(y_u, X_u)` raises),
 `update_simulate(y_u, noise_u, X_u)`, and `simulate(…, with_noise, …)`,
 which simulates the latent process and adds independent
 N(0, `with_noise`ᵢ) observation noise (a scalar applies to every point).
+`WarpKriging` (per-observation `noise` variances, no nugget mode) and
+`MLPKriging` use the same convention: the C++ `simulate(nsim, seed, X_n,
+will_update, with_noise)` takes noise variances, and `update_simulate`
+re-adds them.
 
 **Large n**: both noise models can be fitted with the rank-k Nystrom
 approximation, `method="nystrom(k)"` (objective `"LL"`, O(n·k²) per

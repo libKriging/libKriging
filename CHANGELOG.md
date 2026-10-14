@@ -25,6 +25,14 @@ past release, see the corresponding entry on the
   `with_noise` in the exact path no longer adds an uninitialized matrix.
   R: a numeric scalar `with_noise` (e.g. `0.3`) is now a noise variance for
   every point; it was taken as the logical nugget flag `TRUE`.
+  Same for **WarpKriging and MLPKriging** (C++ API): `simulate(nsim, seed,
+  X_n, will_update, with_noise)` and the `update_simulate` re-add take noise
+  VARIANCES (like `WarpKriging`'s fit `noise` / `noise_u`), where
+  `WarpKriging` used standard deviations; negative / NaN values raise
+  `std::invalid_argument` (was `std::runtime_error` for negative values).
+  `MLPKriging::simulate` gains the optional trailing `with_noise` argument
+  (forwarded to `WarpKriging`). The bindings of both classes do not expose
+  `with_noise` (unchanged). `NestedKriging` has no `simulate`.
 - **Kriging: LOO / LMP with an approximate method reject noise models.**
   `leaveOneOut(method)`, `logMargPost(method)`, `leaveOneOutVec(theta,
   method)` with `"vecchia"` / `"nystrom"`, and `leaveOneOutVecchiaFun`,

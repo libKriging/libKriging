@@ -171,7 +171,9 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 > `WarpKriging` constructor / `fit` accept `noise=` as a per-observation variance vector (there is no `"nugget"` mode),
 > and `parameters=` with numeric `theta`, `warp_params` and `noise` seeds; with `optim="none"` they freeze the
 > hyper-parameters. `update` and `update_simulate` accept `noise_u=` (variances of the new points) when the model was
-> fitted with noise. `WarpKriging` always fits with `objective="LL"`. `WarpKriging` and `MLPKriging` accept `method=`
+> fitted with noise. `simulate` in the bindings draws the latent process (for `WarpKriging` and `MLPKriging`, no
+> `with_noise` argument is exposed); the C++ `simulate(nsim, seed, X_n, will_update, with_noise)` of both classes
+> takes noise VARIANCES (like `noise` / `noise_u`, as `Kriging`). `WarpKriging` always fits with `objective="LL"`. `WarpKriging` and `MLPKriging` accept `method=`
 > for API consistency, but only `"exact"` is implemented.
 
 ---

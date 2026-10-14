@@ -1459,26 +1459,6 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
 }
 
 // =============================================================================
-// Observation-noise draws for simulate(..., with_noise): with_noise holds
-// noise VARIANCES (original y units, like fit's / update's noise), a scalar
-// (same for all rows) or one value per row; adds sqrt(variance) * N(0, 1).
-static void check_noise_variances(const arma::vec& noise_var, const char* what) {
-  if (noise_var.has_nan() || arma::any(noise_var < 0.0))
-    throw std::invalid_argument(std::string(what) + ": with_noise must hold non-negative noise variances");
-}
-
-static void add_noise_draws(arma::mat& y_n, const arma::vec& noise_var, const char* what) {
-  if (noise_var.n_elem == 0)
-    return;
-  check_noise_variances(noise_var, what);
-  arma::mat eps = Random::randn_mat(y_n.n_rows, y_n.n_cols);
-  if (noise_var.n_elem == 1)
-    eps *= std::sqrt(noise_var.at(0));
-  else
-    eps.each_col() %= arma::sqrt(noise_var);
-  y_n += eps;
-}
-
 /* Vecchia (local) simulation: sequential conditional simulation in the row
  * order of X_n. Point t is drawn from its simple-kriging conditional given
  * its m nearest neighbors among the observations and the points 0..t-1

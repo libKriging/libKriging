@@ -138,7 +138,10 @@ One spec string per column of `X`, in column order (see `SKILL.md` §4 for
 the spec vocabulary). `WarpKriging::fit` ignores its `objective` argument
 (always `"LL"`), takes a trailing `method` of which only `"exact"` is
 implemented (same for `MLPKriging`), and its noise is a per-observation variance vector (there is
-no nugget mode).
+no nugget mode). `simulate(nsim, seed, X_n, will_update, with_noise)` (`WarpKriging` and
+`MLPKriging`) adds N(0, `with_noise`) observation noise: `with_noise` holds noise VARIANCES
+(scalar or one per row of `X_n`, like `Kriging`; negative/NaN raise `std::invalid_argument`),
+re-added by `update_simulate` after a `will_update=true` simulate.
 
 ## MLPKriging
 

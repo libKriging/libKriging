@@ -101,7 +101,17 @@ class MLPKriging {
                                                                                               bool return_deriv
                                                                                               = false) const;
 
-  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, bool will_update = false);
+  /** Conditional simulations at X_n (forwards to WarpKriging::simulate).
+   * @param with_noise optional observation-noise VARIANCES in raw y-space
+   *        (empty, a scalar or one per row of X_n; as Kriging / WarpKriging
+   *        simulate): N(0, with_noise) noise is added to the simulated latent
+   *        process; negative/NaN values raise std::invalid_argument. With
+   *        will_update=true, update_simulate adds fresh draws again. */
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim,
+                                       int seed,
+                                       const arma::mat& X_n,
+                                       bool will_update = false,
+                                       const arma::vec& with_noise = {});
 
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::mat& X_u);
 
