@@ -25,7 +25,7 @@ This document lists all methods exposed by each language binding for accessing t
 | Predict | `kriging_predict(obj,x,…,method)` | `obj$predict(x,…,method=)` | `obj.predict(x,…,method=)` | `predict(obj,x,stdev,cov,deriv[,method])` | `predict(obj,X;…,method=)` |
 | Simulate | `kriging_simulate(obj,nsim,seed,x,…,method)` | `obj$simulate(nsim,seed,x,…,method=)` | `obj.simulate(nsim,seed,x,…,method=)` | `simulate(obj,nsim,seed,x,will_update[,method])` | `simulate(obj,nsim,seed,X;…,method=)` |
 | Update | `kriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u;…)` |
-| Update simulate | `kriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` / `update_simulate(obj,y_u,noise_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
+| Update simulate | `kriging_update_simulate(obj,y_u,noise_u,X_u)` | `obj$update_simulate(y_u,X_u)` / `obj$update_simulate(y_u,noise_u,X_u)` | `obj.update_simulate(y_u,X_u,noise_u=)` | `update_simulate(obj,y_u,X_u)` / `update_simulate(obj,y_u,noise_u,X_u)` | `update_simulate(obj,y_u,X_u;noise_u=)` |
 | Save | `kriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
 | Load | `kriging_load(file)` | `load.Kriging(file)` / `load(file)` | `Kriging.load(file)` / `pylibkriging.load(file)` | `Kriging.load(file)` / `load_kriging(file)` | `load_kriging(file)` / `load(file)` |
 | Summary | `kriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
@@ -106,7 +106,7 @@ fit:
 | `logLikelihood(method=)` | `"exact"` (default; after an approximate fit, recomputed in O(n³) at the fitted θ) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
 | `leaveOneOut(method=)`, `leaveOneOutVec(θ, method=)`, `logMargPost(method=)` | `"exact"` (default; O(n³), on any fit) | `"vecchia"`: after a Vecchia fit, noise model none only (raises otherwise) | `"nystrom"`: after a Nystrom fit, noise model none only (raises otherwise) |
 | `update` | exact refit (heterogeneous noise: `update` needs the new `noise`, raises without it) | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks; with heterogeneous noise, `update` with `noise` refits on the joined data) |
-| `update_simulate` | yes | — | — |
+| `update_simulate` | yes (heterogeneous noise: needs `noise_u`, raises without it; `fit` / `update` drop the last `simulate(…, will_update=true)`) | — | — |
 | `save` / `load` | yes | yes (`"method"` saved) | yes (`"method"` saved) |
 
 On a Vecchia or Nystrom fit, `predict` / `simulate` with `method="exact"` (the default) raise an error naming the method to use; the approximate
@@ -171,7 +171,7 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 > `WarpKriging` constructor / `fit` accept `noise=` as a per-observation variance vector (there is no `"nugget"` mode),
 > and `parameters=` with numeric `theta`, `warp_params` and `noise` seeds; with `optim="none"` they freeze the
 > hyper-parameters. `update` and `update_simulate` accept `noise_u=` (variances of the new points) when the model was
-> fitted with noise. `simulate(nsim, seed, X, will_update, with_noise)` (`WarpKriging` and `MLPKriging`, every
+> fitted with noise, and require it then (without it: Python `ValueError`, an error elsewhere). `simulate(nsim, seed, X, will_update, with_noise)` (`WarpKriging` and `MLPKriging`, every
 > binding) draws the latent process by default; `with_noise` (Python `None`, R `NULL`, Julia `nothing`, Octave `[]`
 > or omitted: no noise) holds observation-noise VARIANCES (like `noise` / `noise_u`, as `Kriging`), a scalar or one
 > per row of `X`, added as independent N(0, `with_noise`) draws (and again by `update_simulate` after a

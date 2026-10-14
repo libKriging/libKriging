@@ -74,20 +74,38 @@ end
 assert(failed, "logMargPost(vecchia) should raise on a nugget model");
 
 % update_simulate dispatches on the number of arguments, whatever the noise
-% model: (y_u, X_u) and (y_u, noise_u, X_u) both work on a heterogeneous model
+% model: on a heterogeneous model the 3-arg form (y_u, X_u) raises (the noise
+% of the update points is needed, as for update), the 4-arg form works
 Xu = [0.35 0.65; 0.75 0.25];
 yu = sin(3 * Xu(:, 1)) + cos(5 * Xu(:, 2));
 nsim_u = int32(5000);
 s_ = kh.simulate(nsim_u, int32(11), Xn, var_n, true);
-u3 = kh.update_simulate(yu, Xu);  % 3-arg form: noise-free update points
-assert(size(u3), [3, double(nsim_u)]);
-assert(all(isfinite(u3(:))));
-s_ = kh.simulate(nsim_u, int32(11), Xn, var_n, true);
+failed = false;
+try
+  u3_ = kh.update_simulate(yu, Xu);
+catch err
+  failed = true;
+  assert(~isempty(strfind(err.message, "heterogeneous noise model: use update_simulate(y_u, noise_u, X_u)")), err.message);
+end
+assert(failed, "update_simulate(y_u, X_u) should raise on a heterogeneous model");
 u4 = kh.update_simulate(yu, 0.01 * ones(2, 1), Xu);  % 4-arg form
 assert(size(u4), [3, double(nsim_u)]);
-% the 4-arg form adds the with_noise draws of the last simulate again, the
-% 3-arg form does not: the spread of u4 exceeds that of u3 by about var_n
-assert(all(var(u4, 0, 2) > var(u3, 0, 2)));
+assert(all(isfinite(u4(:))));
+% the 4-arg form adds the with_noise draws of the last simulate again: the
+% spread of u4 exceeds the one after a latent simulate by about var_n
+s_ = kh.simulate(nsim_u, int32(11), Xn, zeros(3, 1), true);
+u4_latent = kh.update_simulate(yu, 0.01 * ones(2, 1), Xu);
+assert(all(var(u4, 0, 2) > var(u4_latent, 0, 2)));
+% fit / update drop the last simulate: update_simulate raises until a new one
+kh.update(yu, 0.01 * ones(2, 1), Xu, false);
+failed = false;
+try
+  u_ = kh.update_simulate(yu, 0.01 * ones(2, 1), Xu);
+catch err
+  failed = true;
+  assert(~isempty(strfind(err.message, "No previous simulation data available")), err.message);
+end
+assert(failed, "update_simulate after update should raise");
 % on a model without noise, the 3-arg form is the only one
 s_ = k.simulate(int32(10), int32(1), Xn, true);
 assert(size(k.update_simulate(yu, Xu)), [3, 10]);

@@ -48,6 +48,18 @@ past release, see the corresponding entry on the
   noise_u, X_u)")` before any state change (Python `ValueError`, R / Julia /
   Octave error), for every method; the exact path used to fail with an
   unclear dimension error after extending the data.
+- **Kriging (breaking): `update_simulate(y_u, X_u)` on a Heterogeneous model**
+  raises `std::invalid_argument("heterogeneous noise model: use
+  update_simulate(y_u, noise_u, X_u)")` before any state change (Python
+  `ValueError`, R / Julia / Octave error), as `update(y_u, X_u)`; it used to
+  condition on the update points as noise-free observations of the latent
+  process. Use `update_simulate(y_u, noise_u, X_u)` (Octave / MATLAB: the
+  4-argument form). Nugget and None models are unchanged. Likewise,
+  `WarpKriging::update_simulate` / `update` on a model fitted with `noise`
+  and an empty `noise_u` raise `std::invalid_argument` ("heterogeneous noise
+  model: use update_simulate(y_u, X_u, noise_u)" / "use update(y_u, X_u,
+  refit, noise_u)"), where they raised `std::runtime_error`; a `noise_u` of
+  the wrong length or with negative values still raises `std::runtime_error`.
 - **Kriging (breaking): with `normalize=true`, every parameter accessor and
   objective function is in the ORIGINAL scale of `X` and `y`**, like the
   `parameters` given to `fit` (which already were), so that input and output
@@ -259,6 +271,20 @@ past release, see the corresponding entry on the
   dispatches to it.
 
 ### Fixed
+- **`fit` / `update` now drop the state of the last `simulate(…,
+  will_update=true)`** (and the update-points cache) for `Kriging` (every
+  noise model and method, refit or not), `WarpKriging` and `MLPKriging`: a
+  later `update_simulate` mixed matrices built for the previous model with
+  the new one, failing with a dimension error ("matrix multiplication:
+  incompatible matrix dimensions") or, after a refit on as many points or
+  when the update-points cache was already filled, silently returning paths
+  of the previous model. `update_simulate` now raises `std::runtime_error("No
+  previous simulation data available")` until a new `simulate(…,
+  will_update=true)`; a call rejected on its input (e.g. `update(y_u, X_u)`
+  on a heterogeneous model) leaves the state unchanged. Also,
+  `Kriging::simulate(…, will_update=true)` without `with_noise` dropped
+  nothing of an earlier `simulate(…, with_noise, true)`, whose with_noise
+  draws `update_simulate(y_u, noise_u, X_u)` then added again.
 - **`Kriging::update_simulate(y_u, X_u)` after `update_simulate(y_u, noise_u,
   X_u)`** with the same `X_u` reused the noisy factorisation left in the
   update-points cache (keyed on `X_u` only) and returned the noisy result. The
@@ -269,10 +295,9 @@ past release, see the corresponding entry on the
   count, as `update`: `update_simulate(y_u, X_u)` and
   `update_simulate(y_u, noise_u, X_u)`, whatever the noise model. On a
   heterogeneous model the 3-argument form failed with an unclear
-  missing-argument error; it now calls the C++ `update_simulate(y_u, X_u)`,
-  which conditions on the update points as noise-free observations of the
-  latent process and does not re-add the `with_noise` draws of the last
-  `simulate` (unchanged C++ behaviour). `WarpKriging.update_simulate` with a
+  missing-argument error; it now reaches the C++ `update_simulate(y_u, X_u)`,
+  which raises the explicit heterogeneous-noise error (see Changed).
+  `WarpKriging.update_simulate` with a
   cell (categorical) `X_u` forwards `noise_u` (it was dropped).
 - **Octave / MATLAB `Kriging.logLikelihoodFun`**: the 4th argument
   (`want_hess`) was passed to the C++ `logLikelihoodFun(theta, return_grad,

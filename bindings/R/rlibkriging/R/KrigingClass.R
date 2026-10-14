@@ -550,12 +550,17 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL,
 #' @param y_u Numeric vector of new responses (output).
 #' @param X_u Numeric matrix of new input points.
 #' @param noise_u Optional numeric vector of observation noise variances
-#'     attached to \code{y_u}.
+#'     attached to \code{y_u}; required for a heterogeneous noise model
+#'     (without it, an error is raised).
 #' @param ... Ignored.
 #'
 #' @return a matrix with \code{nrow(x)} rows and \code{nsim}
 #'     columns containing the simulated paths at the inputs points
 #'     given in \code{x}.
+#'
+#' @details Needs a previous \code{simulate(..., will_update = TRUE)} on the
+#'     current model: \code{fit} and \code{update} drop it (an error is then
+#'     raised until a new one).
 #'
 #' @method update_simulate Kriging
 #' @export

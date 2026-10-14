@@ -314,7 +314,10 @@ needs "exact" or "vecchia"
            &PyKriging::update_simulate,
            py::arg("y_u"),
            py::arg("X_u"),
-           py::arg("noise_u") = py::none())
+           py::arg("noise_u") = py::none(),
+           "Condition the paths of the last simulate(..., will_update=True) on (y_u, X_u). A heterogeneous noise "
+           "model needs noise_u (noise variances of the new points): without it, raises ValueError. fit / update "
+           "drop the last simulate: call simulate(..., will_update=True) again (otherwise raises RuntimeError).")
       .def("summary", &PyKriging::summary)
       .def("save", &PyKriging::save)
       .def_static("load", &PyKriging::load)

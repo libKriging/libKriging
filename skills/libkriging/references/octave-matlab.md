@@ -33,8 +33,8 @@ s = k.simulate(int32(10), int32(123), Xnew, true);   % size(Xnew,1) x nsim
 s_u = k.update_simulate(y_u, X_u);   % condition those paths on new observations
 k.update(y_u, X_u, true);   % (y_u, X_u, refit)
 % update_simulate dispatches on its argument count: (y_u, X_u) or
-% (y_u, noise_u, X_u). On a heterogeneous model (y_u, X_u) treats the update
-% points as noise-free and does not re-add the last simulate's with_noise draws
+% (y_u, noise_u, X_u); a heterogeneous model needs the latter ((y_u, X_u)
+% raises, as update). fit / update drop the last simulate(..., true)
 % heterogeneous noise model: with_noise / noise_u are noise VARIANCES, like the
 % fit's noise; update without noise_u raises an error
 %   s = k.simulate(int32(10), int32(123), Xnew, noise_var_new, false);   % (nsim, seed, X, with_noise, will_update)

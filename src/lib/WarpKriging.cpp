@@ -2715,6 +2715,9 @@ void WarpKriging::fit(const arma::vec& y,
   if (!m_is_joint)
     validate_discrete_columns(X, "fit");
 
+  // the last simulate(..., will_update=true) was built for the previous model
+  clear_simulate_state();
+
   m_y = y;
   m_X_raw = X;
   m_regmodel = regmodel;
@@ -2902,10 +2905,14 @@ LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u,
     throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X_raw.n_cols)
                              + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
 
+  const bool has_model_noise = !m_noise.is_empty();
+  // the noise of the new observations is needed (checked before any state change)
+  if (has_model_noise && noise_u.is_empty())
+    throw std::invalid_argument("heterogeneous noise model: use update_simulate(y_u, X_u, noise_u)");
+
   if (lastsim_y_n.is_empty() || lastsim_y_n.n_rows == 0)
     throw std::runtime_error("No previous simulation data available");
 
-  const bool has_model_noise = !m_noise.is_empty();
   if (has_model_noise) {
     if (noise_u.n_elem != X_u.n_rows)
       throw std::runtime_error("update_simulate: model fit with noise requires noise_u of length "
@@ -2947,17 +2954,31 @@ LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u,
   return y_n;
 }
 
+void WarpKriging::clear_simulate_state() {
+  KrigingImpl::clear_simulate_state();
+  lastsim_with_noise.reset();
+  lastsimup_noise_u.reset();
+}
+
 // -------------------------------------------------------------------------
 //  update()
 // -------------------------------------------------------------------------
 void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit, const arma::vec& noise_u) {
   if (!m_fitted)
     throw std::runtime_error("update: model not fitted");
+  if (y_u.n_elem != X_u.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
+                             + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
+  if (X_u.n_cols != m_X_raw.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X_raw.n_cols)
+                             + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
 
   validate_discrete_columns(X_u, "update");
 
   // Noise consistency check
   const bool has_model_noise = !m_noise.is_empty();
+  if (has_model_noise && noise_u.is_empty())
+    throw std::invalid_argument("heterogeneous noise model: use update(y_u, X_u, refit, noise_u)");
   if (has_model_noise) {
     if (noise_u.n_elem != y_u.n_elem)
       throw std::runtime_error("update: model fit with noise requires noise_u of length " + std::to_string(y_u.n_elem)
@@ -2967,6 +2988,10 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
   } else if (!noise_u.is_empty()) {
     throw std::runtime_error("update: model fit without noise but noise_u was provided");
   }
+
+  // input validated: the last simulate(..., will_update=true) was built for
+  // the model before this update
+  clear_simulate_state();
 
   if (refit) {
     // De-normalise, append, re-normalise, re-optimise

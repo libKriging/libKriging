@@ -727,10 +727,13 @@ class WarpKriging : protected KrigingImpl {
    * @param y_u is n length column vector of new output
    * @param X_u is n*d matrix of new input
    * @param noise_u optional per-point noise variance at update points (length
-   *                n_u). Required when the model was fit with noise; otherwise
+   *                n_u). Required when the model was fit with noise (empty:
+   *                std::invalid_argument, before any change); otherwise
    *                must be empty (treated as zero). Influences how the update
    *                points condition the GP.
    * @return matrix of simulated output (for X_n given previously)
+   * fit() and update() drop the last simulate(..., will_update=true): this
+   * then raises std::runtime_error ("No previous simulation data available").
    */
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u,
                                               const arma::mat& X_u,
@@ -742,7 +745,8 @@ class WarpKriging : protected KrigingImpl {
 
   /** Add new conditional data points to previous (X, y).
    * @param noise_u optional per-point noise variance for update points (length
-   *                n_u). Required when the model was fit with noise.
+   *                n_u). Required when the model was fit with noise (empty:
+   *                std::invalid_argument, before any change).
    */
   LIBKRIGING_EXPORT void update(const arma::vec& y_u,
                                 const arma::mat& X_u,
@@ -870,6 +874,8 @@ class WarpKriging : protected KrigingImpl {
   // WarpKriging only needs the two fields below that the base does not carry.
   arma::vec lastsim_with_noise;  ///< per-point sampling noise variance cached from simulate()
   arma::vec lastsimup_noise_u;   ///< normalized per-point noise at update points (for cache check)
+  /// KrigingImpl::clear_simulate_state plus the two members above (fit/update)
+  void clear_simulate_state();
 
   // MLPKriging is a thin facade that needs access to private members for save/load.
   friend class MLPKriging;

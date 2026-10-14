@@ -144,6 +144,15 @@ class KrigingImpl {
   arma::mat lastsimup_R_un;
   arma::mat lastsimup_R_uu;
 
+  /// Drop the state of the last simulate(..., will_update=true) (lastsim_*)
+  /// and the update-points cache (lastsimup_*): both are built for the model
+  /// of that simulate, so fit() and update() call this (once their input is
+  /// validated) and a later update_simulate() raises "No previous simulation
+  /// data available" until a new simulate(..., will_update=true). Derived
+  /// classes with extra simulate state hide it with their own
+  /// clear_simulate_state() that calls this one.
+  void clear_simulate_state();
+
   // Covariance functor bundle
   std::function<double(const arma::vec&, const arma::vec&)> _Cov;
   std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDtheta;

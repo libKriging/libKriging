@@ -1,4 +1,4 @@
-context("Kriging noise API: with_noise variances, update without noise, approximate LOO / LMP")
+context("Kriging noise API: with_noise variances, update / update_simulate without noise, approximate LOO / LMP")
 
 set.seed(5)
 n <- 30
@@ -31,6 +31,30 @@ test_that("update without noise_u raises on a heterogeneous model", {
   expect_equal(nrow(k2$X()), n)
   k2$update(y[1:2], noise[1:2], X[1:2, , drop = FALSE] + 0.01, FALSE)
   expect_equal(nrow(k2$X()), n + 2)
+})
+
+test_that("update_simulate without noise_u raises on a heterogeneous model", {
+  k2 <- copy(kh)
+  Xu <- X[1:2, , drop = FALSE] + 0.02
+  k2$simulate(nsim = 10, seed = 7, x = Xn, will_update = TRUE)
+  expect_error(k2$update_simulate(y[1:2], Xu),
+               "heterogeneous noise model: use update_simulate\\(y_u, noise_u, X_u\\)")
+  u1 <- k2$update_simulate(y[1:2], noise[1:2], Xu)
+  expect_error(k2$update_simulate(y[1:2], Xu))
+  expect_equal(k2$update_simulate(y[1:2], noise[1:2], Xu), u1, tolerance = 1e-12)
+})
+
+test_that("fit / update drop the last simulate (will_update = TRUE)", {
+  y0 <- sin(3 * X[, 1]) + cos(5 * X[, 2])  # noise-free data for a noise-free model
+  k0 <- Kriging(y0, X, "matern5_2")
+  Xu <- matrix(c(0.13, 0.87, 0.71, 0.29), ncol = 2)
+  k0$simulate(nsim = 10, seed = 7, x = Xn, will_update = TRUE)
+  yu <- sin(3 * Xu[, 1]) + cos(5 * Xu[, 2])
+  k0$update_simulate(yu, Xu)
+  k0$update(yu, Xu, refit = FALSE)
+  expect_error(k0$update_simulate(yu, Xu), "No previous simulation data available")
+  k0$simulate(nsim = 10, seed = 7, x = Xn, will_update = TRUE)
+  expect_equal(dim(k0$update_simulate(yu + 0.1, Xu + 0.05)), c(3L, 10L))
 })
 
 test_that("approximate LOO / LMP raise on noise models", {

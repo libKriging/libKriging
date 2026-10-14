@@ -70,16 +70,17 @@ noiseless case.
 For `heterogeneous`, every noise argument is a vector of **variances** in
 the units of `y`: the fit's `noise`, `update(y_u, noise_u, X_u)` (the
 only `update` such a model accepts: `update(y_u, X_u)` raises),
-`update_simulate(y_u, noise_u, X_u)`, and `simulate(…, with_noise, …)`,
+`update_simulate(y_u, noise_u, X_u)` (likewise the only `update_simulate`:
+`update_simulate(y_u, X_u)` raises `std::invalid_argument` — `ValueError` in
+Python — before any state change), and `simulate(…, with_noise, …)`,
 which simulates the latent process and adds independent
 N(0, `with_noise`ᵢ) observation noise (a scalar applies to every point).
 `WarpKriging` (per-observation `noise` variances, no nugget mode) and
 `MLPKriging` use the same convention: `simulate(nsim, seed, X_n,
 will_update, with_noise)` (C++ and every binding) takes noise variances,
-and `update_simulate` re-adds them. On a heterogeneous `Kriging`,
-`update_simulate(y_u, X_u)` (without `noise_u`) is accepted: it conditions
-on the update points as noise-free observations of the latent process and
-does not re-add the `with_noise` draws of the last `simulate`.
+and `update_simulate` re-adds them. A `WarpKriging` fitted with `noise`
+likewise needs `noise_u` in `update` and `update_simulate` (without it,
+`std::invalid_argument`).
 
 **Large n**: both noise models can be fitted with the rank-k Nystrom
 approximation, `method="nystrom(k)"` (objective `"LL"`, O(n·k²) per

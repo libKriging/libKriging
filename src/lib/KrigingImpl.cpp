@@ -529,6 +529,22 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
   return y_n;
 }
 
+void KrigingImpl::clear_simulate_state() {
+  lastsim_Xn_n.reset();
+  lastsim_y_n.reset();
+  lastsim_nsim = 0;
+  lastsim_seed = 0;
+  lastsim_L_oCn.reset();
+  lastsim_Ecirc_nKo.reset();
+  lastsim_LSigma_nKo.reset();
+  lastsimup_Xn_u.reset();
+  lastsimup_y_u.reset();
+  lastsimup_Wtild_nKu.reset();
+  lastsimup_R_uo.reset();
+  lastsimup_R_un.reset();
+  lastsimup_R_uu.reset();
+}
+
 arma::mat KrigingImpl::update_simulate_impl(const arma::vec& y_u,
                                             const arma::mat& X_u,
                                             bool allow_cache,

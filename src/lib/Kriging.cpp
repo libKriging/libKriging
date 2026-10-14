@@ -3236,6 +3236,8 @@ void Kriging::fit_impl(const arma::vec& y,
   // the evaluated criterion ("LLVecchia(m)" / "LLNystrom(k)" for approximate LL)
   const auto objective_method = fit_objective_method(objective_in, method);
   const std::string objective = internal_fit_objective(objective_method.first, objective_method.second);
+  // the last simulate(..., will_update=true) was built for the previous model
+  clear_simulate_state();
   m_optim = optim;
   m_objective = objective_method.first;
   m_method = objective_method.second;
@@ -4187,15 +4189,21 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
   check_exact_available("simulate", "simulate");
   if (m_noise_model == NoiseModel::Nugget)
     return simulate(nsim, seed, X_n, /*with_nugget=*/false, will_update);
-  return simulate_impl(nsim,
-                       seed,
-                       X_n,
-                       will_update,
-                       /*R_on_factor=*/1.0,
-                       /*R_on_coincident_to_one=*/false,
-                       /*R_nn_factor=*/1.0,
-                       /*R_nn_diag=*/arma::vec(),
-                       /*Sigma_divisor=*/1.0);
+  arma::mat y_n = simulate_impl(nsim,
+                                seed,
+                                X_n,
+                                will_update,
+                                /*R_on_factor=*/1.0,
+                                /*R_on_coincident_to_one=*/false,
+                                /*R_nn_factor=*/1.0,
+                                /*R_nn_diag=*/arma::vec(),
+                                /*Sigma_divisor=*/1.0);
+  if (will_update) {  // latent simulation: no with_noise of an earlier simulate to re-add
+    m_lastsim_with_nugget = false;
+    m_lastsim_with_noise.reset();
+    m_lastsimup_noise_u.reset();
+  }
+  return y_n;
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
@@ -4215,8 +4223,11 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                 /*R_nn_factor=*/alpha,
                                 /*R_nn_diag=*/diag_nn,
                                 /*Sigma_divisor=*/alpha);
-  if (will_update)
+  if (will_update) {  // replaces the state of an earlier simulate(..., will_update=true)
     m_lastsim_with_nugget = with_nugget;
+    m_lastsim_with_noise.reset();
+    m_lastsimup_noise_u.reset();
+  }
   return y_n;
 }
 
@@ -4239,13 +4250,26 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                 /*R_nn_factor=*/1.0,
                                 /*R_nn_diag=*/arma::vec(),
                                 /*Sigma_divisor=*/1.0);
-  if (will_update)
+  if (will_update) {  // replaces the state of an earlier simulate(..., will_update=true)
+    m_lastsim_with_nugget = false;
     m_lastsim_with_noise = with_noise;
+    m_lastsimup_noise_u.reset();
+  }
   add_noise_draws(y_n, with_noise, "simulate");
   return y_n;
 }
 
+void Kriging::clear_simulate_state() {
+  KrigingImpl::clear_simulate_state();
+  m_lastsim_with_nugget = false;
+  m_lastsim_with_noise.reset();
+  m_lastsimup_noise_u.reset();
+}
+
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
+  // the noise of the new observations is needed (checked before any state change)
+  if (m_noise_model == NoiseModel::Heterogeneous)
+    throw std::invalid_argument("heterogeneous noise model: use update_simulate(y_u, noise_u, X_u)");
   check_not_vecchia_light("update_simulate");
   check_not_nystrom_light("update_simulate");
   // reuse the update-points cache only if it was built by the noise-free form
@@ -4314,6 +4338,19 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
   // the noise of the new observations is needed (checked before any state change)
   if (m_noise_model == NoiseModel::Heterogeneous)
     throw std::invalid_argument("heterogeneous noise model: use update(y_u, noise_u, X_u)");
+  if (y_u.n_elem != X_u.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
+                             + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
+
+  if (X_u.n_cols != m_X.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
+                             + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
+
+  // input validated: the last simulate(..., will_update=true) was built for
+  // the model before this update (the Nugget refit below goes through fit(),
+  // which clears it again)
+  clear_simulate_state();
+
   // a Vecchia model (including a legacy one still carrying an exact
   // factorization, see load_from_json) is updated as a Vecchia fit
   if (m_vecchia_m > 0) {
@@ -4324,13 +4361,6 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
     update_nystrom(y_u, X_u, refit);
     return;
   }
-  if (y_u.n_elem != X_u.n_rows)
-    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
-                             + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
-
-  if (X_u.n_cols != m_X.n_cols)
-    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
-                             + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
 
   if (refit && m_optim != "none" && m_noise_model == NoiseModel::Nugget) {
     // For Nugget mode: full re-fit with de-normalized data (matches NuggetKriging::update behavior)
@@ -4524,7 +4554,8 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u,
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
   if (noise_u.n_elem != y_u.n_elem)
     throw std::runtime_error("noise_u must have the same length as y_u");
-  // Rebuild de-normalized data and call fit() with the joined dataset
+  // Rebuild de-normalized data and call fit() with the joined dataset (fit()
+  // also drops the state of the last simulate(..., will_update=true))
   const arma::vec y_all = arma::join_cols(m_y * m_scaleY + m_centerY, y_u);
   const arma::vec noise_all = arma::join_cols(noise(), noise_u);
   const arma::mat X_all = arma::join_cols((m_X.each_row() % m_scaleX).each_row() + m_centerX, X_u);

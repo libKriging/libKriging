@@ -107,6 +107,26 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test size(X(nk)) == (n_train, 1)  # unchanged
     end
 
+    @testset "Update_simulate without noise_u raises" begin
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
+        X_new = reshape([0.35], :, 1)
+        y_new = [f_test(0.35)]
+        simulate(nk, 10, 7, X_test; will_update=true)
+        err = try
+            update_simulate(nk, y_new, X_new)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ErrorException
+        @test occursin("heterogeneous noise model: use update_simulate(y_u, noise_u, X_u)", err.msg)
+        u1 = update_simulate(nk, y_new, X_new; noise_u=[noise_level^2])
+        @test size(u1) == (n_test, 10)
+        # fit / update drop the last simulate
+        update!(nk, y_new, X_new; noise_u=[noise_level^2], refit=false)
+        @test_throws ErrorException update_simulate(nk, y_new, X_new; noise_u=[noise_level^2])
+    end
+
     @testset "Simulate with_noise holds variances" begin
         nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
         var_n = collect(range(0.05, 0.5; length=n_test))

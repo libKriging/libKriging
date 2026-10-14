@@ -45,6 +45,8 @@ arma::mat sims = model.simulate(/*nsim=*/10, /*seed=*/123, Xnew, /*will_update=*
 // simulate(nsim, seed, X, method, will_update), logLikelihood(method),
 // method = "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (the fitted k)
 arma::mat sims_u = model.update_simulate(y_new, X_new);  // condition those paths on new observations
+// (Heterogeneous model: update_simulate(y_new, noise_new, X_new); fit / update
+// drop the last simulate: call simulate(..., will_update=true) again)
 model.update(y_new, X_new, /*refit=*/true);
 
 model.save("k.json");                        // JSON

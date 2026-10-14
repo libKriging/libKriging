@@ -1556,11 +1556,12 @@ static void test_simulate_and_update_simulate_with_noise() {
   }
   assert(reuse_diff < 1e-8);
 
-  // Missing noise_u when model has noise should throw.
+  // Missing noise_u when model has noise should throw (std::invalid_argument,
+  // as Kriging::update_simulate(y_u, X_u) on a heterogeneous model).
   bool threw_empty = false;
   try {
     wk.update_simulate(y_u, X_u, arma::vec{});
-  } catch (const std::runtime_error&) {
+  } catch (const std::invalid_argument&) {
     threw_empty = true;
   }
   assert(threw_empty);

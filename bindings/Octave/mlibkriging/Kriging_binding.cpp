@@ -272,9 +272,8 @@ void update_simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
     output.set(0, result, "updated simulated values");
   } else {
     // update_simulate(ref, y_u, X_u). On a heterogeneous model the C++ core
-    // conditions on the update points as noise-free observations of the
-    // latent process and does not add the with_noise draws of the last
-    // simulate again (use the 4-argument form to give their noise)
+    // raises (the noise of the update points is needed: use the 4-argument
+    // form), before any state change, as update(ref, y_u, X_u)
     auto result = km->update_simulate(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"));
     output.set(0, result, "updated simulated values");
   }

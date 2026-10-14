@@ -27,9 +27,12 @@ s <- simulate(k, nsim = 10, seed = 123, x = Xnew, will_update = TRUE)   # length
 s_u <- update_simulate(k, y_u, X_u)   # condition those paths on new observations
 update(k, y_u, X_u, refit = TRUE)
 # heterogeneous noise model (noise = <variance vector>): with_noise / noise_u are
-# noise VARIANCES, like the fit's noise; update without noise_u raises an error
-# s <- simulate(k, nsim = 10, seed = 123, x = Xnew, with_noise = noise_var_new)
+# noise VARIANCES, like the fit's noise; update / update_simulate without
+# noise_u raise an error
+# s <- simulate(k, nsim = 10, seed = 123, x = Xnew, with_noise = noise_var_new, will_update = TRUE)
+# s_u <- update_simulate(k, y_u, noise_var_u, X_u)
 # update(k, y_u, noise_var_u, X_u, refit = TRUE)
+# fit / update drop the last simulate: simulate(..., will_update = TRUE) again
 
 save(k, "k.json")      # JSON, any libKriging class
 k <- load("k.json")    # auto-detects the class

@@ -36,9 +36,12 @@ sims = model.simulate(nsim=10, seed=123, X=Xnew, will_update=True)   # shape (q,
 sims_u = model.update_simulate(y_u, X_u)   # condition those paths on new observations
 model.update(y_u, X_u, refit=True)
 # heterogeneous noise model (noise=<variance vector>): with_noise= / noise_u= are
-# noise VARIANCES, like the fit's noise; update without noise_u raises ValueError
-# sims = model.simulate(10, 123, Xnew, with_noise=noise_var_new)
+# noise VARIANCES, like the fit's noise; update / update_simulate without
+# noise_u raise ValueError
+# sims = model.simulate(10, 123, Xnew, with_noise=noise_var_new, will_update=True)
+# sims_u = model.update_simulate(y_u, X_u, noise_u=noise_var_u)
 # model.update(y_u, X_u, refit=True, noise_u=noise_var_u)
+# fit / update drop the last simulate: simulate(..., will_update=True) again
 
 model.logLikelihood()
 model.leaveOneOut()

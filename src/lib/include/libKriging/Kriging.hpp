@@ -495,6 +495,11 @@ class Kriging : public KrigingImpl {
    * @return
    *
    * put is m*nsim matrix of simulations at X_n
+   * Needs a previous simulate(..., will_update=true) on the current model:
+   * fit() and update() drop it, after which this raises std::runtime_error
+   * ("No previous simulation data available"). A Heterogeneous model needs
+   * the noise of the new data: this overload raises std::invalid_argument
+   * (before any change) on it; use update_simulate(y_u, noise_u, X_u).
    */
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::mat& X_u);
   // Heterogeneous-mode variant: noise_u is per-observation noise VARIANCE for
@@ -547,6 +552,8 @@ class Kriging : public KrigingImpl {
   // Update-points cache key complement: noise_u of the last update_simulate
   // (empty for the noise-free form). The base cache is keyed on X_u only.
   arma::vec m_lastsimup_noise_u;
+  /// KrigingImpl::clear_simulate_state plus the members above
+  void clear_simulate_state();
 
   using FitOfn = std::function<double(const arma::vec&, arma::vec*, KModel*)>;
   FitOfn make_fit_objective(const std::string& objective) const;
