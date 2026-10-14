@@ -92,7 +92,7 @@ class KrigingImpl {
   double m_centerY{};
   double m_scaleY{};
   bool m_normalize{};
-  Trend::RegressionModel m_regmodel;
+  Trend::RegressionModel m_regmodel = Trend::RegressionModel::Constant;  // defined even for an unfitted model
   std::string m_optim;
   std::string m_objective;
   std::string m_method = "exact";
