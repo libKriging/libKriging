@@ -62,7 +62,7 @@ still recognized (e.g. by `load()`), are for legacy saved files only.
 wk = WarpKriging(y, X, ["kumaraswamy", "categorical(5,2)", "none"], "gauss";
                  regmodel="constant",
                  normalize=false,
-                 optim="BFGS+Adam",   # different default from Kriging
+                 optim="BFGS",        # default: joint L-BFGS-B on warp params + θ
                  objective="LL",     # only "LL": any other value is ignored
                  noise=nothing,      # nothing | Vector{Float64} of variances (no "nugget" mode)
                  method="exact")     # only "exact" is implemented (same for MLPKriging)
@@ -151,8 +151,9 @@ jlibkriging.method(nk), objective(nk)
 - Using a `NuggetKriging`/`NoiseKriging` constructor for a new fit.
 - Passing `X`/`y` as `Vector{Vector{Float64}}` or a non-`Float64` matrix —
   the ccall FFI layer expects `Matrix{Float64}`/`Vector{Float64}` exactly.
-- Assuming `WarpKriging` defaults to `optim="BFGS"` — its default is
-  `"BFGS+Adam"` (`MLPKriging` defaults to `"BFGS"`).
+- Expecting `WarpKriging`/`MLPKriging` to still default to
+  `optim="BFGS+Adam"` (older versions): the default is now `"BFGS"` (joint
+  L-BFGS-B); `"BFGS+Adam"` must be asked for explicitly.
 - `aggregation="NK"` with `regmodel != "constant"` on `NestedKriging`.
 - **Name clashes with other loaded packages**: `jlibkriging` exports common
   names (`predict`, `update`, `simulate`, ...) that many other Julia

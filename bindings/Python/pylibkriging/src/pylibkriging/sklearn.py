@@ -286,7 +286,7 @@ class WarpKrigingRegressor(_BaseKrigingEstimator):
     kernel : str, default="gauss"
     regmodel : str, default="constant"
     normalize : bool, default=False
-    optim : str, default="BFGS+Adam"
+    optim : str, default="BFGS"
         Note this default differs from `KrigingRegressor`'s `"BFGS"`:
         fitting the warp parameters benefits from the extra Adam-style
         steps, matching libKriging's own default for this class.
@@ -308,7 +308,7 @@ class WarpKrigingRegressor(_BaseKrigingEstimator):
     """
 
     def __init__(self, warping=None, kernel="gauss", regmodel="constant",
-                 normalize=False, optim="BFGS+Adam", objective="LL",
+                 normalize=False, optim="BFGS", objective="LL",
                  noise=None, parameters=None):
         self.warping = warping
         self.kernel = kernel

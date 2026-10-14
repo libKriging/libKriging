@@ -706,7 +706,7 @@ function WarpKriging(y::Vector{Float64}, X::Matrix{Float64},
                      warping::Vector{String}, kernel::String="gauss";
                      regmodel::String="constant",
                      normalize::Bool=false,
-                     optim::String="BFGS+Adam",
+                     optim::String="BFGS",
                      objective::String="LL",
                      parameters::Union{Nothing,AbstractDict}=nothing,
                      theta::Union{Nothing,AbstractVector}=nothing,
@@ -806,7 +806,7 @@ end
 function fit!(wk::WarpKriging, y::Vector{Float64}, X::Matrix{Float64};
               regmodel::String="constant",
               normalize::Bool=false,
-              optim::String="BFGS+Adam",
+              optim::String="BFGS",
               objective::String="LL",
               parameters::Union{Nothing,AbstractDict}=nothing,
               theta::Union{Nothing,AbstractVector}=nothing,

@@ -322,7 +322,7 @@ def test_config_accessors():
     y = f1d(X)
     k = lk.WarpKriging(y, X, ["kumaraswamy"], "gauss",
                        parameters={"max_iter_adam": "80"})
-    assert k.optim() == "BFGS+Adam"
+    assert k.optim() == "BFGS"
     assert k.objective() == "LL"
     assert np.asarray(k.noise()).size == 0
     wp = np.asarray(k.warp_params())

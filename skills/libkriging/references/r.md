@@ -57,7 +57,7 @@ wk <- WarpKriging(y, X, warping = c("kumaraswamy", "categorical(5,2)", "none"),
                   kernel = "gauss",
                   regmodel = "constant",
                   normalize = FALSE,
-                  optim = "BFGS+Adam",   # different default from Kriging: warp params need Adam-style steps
+                  optim = "BFGS",       # default: joint L-BFGS-B on warp params + theta
                   objective = "LL",     # only "LL": any other value is ignored
                   parameters = NULL,
                   noise = NULL,        # NULL | numeric variance vector (no "nugget" mode)
@@ -155,8 +155,9 @@ other classes.
 - Forgetting `X <- as.matrix(X)` when `X` comes from a `data.frame` — the
   bindings expect a plain numeric matrix.
 - `aggregation = "NK"` with `regmodel` other than `"constant"`.
-- Assuming `WarpKriging` defaults to `optim = "BFGS"` like plain `Kriging` —
-  its default is `"BFGS+Adam"` (`MLPKriging` defaults to `"BFGS"`).
+- Expecting `WarpKriging`/`MLPKriging` to still default to `optim =
+  "BFGS+Adam"` (older versions): the default is now `"BFGS"` (joint
+  L-BFGS-B); `"BFGS+Adam"` must be asked for explicitly.
 - Forgetting `y <- as.numeric(y)` when `y` comes from a single-column
   `data.frame`/`matrix` (e.g. from a DOE package) — the bindings expect a
   plain numeric vector, not an `n × 1` object.

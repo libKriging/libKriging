@@ -658,7 +658,7 @@ class WarpKriging : protected KrigingImpl {
                                 const std::string& kernel,
                                 const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                                 bool normalize = false,
-                                const std::string& optim = "BFGS+Adam",
+                                const std::string& optim = "BFGS",
                                 const std::string& objective = "LL",
                                 const std::map<std::string, std::string>& parameters = {},
                                 const std::string& method = "exact");
@@ -671,7 +671,7 @@ class WarpKriging : protected KrigingImpl {
                              const arma::mat& X,
                              const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                              bool normalize = false,
-                             const std::string& optim = "BFGS+Adam",
+                             const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
                              const std::map<std::string, std::string>& parameters = {},
                              const std::string& method = "exact");

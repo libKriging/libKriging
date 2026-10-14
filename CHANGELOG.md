@@ -31,7 +31,13 @@ past release, see the corresponding entry on the
 - **MLPKriging: the default optimiser is now `"BFGS"`** (joint L-BFGS-B on
   the MLP weights and θ) in C++ and every binding, instead of `"BFGS+Adam"`,
   whose 10 Adam steps of size 1e-3 left the network at its random
-  initialisation (#382). `WarpKriging` keeps `"BFGS+Adam"` as default.
+  initialisation (#382).
+- **WarpKriging: the default optimiser is now `"BFGS"`** too (C++ and every
+  binding), instead of `"BFGS+Adam"`: on every warp tested (Branin 2D,
+  kumaraswamy, boxcox, knots, neural_mono, mlp, mlp_joint) the joint
+  L-BFGS-B reaches an equal or better log-likelihood than the (now
+  effective, see below) bi-level Adam phase, in less time. `"BFGS+Adam"`
+  stays available on request.
 - WarpKriging/MLPKriging `update(refit=true)` of a model fitted with
   `"BFGS"`/`"BFGSk"` re-runs the joint L-BFGS-B (warm start) instead of
   always using the bi-level `"BFGS+Adam"` path.
@@ -46,7 +52,7 @@ past release, see the corresponding entry on the
   versions carry `max_iter_bfgs = 100`, used as-is after `load`). Fits get slower but reach
   the optimum: ~0.2 s instead of ~5 ms on the #382 case (Branin, n = 30,
   `hidden_dims=[8]`), with log-likelihood -80 instead of -172.
-- WarpKriging `"BFGS+Adam"` (its default optimiser): the Adam phase now
+- WarpKriging `"BFGS+Adam"`: the Adam phase now
   actually moves the warp parameters. Defaults `max_iter_adam` 10 → 200 and
   `adam_lr` 1e-3 → 3e-2 (each Adam step moves a parameter by about
   `adam_lr`, so 10 × 1e-3 left the warps at their initialisation), with an
@@ -351,8 +357,6 @@ past release, see the corresponding entry on the
 - WarpKriging/MLPKriging joint `"BFGS"`: when the objective cannot be
   evaluated (correlation matrix not factorisable even with the numerical
   nugget), the fit keeps the best point evaluated so far instead of throwing.
-- `skills/libkriging/references/python.md` documented `"BFGS"` as the
-  `WarpKriging` default optimiser (it is `"BFGS+Adam"`).
 - **`fit` / `update` now drop the state of the last `simulate(…,
   will_update=true)`** (and the update-points cache) for `Kriging` (every
   noise model and method, refit or not), `WarpKriging` and `MLPKriging`: a

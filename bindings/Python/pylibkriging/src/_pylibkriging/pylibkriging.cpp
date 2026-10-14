@@ -381,7 +381,7 @@ needs "exact" or "vecchia"
       .def("is_nugget_estim", &PyKriging::is_nugget_estim)
       .def("noise", &PyKriging::noise);
 
-  const std::string default_warp_optim = "BFGS+Adam";
+  const std::string default_warp_optim = "BFGS";
   const std::string default_mlp_optim = "BFGS";
 
   /* --- NestedKriging --- */
