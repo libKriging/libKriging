@@ -290,6 +290,12 @@ add_test(NAME GetVersion COMMAND GetVersion)
 
 # Check that the installed CMake package can be used with find_package(libKriging) (issue #127)
 # Needs `cmake --install` (CMake >= 3.15); installs only the library and its dependencies, not the tests
+# Linker flags of the instrumented library (coverage, sanitizers) that the consumer project has to use too
+set(CONSUMER_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+if (SANITIZE AND NOT SANITIZE STREQUAL "OFF")
+    string(TOLOWER "${SANITIZE}" SANITIZE_LOWER)
+    set(CONSUMER_LINKER_FLAGS "${CONSUMER_LINKER_FLAGS} -fsanitize=${SANITIZE_LOWER}")
+endif ()
 if (NOT CMAKE_VERSION VERSION_LESS 3.15)
     add_test(NAME cmake_package
             COMMAND ${CMAKE_COMMAND}
@@ -301,7 +307,7 @@ if (NOT CMAKE_VERSION VERSION_LESS 3.15)
             -DCXX_COMPILER=${CMAKE_CXX_COMPILER}
             -DEXPECTED_VERSION=${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}
             -DINSTALLED_PREFIX=${CMAKE_INSTALL_PREFIX}
-            "-DCONSUMER_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
+            "-DCONSUMER_LINKER_FLAGS=${CONSUMER_LINKER_FLAGS}"
             "-DINSTALL_DIRS=${PROJECT_BINARY_DIR}/dependencies/armadillo-code|${PROJECT_BINARY_DIR}/dependencies/lbfgsb_cpp|$<TARGET_PROPERTY:Kriging,BINARY_DIR>"
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake_package/run_test.cmake)
     set_tests_properties(cmake_package PROPERTIES LABELS "install")
