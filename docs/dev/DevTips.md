@@ -131,3 +131,16 @@ end
     ```shell
     cmake <options> -DCMAKE_CXX_FLAGS=-DARMA_EXTRA_DEBUG ..
     ```
+
+## Using the installed C++ library from another CMake project
+
+After `cmake --install`, a CMake package is installed in `<prefix>/lib/cmake/libKriging`:
+
+```cmake
+find_package(libKriging 1.2 CONFIG REQUIRED)
+target_link_libraries(myapp PRIVATE libKriging::Kriging)
+```
+
+Point CMake to the installation with `-DCMAKE_PREFIX_PATH=<prefix>`. The
+dependencies (Armadillo, lbfgsb_cpp) are installed under the same prefix and
+found automatically.

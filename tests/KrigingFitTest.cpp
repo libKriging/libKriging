@@ -253,3 +253,84 @@ TEST_CASE("KrigingFitTest - constant input column", "[fit][kriging]") {
   auto [mean, stdev, cov, dm, ds] = k.predict(X.rows(0, 4), true, false, false);
   CHECK(arma::abs(mean - y.head(5)).max() < 1e-4);
 }
+
+TEST_CASE("KrigingFitTest - is_theta_estim = false is honoured by BFGS (#388)", "[fit][kriging]") {
+  arma::arma_rng::set_seed(0);
+  const arma::uword n = 20;
+  arma::mat X(n, 2, arma::fill::randu);
+  arma::vec y = arma::sin(3 * X.col(0)) + arma::square(X.col(1));
+  const arma::vec theta_fixed{0.3, 0.4};
+
+  Kriging::Parameters parameters;
+  parameters.theta = arma::mat(theta_fixed.t());
+  parameters.is_theta_estim = false;
+
+  for (const std::string objective : {"LL", "LOO", "LMP"}) {
+    for (const std::string optim : {"BFGS", "BFGS4"}) {
+      for (const bool normalize : {false, true}) {
+        INFO("objective=" << objective << " optim=" << optim << " normalize=" << normalize);
+        Kriging k("gauss");
+        k.fit(y, X, Trend::RegressionModel::Constant, normalize, optim, objective, parameters);
+        CHECK(arma::approx_equal(k.theta(), theta_fixed, "reldiff", 1e-12));
+        CHECK_FALSE(k.is_theta_estim());
+        CHECK(k.is_sigma2_estim());
+
+        // with no noise, sigma2 / beta are profiled at theta: same as optim="none" for LL
+        if (objective == "LL") {
+          Kriging kn("gauss");
+          kn.fit(y, X, Trend::RegressionModel::Constant, normalize, "none", objective, parameters);
+          CHECK(std::abs(k.sigma2() - kn.sigma2()) <= 1e-10 * kn.sigma2());
+          CHECK(std::abs(k.logLikelihood() - kn.logLikelihood()) <= 1e-10 * std::abs(kn.logLikelihood()));
+        }
+      }
+    }
+  }
+
+  SECTION("nugget: theta fixed, nugget still estimated") {
+    arma::vec yn = y + 0.05 * arma::randn<arma::vec>(n);
+    Kriging k("gauss", Kriging::NoiseModel::Nugget);
+    k.fit(yn, X, Trend::RegressionModel::Constant, false, "BFGS10", "LL", parameters);
+    CHECK(arma::approx_equal(k.theta(), theta_fixed, "reldiff", 1e-12));
+    CHECK_FALSE(k.is_theta_estim());
+    CHECK(k.is_nugget_estim());
+    CHECK(k.nugget() > 0);
+    // the nugget is optimized: at least as good as any fixed alpha on a grid
+    const double ll = k.logLikelihood();
+    for (double alpha : {0.5, 0.9, 0.99, 0.999}) {
+      arma::vec gamma = arma::join_cols(theta_fixed, arma::vec{alpha});
+      CHECK(std::get<0>(k.logLikelihoodFun(gamma, false, false)) <= ll + 1e-8);
+    }
+
+    // update(refit = true) keeps theta fixed
+    arma::mat Xu(3, 2, arma::fill::randu);
+    arma::vec yu = arma::sin(3 * Xu.col(0)) + arma::square(Xu.col(1));
+    k.update(yu, Xu, true);
+    CHECK(arma::approx_equal(k.theta(), theta_fixed, "reldiff", 1e-12));
+    CHECK_FALSE(k.is_theta_estim());
+  }
+
+  SECTION("update(refit = true) keeps theta fixed (no noise)") {
+    Kriging k("gauss");
+    k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
+    arma::mat Xu(3, 2, arma::fill::randu);
+    arma::vec yu = arma::sin(3 * Xu.col(0)) + arma::square(Xu.col(1));
+    k.update(yu, Xu, true);
+    CHECK(arma::approx_equal(k.theta(), theta_fixed, "reldiff", 1e-12));
+    CHECK_FALSE(k.is_theta_estim());
+  }
+
+  SECTION("several theta rows with is_theta_estim = false are rejected") {
+    Kriging::Parameters p2 = parameters;
+    p2.theta = arma::mat{{0.3, 0.4}, {0.5, 0.6}};
+    Kriging k("gauss");
+    CHECK_THROWS_AS(k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", p2), std::invalid_argument);
+  }
+
+  SECTION("is_theta_estim = false without theta: theta is estimated") {
+    Kriging::Parameters p3;
+    p3.is_theta_estim = false;
+    Kriging k("gauss");
+    k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", p3);
+    CHECK(k.is_theta_estim());
+  }
+}
