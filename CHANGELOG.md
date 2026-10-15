@@ -14,6 +14,12 @@ past release, see the corresponding entry on the
 ### Fixed
 - **R**: `str()`/`as.list()` on an unfitted `Kriging("gauss")` no longer segfaults
   (the trend `regmodel` was left uninitialized, and a `str.Kriging` method now displays the model content, [#249](https://github.com/libKriging/libKriging/issues/249)).
+- **Kriging**: `parameters` with a `theta` and `is_theta_estim = false` now keep
+  theta fixed with `optim = "BFGS[#]"` too (it was silently re-estimated unless
+  `optim = "none"`); the nugget / heterogeneous-noise `sigma2` are still
+  optimized per their own flags, and `update(…, refit = true)` keeps theta
+  fixed. Several `theta` rows with `is_theta_estim = false` are rejected
+  ([#388](https://github.com/libKriging/libKriging/issues/388)).
 
 ### Changed
 - **Kriging (breaking): `simulate(…, with_noise, …)` takes noise VARIANCES**,
