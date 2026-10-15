@@ -732,6 +732,10 @@ update.Kriging <- function(object, y_u, ..., X_u = NULL, noise_u = NULL, refit =
 
 #' Save a Kriging Model to a file storage
 #'
+#' A Kriging object also survives R serialization (\code{saveRDS} /
+#' \code{readRDS}, \code{base::save} / \code{base::load}, PSOCK / future
+#' workers), which stores the same JSON content.
+#'
 #' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 Kriging object.

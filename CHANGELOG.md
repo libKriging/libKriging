@@ -11,6 +11,14 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Added
+- **R**: `Kriging`, `NestedKriging`, `WarpKriging` and `MLPKriging` objects survive R
+  serialization: `saveRDS()` / `readRDS()`, `save()` / `load()` of a workspace,
+  `serialize()`, and shipping to PSOCK / `future` workers. The current model is stored as its
+  JSON save file and reloaded into a new C++ object, which the object and its `$` methods
+  share ([#327](https://github.com/libKriging/libKriging/issues/327)). Objects serialized by
+  an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
+
 ### Fixed
 - **Kriging (nugget)**: the BFGS fit seeds its first start with the theta of the
   noise-free fit on the same data and a small nugget share (alpha = 0.99), instead of a

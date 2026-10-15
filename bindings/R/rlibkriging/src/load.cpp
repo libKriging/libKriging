@@ -15,6 +15,7 @@
 #include "libKriging/WarpKriging.hpp"
 
 #include <optional>
+#include "handle.hpp"
 #include "retrofit_utils.hpp"
 
 // [[Rcpp::export]]
@@ -23,7 +24,7 @@ Rcpp::List kriging_load(std::string filename) {
 
   Rcpp::List obj;
   Rcpp::XPtr<Kriging> impl_copy(new Kriging(ok, ExplicitCopySpecifier{}));
-  obj.attr("object") = impl_copy;
+  obj.attr("object") = lk_wrap(impl_copy, "Kriging");
   obj.attr("class") = "Kriging";
   return obj;
 }
@@ -32,14 +33,14 @@ Rcpp::List kriging_load(std::string filename) {
 SEXP warpkriging_load(std::string filename) {
   auto* wk = new libKriging::WarpKriging(libKriging::WarpKriging::load(filename));
   Rcpp::XPtr<libKriging::WarpKriging> ptr(wk);
-  return ptr;
+  return lk_wrap(ptr, "WarpKriging");
 }
 
 // [[Rcpp::export]]
 SEXP mlpkriging_load(std::string filename) {
   auto* mk = new libKriging::MLPKriging(libKriging::MLPKriging::load(filename));
   Rcpp::XPtr<libKriging::MLPKriging> ptr(mk);
-  return ptr;
+  return lk_wrap(ptr, "MLPKriging");
 }
 
 // [[Rcpp::export]]
