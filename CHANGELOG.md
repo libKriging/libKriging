@@ -12,12 +12,12 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
-- **R**: `Kriging` and `NestedKriging` objects survive R serialization: `saveRDS()` /
-  `readRDS()`, `save()` / `load()` of a workspace, `serialize()`, and shipping to PSOCK /
-  `future` workers. The current model is stored as its JSON save file and reloaded into a new
-  C++ object, which the object and its `$` methods share
-  ([#327](https://github.com/libKriging/libKriging/issues/327)). `WarpKriging` /
-  `MLPKriging` still need `$save()` / `load.*()`.
+- **R**: `Kriging`, `NestedKriging`, `WarpKriging` and `MLPKriging` objects survive R
+  serialization: `saveRDS()` / `readRDS()`, `save()` / `load()` of a workspace,
+  `serialize()`, and shipping to PSOCK / `future` workers. The current model is stored as its
+  JSON save file and reloaded into a new C++ object, which the object and its `$` methods
+  share ([#327](https://github.com/libKriging/libKriging/issues/327)). Objects serialized by
+  an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
 - **R**: `str()`/`as.list()` on an unfitted `Kriging("gauss")` no longer segfaults

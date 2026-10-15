@@ -8,7 +8,9 @@
 #include <R_ext/Altrep.h>
 
 #include "libKriging/Kriging.hpp"
+#include "libKriging/MLPKriging.hpp"
 #include "libKriging/NestedKriging.hpp"
+#include "libKriging/WarpKriging.hpp"
 
 #include <cstdio>
 #include <fstream>
@@ -74,6 +76,10 @@ static SEXP handle_Serialized_state(SEXP h) {
       static_cast<Kriging*>(R_ExternalPtrAddr(xptr))->save(filename);
     else if (type == "NestedKriging")
       static_cast<NestedKriging*>(R_ExternalPtrAddr(xptr))->save(filename);
+    else if (type == "WarpKriging")
+      static_cast<libKriging::WarpKriging*>(R_ExternalPtrAddr(xptr))->save(filename);
+    else if (type == "MLPKriging")
+      static_cast<libKriging::MLPKriging*>(R_ExternalPtrAddr(xptr))->save(filename);
     else
       return R_NilValue;
   } catch (const std::exception& e) {
@@ -117,6 +123,11 @@ static SEXP handle_Unserialize(SEXP, SEXP state) {
           xptr = Rcpp::XPtr<Kriging>(new Kriging(ok, ExplicitCopySpecifier{}));
         } else if (type == "NestedKriging") {
           xptr = Rcpp::XPtr<NestedKriging>(new NestedKriging(NestedKriging::load(filename)));
+        } else if (type == "WarpKriging") {
+          xptr = Rcpp::XPtr<libKriging::WarpKriging>(
+              new libKriging::WarpKriging(libKriging::WarpKriging::load(filename)));
+        } else if (type == "MLPKriging") {
+          xptr = Rcpp::XPtr<libKriging::MLPKriging>(new libKriging::MLPKriging(libKriging::MLPKriging::load(filename)));
         } else {
           std::snprintf(err, sizeof(err), "unknown model type %s", type.c_str());
         }

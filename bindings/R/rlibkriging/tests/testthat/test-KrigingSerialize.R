@@ -1,4 +1,4 @@
-context("R serialization (saveRDS / readRDS, serialize, PSOCK) of Kriging and NestedKriging (#327)")
+context("R serialization (saveRDS / readRDS, serialize, PSOCK) of Kriging, NestedKriging, WarpKriging, MLPKriging (#327)")
 
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 X <- as.matrix(c(0.0, 0.2, 0.4, 0.5, 0.7, 0.8, 1.0))
@@ -65,6 +65,28 @@ test_that("saveRDS / readRDS round-trips a NestedKriging", {
   nk2 <- unserialize(serialize(nk, NULL))
   xn <- matrix(runif(10), ncol = 2)
   expect_equal(predict(nk2, xn)$mean, predict(nk, xn)$mean)
+})
+
+test_that("saveRDS / readRDS round-trips a WarpKriging", {
+  set.seed(3)
+  Xw <- matrix(runif(40), ncol = 2)
+  yw <- sin(3 * Xw[, 1]) + Xw[, 2]^2
+  wk <- WarpKriging(yw, Xw, warping = c("kumaraswamy", "none"), kernel = "gauss")
+  wk2 <- unserialize(serialize(wk, NULL))
+  xw <- matrix(runif(10), ncol = 2)
+  expect_equal(predict(wk2, xw)$mean, predict(wk, xw)$mean)
+  expect_equal(wk2$theta(), wk$theta())
+  expect_equal(wk2$warping(), wk$warping())
+})
+
+test_that("saveRDS / readRDS round-trips an MLPKriging", {
+  set.seed(4)
+  Xm <- matrix(runif(40), ncol = 2)
+  ym <- sin(3 * Xm[, 1]) + Xm[, 2]^2
+  mk <- MLPKriging(ym, Xm, hidden_dims = c(4), d_out = 1, activation = "selu", kernel = "gauss")
+  mk2 <- unserialize(serialize(mk, NULL))
+  xm <- matrix(runif(10), ncol = 2)
+  expect_equal(predict(mk2, xm)$mean, predict(mk, xm)$mean)
 })
 
 test_that("a Kriging is shipped to a PSOCK worker", {

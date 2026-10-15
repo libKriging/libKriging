@@ -4,6 +4,8 @@
 // clang-format on
 
 #include "libKriging/MLPKriging.hpp"
+
+#include "handle.hpp"
 #include "libKriging/Trend.hpp"
 
 using namespace libKriging;
@@ -52,7 +54,7 @@ SEXP mlpKriging_new(const arma::vec& y,
                                      params,
                                      method);
 
-  return MLPKrigingPtr(model, true);
+  return lk_wrap(MLPKrigingPtr(model, true), "MLPKriging");
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +71,7 @@ void mlpKriging_fit(SEXP model_ptr,
                     std::string objective = "LL",
                     Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
                     std::string method = "exact") {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
 
   std::map<std::string, std::string> params;
   if (parameters.isNotNull()) {
@@ -92,7 +94,7 @@ Rcpp::List mlpKriging_predict(SEXP model_ptr,
                               bool withStd = true,
                               bool withCov = false,
                               bool withDeriv = false) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model->predict(x_new, withStd, withCov, withDeriv);
 
   Rcpp::List result;
@@ -122,7 +124,7 @@ arma::mat mlpKriging_simulate(SEXP model_ptr,
                               const arma::mat& x_new,
                               bool will_update = false,
                               Rcpp::Nullable<Rcpp::NumericVector> with_noise = R_NilValue) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   arma::vec noise_var;
   if (with_noise.isNotNull())
     noise_var = Rcpp::as<arma::vec>(with_noise.get());
@@ -135,7 +137,7 @@ arma::mat mlpKriging_simulate(SEXP model_ptr,
 
 // [[Rcpp::export]]
 arma::mat mlpKriging_update_simulate(SEXP model_ptr, const arma::vec& y_u, const arma::mat& X_u) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->update_simulate(y_u, X_u);
 }
 
@@ -145,7 +147,7 @@ arma::mat mlpKriging_update_simulate(SEXP model_ptr, const arma::vec& y_u, const
 
 // [[Rcpp::export]]
 void mlpKriging_update(SEXP model_ptr, const arma::vec& y_u, const arma::mat& X_u, bool refit = true) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   model->update(y_u, X_u, refit);
 }
 
@@ -155,7 +157,7 @@ void mlpKriging_update(SEXP model_ptr, const arma::vec& y_u, const arma::mat& X_
 
 // [[Rcpp::export]]
 double mlpKriging_logLikelihood(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->logLikelihood();
 }
 
@@ -164,7 +166,7 @@ Rcpp::List mlpKriging_logLikelihoodFun(SEXP model_ptr,
                                        const arma::vec& theta_gp,
                                        bool withGrad = true,
                                        bool withHess = false) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   auto [ll, grad, hess] = model->logLikelihoodFun(theta_gp, withGrad, withHess);
 
   Rcpp::List result;
@@ -182,49 +184,49 @@ Rcpp::List mlpKriging_logLikelihoodFun(SEXP model_ptr,
 
 // [[Rcpp::export]]
 std::string mlpKriging_summary(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->summary();
 }
 
 // [[Rcpp::export]]
 arma::vec mlpKriging_theta(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->theta();
 }
 
 // [[Rcpp::export]]
 double mlpKriging_sigma2(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->sigma2();
 }
 
 // [[Rcpp::export]]
 std::string mlpKriging_objective(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->objective();
 }
 
 // [[Rcpp::export]]
 std::string mlpKriging_method(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->method();
 }
 
 // [[Rcpp::export]]
 std::string mlpKriging_kernel(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->kernel();
 }
 
 // [[Rcpp::export]]
 int mlpKriging_featureDim(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return static_cast<int>(model->feature_dim());
 }
 
 // [[Rcpp::export]]
 Rcpp::IntegerVector mlpKriging_hiddenDims(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   const auto& hd = model->hidden_dims();
   Rcpp::IntegerVector out(hd.size());
   for (size_t i = 0; i < hd.size(); ++i)
@@ -234,107 +236,107 @@ Rcpp::IntegerVector mlpKriging_hiddenDims(SEXP model_ptr) {
 
 // [[Rcpp::export]]
 std::string mlpKriging_activation(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->activation();
 }
 
 // [[Rcpp::export]]
 bool mlpKriging_isFitted(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->is_fitted();
 }
 
 // [[Rcpp::export]]
 arma::mat mlpKriging_X(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->X();
 }
 
 // [[Rcpp::export]]
 arma::vec mlpKriging_centerX(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return arma::vec(model->centerX().t());
 }
 
 // [[Rcpp::export]]
 arma::vec mlpKriging_scaleX(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return arma::vec(model->scaleX().t());
 }
 
 // [[Rcpp::export]]
 arma::vec mlpKriging_y(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->y();
 }
 
 // [[Rcpp::export]]
 double mlpKriging_centerY(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->centerY();
 }
 
 // [[Rcpp::export]]
 double mlpKriging_scaleY(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->scaleY();
 }
 
 // [[Rcpp::export]]
 bool mlpKriging_normalize(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->normalize();
 }
 
 // [[Rcpp::export]]
 std::string mlpKriging_regmodel(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return Trend::toString(model->regmodel());
 }
 
 // [[Rcpp::export]]
 arma::mat mlpKriging_F(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->F();
 }
 
 // [[Rcpp::export]]
 arma::mat mlpKriging_T(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->T();
 }
 
 // [[Rcpp::export]]
 arma::mat mlpKriging_M(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->M();
 }
 
 // [[Rcpp::export]]
 arma::vec mlpKriging_z(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->z();
 }
 
 // [[Rcpp::export]]
 arma::vec mlpKriging_beta(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->beta();
 }
 
 // [[Rcpp::export]]
 SEXP mlpKriging_copy(SEXP model_ptr) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   auto* clone = new MLPKriging(model->hidden_dims(), model->d_out(), model->activation(), model->kernel());
   if (model->is_fitted()) {
     clone->fit(model->y(), model->X());
   }
   Rcpp::XPtr<MLPKriging> clone_ptr(clone);
-  return clone_ptr;
+  return lk_wrap(clone_ptr, "MLPKriging");
 }
 
 // [[Rcpp::export]]
 void mlpKriging_save(SEXP model_ptr, std::string filename) {
-  MLPKrigingPtr model(model_ptr);
+  MLPKrigingPtr model(lk_xptr(model_ptr));
   model->save(filename);
 }

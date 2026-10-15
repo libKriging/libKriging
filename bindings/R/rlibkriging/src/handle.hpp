@@ -5,17 +5,17 @@
 typedef struct SEXPREC* SEXP;
 
 // R serialization (saveRDS / save / PSOCK clusters, #327) of the objects
-// holding a C++ model ("Kriging", "NestedKriging").
+// holding a C++ model ("Kriging", "NestedKriging", "WarpKriging", "MLPKriging").
 //
-// Their attr(, "object") is an environment holding, as "handle", an ALTREP
-// integer of length 1 whose data1 is the XPtr to the C++ model. On
-// serialization, the ALTREP Serialized_state method stores the current
-// model as its JSON save file; on unserialization, the model is loaded back
-// into a new C++ object. The environment is serialized by reference, so the
+// Their attr(, "object") (`$ptr` for WarpKriging / MLPKriging) is an
+// environment holding, as "handle", an ALTREP integer of length 1 whose
+// data1 is the XPtr to the C++ model. On serialization, the ALTREP
+// Serialized_state method stores the current model as its JSON save file;
+// on unserialization, the model is loaded back into a new C++ object. The environment is serialized by reference, so the
 // object and the closures of its `$` methods keep sharing one C++ model.
 
-/// Wrap a fresh XPtr (of a C++ `type`, "Kriging" or "NestedKriging") as the
-/// attr(, "object") of an R object.
+/// Wrap a fresh XPtr (of a C++ `type`: "Kriging", "NestedKriging",
+/// "WarpKriging" or "MLPKriging") as the attr(, "object") / `$ptr` of an R object.
 SEXP lk_wrap(SEXP xptr, const char* type);
 
 /// The XPtr held by attr(, "object") (also accepts a bare XPtr).
