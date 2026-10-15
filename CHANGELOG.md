@@ -12,6 +12,11 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Fixed
+- **Kriging (nugget)**: the BFGS fit seeds its first start with the theta of the
+  noise-free fit on the same data and a small nugget share (alpha = 0.99), instead of a
+  random start that often ended in the all-noise region (nugget >> sigma2) with the
+  default single start. On Branin (n = 30, low noise) the mean LL gap to `BFGS10` drops
+  from ~8 to ~0.5 ([#383](https://github.com/libKriging/libKriging/issues/383)).
 - **Build**: the `install.lib` target no longer fails on a fresh build directory
   because of the bench executables it does not build: their install is now `OPTIONAL`
   ([#384](https://github.com/libKriging/libKriging/issues/384)).
