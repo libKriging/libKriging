@@ -12,6 +12,10 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Fixed
+- **R (Linux binary)**: the release archive bundles OpenBLAS and its Fortran runtime
+  (`$ORIGIN` RUNPATH), which a base R install lacks, so `library(rlibkriging)` no longer fails
+  with `libopenblas.so.0: cannot open shared object file`; the README documents the
+  workaround for earlier archives ([#387](https://github.com/libKriging/libKriging/issues/387)).
 - **R**: `str()`/`as.list()` on an unfitted `Kriging("gauss")` no longer segfaults
   (the trend `regmodel` was left uninitialized, and a `str.Kriging` method now displays the model content, [#249](https://github.com/libKriging/libKriging/issues/249)).
 

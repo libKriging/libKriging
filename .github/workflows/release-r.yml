@@ -130,7 +130,7 @@ jobs:
           if [ "${{matrix.force_update}}" == "on" ]; then
             sudo apt update
           fi
-          sudo apt install -qy liblapack-dev gfortran
+          sudo apt install -qy liblapack-dev gfortran patchelf  # patchelf: tools/release/r-release.sh
         if: runner.os == 'Linux' # or use $RUNNER_OS
 
       - name: install

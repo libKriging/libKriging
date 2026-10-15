@@ -30,6 +30,7 @@ LinkingTo: Rcpp, RcppArmadillo
 Depends: R (>= 4.2)
 Imports: Rcpp (>= 0.12.11), methods, utils
 Suggests: testthat, foreach
-SystemRequirements: GNU make, cmake (>= 3.2.0), gcc
+SystemRequirements: GNU make, cmake (>= 3.2.0), gcc, a BLAS / LAPACK library
+    (e.g. OpenBLAS)
 URL: https://github.com/libKriging
 RoxygenNote: 7.3.3
