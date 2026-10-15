@@ -171,6 +171,10 @@ past release, see the corresponding entry on the
     uniform API (only `"exact"` is implemented).
 
 ### Added
+- CMake package for the C++ library (#127): after installation,
+  `find_package(libKriging CONFIG)` and `target_link_libraries(app PRIVATE libKriging::Kriging)`
+  work, with version checking (`SameMajorVersion`) and transitive dependencies
+  (Armadillo, lbfgsb_cpp, OpenMP).
 - **WarpKriging / MLPKriging bindings: `simulate(…, will_update, with_noise)`**
   in Python, R, Julia and Octave / MATLAB, after `will_update` (its existing
   position is kept): `with_noise` holds observation-noise VARIANCES (a
