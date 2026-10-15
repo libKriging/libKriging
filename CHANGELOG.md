@@ -12,6 +12,9 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Fixed
+- **Build**: the `install.lib` target no longer fails on a fresh build directory
+  because of the bench executables it does not build: their install is now `OPTIONAL`
+  ([#384](https://github.com/libKriging/libKriging/issues/384)).
 - **Octave/MATLAB**: `NestedKriging.predict(X, return_stdev)` accepts the optional
   `return_stdev` flag like `Kriging.predict` (it raised "Input requires exactly 2 arguments",
   [#385](https://github.com/libKriging/libKriging/issues/385)).
