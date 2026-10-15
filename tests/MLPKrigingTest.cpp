@@ -11,6 +11,8 @@
 #include <cmath>
 #include <cstdio>
 #include <iostream>
+#include <stdexcept>
+#include <string>
 
 using namespace libKriging;
 
@@ -198,6 +200,60 @@ static void test_save_load_dispatch() {
 }
 
 // ==========================================================================
+//  Test: default single-start optimiser actually optimises (issue #382)
+//
+//  The default fit used to stop after a few ms at a poor optimum: the joint
+//  L-BFGS-B was capped at Optim::max_iteration (20) for ~40 parameters, and
+//  the former "BFGS+Adam" default moved the MLP weights by at most ~0.01.
+// ==========================================================================
+static void test_default_optim_branin() {
+  std::cout << "=== Test: default optim on Branin 2D (issue #382) ===" << std::endl;
+
+  auto branin = [](const arma::mat& U) -> arma::vec {
+    arma::vec x1 = 15.0 * U.col(0) - 5.0, x2 = 15.0 * U.col(1);
+    return arma::square(x2 - 5.1 / (4.0 * M_PI * M_PI) * arma::square(x1) + 5.0 / M_PI * x1 - 6.0)
+           + 10.0 * (1.0 - 1.0 / (8.0 * M_PI)) * arma::cos(x1) + 10.0;
+  };
+
+  arma::arma_rng::set_seed(3);
+  const arma::uword n = 30;
+  arma::mat X(n, 2);
+  for (arma::uword j = 0; j < 2; ++j)  // Latin hypercube
+    X.col(j) = (arma::conv_to<arma::vec>::from(arma::randperm(n)) + arma::randu<arma::vec>(n)) / n;
+  arma::vec y = branin(X);
+  arma::mat Xt = arma::randu<arma::mat>(500, 2);
+  arma::vec yt = branin(Xt);
+
+  auto q2 = [&](const MLPKriging& m) {
+    arma::vec pred = std::get<0>(m.predict(Xt, false, false, false));
+    return 1.0 - arma::accu(arma::square(yt - pred)) / arma::accu(arma::square(yt - arma::mean(yt)));
+  };
+
+  MLPKriging m_default({8}, 2, "tanh", "matern5_2");
+  m_default.fit(y, X);
+  MLPKriging m_multi({8}, 2, "tanh", "matern5_2");
+  m_multi.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS3");
+
+  const double q2_default = q2(m_default);
+  const double q2_multi = q2(m_multi);
+  std::cout << "  default optim=" << m_default.optim() << "  Q2=" << q2_default << "  LL=" << m_default.logLikelihood()
+            << std::endl;
+  std::cout << "  BFGS3             Q2=" << q2_multi << "  LL=" << m_multi.logLikelihood() << std::endl;
+
+  if (m_default.optim() != "BFGS")
+    throw std::runtime_error("MLPKriging default optim should be \"BFGS\", got \"" + m_default.optim() + "\"");
+  if (!(q2_default > 0.95))
+    throw std::runtime_error("MLPKriging default fit on Branin: Q2 = " + std::to_string(q2_default) + " <= 0.95");
+  // No LL ordering between BFGS3 and the single start: the first multistart
+  // start begins from the same point, but runs on a clone in a worker thread
+  // and, over ~1000 iterations of a non-convex problem, round-off differences
+  // (BLAS kernels, buffer alignment) can lead it to another local optimum
+  // (seen on CI: single -79.4, BFGS3 -80.9; locally both -81.1).
+  if (!(q2_multi > 0.95))
+    throw std::runtime_error("MLPKriging BFGS3 fit on Branin: Q2 = " + std::to_string(q2_multi) + " <= 0.95");
+}
+
+// ==========================================================================
 //  main
 // ==========================================================================
 int main() {
@@ -205,6 +261,7 @@ int main() {
     test_mlp_kriging_basic();
     test_predict_derivative();
     test_save_load_dispatch();
+    test_default_optim_branin();
 
     std::cout << "============================================\n"
               << "  ALL MLPKriging TESTS PASSED\n"

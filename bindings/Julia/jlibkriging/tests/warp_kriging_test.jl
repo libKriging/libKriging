@@ -334,7 +334,7 @@ end
                         parameters=Dict("max_iter_adam" => "120"))
 
         # accessors
-        @test optim(k) == "BFGS+Adam"
+        @test optim(k) == "BFGS"
         @test objective(k) == "LL"
         @test isempty(noise(k))                 # fitted noise-free
         wp = warp_params(k)

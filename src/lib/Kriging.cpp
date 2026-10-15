@@ -22,6 +22,8 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
 
+#include "BlasThreads.hpp"
+
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
@@ -119,6 +121,21 @@ static ForkSafeRegistrar fork_safe_registrar;
 
 }  // namespace
 #endif  // !_WIN32 && _POSIX_VERSION
+
+namespace libKriging {
+namespace detail {
+void set_blas_threads(unsigned int n) {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_set_num_threads();
+  if (fn)
+    fn(static_cast<int>(n));
+#endif
+#ifdef _OPENMP
+  omp_set_num_threads(static_cast<int>(n));
+#endif
+}
+}  // namespace detail
+}  // namespace libKriging
 
 // =============================================================================
 // Subset-of-data pre-fit reduction (see Kriging.hpp for the full doc) -- a
@@ -3529,37 +3546,8 @@ void Kriging::fit_impl(const arma::vec& y,
 
       // Configure threads for Armadillo/BLAS to balance nested parallelism.
       // Each of the 'multistart' workers uses internal BLAS/OMP parallelism.
-      // A RAII guard resets to 1 thread when the scope exits — this collapses
-      // the idle thread pool so a subsequent fork() (e.g. R's mclapply) does
-      // not inherit locked mutexes and deadlock.
       unsigned int n_cpu = std::thread::hardware_concurrency();
-      struct ThreadCountGuard {
-        bool active = false;
-        ThreadCountGuard() = default;
-        void set(unsigned int n) {
-          active = true;
-#if !defined(__APPLE__) || !defined(__arm64__)
-          auto fn = get_openblas_set_num_threads();
-          if (fn)
-            fn(static_cast<int>(n));
-#endif
-#ifdef _OPENMP
-          omp_set_num_threads(static_cast<int>(n));
-#endif
-        }
-        ~ThreadCountGuard() {
-          if (!active)
-            return;
-#if !defined(__APPLE__) || !defined(__arm64__)
-          auto fn = get_openblas_set_num_threads();
-          if (fn)
-            fn(1);
-#endif
-#ifdef _OPENMP
-          omp_set_num_threads(1);
-#endif
-        }
-      } thread_guard;
+      libKriging::detail::BlasThreadGuard thread_guard;
 
       if (n_cpu > 0 && multistart > 1) {
         unsigned int threads_per_worker = std::max(1u, n_cpu / multistart);

@@ -5,6 +5,8 @@
 #include "libKriging/utils/data_from_arma_vec.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <functional>
 #include <vector>
 
@@ -62,6 +64,11 @@ class AdamBFGS {
   double adam_beta1 = 0.9;
   double adam_beta2 = 0.999;
   double adam_eps = 1e-8;
+  /// Early stop: end the Adam loop after `patience` consecutive steps without
+  /// improving the best objective by more than rel_tol * max(1, |best|).
+  /// 0 disables it (run all max_iter_adam steps).
+  arma::uword patience = 0;
+  double rel_tol = 0.0;
 
   // BFGS parameters (for inner loop)
   arma::uword max_iter_bfgs = 100;
@@ -99,6 +106,8 @@ class AdamBFGS {
     arma::vec best_outer = x_outer;
     arma::vec best_inner = x_inner;
     arma::uword total_bfgs_evals = 0;
+    arma::uword n_iters = 0;
+    arma::uword stall = 0;
 
     // Set up bounds for BFGS
     bool has_bounds = (inner_lower.n_elem == n_inner && inner_upper.n_elem == n_inner);
@@ -145,12 +154,18 @@ class AdamBFGS {
       double f = fn(x_outer, x_inner, &grad_outer, nullptr);
 
       // Track best
+      n_iters = t;
+      const double gain = maximize ? (f - best_f) : (best_f - f);
+      const bool significant = !std::isfinite(best_f) || gain > rel_tol * std::max(1.0, std::abs(best_f));
       bool improved = maximize ? (f > best_f) : (f < best_f);
       if (improved) {
         best_f = f;
         best_outer = x_outer;
         best_inner = x_inner;
       }
+      stall = significant ? 0 : stall + 1;
+      if (patience > 0 && stall >= patience)
+        break;
 
       // ---- Adam update on x_outer ----
       if (n_outer > 0) {
@@ -166,7 +181,7 @@ class AdamBFGS {
       }
     }
 
-    return {best_outer, best_inner, best_f, max_iter_adam, total_bfgs_evals};
+    return {best_outer, best_inner, best_f, n_iters, total_bfgs_evals};
   }
 };
 

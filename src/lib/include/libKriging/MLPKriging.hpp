@@ -64,7 +64,7 @@ class MLPKriging {
                                const std::string& kernel,
                                const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                                bool normalize = false,
-                               const std::string& optim = "BFGS+Adam",
+                               const std::string& optim = "BFGS",
                                const std::string& objective = "LL",
                                const std::map<std::string, std::string>& parameters = {},
                                const std::string& method = "exact");
@@ -77,7 +77,7 @@ class MLPKriging {
                              const arma::mat& X,
                              const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                              bool normalize = false,
-                             const std::string& optim = "BFGS+Adam",
+                             const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
                              const std::map<std::string, std::string>& parameters = {},
                              const std::string& method = "exact");
@@ -147,6 +147,7 @@ class MLPKriging {
   const arma::vec& z() const { return m_impl.z(); }
   const arma::vec& beta() const { return m_impl.beta(); }
   std::string kernel() const { return m_impl.kernel(); }
+  const std::string& optim() const { return m_impl.optim(); }
   const std::string& objective() const { return m_impl.objective(); }
   const std::string& method() const { return m_impl.method(); }
   arma::vec theta() const { return m_impl.theta(); }
