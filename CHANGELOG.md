@@ -20,6 +20,10 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **R (Linux binary)**: the release archive bundles OpenBLAS and its Fortran runtime
+  (`$ORIGIN` RUNPATH), which a base R install lacks, so `library(rlibkriging)` no longer fails
+  with `libopenblas.so.0: cannot open shared object file`; the README documents the
+  workaround for earlier archives ([#387](https://github.com/libKriging/libKriging/issues/387)).
 - **Kriging (nugget)**: the BFGS fit seeds its first start with the theta of the
   noise-free fit on the same data and a small nugget share (alpha = 0.99), instead of a
   random start that often ended in the all-noise region (nugget >> sigma2) with the

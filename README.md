@@ -149,6 +149,11 @@ Or using the archive from [rlibkriging releases](https://github.com/libKriging/r
 install.packages("https://github.com/libKriging/rlibkriging/releases/download/1.1-1/rlibkriging_1.1-1_R_x86_64-pc-linux-gnu.tar.gz", repos=NULL)
 ```
 
+The Linux binary archives up to v1.2.2 need OpenBLAS at runtime: if `library(rlibkriging)` fails
+with `libopenblas.so.0: cannot open shared object file`, install it
+(`sudo apt install libopenblas0` on Debian/Ubuntu, `sudo dnf install openblas` on Fedora/RHEL).
+Later archives bundle it.
+
 **Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)**
 
 <details>

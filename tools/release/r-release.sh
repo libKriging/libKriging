@@ -42,6 +42,32 @@ case $ARCH in
     tar xzvf "${PREFIX}_${RVER}_R_$(uname -m)-pc-linux-gnu.tar.gz" -C "${TMP_DIR}"
     cp -a ${BUILD_DIR:-build}/installed/lib/libarmadillo.so.* "${TMP_DIR}"/rlibkriging/libs/ || echo "No armadillo shared lib to copy"
     cp -a ${BUILD_DIR:-build}/installed/lib/libKriging.so.* "${TMP_DIR}"/rlibkriging/libs/ || echo "No libKriging shared lib to copy"
+    # Bundle the runtime libraries that a base R install does not provide
+    # (OpenBLAS and its Fortran runtime, #387): R itself already brings
+    # libblas / liblapack / libgomp / libstdc++. They are found next to
+    # rlibkriging.so through a $ORIGIN RUNPATH (set on each bundled library
+    # too, as RUNPATH is not transitive).
+    LIBS_DIR="${TMP_DIR}"/rlibkriging/libs
+    # OpenBLAS: always bundle the pthreads build when the runner has it (Debian
+    # layout), whatever variant the system alternatives select: an OpenMP
+    # build (libopenblaso) is the most deadlock-prone in forked R workers (#325)
+    OPENBLAS_PTHREAD_DIR=/usr/lib/$(gcc -print-multiarch 2>/dev/null || echo "$(uname -m)-linux-gnu")/openblas-pthread
+    ldd "${LIBS_DIR}"/rlibkriging.so | awk '/=> \// { print $3 }' | grep -E '/lib(openblas|gfortran|quadmath)[^/]*\.so' | while read -r lib; do
+      name=$(basename "$lib")
+      if [[ "$name" == libopenblas* && -e "${OPENBLAS_PTHREAD_DIR}/${name}" ]]; then
+        lib="${OPENBLAS_PTHREAD_DIR}/${name}"
+      fi
+      echo "Bundling $lib as $name"
+      cp -L "$lib" "${LIBS_DIR}/${name}"
+    done
+    for so in "${LIBS_DIR}"/*.so*; do
+      patchelf --set-rpath '$ORIGIN' "$so"
+    done
+    if ldd "${LIBS_DIR}"/rlibkriging.so | grep -q "not found"; then
+      echo "Unresolved libraries in rlibkriging.so:"
+      ldd "${LIBS_DIR}"/rlibkriging.so | grep "not found"
+      exit 1
+    fi
     RELEASE_FILE=${PREFIX}_${GIT_TAG#v}_${ARCHZ}.tgz
     tar czvf "${RELEASE_FILE}" -C "${TMP_DIR}" .
     ;;
