@@ -259,6 +259,37 @@ jobs:
           fi
         if: runner.os == 'Linux' # or use $RUNNER_OS
 
+      - name: runner diagnostics
+        # CPU model / instruction sets and the OpenBLAS kernel picked at run
+        # time: some runners give numerically wrong results (e.g. 101 R tests
+        # failing on one R Linux runner of PR #404, passing on rerun with the
+        # same image), which these logs make it possible to attribute.
+        shell: bash
+        continue-on-error: true
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            LC_ALL=C lscpu | grep -E "^(Model name|Vendor ID|CPU\(s\)|Thread|Core|Socket|L3)" || true
+            echo "SIMD: $(grep -o -w -E 'avx512[a-z_0-9]*|avx2|fma' /proc/cpuinfo | sort -u | tr '\n' ' ')"
+          else
+            sysctl -n machdep.cpu.brand_string hw.ncpu 2>/dev/null || true
+          fi
+          python3 - <<'PYEOF'
+          import ctypes
+          for name in ("libopenblas.so.0", "libopenblas.dylib"):
+              try:
+                  lib = ctypes.CDLL(name)
+              except OSError:
+                  continue
+              lib.openblas_get_config.restype = ctypes.c_char_p
+              lib.openblas_get_corename.restype = ctypes.c_char_p
+              print(f"{name}: {lib.openblas_get_config().decode()} | core: {lib.openblas_get_corename().decode()}"
+                    f" | threads: {lib.openblas_get_num_threads()}")
+              break
+          else:
+              print("system OpenBLAS: not found")
+          PYEOF
+        if: runner.os != 'Windows'
+
       - name: pre-install-matlab
         uses: matlab-actions/setup-matlab@v2
         if: matrix.enable_matlab == 'on'
