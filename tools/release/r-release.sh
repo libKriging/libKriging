@@ -48,9 +48,17 @@ case $ARCH in
     # rlibkriging.so through a $ORIGIN RUNPATH (set on each bundled library
     # too, as RUNPATH is not transitive).
     LIBS_DIR="${TMP_DIR}"/rlibkriging/libs
+    # OpenBLAS: always bundle the pthreads build when the runner has it (Debian
+    # layout), whatever variant the system alternatives select: an OpenMP
+    # build (libopenblaso) is the most deadlock-prone in forked R workers (#325)
+    OPENBLAS_PTHREAD_DIR=/usr/lib/$(gcc -print-multiarch 2>/dev/null || echo "$(uname -m)-linux-gnu")/openblas-pthread
     ldd "${LIBS_DIR}"/rlibkriging.so | awk '/=> \// { print $3 }' | grep -E '/lib(openblas|gfortran|quadmath)[^/]*\.so' | while read -r lib; do
-      echo "Bundling $lib"
-      cp -L "$lib" "${LIBS_DIR}"/
+      name=$(basename "$lib")
+      if [[ "$name" == libopenblas* && -e "${OPENBLAS_PTHREAD_DIR}/${name}" ]]; then
+        lib="${OPENBLAS_PTHREAD_DIR}/${name}"
+      fi
+      echo "Bundling $lib as $name"
+      cp -L "$lib" "${LIBS_DIR}/${name}"
     done
     for so in "${LIBS_DIR}"/*.so*; do
       patchelf --set-rpath '$ORIGIN' "$so"
