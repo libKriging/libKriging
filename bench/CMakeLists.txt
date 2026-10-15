@@ -39,7 +39,8 @@ target_link_libraries(bench-mlpkriging LINK_PUBLIC Kriging)
 
 # Optionally install benchmarks
 install(TARGETS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia bench-nystrom
-        RUNTIME DESTINATION bin/bench)
+        RUNTIME DESTINATION bin/bench
+        OPTIONAL)  # install.lib does not build them (#384)
 
 # Add custom target to build all benchmarks
 add_custom_target(all_benchmarks

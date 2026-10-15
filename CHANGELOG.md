@@ -12,6 +12,9 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Fixed
+- **Build**: the `install.lib` target no longer fails on a fresh build directory
+  because of the bench executables it does not build: their install is now `OPTIONAL`
+  ([#384](https://github.com/libKriging/libKriging/issues/384)).
 - **R**: `str()`/`as.list()` on an unfitted `Kriging("gauss")` no longer segfaults
   (the trend `regmodel` was left uninitialized, and a `str.Kriging` method now displays the model content, [#249](https://github.com/libKriging/libKriging/issues/249)).
 
