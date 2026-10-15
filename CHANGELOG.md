@@ -20,6 +20,9 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **R**: regression test for forked workers (`parallel::mcparallel`) after a multistart
+  fit, and the fork / threading constraints documented in `bindings/R/README.md`
+  ([#325](https://github.com/libKriging/libKriging/issues/325)).
 - **R (Linux binary)**: the release archive bundles OpenBLAS and its Fortran runtime
   (`$ORIGIN` RUNPATH), which a base R install lacks, so `library(rlibkriging)` no longer fails
   with `libopenblas.so.0: cannot open shared object file`; the README documents the
