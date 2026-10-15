@@ -99,6 +99,9 @@ set(LIBKRIGING_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 #option(BUILD_SHARED_LIBS "Build the shared library" ON) # BUILD_SHARED_LIBS config should be after armadillo config
 #option(BUILD_STATIC_LIBS "Build the static library" ON) # TODO not yet implemented; today, equivalent to BUILD_SHARED_LIBS=off 
 option(LIBKRIGING_BENCHMARK_TESTS "Enable benchmark tests while testing" OFF)
+# OFF when only the library / a binding is needed (e.g. the Python wheel or
+# sdist build of setup.py): no Catch2, C++ tests nor benchmarks
+option(LIBKRIGING_BUILD_TESTS "Build the C++ tests and benchmarks" ON)
 option(ENABLE_COVERAGE "Enable coverage target" OFF)
 option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
 option(SANITIZE "Enable sanitize feature" OFF) # could be THREAD, ADDRESS or LEAK
@@ -561,7 +564,12 @@ if (PythonInterp_FOUND)
     set(HAS_PYTHON_REQUIREMENT true)
     set(PYTHON_REQUIREMENT_INFO "\tpython3 interpreter found: ${PYTHON_EXECUTABLE}")
     set(INDENTATION "   ")
-    execute_process(COMMAND ${PYTHON_EXECUTABLE} ${LIBKRIGING_SOURCE_DIR}/bindings/Python/pylibkriging/check_requirements.py --pretty --indent=${INDENTATION} requirements.txt dev-requirements.txt
+    # dev-requirements (pytest, ...) are only needed to run the Python tests
+    set(PYTHON_REQUIREMENT_FILES requirements.txt)
+    if (LIBKRIGING_BUILD_TESTS)
+        list(APPEND PYTHON_REQUIREMENT_FILES dev-requirements.txt)
+    endif ()
+    execute_process(COMMAND ${PYTHON_EXECUTABLE} ${LIBKRIGING_SOURCE_DIR}/bindings/Python/pylibkriging/check_requirements.py --pretty --indent=${INDENTATION} ${PYTHON_REQUIREMENT_FILES}
                 RESULT_VARIABLE PYTHON_IMPORT_RETCODE)
     if (NOT PYTHON_IMPORT_RETCODE EQUAL "0")
         set(HAS_PYTHON_REQUIREMENT false)
@@ -636,9 +644,11 @@ endif()
 if (POLICY CMP0110)
     cmake_policy(SET CMP0110 NEW) # supports arbitrary characters in test names (requires in CMake 3.19)
 endif()
-set(CATCH_MODULE_PATH "${LIBKRIGING_SOURCE_DIR}/dependencies/Catch2")
-add_subdirectory("${CATCH_MODULE_PATH}")
-list(APPEND CMAKE_MODULE_PATH ${CATCH_MODULE_PATH}/contrib)
+if (LIBKRIGING_BUILD_TESTS)
+    set(CATCH_MODULE_PATH "${LIBKRIGING_SOURCE_DIR}/dependencies/Catch2")
+    add_subdirectory("${CATCH_MODULE_PATH}")
+    list(APPEND CMAKE_MODULE_PATH ${CATCH_MODULE_PATH}/contrib)
+endif ()
 
 # On Windows, ensure DLL files are in the same directory as test executables
 # This prevents "Exit code 0xc0000135" (STATUS_DLL_NOT_FOUND) errors
@@ -660,34 +670,36 @@ if(WIN32)
 endif()
 
 include(CTest)
-add_subdirectory(tests)
-add_subdirectory(bench)
+if (LIBKRIGING_BUILD_TESTS)
+    add_subdirectory(tests)
+    add_subdirectory(bench)
 
-# PROCESSOR_COUNT was previously used below without ever being set, silently
-# expanding to nothing and letting `ctest -j` fall back to CTest's own
-# "use every detected core" default -- full, unconstrained parallelism with no
-# --output-on-failure, unlike every other ctest invocation in this project
-# (tools/*/test.sh run ctest serially). On shared/resource-constrained CI
-# runners this oversubscribes (each test binary may itself spawn OpenMP
-# threads) and made tolerance/timing-sensitive tests (BFGS-within-budget,
-# gradient-vs-finite-differences, concurrent-access stress tests) intermittently
-# fail under contention -- reproduced identically across unrelated branches and
-# unrelated content changes. Detect a real core count (falling back to 1 if
-# detection fails) and cap it modestly.
-include(ProcessorCount)
-ProcessorCount(PROCESSOR_COUNT)
-if (PROCESSOR_COUNT EQUAL 0)
-    set(PROCESSOR_COUNT 1)
-endif ()
-if (PROCESSOR_COUNT GREATER 4)
-    set(PROCESSOR_COUNT 4)
-endif ()
+    # PROCESSOR_COUNT was previously used below without ever being set, silently
+    # expanding to nothing and letting `ctest -j` fall back to CTest's own
+    # "use every detected core" default -- full, unconstrained parallelism with no
+    # --output-on-failure, unlike every other ctest invocation in this project
+    # (tools/*/test.sh run ctest serially). On shared/resource-constrained CI
+    # runners this oversubscribes (each test binary may itself spawn OpenMP
+    # threads) and made tolerance/timing-sensitive tests (BFGS-within-budget,
+    # gradient-vs-finite-differences, concurrent-access stress tests) intermittently
+    # fail under contention -- reproduced identically across unrelated branches and
+    # unrelated content changes. Detect a real core count (falling back to 1 if
+    # detection fails) and cap it modestly.
+    include(ProcessorCount)
+    ProcessorCount(PROCESSOR_COUNT)
+    if (PROCESSOR_COUNT EQUAL 0)
+        set(PROCESSOR_COUNT 1)
+    endif ()
+    if (PROCESSOR_COUNT GREATER 4)
+        set(PROCESSOR_COUNT 4)
+    endif ()
 
-add_custom_target(run_unit_tests
-        COMMAND ${CMAKE_CTEST_COMMAND} -j ${PROCESSOR_COUNT} --output-on-failure
-        COMMENT "Executing unit tests."
-        DEPENDS all_test_binaries
-        )
+    add_custom_target(run_unit_tests
+            COMMAND ${CMAKE_CTEST_COMMAND} -j ${PROCESSOR_COUNT} --output-on-failure
+            COMMENT "Executing unit tests."
+            DEPENDS all_test_binaries
+            )
+endif ()
 
 #------------------------------------------------------
 
@@ -801,7 +813,7 @@ find_package(Doxygen
         QUIET
         COMPONENTS dot
         OPTIONAL_COMPONENTS mscgen dia)
-if (DOXYGEN_FOUND)
+if (DOXYGEN_FOUND AND EXISTS ${LIBKRIGING_SOURCE_DIR}/docs/Doxyfile.in)  # (not in the Python sdist)
     # set input and output files
     set(DOXYGEN_IN ${LIBKRIGING_SOURCE_DIR}/docs/Doxyfile.in)
     set(DOXYGEN_OUT ${CMAKE_BINARY_DIR}/Doxyfile)

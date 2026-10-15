@@ -1,0 +1,34 @@
+# Python source distribution (sdist) of pylibkriging: everything that
+# `pip install pylibkriging-<version>.tar.gz` needs to build the C++ library
+# and the binding with CMake (setup.py passes -DLIBKRIGING_BUILD_TESTS=off,
+# so no C++ tests / benchmarks / Catch2). Requires a C++17 compiler and a
+# BLAS / LAPACK library on the target system.
+include CMakeLists.txt LICENSE NOTICE README.md setup.py
+graft cmake
+graft src
+
+graft bindings/Python/pylibkriging
+prune bindings/Python/pylibkriging/tests
+# headers shared with the Octave binding
+include bindings/Octave/mlibkriging/tools/formatString.hpp bindings/Octave/mlibkriging/tools/string_hash.hpp
+
+# dependencies (git submodules): sources and build files only
+include dependencies/armadillo-code/CMakeLists.txt
+include dependencies/armadillo-code/LICENSE.txt dependencies/armadillo-code/NOTICE.txt dependencies/armadillo-code/README.md
+graft dependencies/armadillo-code/include
+graft dependencies/armadillo-code/cmake_aux
+graft dependencies/armadillo-code/misc
+graft dependencies/armadillo-code/src
+graft dependencies/lbfgsb_cpp
+prune dependencies/lbfgsb_cpp/examples
+graft dependencies/pybind11
+prune dependencies/pybind11/docs
+prune dependencies/pybind11/tests
+graft dependencies/carma
+prune dependencies/carma/docs
+prune dependencies/carma/examples
+prune dependencies/carma/tests
+prune dependencies/carma/integration_test
+prune dependencies/carma/mre
+
+global-exclude .git .gitmodules __pycache__ *.py[cod] *.so *.o

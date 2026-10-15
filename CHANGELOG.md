@@ -33,6 +33,11 @@ past release, see the corresponding entry on the
   ([#388](https://github.com/libKriging/libKriging/issues/388)).
 
 ### Changed
+- **Python**: supported CPython versions are 3.10 to 3.14: the CI tests each of them
+  (3.10 and 3.14 on Linux and Windows), the release builds wheels for all of them, and
+  `python_requires` is now `>=3.10` (the end-of-life 3.7 and 3.9 jobs are dropped)
+  ([#386](https://github.com/libKriging/libKriging/issues/386),
+  [#389](https://github.com/libKriging/libKriging/issues/389)).
 - **MLPKriging: the default optimiser is now `"BFGS"`** (joint L-BFGS-B on
   the MLP weights and θ) in C++ and every binding, instead of `"BFGS+Adam"`,
   whose 10 Adam steps of size 1e-3 left the network at its random
@@ -224,6 +229,13 @@ past release, see the corresponding entry on the
     uniform API (only `"exact"` is implemented).
 
 ### Added
+- **Python**: a source distribution (sdist) is published with the wheels, so `pip install
+  pylibkriging` builds from source (CMake, a C++17 compiler and BLAS / LAPACK) where no
+  wheel matches, instead of failing with "no matching distribution". It is built from the
+  new root `MANIFEST.in` / `pyproject.toml`, and its install is checked on every push
+  ([#389](https://github.com/libKriging/libKriging/issues/389)). New CMake option
+  `LIBKRIGING_BUILD_TESTS` (default `ON`; `OFF` in `setup.py`, which no longer builds the
+  C++ tests nor benchmarks, and links armadillo statically).
 - CMake package for the C++ library (#127): after installation,
   `find_package(libKriging CONFIG)` and `target_link_libraries(app PRIVATE libKriging::Kriging)`
   work, with version checking (`SameMajorVersion`) and transitive dependencies

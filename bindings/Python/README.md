@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python ≥ 3.7 with pip
+- Python ≥ 3.10 with pip (3.10 to 3.14 are tested)
 - C++ compiler with C++17 support
 - CMake ≥ 3.13
 - Linear algebra library (BLAS/LAPACK, OpenBLAS, or MKL)
@@ -12,6 +12,11 @@
 ```shell
 pip3 install pylibkriging
 ```
+
+Wheels are published for the usual platforms. Elsewhere, `pip` builds the
+source distribution (sdist), which needs CMake (installed by `pip`), a C++17
+compiler and a BLAS / LAPACK library (e.g. `sudo apt install liblapack-dev`
+on Debian / Ubuntu); the build takes a few minutes.
 
 ## Build from source
 
@@ -116,9 +121,12 @@ pred, stdev = pipe.predict(X_test, return_std=True)
 
 Tested in GitHub Actions (`main.yml`):
 
-| Job name               | OS           |
-|:-----------------------|:-------------|
-| Linux Debug            | Ubuntu 22.04 |
-| macOS Debug            | macOS latest |
-| Python (3.7) Windows   | Windows      |
-| Python (3.9) Windows   | Windows      |
+| Job name                    | OS           | Python |
+|:----------------------------|:-------------|:-------|
+| Linux Debug                 | Ubuntu 22.04 | 3.11   |
+| Linux Debug without OpenMP  | Ubuntu 22.04 | 3.13   |
+| Python (3.10) Linux         | Ubuntu 22.04 | 3.10   |
+| Python (3.14) Linux         | Ubuntu 22.04 | 3.14   |
+| macOS Debug                 | macOS latest | 3.12   |
+| Python (3.10) Windows Debug | Windows      | 3.10   |
+| Python (3.14) Windows Debug | Windows      | 3.14   |
