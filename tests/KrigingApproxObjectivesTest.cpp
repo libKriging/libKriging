@@ -49,9 +49,23 @@ static void check_gradient(const Fun& f, const arma::vec& theta, double h, doubl
     tp(j) += h;
     tm(j) -= h;
     const double fd = (std::get<0>(f(tp, false)) - std::get<0>(f(tm, false))) / (2 * h);
-    INFO("theta=" << theta.t() << " dim " << j << ": analytic=" << grad(j) << " fd=" << fd << " f=" << f0);
+    // rounding noise of the objective itself (e.g. ~1e-8 for a Nystrom LOO
+    // of ~5e-4, issue #393): its spread over steps far below h, where the
+    // true variation is negligible, bounds the FD rounding error by noise / h
+    double f_min = f0, f_max = f0;
+    for (int k = 1; k <= 8; ++k) {
+      arma::vec tk = theta;
+      tk(j) += k * 1e-3 * h;
+      const double fk = std::get<0>(f(tk, false)) - grad(j) * (k * 1e-3 * h);  // remove the true variation
+      f_min = std::min(f_min, fk);
+      f_max = std::max(f_max, fk);
+    }
+    const double fd_noise = (f_max - f_min) / h;
     // relative to the gradient scale: a near-zero component is compared in absolute terms
-    CHECK(std::abs(grad(j) - fd) < rtol * std::max(std::abs(fd), 0.1 * arma::abs(grad).max()));
+    const double tol = rtol * std::max(std::abs(fd), 0.1 * arma::abs(grad).max()) + fd_noise;
+    INFO("theta=" << theta.t() << " dim " << j << ": analytic=" << grad(j) << " fd=" << fd << " f=" << f0
+                  << " fd_noise=" << fd_noise << " tol=" << tol);
+    CHECK(std::abs(grad(j) - fd) < tol);
   }
 }
 

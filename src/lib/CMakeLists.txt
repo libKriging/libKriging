@@ -113,10 +113,34 @@ install(TARGETS Kriging
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT devel
 )
+
+# CMake package: allows `find_package(libKriging)` then `target_link_libraries(app PRIVATE libKriging::Kriging)`
+include(CMakePackageConfigHelpers)
+set(LIBKRIGING_CMAKE_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/libKriging)
+
 install(EXPORT libKriging-export
-        FILE libKriging.cmake
+        FILE libKrigingTargets.cmake
         NAMESPACE libKriging::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake
+        DESTINATION ${LIBKRIGING_CMAKE_INSTALL_DIR}
+)
+
+# same namespaced name inside the build tree
+add_library(libKriging::Kriging ALIAS Kriging)
+
+configure_package_config_file(
+        ${PROJECT_SOURCE_DIR}/cmake/libKrigingConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/libKrigingConfig.cmake
+        INSTALL_DESTINATION ${LIBKRIGING_CMAKE_INSTALL_DIR}
+)
+write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/libKrigingConfigVersion.cmake
+        VERSION ${KRIGING_VERSION}
+        COMPATIBILITY SameMajorVersion
+)
+install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/libKrigingConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/libKrigingConfigVersion.cmake
+        DESTINATION ${LIBKRIGING_CMAKE_INSTALL_DIR}
 )
 install(FILES
         ${CMAKE_CURRENT_BINARY_DIR}/libKriging/libKriging_exports.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libKriging

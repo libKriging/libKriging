@@ -15,8 +15,17 @@ past release, see the corresponding entry on the
 - **Build**: the `install.lib` target no longer fails on a fresh build directory
   because of the bench executables it does not build: their install is now `OPTIONAL`
   ([#384](https://github.com/libKriging/libKriging/issues/384)).
+- **Octave/MATLAB**: `NestedKriging.predict(X, return_stdev)` accepts the optional
+  `return_stdev` flag like `Kriging.predict` (it raised "Input requires exactly 2 arguments",
+  [#385](https://github.com/libKriging/libKriging/issues/385)).
 - **R**: `str()`/`as.list()` on an unfitted `Kriging("gauss")` no longer segfaults
   (the trend `regmodel` was left uninitialized, and a `str.Kriging` method now displays the model content, [#249](https://github.com/libKriging/libKriging/issues/249)).
+- **Kriging**: `parameters` with a `theta` and `is_theta_estim = false` now keep
+  theta fixed with `optim = "BFGS[#]"` too (it was silently re-estimated unless
+  `optim = "none"`); the nugget / heterogeneous-noise `sigma2` are still
+  optimized per their own flags, and `update(…, refit = true)` keeps theta
+  fixed. Several `theta` rows with `is_theta_estim = false` are rejected
+  ([#388](https://github.com/libKriging/libKriging/issues/388)).
 
 ### Changed
 - **Kriging (breaking): `simulate(…, with_noise, …)` takes noise VARIANCES**,
@@ -174,6 +183,10 @@ past release, see the corresponding entry on the
     uniform API (only `"exact"` is implemented).
 
 ### Added
+- CMake package for the C++ library (#127): after installation,
+  `find_package(libKriging CONFIG)` and `target_link_libraries(app PRIVATE libKriging::Kriging)`
+  work, with version checking (`SameMajorVersion`) and transitive dependencies
+  (Armadillo, lbfgsb_cpp, OpenMP).
 - **WarpKriging / MLPKriging bindings: `simulate(…, will_update, with_noise)`**
   in Python, R, Julia and Octave / MATLAB, after `will_update` (its existing
   position is kept): `with_noise` holds observation-noise VARIANCES (a
