@@ -24,6 +24,12 @@ nk.set_predict_chunk(128);
 assert(max(abs(m1 - m2)) < 1e-8);  % chunking does not change the result (up to summation order)
 assert(max(abs(s1 - s2)) < 1e-8);
 
+% optional return_stdev flag, like Kriging.predict (#385)
+[m3, s3] = nk.predict(X(1:10, :), true);
+assert(max(abs(m3 - m2)) < 1e-12 && max(abs(s3 - s2)) < 1e-12);
+m4 = nk.predict(X(1:10, :), false);
+assert(max(abs(m4 - m2)) < 1e-12);
+
 nk.set_warp_subsample(500);  % accepted (used by warped fits)
 
 nkw = NestedKriging(y, X, "gauss", 2, "NK", "kmeans", 123, "constant", "BFGS", "LL", Params(), {"kumaraswamy", "kumaraswamy"});

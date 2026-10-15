@@ -240,9 +240,12 @@ warp_knots <- function(n_knots = 3, knot_positions = NULL) {
 #' @param kernel covariance kernel: "gauss", "matern3_2", "matern5_2", "exp"
 #' @param regmodel trend: "constant", "linear", "quadratic"
 #' @param normalize logical; normalise continuous inputs?
-#' @param optim optimiser (currently only one bi-level strategy). Use
-#'   \code{"none"} to skip optimisation and keep the values passed in
-#'   \code{parameters} (e.g. to rebuild a model with frozen hyper-parameters).
+#' @param optim optimiser: \code{"BFGS"} (default; joint L-BFGS-B on the warp
+#'   parameters and theta), \code{"BFGSk"} for k starts (e.g.
+#'   \code{"BFGS10"}), \code{"BFGS+Adam"} (bi-level: Adam on the warp
+#'   parameters, L-BFGS-B on theta), or \code{"none"} to skip optimisation and
+#'   keep the values passed in \code{parameters} (e.g. to rebuild a model with
+#'   frozen hyper-parameters).
 #' @param objective "LL" (log-likelihood)
 #' @param parameters optional named list of initial hyper-parameter values
 #'   and/or optimiser knobs. Recognised entries:
@@ -287,7 +290,7 @@ WarpKriging <- function(y, X, warping,
                         kernel = "gauss",
                         regmodel = "constant",
                         normalize = FALSE,
-                        optim = "BFGS+Adam",
+                        optim = "BFGS",
                         objective = "LL",
                         parameters = NULL,
                         noise = NULL,
@@ -360,7 +363,7 @@ summary.WarpKriging <- function(object, ...) {
 fit.WarpKriging <- function(object, y, X,
                             regmodel = "constant",
                             normalize = FALSE,
-                            optim = "BFGS+Adam",
+                            optim = "BFGS",
                             objective = "LL",
                             parameters = NULL,
                             noise = NULL,

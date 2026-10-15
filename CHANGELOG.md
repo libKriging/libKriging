@@ -16,10 +16,68 @@ past release, see the corresponding entry on the
   (`$ORIGIN` RUNPATH), which a base R install lacks, so `library(rlibkriging)` no longer fails
   with `libopenblas.so.0: cannot open shared object file`; the README documents the
   workaround for earlier archives ([#387](https://github.com/libKriging/libKriging/issues/387)).
+- **Kriging (nugget)**: the BFGS fit seeds its first start with the theta of the
+  noise-free fit on the same data and a small nugget share (alpha = 0.99), instead of a
+  random start that often ended in the all-noise region (nugget >> sigma2) with the
+  default single start. On Branin (n = 30, low noise) the mean LL gap to `BFGS10` drops
+  from ~8 to ~0.5 ([#383](https://github.com/libKriging/libKriging/issues/383)).
+- **Build**: the `install.lib` target no longer fails on a fresh build directory
+  because of the bench executables it does not build: their install is now `OPTIONAL`
+  ([#384](https://github.com/libKriging/libKriging/issues/384)).
+- **Octave/MATLAB**: `NestedKriging.predict(X, return_stdev)` accepts the optional
+  `return_stdev` flag like `Kriging.predict` (it raised "Input requires exactly 2 arguments",
+  [#385](https://github.com/libKriging/libKriging/issues/385)).
 - **R**: `str()`/`as.list()` on an unfitted `Kriging("gauss")` no longer segfaults
   (the trend `regmodel` was left uninitialized, and a `str.Kriging` method now displays the model content, [#249](https://github.com/libKriging/libKriging/issues/249)).
+- **Kriging**: `parameters` with a `theta` and `is_theta_estim = false` now keep
+  theta fixed with `optim = "BFGS[#]"` too (it was silently re-estimated unless
+  `optim = "none"`); the nugget / heterogeneous-noise `sigma2` are still
+  optimized per their own flags, and `update(…, refit = true)` keeps theta
+  fixed. Several `theta` rows with `is_theta_estim = false` are rejected
+  ([#388](https://github.com/libKriging/libKriging/issues/388)).
 
 ### Changed
+- **Python**: supported CPython versions are 3.10 to 3.14: the CI tests each of them
+  (3.10 and 3.14 on Linux and Windows), the release builds wheels for all of them, and
+  `python_requires` is now `>=3.10` (the end-of-life 3.7 and 3.9 jobs are dropped)
+  ([#386](https://github.com/libKriging/libKriging/issues/386),
+  [#389](https://github.com/libKriging/libKriging/issues/389)).
+- **MLPKriging: the default optimiser is now `"BFGS"`** (joint L-BFGS-B on
+  the MLP weights and θ) in C++ and every binding, instead of `"BFGS+Adam"`,
+  whose 10 Adam steps of size 1e-3 left the network at its random
+  initialisation (#382).
+- **WarpKriging: the default optimiser is now `"BFGS"`** too (C++ and every
+  binding), instead of `"BFGS+Adam"`: on every warp tested (Branin 2D,
+  kumaraswamy, boxcox, knots, neural_mono, mlp, mlp_joint) the joint
+  L-BFGS-B reaches an equal or better log-likelihood than the (now
+  effective, see below) bi-level Adam phase, in less time. `"BFGS+Adam"`
+  stays available on request.
+- WarpKriging/MLPKriging `update(refit=true)` of a model fitted with
+  `"BFGS"`/`"BFGSk"` re-runs the joint L-BFGS-B (warm start) instead of
+  always using the bi-level `"BFGS+Adam"` path.
+- WarpKriging/MLPKriging joint `"BFGS"`: the iteration budget grows with the
+  number of optimised parameters (20 per parameter, capped at 1000, never
+  below `Optim::max_iteration`) instead of the global `Optim::max_iteration`
+  (20), sized for a handful of θ; a run that hits the budget while still
+  improving is resumed from the point reached rather than restarted from a
+  contracted θ. The `max_iter_bfgs` tuning knob now defaults to 0 (automatic:
+  100 for the inner θ L-BFGS of `"BFGS+Adam"`, the budget above for the
+  joint L-BFGS-B) and, when set, applies to both (models saved by earlier
+  versions carry `max_iter_bfgs = 100`, used as-is after `load`). Fits get slower but reach
+  the optimum: ~0.2 s instead of ~5 ms on the #382 case (Branin, n = 30,
+  `hidden_dims=[8]`), with log-likelihood -80 instead of -172.
+- WarpKriging `"BFGS+Adam"`: the Adam phase now
+  actually moves the warp parameters. Defaults `max_iter_adam` 10 → 200 and
+  `adam_lr` 1e-3 → 3e-2 (each Adam step moves a parameter by about
+  `adam_lr`, so 10 × 1e-3 left the warps at their initialisation), with an
+  early stop after 20 steps without a relative log-likelihood gain > 1e-6.
+  On Branin 2D (n = 30) the log-likelihood rises e.g. from -131 to -94
+  (`mlp`), -120 to -99 (`neural_mono`), -155 to -83 (`mlp_joint`), for
+  30–200 ms instead of 5–20 ms. Models saved by earlier versions carry
+  `max_iter_adam = 10`, `adam_lr = 0.001`, used as-is after `load`.
+- WarpKriging/MLPKriging multistart (`"BFGSk"`, `"BFGSk+Adam"`): starts
+  2..k also re-draw the MLP weights (`mlp_joint`, per-dimension `mlp`), not
+  only θ; start 1 still uses the current parameters.
 - **Kriging (breaking): `simulate(…, with_noise, …)` takes noise VARIANCES**,
   consistent with the `noise` of `fit` / `update(y_u, noise_u, X_u)` /
   `update_simulate(y_u, noise_u, X_u)` (which already were variances):
@@ -175,6 +233,17 @@ past release, see the corresponding entry on the
     uniform API (only `"exact"` is implemented).
 
 ### Added
+- **Python**: a source distribution (sdist) is published with the wheels, so `pip install
+  pylibkriging` builds from source (CMake, a C++17 compiler and BLAS / LAPACK) where no
+  wheel matches, instead of failing with "no matching distribution". It is built from the
+  new root `MANIFEST.in` / `pyproject.toml`, and its install is checked on every push
+  ([#389](https://github.com/libKriging/libKriging/issues/389)). New CMake option
+  `LIBKRIGING_BUILD_TESTS` (default `ON`; `OFF` in `setup.py`, which no longer builds the
+  C++ tests nor benchmarks, and links armadillo statically).
+- CMake package for the C++ library (#127): after installation,
+  `find_package(libKriging CONFIG)` and `target_link_libraries(app PRIVATE libKriging::Kriging)`
+  work, with version checking (`SameMajorVersion`) and transitive dependencies
+  (Armadillo, lbfgsb_cpp, OpenMP).
 - **WarpKriging / MLPKriging bindings: `simulate(…, will_update, with_noise)`**
   in Python, R, Julia and Octave / MATLAB, after `will_update` (its existing
   position is kept): `with_noise` holds observation-noise VARIANCES (a
@@ -279,6 +348,15 @@ past release, see the corresponding entry on the
   dispatches to it.
 
 ### Fixed
+- WarpKriging/MLPKriging parallel multistart: each worker now gets
+  `ncpu / workers` BLAS/OpenMP threads (as `Kriging` already did) instead of
+  all of them; the nested thread teams contended (`"BFGS4"`, `mlp_joint`,
+  n = 500: 19.6 s → 10.1 s, system time 24 s → 1 s). The staggered start
+  delay (`Optim::thread_start_delay_ms`) now applies only to each worker's
+  first start instead of every start (`"BFGS10"`, n = 30: 175 ms → 43 ms).
+- WarpKriging/MLPKriging joint `"BFGS"`: when the objective cannot be
+  evaluated (correlation matrix not factorisable even with the numerical
+  nugget), the fit keeps the best point evaluated so far instead of throwing.
 - **`fit` / `update` now drop the state of the last `simulate(…,
   will_update=true)`** (and the update-points cache) for `Kriging` (every
   noise model and method, refit or not), `WarpKriging` and `MLPKriging`: a

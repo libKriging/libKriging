@@ -22,6 +22,8 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
 
+#include "BlasThreads.hpp"
+
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
@@ -119,6 +121,21 @@ static ForkSafeRegistrar fork_safe_registrar;
 
 }  // namespace
 #endif  // !_WIN32 && _POSIX_VERSION
+
+namespace libKriging {
+namespace detail {
+void set_blas_threads(unsigned int n) {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_set_num_threads();
+  if (fn)
+    fn(static_cast<int>(n));
+#endif
+#ifdef _OPENMP
+  omp_set_num_threads(static_cast<int>(n));
+#endif
+}
+}  // namespace detail
+}  // namespace libKriging
 
 // =============================================================================
 // Subset-of-data pre-fit reduction (see Kriging.hpp for the full doc) -- a
@@ -2122,8 +2139,10 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
     const arma::vec maxdX_local = arma::trans(arma::max(m_X, 0) - arma::min(m_X, 0));
     arma::vec gamma_lower = gamma;
     arma::vec gamma_upper = gamma;
-    gamma_lower.head(d) = arma::min(m_theta, Optim::theta_lower_factor * maxdX_local);
-    gamma_upper.head(d) = arma::max(m_theta, Optim::theta_upper_factor * maxdX_local);
+    if (m_est_theta) {  // else fixed theta: pinned at lower == upper
+      gamma_lower.head(d) = arma::min(m_theta, Optim::theta_lower_factor * maxdX_local);
+      gamma_upper.head(d) = arma::max(m_theta, Optim::theta_upper_factor * maxdX_local);
+    }
     if (m_noise_model == NoiseModel::Nugget) {
       gamma_lower.at(d) = std::min(gamma.at(d), nugget_alpha_lower);
       gamma_upper.at(d) = 1.0;
@@ -2166,7 +2185,6 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
       gamma = nugget_reparam_from(gamma_start);
     else
       gamma = Optim::reparam_from(gamma_start);
-    m_est_theta = true;
   }
 
   // commit at gamma (beta / sigma2 [/ nugget] / U / D profiled by the Nystrom
@@ -3498,7 +3516,29 @@ void Kriging::fit_impl(const arma::vec& y,
     arma::vec theta_lower = theta_bounds_pair.first;
     arma::vec theta_upper = theta_bounds_pair.second;
 
+    const bool theta_fixed = !parameters.is_theta_estim && parameters.theta.has_value();
+    if (theta_fixed && theta0.n_rows != 1)
+      throw std::invalid_argument("fit: is_theta_estim = false needs a single theta (1x" + std::to_string(d)
+                                  + " matrix), got " + std::to_string(theta0.n_rows) + " rows");
+
     if (optim.rfind("BFGS", 0) == 0) {
+      // Nugget warm start (#383): from a random theta and alpha, a single
+      // start often ends in the all-noise region (small theta, nugget >>
+      // sigma2), far below the multistart optimum. The noise-free fit on the
+      // same data is cheap and well conditioned, and its theta with a small
+      // nugget share (alpha = 0.99) lands near the optimum on most problems:
+      // seed the first start with it, keep the others random. Done before
+      // Random::init() below, as the sub-fit reseeds the shared engine.
+      arma::mat theta0_nugget_seed;
+      if (m_noise_model == NoiseModel::Nugget && !parameters.theta.has_value() && build_dX) {
+        try {
+          Kriging nf_fit(m_y, m_X, m_covType, m_regmodel, /*normalize=*/false, "BFGS", "LL");
+          theta0_nugget_seed = nf_fit.theta().t();  // 1 x d, in m_X's (normalized) scale
+        } catch (const std::exception&) {
+          // fall back to plain random multistart
+        }
+      }
+
       Random::init();
 
       auto parsed_bfgs = Optim::parse_method(optim, "BFGS");
@@ -3506,37 +3546,8 @@ void Kriging::fit_impl(const arma::vec& y,
 
       // Configure threads for Armadillo/BLAS to balance nested parallelism.
       // Each of the 'multistart' workers uses internal BLAS/OMP parallelism.
-      // A RAII guard resets to 1 thread when the scope exits — this collapses
-      // the idle thread pool so a subsequent fork() (e.g. R's mclapply) does
-      // not inherit locked mutexes and deadlock.
       unsigned int n_cpu = std::thread::hardware_concurrency();
-      struct ThreadCountGuard {
-        bool active = false;
-        ThreadCountGuard() = default;
-        void set(unsigned int n) {
-          active = true;
-#if !defined(__APPLE__) || !defined(__arm64__)
-          auto fn = get_openblas_set_num_threads();
-          if (fn)
-            fn(static_cast<int>(n));
-#endif
-#ifdef _OPENMP
-          omp_set_num_threads(static_cast<int>(n));
-#endif
-        }
-        ~ThreadCountGuard() {
-          if (!active)
-            return;
-#if !defined(__APPLE__) || !defined(__arm64__)
-          auto fn = get_openblas_set_num_threads();
-          if (fn)
-            fn(1);
-#endif
-#ifdef _OPENMP
-          omp_set_num_threads(1);
-#endif
-        }
-      } thread_guard;
+      libKriging::detail::BlasThreadGuard thread_guard;
 
       if (n_cpu > 0 && multistart > 1) {
         unsigned int threads_per_worker = std::max(1u, n_cpu / multistart);
@@ -3586,8 +3597,21 @@ void Kriging::fit_impl(const arma::vec& y,
       } else if (!theta0_seed.is_empty()) {
         theta0 = arma::join_cols(theta0_seed, theta0_rand);  // landmark-fit theta first, then random
         theta0.resize(multistart, theta0.n_cols);
+      } else if (!theta0_nugget_seed.is_empty()) {
+        theta0 = arma::join_cols(theta0_nugget_seed, theta0_rand);  // noise-free fit theta first, then random
+        theta0.resize(multistart, theta0.n_cols);
       } else {
         theta0 = theta0_rand;
+      }
+      // Fixed theta (given with is_theta_estim = false): pin it with
+      // lower == upper bounds (L-BFGS-B keeps such a variable fixed), so the
+      // other hyperparameters (alpha / sigma2) are still optimized according
+      // to their own is_*_estim flags, and sigma2 / beta are profiled as for
+      // an estimated theta.
+      if (theta_fixed) {
+        theta_lower = theta0.row(0).t();
+        theta_upper = theta_lower;
+        theta0 = arma::repmat(theta0.row(0), multistart, 1);
       }
       // arma::cout << "theta0:" << theta0 << arma::endl;
 
@@ -3606,6 +3630,8 @@ void Kriging::fit_impl(const arma::vec& y,
         } else {
           extra0 = extra_lower_val
                    + (extra_upper_val - extra_lower_val) * (1.0 - arma::pow(Random::randu_vec(theta0.n_rows), 3.0));
+          if (!theta0_nugget_seed.is_empty())
+            extra0.at(0) = 0.99;  // small nugget share for the noise-free-fit seed
         }
       } else if (m_noise_model == NoiseModel::Heterogeneous) {
         // sigma2 bounds from variogram (on a subsample without the O(n^2)
@@ -3970,7 +3996,7 @@ void Kriging::fit_impl(const arma::vec& y,
         // sigma2) from the optimizer, beta/sigma2 profiled by the Vecchia likelihood
         const auto& best = results[best_idx];
         m_theta = best.theta;
-        m_est_theta = true;
+        m_est_theta = !theta_fixed;
         commit_approx(/*lmp_dof=*/true, best.extra_param);
       } else if (best_idx >= 0 && m_nystrom_k > 0) {
         // Nystrom commit: never an exact factorization; theta from the
@@ -3978,12 +4004,12 @@ void Kriging::fit_impl(const arma::vec& y,
         // likelihood at gamma* = (theta* [, alpha* | sigma2*])
         const auto& best = results[best_idx];
         m_theta = best.theta;
-        m_est_theta = true;
+        m_est_theta = !theta_fixed;
         commit_approx(/*lmp_dof=*/true, best.extra_param);
       } else if (best_idx >= 0) {
         const auto& best = results[best_idx];
         m_theta = best.theta;  // copy
-        m_est_theta = true;
+        m_est_theta = !theta_fixed;
         m_is_empty = false;
         m_T = best.L;  // copy instead of move to avoid issues
         m_R = best.R;
@@ -4413,8 +4439,8 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
 
     // Compute theta bounds for the extended dataset
     auto theta_bounds_pair = Optim::theta_bounds(m_maxdX, m_dX, m_y, n);
-    arma::vec theta_lower = theta_bounds_pair.first;
-    arma::vec theta_upper = theta_bounds_pair.second;
+    arma::vec theta_lower = m_est_theta ? theta_bounds_pair.first : m_theta;  // fixed theta: pinned
+    arma::vec theta_upper = m_est_theta ? theta_bounds_pair.second : m_theta;
 
     const arma::uword gd = gamma_dim();
     arma::vec gamma_start(gd), gamma_lower(gd), gamma_upper(gd);
@@ -4515,7 +4541,6 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
       m_theta = Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp;
     }
 
-    m_est_theta = true;
     m_is_empty = false;
     m_T = std::move(km.L);
     m_R = std::move(km.R);

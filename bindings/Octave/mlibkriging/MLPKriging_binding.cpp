@@ -78,7 +78,7 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto kernel = input.getOptional<std::string>(5, "kernel").value_or("gauss");
   auto regmodel = input.getOptional<std::string>(6, "regression model").value_or("constant");
   auto normalize = input.getOptional<bool>(7, "normalize").value_or(false);
-  auto optim = input.getOptional<std::string>(8, "optim").value_or("BFGS+Adam");
+  auto optim = input.getOptional<std::string>(8, "optim").value_or("BFGS");
   auto objective = input.getOptional<std::string>(9, "objective").value_or("LL");
   std::map<std::string, std::string> params;
   if (nrhs > 10 && !mxIsEmpty(prhs[10]))
@@ -117,7 +117,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto regmodel = input.getOptional<std::string>(3, "regression model").value_or("constant");
   auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
-  auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS+Adam");
+  auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
   auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
   std::map<std::string, std::string> params;
   if (nrhs > 7 && !mxIsEmpty(prhs[7]))
