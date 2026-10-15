@@ -83,6 +83,26 @@ s <- simulate(k_R, nsim = 10, seed = 123, x = x)
 
 Full demo: [rlibkriging/tests/testthat/test-rlibkriging-demo.R](rlibkriging/tests/testthat/test-rlibkriging-demo.R)
 
+## Parallel R code (`mclapply`, forked workers)
+
+libKriging uses OpenMP (multistart `"BFGS<k>"`) and the system BLAS, which may be
+multithreaded. A process forked while such a thread pool is alive
+(`parallel::mclapply`, `parallel::mcparallel`, `future::multicore`) can deadlock in
+the child. libKriging quiesces its own OpenMP and OpenBLAS threads before every
+`fork()` (`pthread_atfork`), which covers the usual OpenBLAS builds. If forked workers
+still hang (e.g. with an OpenMP build of OpenBLAS, `libopenblaso`, selected as the
+system BLAS, or another threaded BLAS), make the parent single-threaded before
+starting R:
+
+```shell
+export OMP_THREAD_LIMIT=1 GOMP_SPINCOUNT=0 OPENBLAS_NUM_THREADS=1
+```
+
+or use socket workers (`parallel::makeCluster(type = "PSOCK")`, `future::multisession`),
+which do not fork. Models are shipped to them by R serialization (rlibkriging versions
+including [#327](https://github.com/libKriging/libKriging/issues/327)) or with `$save()` /
+`load.Kriging()`.
+
 ## CI
 
 Tested in GitHub Actions (`main.yml`):
