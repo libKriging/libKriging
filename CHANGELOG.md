@@ -12,6 +12,9 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Fixed
+- **Octave/MATLAB**: `NestedKriging.predict(X, return_stdev)` accepts the optional
+  `return_stdev` flag like `Kriging.predict` (it raised "Input requires exactly 2 arguments",
+  [#385](https://github.com/libKriging/libKriging/issues/385)).
 - **R**: `str()`/`as.list()` on an unfitted `Kriging("gauss")` no longer segfaults
   (the trend `regmodel` was left uninitialized, and a `str.Kriging` method now displays the model content, [#249](https://github.com/libKriging/libKriging/issues/249)).
 - **Kriging**: `parameters` with a `theta` and `is_theta_estim = false` now keep

@@ -120,15 +120,16 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
           method);
 }
 
-// [mean, [stdev]] = NestedKriging::predict(ref, X)
+// [mean, [stdev]] = NestedKriging::predict(ref, X, [return_stdev])
+// (return_stdev defaults to nargout >= 2, like Kriging::predict)
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{2}};
+                 RequiresArg::Range{2, 3}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* nk = input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference");
-  const bool return_stdev = (nlhs >= 2);
+  const bool return_stdev = flag_output_compliance(input, 2, "return_stdev", output, 1);
   auto [mean, stdev] = nk->predict(input.get<arma::mat>(1, "matrix"), return_stdev);
   output.set(0, mean, "predicted response");
   output.setOptional(1, stdev, "stdev vector");
