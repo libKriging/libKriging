@@ -441,7 +441,7 @@ test_that("noise(), warp_params(), optim(), objective() accessors work", {
   k <- WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss",
                    parameters = list(max_iter_adam = "80"))
 
-  expect_identical(k$optim(), "BFGS+Adam")
+  expect_identical(k$optim(), "BFGS")
   expect_identical(k$objective(), "LL")
   expect_length(noise(k), 0L)             # fitted noise-free
   wp <- warp_params(k)

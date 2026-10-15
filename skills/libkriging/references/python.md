@@ -66,7 +66,8 @@ model = lk.WarpKriging(
     kernel="gauss",
     regmodel="constant",
     normalize=False,
-    optim="BFGS",
+    optim="BFGS",         # default: joint L-BFGS-B on warp params + θ;
+                          # "BFGSk" k starts, "BFGS+Adam" bi-level
     objective="LL",       # only "LL": any other value is ignored
     parameters={},
     noise=None,   # None | per-observation variance vector (no "nugget" mode, unlike Kriging)
@@ -93,7 +94,8 @@ model = lk.MLPKriging(
     kernel="gauss",
     regmodel="constant",
     normalize=False,
-    optim="BFGS",
+    optim="BFGS",          # default: joint L-BFGS-B on MLP weights + θ; "BFGS10" adds
+                           # 10 starts (random θ and MLP weights)
     objective="LL",
     parameters={},
 )

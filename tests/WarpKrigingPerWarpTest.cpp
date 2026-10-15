@@ -395,26 +395,31 @@ void check_warp_param_grad_vs_fd(const std::string& warp_spec) {
   REQUIRE(grad_analytic.n_elem == wp0.n_elem);
   REQUIRE(grad_analytic.is_finite());
 
-  const double h = 1e-5;
+  // Step: the fitted warp can make R nearly singular (rcond ~ 1e-12 for
+  // mlp(8,1,tanh) since the Adam phase actually moves the warp), where LL
+  // round-off swamps a central difference with h = 1e-5. A larger step with
+  // Richardson extrapolation keeps the truncation error O(h^4) instead
+  // (max |err| / tol <= 0.11 over WARP_SPECS with h = 4e-3).
+  const double h = 4e-3;
   const double abs_floor = 1e-2;
   const double rel_tol = 0.02;  // 2 %
+
+  auto ll_at = [&wk](const arma::vec& wp) {
+    wk.unpack_warp_params(wp);
+    wk.refresh_cache();
+    return wk.concentrated_ll();
+  };
+  auto central = [&](arma::uword k, double step) {
+    arma::vec pp = wp0, pm = wp0;
+    pp(k) += step;
+    pm(k) -= step;
+    return (ll_at(pp) - ll_at(pm)) / (2.0 * step);
+  };
 
   int failures = 0;
   std::stringstream details;
   for (arma::uword k = 0; k < wp0.n_elem; ++k) {
-    arma::vec pp = wp0, pm = wp0;
-    pp(k) += h;
-    pm(k) -= h;
-
-    wk.unpack_warp_params(pp);
-    wk.refresh_cache();
-    double llp = wk.concentrated_ll();
-
-    wk.unpack_warp_params(pm);
-    wk.refresh_cache();
-    double llm = wk.concentrated_ll();
-
-    double fd = (llp - llm) / (2.0 * h);
+    double fd = (4.0 * central(k, h / 2.0) - central(k, h)) / 3.0;
     double tol = std::max(abs_floor, rel_tol * std::max(std::abs(fd), std::abs(grad_analytic(k))));
     double err = std::abs(grad_analytic(k) - fd);
     if (err > tol) {

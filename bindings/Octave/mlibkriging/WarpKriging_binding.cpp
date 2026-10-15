@@ -112,7 +112,7 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto kernel = input.getOptional<std::string>(3, "kernel").value_or("gauss");
   auto regmodel = input.getOptional<std::string>(4, "regression model").value_or("constant");
   auto normalize = input.getOptional<bool>(5, "normalize").value_or(false);
-  auto optim = input.getOptional<std::string>(6, "optim").value_or("BFGS+Adam");
+  auto optim = input.getOptional<std::string>(6, "optim").value_or("BFGS");
   auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
   auto noise_opt = input.getOptional<arma::vec>(9, "noise");
   auto method = input.getOptional<std::string>(10, "method").value_or("exact");
@@ -157,7 +157,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto regmodel = input.getOptional<std::string>(3, "regression model").value_or("constant");
   auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
-  auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS+Adam");
+  auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
   auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
   auto noise_opt = input.getOptional<arma::vec>(8, "noise");
   auto method = input.getOptional<std::string>(9, "method").value_or("exact");

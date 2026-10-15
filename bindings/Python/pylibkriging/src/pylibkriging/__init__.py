@@ -287,7 +287,7 @@ class WarpKriging:
         return X_enc
 
     def fit(self, y, X, regmodel="constant", normalize=False,
-            optim="BFGS+Adam", objective="LL", parameters=None, noise=None,
+            optim="BFGS", objective="LL", parameters=None, noise=None,
             method="exact"):
         if parameters is None:
             parameters = {}
