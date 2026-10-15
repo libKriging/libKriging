@@ -135,3 +135,37 @@ TEST_CASE("NuggetKrigingFitTest - BFGS finds better LL/LMP than grid search", "[
     CHECK(lmp_bfgs >= best_lmp_grid - std::abs(best_lmp_grid) * 1e-3);
   }
 }
+
+TEST_CASE("Nugget single-start BFGS is close to the multistart optimum (#383)", "[nugget][fit]") {
+  // Branin, n = 30, noise sd = 5% of sd(y): a random single start used to
+  // end in the all-noise region (small theta, nugget >> sigma2)
+  auto branin = [](const arma::mat& U) -> arma::vec {
+    const arma::vec x1 = 15 * U.col(0) - 5;
+    const arma::vec x2 = 15 * U.col(1);
+    return arma::square(x2 - 5.1 / (4 * M_PI * M_PI) * arma::square(x1) + 5 / M_PI * x1 - 6)
+           + 10 * (1 - 1 / (8 * M_PI)) * arma::cos(x1) + 10;
+  };
+  const arma::uword n = 30;
+  const int n_rep = 10;
+  double gap_sum = 0;
+  for (int rep = 0; rep < n_rep; rep++) {
+    arma::arma_rng::set_seed(1000 + rep);
+    arma::mat X(n, 2);
+    for (arma::uword j = 0; j < 2; j++)
+      X.col(j) = (arma::conv_to<arma::vec>::from(arma::randperm(n)) + arma::randu<arma::vec>(n)) / n;
+    arma::vec y = branin(X);
+    y += 0.05 * arma::stddev(y) * arma::randn<arma::vec>(n);
+
+    Kriging k1("matern5_2", Kriging::NoiseModel::Nugget);
+    k1.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {});
+    Kriging k10("matern5_2", Kriging::NoiseModel::Nugget);
+    k10.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS10", "LL", {});
+    const double gap = k10.logLikelihood() - k1.logLikelihood();
+    INFO("rep " << rep << ": LL(BFGS) = " << k1.logLikelihood() << ", LL(BFGS10) = " << k10.logLikelihood()
+                << ", nugget = " << k1.nugget() << ", sigma2 = " << k1.sigma2());
+    CHECK(gap < 5);                          // never the all-noise region (gaps of 10 to 40 before)
+    CHECK(k1.nugget() < k1.sigma2());        // signal-dominated model
+    gap_sum += std::max(gap, 0.0);
+  }
+  CHECK(gap_sum / n_rep < 1.5);  // mean gap was ~8 with a random single start
+}

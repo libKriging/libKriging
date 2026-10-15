@@ -3499,6 +3499,23 @@ void Kriging::fit_impl(const arma::vec& y,
     arma::vec theta_upper = theta_bounds_pair.second;
 
     if (optim.rfind("BFGS", 0) == 0) {
+      // Nugget warm start (#383): from a random theta and alpha, a single
+      // start often ends in the all-noise region (small theta, nugget >>
+      // sigma2), far below the multistart optimum. The noise-free fit on the
+      // same data is cheap and well conditioned, and its theta with a small
+      // nugget share (alpha = 0.99) lands near the optimum on most problems:
+      // seed the first start with it, keep the others random. Done before
+      // Random::init() below, as the sub-fit reseeds the shared engine.
+      arma::mat theta0_nugget_seed;
+      if (m_noise_model == NoiseModel::Nugget && !parameters.theta.has_value() && build_dX) {
+        try {
+          Kriging nf_fit(m_y, m_X, m_covType, m_regmodel, /*normalize=*/false, "BFGS", "LL");
+          theta0_nugget_seed = nf_fit.theta().t();  // 1 x d, in m_X's (normalized) scale
+        } catch (const std::exception&) {
+          // fall back to plain random multistart
+        }
+      }
+
       Random::init();
 
       auto parsed_bfgs = Optim::parse_method(optim, "BFGS");
@@ -3586,6 +3603,9 @@ void Kriging::fit_impl(const arma::vec& y,
       } else if (!theta0_seed.is_empty()) {
         theta0 = arma::join_cols(theta0_seed, theta0_rand);  // landmark-fit theta first, then random
         theta0.resize(multistart, theta0.n_cols);
+      } else if (!theta0_nugget_seed.is_empty()) {
+        theta0 = arma::join_cols(theta0_nugget_seed, theta0_rand);  // noise-free fit theta first, then random
+        theta0.resize(multistart, theta0.n_cols);
       } else {
         theta0 = theta0_rand;
       }
@@ -3606,6 +3626,8 @@ void Kriging::fit_impl(const arma::vec& y,
         } else {
           extra0 = extra_lower_val
                    + (extra_upper_val - extra_lower_val) * (1.0 - arma::pow(Random::randu_vec(theta0.n_rows), 3.0));
+          if (!theta0_nugget_seed.is_empty())
+            extra0.at(0) = 0.99;  // small nugget share for the noise-free-fit seed
         }
       } else if (m_noise_model == NoiseModel::Heterogeneous) {
         // sigma2 bounds from variogram (on a subsample without the O(n^2)

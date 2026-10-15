@@ -12,6 +12,11 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Fixed
+- **Kriging (nugget)**: the BFGS fit seeds its first start with the theta of the
+  noise-free fit on the same data and a small nugget share (alpha = 0.99), instead of a
+  random start that often ended in the all-noise region (nugget >> sigma2) with the
+  default single start. On Branin (n = 30, low noise) the mean LL gap to `BFGS10` drops
+  from ~8 to ~0.5 ([#383](https://github.com/libKriging/libKriging/issues/383)).
 - **R**: `str()`/`as.list()` on an unfitted `Kriging("gauss")` no longer segfaults
   (the trend `regmodel` was left uninitialized, and a `str.Kriging` method now displays the model content, [#249](https://github.com/libKriging/libKriging/issues/249)).
 
