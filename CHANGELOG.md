@@ -193,6 +193,13 @@ past release, see the corresponding entry on the
     uniform API (only `"exact"` is implemented).
 
 ### Added
+- **Python**: a source distribution (sdist) is published with the wheels, so `pip install
+  pylibkriging` builds from source (CMake, a C++17 compiler and BLAS / LAPACK) where no
+  wheel matches, instead of failing with "no matching distribution". It is built from the
+  new root `MANIFEST.in` / `pyproject.toml`, and its install is checked on every push
+  ([#389](https://github.com/libKriging/libKriging/issues/389)). New CMake option
+  `LIBKRIGING_BUILD_TESTS` (default `ON`; `OFF` in `setup.py`, which no longer builds the
+  C++ tests nor benchmarks, and links armadillo statically).
 - CMake package for the C++ library (#127): after installation,
   `find_package(libKriging CONFIG)` and `target_link_libraries(app PRIVATE libKriging::Kriging)`
   work, with version checking (`SameMajorVersion`) and transitive dependencies

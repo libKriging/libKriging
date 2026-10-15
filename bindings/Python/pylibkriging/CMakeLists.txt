@@ -54,7 +54,9 @@ target_compile_definitions(_pylibkriging PUBLIC KRIGING_VERSION_INFO=\"${KRIGING
 target_compile_definitions(_pylibkriging PUBLIC BUILD_TYPE=\"$<CONFIG>\") # do not use CMAKE_BUILD_TYPE specially for Windows
 
 include(CTest)
-add_subdirectory(tests)
+if (LIBKRIGING_BUILD_TESTS)  # (not in the Python sdist)
+    add_subdirectory(tests)
+endif ()
 
 install(TARGETS _pylibkriging
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Python)

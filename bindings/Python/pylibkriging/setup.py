@@ -141,7 +141,10 @@ class CMakeBuild(build_ext):
                       '-DENABLE_PYTHON_BINDING=on',
                       '-DENABLE_OCTAVE_BINDING=off',
                       '-DENABLE_MATLAB_BINDING=off',
+                      '-DENABLE_JULIA_BINDING=off',
                       '-DBUILD_SHARED_LIBS=off',
+                      '-DSTATIC_LIB=on',  # static armadillo: a self-contained extension (an sdist build has no auditwheel)
+                      '-DLIBKRIGING_BUILD_TESTS=off',  # only the binding: no C++ tests / benchmarks
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       f'-DKRIGING_VERSION={self.distribution.get_version()}'
                       ]

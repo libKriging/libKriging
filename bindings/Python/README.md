@@ -13,6 +13,11 @@
 pip3 install pylibkriging
 ```
 
+Wheels are published for the usual platforms. Elsewhere, `pip` builds the
+source distribution (sdist), which needs CMake (installed by `pip`), a C++17
+compiler and a BLAS / LAPACK library (e.g. `sudo apt install liblapack-dev`
+on Debian / Ubuntu); the build takes a few minutes.
+
 ## Build from source
 
 ### Clone

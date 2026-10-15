@@ -1,0 +1,13 @@
+# Build of pylibkriging from this repository root or from its sdist (the
+# setuptools build runs setup.py, which builds the C++ library with CMake).
+# numpy is needed at build time: setup.py checks the runtime requirements and
+# carma compiles against its headers.
+[build-system]
+requires = [
+    "setuptools>=61",
+    "wheel",
+    "cmake>=3.13",
+    "packaging",
+    "numpy",
+]
+build-backend = "setuptools.build_meta:__legacy__"

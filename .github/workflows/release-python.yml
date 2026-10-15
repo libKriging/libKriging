@@ -178,11 +178,54 @@ jobs:
           path: |
             dist 
             
+  build-sdist-python:
+    # Source distribution (#389): pip builds it with CMake when no wheel
+    # matches the platform / Python version. Checked by installing it in a
+    # fresh venv (isolated build) and running a fit / predict.
+    needs: check-release-consistency
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist
+        shell: bash
+        run: |
+          python -m pip install build
+          python -m build --sdist --outdir dist
+
+      - name: Check that the sdist builds and works
+        shell: bash
+        run: |
+          sudo apt install -qy liblapack-dev
+          python -m venv /tmp/venv-sdist
+          /tmp/venv-sdist/bin/pip install dist/pylibkriging-*.tar.gz
+          cd /tmp && /tmp/venv-sdist/bin/python -c "
+          import numpy as np, pylibkriging as lk
+          X = np.random.default_rng(0).random((10, 2)); y = np.sin(3 * X[:, 0]) + X[:, 1]
+          k = lk.Kriging(y, X, 'gauss')
+          assert np.allclose(k.predict(X, True, False, False)[0], y, atol=1e-6)
+          print('pylibkriging', lk.__version__, 'from sdist: OK')"
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-artifact-sdist
+          path: |
+            dist
+
   all-package-build-checkpoint:
     name: Build package checkpoint
     needs:
       - check-release-consistency
       - build-wheel-python
+      - build-sdist-python
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -257,7 +300,7 @@ jobs:
           # TWINE_PASSWORD is set to an API token in GitHub Actions secrets
           python3 -m twine upload \
                   --repository-url https://upload.pypi.org/legacy/ \
-                  ./dist/*.whl
+                  ./dist/*.whl ./dist/pylibkriging-*.tar.gz
         if: ${{ needs.check-release-consistency.outputs.draft-release == 'false' }}  
 
   release-artifacts:
