@@ -74,7 +74,15 @@ def main():
         package_data={'pylibkriging': []},
         # https://docs.python.org/3/distutils/setupscript.html#installing-additional-files
         data_files=[('lib/site-packages/pylibkriging/shared_libs', extra_libs)],
-        python_requires='>=3.7',
+        python_requires='>=3.10',
+        classifiers=[
+            'Programming Language :: Python :: 3',
+            'Programming Language :: Python :: 3.10',
+            'Programming Language :: Python :: 3.11',
+            'Programming Language :: Python :: 3.12',
+            'Programming Language :: Python :: 3.13',
+            'Programming Language :: Python :: 3.14',
+        ],
         install_requires=get_requirements("requirements.txt"),  # they should be in C++ build environment
         extras_require={
             # pylibkriging.sklearn (scikit-learn compatible estimators): `pip install pylibkriging[sklearn]`

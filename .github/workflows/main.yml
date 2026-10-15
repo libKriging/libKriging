@@ -70,29 +70,44 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Python: every supported CPython (3.10 to 3.14) is tested at least
+          # once, the oldest and the newest on two OSes
           - name: "Linux Debug"
             os: ubuntu-22.04
             mode: Debug
             enable_python: on
+            python-version: "3.11"
           - name: "Linux Debug without OpenMP"
             os: ubuntu-22.04
             mode: Debug
             enable_python: on
             disable_openmp: on
+            python-version: "3.13"
+          - name: "Python (3.10) Linux"
+            os: ubuntu-22.04
+            mode: Release
+            enable_python: on
+            python-version: "3.10"
+          - name: "Python (3.14) Linux"
+            os: ubuntu-22.04
+            mode: Release
+            enable_python: on
+            python-version: "3.14"
           - name: "macOS Debug"
             os: macOS-latest
             mode: Debug
             enable_python: on
-          - name: "Python (3.7) Windows Debug"
+            python-version: "3.12"
+          - name: "Python (3.10) Windows Debug"
             os: windows-latest
             mode: Debug
             enable_python: on
-            python-version: 3.7
-          - name: "Python (3.9) Windows Debug"
+            python-version: "3.10"
+          - name: "Python (3.14) Windows Debug"
             os: windows-latest
             mode: Debug
             enable_python: on
-            python-version: 3.9
+            python-version: "3.14"
           - name: "Octave Linux"
             os: ubuntu-22.04 # required to ease the support of octave ≥ 6
             mode: Release

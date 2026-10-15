@@ -33,6 +33,11 @@ past release, see the corresponding entry on the
   ([#388](https://github.com/libKriging/libKriging/issues/388)).
 
 ### Changed
+- **Python**: supported CPython versions are 3.10 to 3.14: the CI tests each of them
+  (3.10 and 3.14 on Linux and Windows), the release builds wheels for all of them, and
+  `python_requires` is now `>=3.10` (the end-of-life 3.7 and 3.9 jobs are dropped)
+  ([#386](https://github.com/libKriging/libKriging/issues/386),
+  [#389](https://github.com/libKriging/libKriging/issues/389)).
 - **Kriging (breaking): `simulate(…, with_noise, …)` takes noise VARIANCES**,
   consistent with the `noise` of `fit` / `update(y_u, noise_u, X_u)` /
   `update_simulate(y_u, noise_u, X_u)` (which already were variances):

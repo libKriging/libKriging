@@ -52,6 +52,12 @@ case $PYVER in
   3.12)
     PYBIN=/opt/python/cp312-cp312/bin
     ;;
+  3.13)
+    PYBIN=/opt/python/cp313-cp313/bin
+    ;;
+  3.14)
+    PYBIN=/opt/python/cp314-cp314/bin
+    ;;
   *)
     echo "Unsupported Python version: $PYVER"
     exit 1

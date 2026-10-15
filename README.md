@@ -297,7 +297,7 @@ Continuous integration (`main.yml`, libKriging 1.2) builds and tests each bindin
 
 |        | Linux (Ubuntu 22.04)                        | macOS (latest runner)                       | Windows (latest runner)                     |
 |:-------|:--------------------------------------------|:--------------------------------------------|:--------------------------------------------|
-| Python | <span style="color:green">✔</span> runner default | <span style="color:green">✔</span> runner default | <span style="color:green">✔</span> 3.7, 3.9 |
+| Python | <span style="color:green">✔</span> 3.10, 3.11, 3.13, 3.14 | <span style="color:green">✔</span> 3.12 | <span style="color:green">✔</span> 3.10, 3.14 |
 | R      | <span style="color:green">✔</span> latest release | <span style="color:green">✔</span> latest release | <span style="color:green">✔</span> latest release |
 | Octave | <span style="color:green">✔</span> distribution package (6.x) | <span style="color:green">✔</span> Homebrew (latest) | <span style="color:green">✔</span> 9.2 |
 | Matlab | <span style="color:orange"><b>?</b></span> CI job disabled | no pre-built package or CI | no pre-built package or CI |
@@ -306,8 +306,8 @@ Continuous integration (`main.yml`, libKriging 1.2) builds and tests each bindin
 * <span style="color:orange"><b>?</b></span> : requires manual verification. The Matlab job needs a MathWorks license
   token and has been disabled since v0.9.3; Matlab ≥ R2021 is supported by the code but not checked on each change.
 
-* Pre-built Python wheels of the latest release: Linux x86-64, macOS (universal2) and Windows (x86-64) for
-  Python 3.9 to 3.12, plus Python 3.7 on Windows. Pre-built Octave packages: Linux x86-64, macOS ARM and Windows
+* Pre-built Python wheels: Linux x86-64, macOS and Windows (x86-64) for Python 3.10 to 3.14
+  (releases up to v1.2.2: Python 3.9 to 3.12, plus 3.7 on Windows). Pre-built Octave packages: Linux x86-64, macOS ARM and Windows
   (MinGW-64). See [the releases page](https://github.com/libKriging/libKriging/releases).
 
 * Julia ≥ 1.10 is required.
@@ -324,7 +324,7 @@ Continuous integration (`main.yml`, libKriging 1.2) builds and tests each bindin
 
   You can use standard Blas and Lapack, OpenBlas or MKL.
 
-* Python ≥ 3.7 (optional)
+* Python ≥ 3.10 (optional)
 
 * Octave ≥ 6.0 (optional)
 
