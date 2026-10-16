@@ -262,6 +262,23 @@ class LIBKRIGING_EXPORT IWarp {
   /// into that domain before warping; all other warps ignore it.
   /// Called by WarpKriging at fit / refit / load time.
   virtual void set_input_range(double /*lo*/, double /*hi*/) {}
+
+  /// Box constraints on the learnable parameters, in the same layout as
+  /// get_params(): lo(i) <= p(i) <= hi(i), ±infinity meaning unbounded.
+  /// Applied by the fit optimisers (L-BFGS-B bounds, projected Adam steps).
+  /// Default: all parameters unbounded.
+  virtual void param_bounds(arma::vec& lo, arma::vec& hi) const {
+    lo.set_size(n_params());
+    hi.set_size(n_params());
+    lo.fill(-arma::datum::inf);
+    hi.fill(arma::datum::inf);
+  }
+
+  /// Whether the fit guards this warp against collapsing its training inputs
+  /// (see WarpKriging::collapse_penalty). Meant for monotone 1D warps of a
+  /// continuous variable, whose parameters can squeeze a whole sub-range of
+  /// the training inputs onto (numerically) a single point. Default: false.
+  virtual bool collapse_guard() const { return false; }
 };
 
 // --- Concrete warp implementations ----------------------------------------
@@ -308,6 +325,7 @@ class LIBKRIGING_EXPORT WarpBoxCox final : public IWarp {
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
+  bool collapse_guard() const override { return true; }
 
   /// Affinely map inputs from [lo, hi] onto (0, 1] before the Box-Cox
   /// transform, which requires x > 0. The default range [0, 1] reproduces the
@@ -335,11 +353,18 @@ class LIBKRIGING_EXPORT WarpKumaraswamy final : public IWarp {
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
+  bool collapse_guard() const override { return true; }
 
   /// Map inputs from [lo, hi] onto (0, 1) before the Kumaraswamy CDF, which is
   /// a distribution on the unit interval; without this, inputs on any other
   /// scale are all clamped to the (0, 1) boundary. Default: identity on [0, 1].
   void set_input_range(double lo, double hi) override;
+
+  /// log a, log b in [-log(kMaxShape), log(kMaxShape)]: beyond that the CDF
+  /// squeezes most of the unit interval onto a single point, a degenerate
+  /// maximum of the likelihood (inputs collapsed together, see #406).
+  void param_bounds(arma::vec& lo, arma::vec& hi) const override;
+  static constexpr double kMaxShape = 3.0;
 
  private:
   double m_log_a = 0.0, m_log_b = 0.0;  ///< a,b > 0 via exp()
@@ -360,6 +385,7 @@ class LIBKRIGING_EXPORT WarpNeuralMono final : public IWarp {
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
+  bool collapse_guard() const override { return true; }
 
   /// Affinely map inputs from [lo, hi] onto [0, 1] before the network. The
   /// weight init and softplus assume O(1) inputs; on a wider scale the fit
@@ -582,6 +608,7 @@ class LIBKRIGING_EXPORT WarpKnots final : public IWarp {
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
+  bool collapse_guard() const override { return true; }
 
   /// Map inputs from [lo, hi] onto the reference domain [0, 1] before warping.
   /// Xiong et al. (2007) define the piecewise-linear warp on the unit
@@ -982,6 +1009,12 @@ class WarpKriging : protected KrigingImpl {
   arma::uword total_warp_params() const;
   LIBKRIGING_EXPORT arma::vec pack_warp_params() const;
   LIBKRIGING_EXPORT void unpack_warp_params(const arma::vec& w);
+  /// Packed box constraints of the warp params (IWarp::param_bounds).
+  void warp_param_bounds(arma::vec& lo, arma::vec& hi) const;
+  /// Penalty (≥ 0, to subtract from the LL in the fit objective) against
+  /// warps collapsing their training inputs, and its gradient w.r.t. the
+  /// packed warp params. Uses the cached training features m_X.
+  LIBKRIGING_EXPORT std::pair<double, arma::vec> collapse_penalty() const;
 
   // ---- Optimisation -------------------------------------------------------
   //

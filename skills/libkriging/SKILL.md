@@ -158,6 +158,13 @@ One spec string per input column, e.g. `{"kumaraswamy", "categorical(5,2)", "non
 | `categorical(L,q)` / `categorical(["a","b",...], q)` | unordered categorical with L levels, embedded in ℝ^q | L·q | [Warping-Categorical.md](../../docs/math/Warping-Categorical.md) |
 | `ordinal(L)` / `ordinal(["low","med","high"])` | ordered categorical | L−1 | [Warping-Ordinal.md](../../docs/math/Warping-Ordinal.md) |
 
+Monotone warps (`boxcox`, `kumaraswamy`, `neural_mono`, `knots`) are fit
+with a guard against squeezing a sub-range of the training inputs onto one
+point (the noise-free likelihood is unbounded there, #406), and
+`kumaraswamy` has a, b ∈ [1/3, 3]. If such a warp still predicts worse than
+plain `Kriging` with a tiny predictive stdev, compare with `Kriging` on held-out
+data rather than trusting the higher `logLikelihood()`.
+
 For a genuinely deep/joint transform across several continuous variables at
 once, use `MLPKriging` (`mlp_joint(h1:h2,q,act)`-style joint map, see
 [Warping-MLPJoint.md](../../docs/math/Warping-MLPJoint.md)) instead of
