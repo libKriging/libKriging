@@ -37,10 +37,15 @@ namespace libKriging {
 namespace {
 // Inner θ L-BFGS budget of the bi-level "BFGS+Adam" optimiser (max_iter_bfgs = 0).
 constexpr arma::uword kDefaultInnerMaxIterBFGS = 100;
-// Automatic budget of the joint "BFGS" optimiser when warp params are present:
-// kJointIterPerParam iterations per optimised parameter, capped. The global
-// Optim::max_iteration (20 by default) is sized for a handful of θ and stops a
-// joint MLP+θ problem with tens of parameters far from its optimum (#382).
+// Automatic budget of the joint "BFGS" optimiser when per-variable warp params
+// are present: kJointIterPerParam iterations per optimised parameter, capped.
+// The global Optim::max_iteration (20 by default) is sized for a handful of θ
+// and stops a joint warp+θ problem with tens of parameters far from its
+// optimum (#382). A joint MLP (mlp_joint / MLPKriging) instead keeps
+// Optim::max_iteration per L-BFGS-B call, resumed while it still improves
+// (see run_joint_bfgs): with more weights than observations, a long run mostly
+// overfits the training points, for a mean no better and an overconfident
+// predictive variance, at 10-20x the cost (#407).
 constexpr arma::uword kJointIterPerParam = 20;
 constexpr arma::uword kJointMaxIterCap = 1000;
 // Early stop of the Adam phase: steps without a relative LL gain > tol.
@@ -2254,7 +2259,7 @@ unsigned int WarpKriging::joint_bfgs_max_iter(arma::uword n_total) const {
   if (m_max_iter_bfgs > 0)
     return static_cast<unsigned int>(m_max_iter_bfgs);
   const arma::uword base = static_cast<arma::uword>(std::max(Optim::max_iteration, 1));
-  if (total_warp_params() == 0)
+  if (total_warp_params() == 0 || m_is_joint)
     return static_cast<unsigned int>(base);
   return static_cast<unsigned int>(std::max(base, std::min(kJointIterPerParam * n_total, kJointMaxIterCap)));
 }
@@ -2414,6 +2419,83 @@ std::pair<double, arma::vec> WarpKriging::collapse_penalty() const {
 }
 
 // -------------------------------------------------------------------------
+//  calibrate_variance()  —  K-fold calibration of the predictive variance
+//
+//  A joint MLP has many more weights than there are observations: maximising
+//  the likelihood, it learns features in which the training outputs are
+//  almost exactly a smooth function (e.g. one feature ≈ y), so the GP on top
+//  is very confident (long θ, tiny predictive variance) while the features
+//  are off between the training points (#407: 95% intervals covering 1% of
+//  the test points). The likelihood, or a leave-one-out at fixed features,
+//  cannot see it: only refitting without the held-out points does. Each fold
+//  is refitted from the starting point of the optimiser start that gave the
+//  fit (not from the fit itself, which already knows the held-out points: a
+//  warm start barely moves away from it), and σ² is scaled for
+//  predict/simulate by the mean squared standardised held-out residual, if
+//  above 1: the calibration only corrects overconfidence (that start was
+//  picked on all the data, so the folds are slightly optimistic).
+// -------------------------------------------------------------------------
+void WarpKriging::calibrate_variance() {
+  m_var_scale = 1.0;
+  const arma::uword n = m_y.n_elem;
+  const arma::uword K = m_calibration_folds;
+  if (!m_is_joint || K < 2 || n < 2 * K || !m_noise.is_empty() || total_warp_params() == 0
+      || m_start_theta.n_elem != m_theta.n_elem || m_start_warp_params.n_elem != total_warp_params())
+    return;
+
+  // Back to the raw scale: fit() normalises its inputs again.
+  const arma::vec y_raw = m_y * m_scaleY + m_centerY;
+  arma::mat X_raw = m_X_raw;
+  X_raw.each_row() %= m_scaleX;
+  X_raw.each_row() += m_centerX;
+
+  // Same single-start optimiser and budget as the start that gave the fit.
+  Parameters start;
+  start.theta = m_start_theta;
+  start.warp_params = m_start_warp_params;
+  const std::string method = Optim::parse_method(m_optim, "BFGS").first;
+
+  double sum_z2 = 0.0;
+  arma::uword n_z = 0;
+  for (arma::uword f = 0; f < K; ++f) {
+    // Interleaved folds: f, f + K, f + 2K, …
+    arma::uvec test = arma::regspace<arma::uvec>(f, K, n - 1);
+    std::vector<arma::uword> train_idx;
+    train_idx.reserve(n - test.n_elem);
+    for (arma::uword i = 0; i < n; ++i)
+      if (i % K != f)
+        train_idx.push_back(i);
+    const arma::uvec train(train_idx);
+    try {
+      WarpKriging wf(warping_strings(), m_covType);
+      wf.m_max_iter_bfgs = m_max_iter_bfgs;
+      wf.m_max_iter_adam = m_max_iter_adam;
+      wf.m_adam_lr = m_adam_lr;
+      wf.m_calibration_folds = 0;  // no nested calibration
+      wf.fit(y_raw.elem(train), X_raw.rows(train), m_regmodel, m_normalize, method, "LL", start, {}, "exact");
+      auto [mean, stdev, _c, _md, _sd] = wf.predict(X_raw.rows(test), true, false, false);
+      for (arma::uword i = 0; i < test.n_elem; ++i) {
+        const double v = stdev(i) * stdev(i);
+        const double e = y_raw(test(i)) - mean(i);
+        if (v > 0 && std::isfinite(v) && std::isfinite(e)) {
+          sum_z2 += e * e / v;
+          ++n_z;
+        }
+      }
+    } catch (const std::exception& e) {
+      if (Optim::log_level > Optim::log_none)
+        arma::cout << "Warning: WarpKriging variance calibration, fold " << (f + 1) << " failed: " << e.what()
+                   << arma::endl;
+    }
+  }
+  if (2 * n_z < n)  // too few held-out residuals to calibrate on
+    return;
+  const double factor = sum_z2 / static_cast<double>(n_z);
+  if (std::isfinite(factor) && factor > 1.0)
+    m_var_scale = factor;
+}
+
+// -------------------------------------------------------------------------
 //  clone_for_thread()  —  deep copy for parallel multistart
 // -------------------------------------------------------------------------
 WarpKriging WarpKriging::clone_for_thread() const {
@@ -2436,6 +2518,8 @@ WarpKriging WarpKriging::clone_for_thread() const {
   c.m_max_iter_bfgs = m_max_iter_bfgs;
   c.m_max_iter_adam = m_max_iter_adam;
   c.m_adam_lr = m_adam_lr;
+  c.m_calibration_folds = m_calibration_folds;
+  c.m_var_scale = m_var_scale;
   c.m_fitted = true;
 
   // Copy mutable GP state
@@ -2729,6 +2813,8 @@ void WarpKriging::optimise_joint(const std::string& method) {
     arma::mat dPhi;
     double logdet = 0;
     bool success = false;
+    arma::vec start_theta;  // starting point of this start (see calibrate_variance)
+    arma::vec start_warp_params;
   };
 
   // Helper: extract result from a WarpKriging instance after optimization
@@ -2811,6 +2897,8 @@ void WarpKriging::optimise_joint(const std::string& method) {
         double neg_ll = optimizer_fn(wk);
 
         OptimizationResult r = extract_result(wk, neg_ll);
+        r.start_theta = theta0_rand.row(task_id).t();
+        r.start_warp_params = wp_starts[task_id];
         std::lock_guard<std::mutex> lock(results_mutex);
         results[task_id] = std::move(r);
       } catch (const std::exception& e) {
@@ -2896,14 +2984,22 @@ void WarpKriging::optimise_joint(const std::string& method) {
         best_idx = i;
       }
     }
-    if (best_idx >= 0)
+    if (best_idx >= 0) {
       restore_best(results[best_idx]);
+      m_start_theta = results[best_idx].start_theta;
+      m_start_warp_params = results[best_idx].start_warp_params;
+    }
   };
 
   if (base_method == "none") {
     // --- Skip optimisation: keep current θ and warp params as-is ---
     return;
   }
+
+  // Starting point of the (single) start; a multistart overwrites it with
+  // the starting point of its best start.
+  m_start_theta = m_theta;
+  m_start_warp_params = pack_warp_params();
 
   if (base_method == "BFGS" || n_warp == 0) {
     // --- Joint L-BFGS-B (with multistart) ---
@@ -2964,6 +3060,8 @@ void WarpKriging::fit(const arma::vec& y,
       m_max_iter_adam = std::stoul(val);
     else if (key == "max_iter_bfgs")
       m_max_iter_bfgs = std::stoul(val);
+    else if (key == "calibration_folds")
+      m_calibration_folds = std::stoul(val);
   }
 
   if (y.n_elem != X.n_rows)
@@ -3046,6 +3144,9 @@ void WarpKriging::fit(const arma::vec& y,
   refresh_cache();
   optimise_joint(optim);
   m_optim = optim;
+  m_var_scale = 1.0;
+  if (Optim::parse_method(optim, "BFGS").first != "none")
+    calibrate_variance();
   m_objective = "LL";
   m_fitted = true;
 }
@@ -3092,7 +3193,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
                       /*R_on_factor=*/1.0,
                       /*R_nn_factor=*/1.0,
                       /*R_nn_diag=*/{},
-                      /*var_scale=*/m_sigma2,
+                      /*var_scale=*/m_sigma2 * m_var_scale,
                       phi_fn,
                       jac_fn);
 }
@@ -3137,7 +3238,7 @@ arma::mat WarpKriging::simulate(int nsim,
                                 /*R_on_coincident_to_one=*/false,
                                 /*R_nn_factor=*/1.0,
                                 /*R_nn_diag=*/{},
-                                /*Sigma_divisor=*/1.0,
+                                /*Sigma_divisor=*/1.0 / m_var_scale,
                                 phi_fn);
 
   if (will_update) {
@@ -3204,7 +3305,7 @@ LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u,
                                        /*R_uo_factor=*/1.0,
                                        /*R_un_factor=*/1.0,
                                        /*R_un_coincident_to_one=*/false,
-                                       /*Sigma_divisor=*/1.0,
+                                       /*Sigma_divisor=*/1.0 / m_var_scale,
                                        phi_fn);
 
   lastsimup_noise_u = noise_u_norm;
@@ -3279,6 +3380,9 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
       m_noise /= (m_scaleY * m_scaleY);
     refresh_cache();
 
+    // The refit is warm-started from the current fit: keep the starting point
+    // of the original fit for the variance calibration.
+    const arma::vec start_theta = m_start_theta, start_warp_params = m_start_warp_params;
     if (Optim::parse_method(m_optim, "BFGS").first == "BFGS") {
       // Joint L-BFGS-B warm-started from the current fit (single start).
       optimise_joint("BFGS");
@@ -3288,6 +3392,9 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
       optimise_joint("BFGS+Adam");
       m_max_iter_adam = saved_adam;
     }
+    m_start_theta = start_theta;
+    m_start_warp_params = start_warp_params;
+    calibrate_variance();
   } else {
     // Fast incremental update: keep all hyperparameters fixed, use Cholesky
     // update via KrigingImpl::update_no_refit_impl. Warp's per-dim
@@ -3360,6 +3467,9 @@ std::string WarpKriging::summary() const {
     }
     if (m_fitted)
       oss << "  * total warp params: " << total_warp_params() << "\n";
+    if (m_fitted && m_var_scale != 1.0)
+      oss << "  * predictive variance: sigma2 x " << m_var_scale << " (" << m_calibration_folds
+          << "-fold calibration)\n";
     summary_bottom(oss);
   }
   return oss.str();
@@ -3380,6 +3490,10 @@ void WarpKriging::dump_to_json(nlohmann::json& j) const {
   j["max_iter_bfgs"] = m_max_iter_bfgs;
   j["max_iter_adam"] = m_max_iter_adam;
   j["adam_lr"] = m_adam_lr;
+  j["calibration_folds"] = m_calibration_folds;
+  j["var_scale"] = m_var_scale;
+  j["start_theta"] = to_json(m_start_theta);
+  j["start_warp_params"] = to_json(m_start_warp_params);
   j["fitted"] = m_fitted;
   j["logdet"] = m_logdet;
   j["warp_params"] = to_json(pack_warp_params());
@@ -3431,6 +3545,13 @@ void WarpKriging::load_from_json(const nlohmann::json& j) {
   m_max_iter_bfgs = j["max_iter_bfgs"].template get<arma::uword>();
   m_max_iter_adam = j["max_iter_adam"].template get<arma::uword>();
   m_adam_lr = j["adam_lr"].template get<double>();
+  // Absent from files saved before #407: no calibration.
+  m_calibration_folds = j.contains("calibration_folds") ? j["calibration_folds"].template get<arma::uword>() : 0;
+  m_var_scale = j.contains("var_scale") ? j["var_scale"].template get<double>() : 1.0;
+  if (j.contains("start_theta"))
+    m_start_theta = colvec_from_json(j["start_theta"]);
+  if (j.contains("start_warp_params"))
+    m_start_warp_params = colvec_from_json(j["start_warp_params"]);
   m_fitted = j["fitted"].template get<bool>();
   if (m_is_joint)
     ensure_joint_warp(m_X_raw.n_cols);

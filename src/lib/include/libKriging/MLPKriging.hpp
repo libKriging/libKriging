@@ -152,6 +152,8 @@ class MLPKriging {
   const std::string& method() const { return m_impl.method(); }
   arma::vec theta() const { return m_impl.theta(); }
   double sigma2() const { return m_impl.sigma2(); }
+  /// Calibration factor of the predictive variance (see WarpKriging::var_scale).
+  double var_scale() const { return m_impl.var_scale(); }
   bool is_fitted() const { return m_impl.is_fitted(); }
   arma::uword feature_dim() const { return m_d_out; }
 

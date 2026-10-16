@@ -20,6 +20,21 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **MLPKriging**: the predictive stdev is calibrated on held-out points. With more weights
+  than observations, the likelihood-optimal network learns features in which the training
+  outputs are almost exactly smooth, and the GP on top was overconfident: on `Branin(Wx)` in
+  10D (n = 120, `hidden_dims=[16, 8]`, `BFGS10`) 95 % intervals covered 1–2 % of test points
+  (NLPD 3.7e4–9.6e5 vs 2.93 for `Kriging`). After the fit, a 5-fold cross-validation (each
+  fold refitted from the starting point of the winning start) scales σ² for `predict` /
+  `simulate` / `update_simulate` (`var_scale()`, reported in `summary()`, saved with the
+  model); the mean, `sigma2()` and `logLikelihood()` are unchanged, `calibration_folds = "0"`
+  disables it (also a `WarpKriging` tuning parameter for `mlp_joint`). The joint L-BFGS-B of
+  a joint MLP keeps `Optim::max_iteration` iterations per call, resumed while it improves,
+  instead of up to 1000 (#382): longer runs only overfitted. On that benchmark (4 designs,
+  tanh / selu) `BFGS10` takes 2.3–2.5 s instead of 23–50 s, with Q2 0.986–0.998, NLPD
+  0.75–2.25 and 95 % coverage 0.95–1.00. The single-start default still often stops at a poor
+  mean in 10D (Q2 < 0); its coverage is now 0.84–1.00
+  ([#407](https://github.com/libKriging/libKriging/issues/407)).
 - **WarpKriging (monotone warps)**: the fit no longer reaches degenerate warps squeezing a
   sub-range of the training inputs onto one point, where the noise-free likelihood is
   unbounded (Gramacy & Lee 2008, `kumaraswamy`: logLikelihood 207 vs 50 for `Kriging`, Q2

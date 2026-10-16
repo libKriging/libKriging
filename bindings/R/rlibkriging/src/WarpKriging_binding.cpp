@@ -20,9 +20,9 @@ namespace {
 
 // Split an R `parameters` list into WarpKriging's typed seeds (numeric
 // `theta` / `warp_params` / `noise`) and the string optimiser knobs
-// (`adam_lr`, `max_iter_adam`, `max_iter_bfgs`). Numeric knob values are
-// accepted and stringified so that both `list(max_iter_adam = 300)` and
-// `list(max_iter_adam = "300")` work.
+// (`adam_lr`, `max_iter_adam`, `max_iter_bfgs`, `calibration_folds`). Numeric
+// knob values are accepted and stringified so that both
+// `list(max_iter_adam = 300)` and `list(max_iter_adam = "300")` work.
 std::pair<WarpKriging::Parameters, std::map<std::string, std::string>> wk_split_parameters(
     const Rcpp::Nullable<Rcpp::List>& parameters) {
   WarpKriging::Parameters wp;
@@ -40,7 +40,7 @@ std::pair<WarpKriging::Parameters, std::map<std::string, std::string>> wk_split_
       wp.warp_params = Rcpp::as<arma::vec>(plist[i]);
     } else if (key == "noise") {
       wp.noise = Rcpp::as<arma::vec>(plist[i]);
-    } else if (key == "adam_lr" || key == "max_iter_adam" || key == "max_iter_bfgs") {
+    } else if (key == "adam_lr" || key == "max_iter_adam" || key == "max_iter_bfgs" || key == "calibration_folds") {
       SEXP v = plist[i];
       if (TYPEOF(v) == STRSXP) {
         tuning[key] = Rcpp::as<std::string>(v);
