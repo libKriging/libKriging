@@ -85,9 +85,10 @@ computed in one pass:
   m × m solves as the Vecchia likelihood. Pᵢᵢ = Σₜ Bₜᵢ²/vₜ is a scatter
   over the O(n m) nonzeros of B, and P·v costs O(n m), so the whole
   criterion costs O(n m³ + n m p) — no n × n matrix.
-- **Nystrom**: P = R̂⁻¹ with R̂ = UUᵀ + diag(D) (fixed landmarks).
-  Woodbury: P = D⁻¹ − YYᵀ with Y = D⁻¹U L_c⁻ᵀ, L_cL_cᵀ = I + UᵀD⁻¹U,
-  so Pᵢᵢ = 1/Dᵢ − ‖yᵢ‖² and P·v cost O(n k); total O(n k²).
+- **Nystrom**: P = R̂⁻¹ with R̂ = UUᵀ + diag(D) (fixed landmarks),
+  through the block Cholesky factorization of
+  [Nystrom.md](Nystrom.md#numerical-factorization) (landmark rows
+  first): diag(P) and P·v cost O(n k); total O(n k²).
 
 **This is not the error of the Vecchia (local) predictor.**
 `predict(…, method="vecchia")` predicts xᵢ from its own m nearest

@@ -83,8 +83,9 @@ precision P = R̃⁻¹:
 - **Vecchia**: P = BᵀD⁻¹B (B unit lower triangular, D = diag(vᵢ) the
   conditional variances, see [Vecchia.md](Vecchia.md)), so
   log det R̃ = Σᵢ log vᵢ, and every product by P costs O(n m).
-- **Nystrom**: R̃ = UUᵀ + diag(D); P by Woodbury and
-  log det R̃ = Σᵢ log Dᵢ + log det(I + UᵀD⁻¹U) (determinant lemma), O(n k²).
+- **Nystrom**: R̃ = UUᵀ + diag(D); P and log det R̃ through the block
+  Cholesky factorization of [Nystrom.md](Nystrom.md#numerical-factorization)
+  (landmark rows first), O(n k²).
 
 The gradient is analytic (FD-verified in
 `tests/KrigingApproxObjectivesTest.cpp`): with r = y − Fβ̂, A = FᵀPF and

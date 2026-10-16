@@ -28,6 +28,18 @@ past release, see the corresponding entry on the
   now takes 1.3 s and 2.9 s. The folds are independent and their residuals summed in fold
   order, so the result depends on the pool size only through the number of BLAS threads
   each fold gets (as a multistart).
+- **Nystrom** (`method="nystrom(k)"`): the log-likelihood, predicted mean and LOO / LMP
+  objectives no longer depend on rounding, i.e. on the CPU / BLAS kernel. At the landmark
+  rows the residual diagonal is at the `num_nugget` level (1e-10), and the Woodbury solve
+  weighted those rows by 1e10 through a Gram matrix squaring their conditioning: with
+  k = n the log-likelihood was off the exact one by 1e-7 to 4e-6, and with an
+  ill-conditioned landmark block (smooth Gaussian kernel, k = 10) a 1-ulp perturbation of
+  `X` moved the predicted mean by ~60 % of sd(y). The rank-k + diagonal matrix is now
+  factorized by block Cholesky with the landmark rows first (QR, no Gram matrix), and the
+  landmark diagonal is set to `num_nugget` instead of computed as 1 − (≈1): k = n now
+  reproduces the exact log-likelihood and mean to ~1e-12, and the 1-ulp sensitivity drops to
+  ~1e-6. Cost: Nystrom `predict` +30–40 %, log-likelihood and gradient +10–20 %
+  ([#410](https://github.com/libKriging/libKriging/issues/410)).
 - **MLPKriging**: the predictive stdev is calibrated on held-out points. With more weights
   than observations, the likelihood-optimal network learns features in which the training
   outputs are almost exactly smooth, and the GP on top was overconfident: on `Branin(Wx)` in

@@ -13,8 +13,7 @@ with a global rank-k factorization built from a fixed subset of k
 where S is the set of k landmarks and R_ns / R_ss are the n×k / k×k
 covariance blocks between all points / among the landmarks. This turns
 the O(n³) exact factorization into O(n·k²) work per likelihood
-evaluation via the Woodbury identity, without ever materializing the
-n×n matrix R.
+evaluation, without ever materializing the n×n matrix R.
 
 libKriging exposes it as a fit method of the log-likelihood objective,
 `method="nystrom"` (default k = 50 landmarks) or `method="nystrom(k)"`
@@ -56,14 +55,15 @@ Every point is coupled to the same k landmarks (greedy pivoted Cholesky picks sp
 - **Low-rank factor**: once S is fixed, R_ss (k×k) and R_ns (n×k) are
   ordinary, smooth functions of θ. With L_ss = chol(R_ss),
   U := R_ns · L_ss⁻ᵀ satisfies U·Uᵀ = R_ns · R_ss⁻¹ · R_ns.t() exactly.
-- **Woodbury identity**: R⁻¹ and log|R| are obtained from U (and a
-  small jittered residual diagonal keeping the factorization SPD)
-  through `LinearAlgebra::woodbury_solve` / `woodbury_logdet`, both
-  O(n·k²) — the dense n×n matrix R is never formed.
+- **Low rank + diagonal**: R̃ = U·Uᵀ + diag(D), with the residual
+  diagonal D = 1 − diag(U·Uᵀ) floored at `num_nugget` (1e-10), which
+  keeps R̃ SPD. At a landmark row D is exactly `num_nugget` (see
+  [Numerical factorization](#numerical-factorization)). R̃⁻¹ and log|R̃|
+  are O(n·k²) — the dense n×n matrix R is never formed.
 - **Profiling**: matches the exact `"LL"` objective — σ² has a closed
   form and β is profiled by generalized least squares, using the same
-  GLS formulas as the exact objective, just solved via Woodbury instead
-  of a dense Cholesky.
+  GLS formulas as the exact objective, just solved through the
+  factorization below instead of a dense Cholesky.
 - **Gradient**: analytic (envelope theorem — β̂/σ̂² don't contribute
   their own θ-dependence since ∂ll/∂β = ∂ll/∂σ² = 0 at the profiled
   values), same principle as the Vecchia gradient. An earlier version
@@ -80,8 +80,8 @@ Every point is coupled to the same k landmarks (greedy pivoted Cholesky picks sp
   exact log-likelihood at the fitted θ, in O(n³));
   `predict(…, method="nystrom")` (or exactly the fitted `"nystrom(k)"`,
   e.g. the string returned by `method()`; another k raises)
-  (C++ `predictNystrom`) reuses the committed rank-k factors (U, D) via
-  the Woodbury identity — O(n k q) instead of O(n² q) for q points
+  (C++ `predictNystrom`) reuses the committed rank-k factors (U, D)
+  through the same factorization — O(n k q) instead of O(n² q) for q points
   (mean and stdev only: `return_cov` / `return_deriv` raise), and
   `simulate(…, method="nystrom")` (C++ `simulateNystrom`) draws joint
   trajectories through the same low-rank machinery (no `will_update`).
@@ -94,9 +94,40 @@ Every point is coupled to the same k landmarks (greedy pivoted Cholesky picks sp
   factorization (as a Vecchia fit). `update` goes through a dedicated
   incremental path (`update_nystrom`, extends the landmarks-fixed
   factorization without a full O(n³) refit) and `save`/`load` serialize
-  the committed rank-k factors (U, D) directly (and the method); `update_simulate`
+  the committed rank-k factors (U, D) and the landmarks directly (and the method); `update_simulate`
   raises a clear error (no such path exists yet, see Current
   limitations).
+
+## Numerical factorization
+
+R̃ = U·Uᵀ + diag(D) is solved and log-determined by a block Cholesky
+factorization with the k landmark rows S first (N: the other n − k rows):
+
+- R̃_SS = U_S·U_Sᵀ + diag(D_S) = L_A·L_Aᵀ, from a QR factorization of
+  [U_Sᵀ; diag(D_S)^½] (the Gram matrix U_S·U_Sᵀ is never formed);
+- R̃_NS = U_N·U_Sᵀ = L_NS·L_Aᵀ;
+- the Schur complement R̃_NN − L_NS·L_NSᵀ = diag(D_N) + U_N·H·U_Nᵀ, with
+  H = (I + U_Sᵀ·diag(D_S)⁻¹·U_S)⁻¹ also from a QR factorization, is
+  "rank k + diagonal" with a diagonal D_N away from `num_nugget` (but for
+  rows nearly duplicating a landmark), and is solved by the Woodbury
+  identity.
+
+Everything stays O(n·k²). With k = n every row is a landmark, and
+R̃ = L_A·L_Aᵀ reproduces the exact Cholesky factorization (log-likelihood
+equal to the exact one to ~1e-12 relative).
+
+Why not the Woodbury identity on the whole of R̃, as before #410: at a
+landmark row i, 1 − (U·Uᵀ)_ii = ε − ε²[(R_ss + εI)⁻¹]_ii ∈ [0, ε]
+(ε = `num_nugget`), so D_i = ε. Woodbury weights these rows by 1/ε = 1e10
+and forms I + Uᵀ·D⁻¹·U, a Gram matrix squaring their conditioning: the
+result then depended on rounding, i.e. on the CPU and BLAS kernel. With
+k = n the log-likelihood was off the exact one by 1e-7 to 4e-6 relative,
+and with an ill-conditioned R_ss (smooth Gaussian kernel, k = 10) a 1-ulp
+perturbation of X moved the predicted mean by ~60% of sd(y). The block
+factorization brings these to ~1e-12 and ~1e-6 respectively
+(`KrigingNystromTest.cpp`, "#410"). For the same reason D_i is set to ε
+at the landmark rows instead of computed as 1 − (≈1), whose rounding
+decided whether the floor applied.
 
 ## Noise models (`noise="nugget"` / heterogeneous `noise`)
 
@@ -104,7 +135,7 @@ Every point is coupled to the same k landmarks (greedy pivoted Cholesky picks sp
 [Noise.md](Noise.md). Write C̃ = U·Uᵀ + diag(D) for the Nystrom
 correlation above (U = R_ns · L_ss⁻ᵀ, D = 1 − diag(U·Uᵀ), jittered), the
 approximation of ρ(θ). The noise model only changes the diagonal (and
-scale) of the matrix fed into Woodbury, which stays "rank k + diagonal":
+scale) of the factorized matrix, which stays "rank k + diagonal":
 
 - **nugget** (γ = [θ, α], α = σ²/(σ²+τ²)):
   R̂ = α·C̃ + (1 − α)·I = (√α·U)(√α·U)ᵀ + diag(α·D + 1 − α)
@@ -113,7 +144,7 @@ scale) of the matrix fed into Woodbury, which stays "rank k + diagonal":
 
 The log-likelihood has the exact one's form,
 ll(γ) = −½ ( n·log(2π·v) + log|R̂| + e'R̂⁻¹e / v ), e = y − F·β̂ (β̂ by GLS
-through Woodbury), with the same profiling of the variance scale v
+through R̂⁻¹), with the same profiling of the variance scale v
 (Cov(y) = v·R̂) as the exact noise-model objectives:
 
 | model | v | concentrated? |
@@ -129,7 +160,7 @@ Gradient (analytic): for any parameter p of R̂ (and of v),
 x = R̂⁻¹e, v' = 0 when v is concentrated (envelope theorem), with
 
 - ∂R̂/∂θ_k = c·∂C̃/∂θ_k, c = α (nugget) or 1 (heterogeneous): the same
-  O(n·k²) Woodbury trace identities as the noise-free gradient, R̂⁻¹ now
+  O(n·k²) trace identities as the noise-free gradient, R̂⁻¹ now
   being that of the noisy R̂;
 - ∂R̂/∂α = C̃ − I = U·Uᵀ + diag(D − 1): x'(∂R̂/∂α)x = ‖Uᵀx‖² + Σ(D_i − 1)x_i²,
   tr(R̂⁻¹ ∂R̂/∂α) = tr(Uᵀ R̂⁻¹ U) + Σ(D_i − 1)(R̂⁻¹)_ii;
@@ -185,10 +216,11 @@ pred <- predict(k, Xnew, return_stdev = TRUE, method = "nystrom")  # explicit: n
   method="nystrom")` overloads raise for them), and `update_simulate` is
   unavailable as for the noise-free Nystrom fit.
 - `objective="LOO"` and `"LMP"` have Nystrom versions for
-  `NoiseModel::None` (LOO under the low-rank joint law, Woodbury
-  log-determinant; see [LOO.md](LOO.md) and [LMP.md](LMP.md)): they
+  `NoiseModel::None` (LOO under the low-rank joint law, same
+  factorization; see [LOO.md](LOO.md) and [LMP.md](LMP.md)): they
   inherit the smoothing bias of R̂ for small k; with a noise model they raise.
-- Landmarks are not serialized (rebuilt on refit).
+- Landmarks are serialized with the fit, but only re-picked by a full
+  `fit` (an `update` keeps them).
 - Rank k is a fixed hyperparameter chosen by the caller; there is no
   automatic rank selection based on a target approximation accuracy.
 - **Free MLE fits (`optim="BFGS"` with no starting `theta`) can drift

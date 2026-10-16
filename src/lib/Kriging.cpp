@@ -1643,11 +1643,11 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
 // Once S is fixed, R_ss (k x k) and R_ns (n x k) are ordinary, smooth
 // functions of theta; U := R_ns * L_ss^-T (L_ss = chol(R_ss)) satisfies
 // U*U.t() = R_ns * R_ss^-1 * R_ns.t() exactly, and R^-1/log|R| go through
-// LinearAlgebra::woodbury_solve/woodbury_logdet -- the n x n matrix R is
-// never materialized. Cost O(n*k^2) per evaluation instead of O(n^3).
+// the block factorization NystromChol (landmark rows first) -- the n x n
+// matrix R is never materialized. Cost O(n*k^2) per evaluation instead of O(n^3).
 //
 // Profiling matches the exact "LL" objective: sigma2 and beta in closed form
-// (same GLS formulas as _logLikelihood, just solved via Woodbury instead of a
+// (same GLS formulas as _logLikelihood, just solved via NystromChol instead of a
 // dense Cholesky). Gradient in theta is analytic (envelope theorem, same
 // principle as _logLikelihoodVecchia: beta_hat/sigma2_hat's own theta-dependence
 // doesn't contribute since d(ll)/d(beta)=d(ll)/d(sigma2)=0 at their profiled
@@ -1701,6 +1701,119 @@ void Kriging::make_nystrom_landmarks() {
                                &m_nystrom_landmarks);
 }
 
+namespace {
+
+// Diagonal residual D0 = 1 - diag(U0 U0') of the Nystrom approximation
+// (U0 U0' = R_ns (R_ss + eps I)^-1 R_ns', eps = num_nugget), floored at eps.
+// At a landmark row i it is exactly eps - eps^2 [(R_ss + eps I)^-1]_ii, in
+// [0, eps]: the floor always applies, so D0_i = eps. It is set so explicitly
+// rather than computed as 1 - (~1): that difference only has an absolute
+// accuracy ~1e-16, i.e. a relative error ~1e-6 at the eps = 1e-10 level, and
+// whether the floor applies would be decided by rounding, which then gets
+// amplified by the 1/D weights of the Woodbury solve and log-determinant
+// (LL off by 1e-7..4e-6 with every row a landmark, depending on the CPU, #410).
+arma::vec nystrom_residual_diag(const arma::mat& U0, const arma::uvec& landmarks) {
+  arma::vec D0 = arma::clamp(1.0 - arma::sum(arma::square(U0), 1), LinearAlgebra::num_nugget, arma::datum::inf);
+  D0.elem(landmarks).fill(LinearAlgebra::num_nugget);
+  return D0;
+}
+
+// Upper triangular factor Rf of an economical QR of A, with a positive
+// diagonal: A'A = Rf'Rf, obtained without forming the Gram matrix A'A.
+arma::mat qr_r(const arma::mat& A) {
+  arma::mat Q, Rf;
+  arma::qr_econ(Q, Rf, A);
+  Rf.each_col() %= arma::sign(Rf.diag());
+  return Rf;
+}
+
+// Factorization of the Nystrom correlation matrix Rhat = U U' + diag(D),
+// numerically stable when the landmark rows S have a diagonal D_S at the
+// num_nugget level (#410). The Woodbury identity weights every row by 1/D
+// and forms I + U' D^-1 U, a Gram matrix in which those 1/num_nugget weights
+// square the conditioning: the predicted mean was off by up to 10% of sd(y)
+// at an ill-conditioned R_ss, and by a CPU-dependent amount. Instead, block
+// Cholesky with the landmark rows first (N: the other rows):
+//   Rhat_SS = U_S U_S' + diag(D_S) = LA LA'         (QR of [U_S'; diag(D_S)^1/2])
+//   Rhat_NS = U_N U_S' = LNS LA'                     (LNS = U_N U_S' LA^-T)
+//   Schur   = Rhat_NN - LNS LNS' = diag(D_N) + U_N H U_N',
+//   H = I - U_S' Rhat_SS^-1 U_S = (I + U_S' D_S^-1 U_S)^-1 = Rh^-1 Rh^-T
+// (QR of [D_S^-1/2 U_S; I]), the Schur complement being solved by Woodbury
+// (diag(D_N) is away from num_nugget but for near-duplicate rows). With every
+// row a landmark, Rhat = LA LA' reproduces the exact Cholesky.
+struct NystromChol {
+  arma::uvec S, N;
+  arma::mat LA;        // k x k lower
+  arma::mat LNS;       // m x k
+  arma::vec DNinv;     // m: Schur^-1 = diag(DNinv) - YN YN'
+  arma::mat YN;        // m x k
+  arma::mat PNS;       // m x k: block N x S of Rhat^-1   (with_inverse only)
+  arma::vec diag_inv;  // n: diag(Rhat^-1)                  (with_inverse only)
+  double logdet = 0;
+
+  NystromChol(const arma::mat& U, const arma::vec& D, const arma::uvec& landmarks, bool with_inverse = false)
+      : S(landmarks) {
+    const arma::uword n = U.n_rows, k = U.n_cols;
+    arma::uvec is_land(n, arma::fill::zeros);
+    is_land.elem(S).ones();
+    N = arma::find(is_land == 0);
+    const arma::mat US = U.rows(S), UN = U.rows(N);
+    const arma::vec DS = D.elem(S), DN = D.elem(N);
+    const arma::vec sDS = arma::sqrt(DS);
+
+    LA = qr_r(arma::join_cols(US.t(), arma::mat(arma::diagmat(sDS)))).t();
+    logdet = 2.0 * arma::accu(arma::log(LA.diag()));
+    DNinv = 1.0 / DN;
+    if (N.is_empty()) {  // every row a landmark: Rhat = LA LA'
+      LNS.zeros(0, k);
+      YN.zeros(0, k);
+      PNS.zeros(0, k);
+      if (with_inverse) {
+        diag_inv.set_size(n);
+        diag_inv.elem(S) = arma::sum(arma::square(LinearAlgebra::solve_lower(LA, arma::eye<arma::mat>(k, k))), 0).t();
+      }
+      return;
+    }
+
+    LNS = UN * LinearAlgebra::solve_lower(LA, US).t();
+    const arma::mat Rh = qr_r(arma::join_cols(US.each_col() / sDS, arma::eye<arma::mat>(k, k)));
+    const arma::mat V = LinearAlgebra::solve_lower(Rh.t(), UN.t()).t();  // U_N Rh^-1: Schur = diag(D_N) + V V'
+    const arma::mat DinvV = V.each_col() % DNinv;
+    const arma::mat Lv = arma::chol(arma::eye<arma::mat>(k, k) + V.t() * DinvV, "lower");
+    YN = LinearAlgebra::solve_lower(Lv, DinvV.t()).t();
+    logdet += arma::accu(arma::log(DN)) + 2.0 * arma::accu(arma::log(Lv.diag()));
+
+    if (!with_inverse)
+      return;
+    // Rhat^-1 = [[T'(I + LNS' Schur^-1 LNS) T, -T' LNS' Schur^-1], [., Schur^-1]], T = LA^-1
+    const arma::mat T = LinearAlgebra::solve_lower(LA, arma::eye<arma::mat>(k, k));
+    const arma::mat C = LNS * T;
+    PNS = -schur_solve(C);
+    diag_inv.set_size(n);
+    diag_inv.elem(S) = arma::sum(arma::square(T), 0).t() - arma::sum(C % PNS, 0).t();
+    diag_inv.elem(N) = DNinv - arma::sum(arma::square(YN), 1);
+  }
+
+  arma::mat schur_solve(const arma::mat& B) const { return (B.each_col() % DNinv) - YN * (YN.t() * B); }
+
+  NystromChol() = default;
+
+  arma::mat solve(const arma::mat& B) const {
+    const arma::mat zS = LinearAlgebra::solve_lower(LA, B.rows(S));
+    arma::mat x(B.n_rows, B.n_cols);
+    if (N.is_empty()) {
+      x.rows(S) = LinearAlgebra::solve_upper(LA.t(), zS);
+      return x;
+    }
+    const arma::mat xN = schur_solve(B.rows(N) - LNS * zS);
+    x.rows(S) = LinearAlgebra::solve_upper(LA.t(), zS - LNS.t() * xN);
+    x.rows(N) = xN;
+    return x;
+  }
+};
+
+}  // namespace
+
 double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
                                       arma::vec* grad_out,
                                       arma::vec* beta_out,
@@ -1742,8 +1855,7 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
   const arma::mat U0
       = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));  // n x k; U0*U0.t() = R_ns R_ss^-1 R_ns.t()
 
-  const arma::vec captured = arma::sum(arma::square(U0), 1);
-  const arma::vec D0 = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
+  const arma::vec D0 = nystrom_residual_diag(U0, m_nystrom_landmarks);
 
   // Correlation matrix of the observations, with Ct := U0*U0.t() + diag(D0) ~= C:
   //   None:          Rhat = Ct                     -> (U, D) = (U0, D0)
@@ -1765,8 +1877,9 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
     D = D0;
   }
 
-  const arma::mat RinvF = LinearAlgebra::woodbury_solve(U, D, m_F);
-  const arma::vec Rinvy = LinearAlgebra::woodbury_solve(U, D, m_y);
+  const NystromChol Rf(U, D, m_nystrom_landmarks, /*with_inverse=*/grad_out != nullptr);
+  const arma::mat RinvF = Rf.solve(m_F);
+  const arma::vec Rinvy = Rf.solve(m_y);
 
   const arma::mat A = m_F.t() * RinvF;
   const arma::vec b = m_F.t() * Rinvy;
@@ -1775,7 +1888,7 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
   const arma::vec e = m_y - m_F * beta;
   const arma::vec Rinve = Rinvy - RinvF * beta;  // Rinv is linear: Rinv(y - F*beta) = Rinv*y - Rinv*F*beta
   const double SSE = arma::dot(e, Rinve);
-  const double logdetR = LinearAlgebra::woodbury_logdet(U, D);
+  const double logdetR = Rf.logdet;
 
   // Variance scale tv (Cov(y) = tv * Rhat) and its derivative wrt the extra
   // parameter, with exactly the profiling of the exact _logLikelihood:
@@ -1848,13 +1961,8 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
 
     const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);           // R_ss^-1
     const arma::mat W = Kinv * R_ns.t();                             // k x n = R_ss^-1 * R_ns.t()
-    const arma::mat RM = LinearAlgebra::woodbury_solve(U, D, R_ns);  // n x k = Rinv * R_ns
-
-    const arma::vec Dinv = 1.0 / D;
-    const arma::mat DinvU = U.each_col() % Dinv;
-    const arma::mat Mcore = arma::eye<arma::mat>(kL, kL) + U.t() * DinvU;  // I_k + U.t() D^-1 U
-    const arma::mat McoreInv = LinearAlgebra::inv_sympd(arma::chol(Mcore, "lower"));
-    const arma::vec diagRinv = Dinv - LinearAlgebra::diagABA(DinvU, McoreInv);  // diag(Rinv)
+    const arma::mat RM = Rf.solve(R_ns);                             // n x k = Rinv * R_ns
+    const arma::vec& diagRinv = Rf.diag_inv;
 
     const arma::vec Mtx = R_ns.t() * x;    // k
     const arma::vec p = Kinv * Mtx;        // R_ss^-1 * R_ns.t() * x
@@ -1894,7 +2002,7 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
       double g = 0.0;  // 0 when the extra parameter is fixed (as the exact gradient)
       if (extra_free && m_noise_model == NoiseModel::Nugget) {
         const arma::vec U0tx = U0.t() * x;
-        const arma::mat RinvU0 = LinearAlgebra::woodbury_solve(U, D, U0);  // n x k
+        const arma::mat RinvU0 = Rf.solve(U0);  // n x k
         const double xdRx = arma::dot(U0tx, U0tx) + arma::dot(x % x, D0 - 1.0);
         const double trRdR = arma::accu(U0 % RinvU0) + arma::dot(diagRinv, D0 - 1.0);
         g = -0.5 * (n * dtv / tv + trRdR - xdRx / tv - SSE * dtv / (tv * tv));
@@ -2011,7 +2119,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const
         if (arma::approx_equal(m_X.row(i), Xn_n.row(j), "absdiff", arma::datum::eps))
           R_on.at(i, j) = 1.0;
 
-  const arma::mat RinvR_on = LinearAlgebra::woodbury_solve(m_nystrom_U, m_nystrom_D, R_on);  // n_o x n_n
+  const arma::mat RinvR_on = NystromChol(m_nystrom_U, m_nystrom_D, m_nystrom_landmarks).solve(R_on);  // n_o x n_n
 
   arma::vec mean = F_n * m_beta + RinvR_on.t() * (m_y - m_F * m_beta);
   mean = mean * m_scaleY + m_centerY;
@@ -2054,7 +2162,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateNystrom(int nsim, int seed, const a
   arma::mat R_on = arma::mat(m_X.n_rows, n_n, arma::fill::none);
   LinearAlgebra::covMat_rect(&R_on, m_X.t(), Xn_n.t(), m_theta, _Cov, r_factor);
 
-  const arma::mat RinvR_on = LinearAlgebra::woodbury_solve(m_nystrom_U, m_nystrom_D, R_on);  // n_o x n_n
+  const arma::mat RinvR_on = NystromChol(m_nystrom_U, m_nystrom_D, m_nystrom_landmarks).solve(R_on);  // n_o x n_n
 
   const arma::vec yhat_n = F_n * m_beta + RinvR_on.t() * (m_y - m_F * m_beta);
 
@@ -2474,9 +2582,7 @@ VecchiaPrecision build_vecchia_precision(const arma::mat& X,
 struct NystromPrecision {
   arma::uword n = 0;
   arma::uword d = 0;
-  arma::vec Dinv;  // n (1 / clamped D)
-  arma::mat Y;     // n x k: P = diag(Dinv) - Y Y'
-  double logdet = 0;
+  NystromChol F;  // P = Rhat^-1
   // gradient data
   arma::mat Wt;                 // n x k: M K^-1
   arma::mat PW;                 // n x k: P W
@@ -2485,9 +2591,9 @@ struct NystromPrecision {
   std::vector<arma::vec> dlow;  // n: diag of the low-rank part of dRhat
   std::vector<arma::vec> ddg;   // n: actual d Rhat_ii (0 where D is not clamped)
 
-  arma::mat P(const arma::mat& X) const { return (X.each_col() % Dinv) - Y * (Y.t() * X); }
-  arma::vec diagP() const { return Dinv - arma::sum(arma::square(Y), 1); }
-  double logdetR() const { return logdet; }
+  arma::mat P(const arma::mat& X) const { return F.solve(X); }
+  const arma::vec& diagP() const { return F.diag_inv; }
+  double logdetR() const { return F.logdet; }
   // X' dRhat_k Z
   arma::mat bilR(arma::uword k, const arma::mat& X, const arma::mat& Z) const {
     const arma::mat WX = Wt.t() * X;
@@ -2500,30 +2606,34 @@ struct NystromPrecision {
   // X' dP_k Z = -(P X)' dRhat_k (P Z)
   arma::mat bil(arma::uword k, const arma::mat& X, const arma::mat& Z) const { return -bilR(k, P(X), P(Z)); }
   // The two quantities below are written with P applied to the n x k
-  // matrices W and dM (P W, P dM: Woodbury, like every P X here) rather than
-  // expanded through P = D^-1 - Y Y': at the landmarks D_i is ~num_nugget, and
-  // the expanded form is a difference of O(1/num_nugget^2) terms (no correct
-  // digit left), whereas P itself stays moderate there.
+  // matrices W and dM (P W, P dM, like every P X here) rather than expanded
+  // through a "diagonal - low rank" form of P: at the landmarks D_i is
+  // ~num_nugget, and the expanded form is a difference of O(1/num_nugget^2)
+  // terms (no correct digit left), whereas P itself stays moderate there.
   //
   // sum_i w_i (dP_k)_ii = -sum_i w_i p_i' dRhat_k p_i (p_i = P e_i)
   //   = -sum_i w_i [2 (dM' p_i).(W' p_i) - (W' p_i)' dK (W' p_i)] + sum_j corr_j (P diag(w) P)_jj
-  // with (P diag(w) P)_jj = w_j P_jj^2 + y_j' (sum_i w_i y_i y_i') y_j - w_j |y_j|^4
-  // (off-diagonal P_ij = -y_i' y_j), only needed where corr_j != 0, i.e.
-  // where D_j is not clamped.
+  // only needed where corr_j != 0, i.e. where D_j is not clamped: never at a
+  // landmark row, so j is among the other rows N, where (NystromChol)
+  // P_NN = diag(DNinv) - YN YN' and P_NS = PNS. Hence, for j in N,
+  // (P diag(w) P)_jj = w_j P_jj^2 + y_j' (sum_{i in N} w_i y_i y_i') y_j - w_j |y_j|^4
+  //                    + sum_{i in S} w_i PNS_ji^2   (y_j: row j of YN).
   double diag_term(arma::uword k, const arma::vec& w) const {
     const arma::mat PdM = P(dM[k]);
     const double t_low = 2.0 * arma::dot(w, arma::sum(PdM % PW, 1)) - arma::dot(w, arma::sum((PW * dK[k]) % PW, 1));
-    const arma::vec corr = dlow[k] - ddg[k];
-    const arma::uvec J = arma::find(corr != 0.0);
+    const arma::vec corrN = arma::vec(dlow[k] - ddg[k]).elem(F.N);
+    const arma::uvec J = arma::find(corrN != 0.0);  // positions in N
     double t_diag = 0;
     if (J.n_elem > 0) {
-      const arma::mat Omega = Y.t() * (Y.each_col() % w);
-      const arma::mat YJ = Y.rows(J);
+      const arma::vec wN = w.elem(F.N);
+      const arma::mat Omega = F.YN.t() * (F.YN.each_col() % wN);
+      const arma::mat YJ = F.YN.rows(J);
       const arma::vec yy = arma::sum(arma::square(YJ), 1);
-      const arma::vec PJJ = Dinv(J) - yy;
-      const arma::vec wJ = w(J);
-      const arma::vec pwp = wJ % arma::square(PJJ) + arma::sum((YJ * Omega) % YJ, 1) - wJ % arma::square(yy);
-      t_diag = arma::dot(corr(J), pwp);
+      const arma::vec PJJ = F.DNinv(J) - yy;
+      const arma::vec wJ = wN(J);
+      const arma::vec pwp = wJ % arma::square(PJJ) + arma::sum((YJ * Omega) % YJ, 1) - wJ % arma::square(yy)
+                            + arma::square(F.PNS.rows(J)) * w.elem(F.S);
+      t_diag = arma::dot(corrN(J), pwp);
     }
     return -t_low + t_diag;
   }
@@ -2555,20 +2665,14 @@ NystromPrecision build_nystrom_precision(const arma::mat& X,
   R_ss.diag() += LinearAlgebra::num_nugget;
   const arma::mat L_ss = arma::chol(R_ss, "lower");
   const arma::mat U = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));
-  const arma::vec captured = arma::sum(arma::square(U), 1);
-  const arma::vec D = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
-  np.Dinv = 1.0 / D;
-  const arma::mat DinvU = U.each_col() % np.Dinv;
-  const arma::mat Mcore = arma::eye<arma::mat>(kL, kL) + U.t() * DinvU;
-  const arma::mat Lc = arma::chol(Mcore, "lower");
-  np.Y = arma::trans(LinearAlgebra::solve_lower(Lc, DinvU.t()));
-  np.logdet = arma::accu(arma::log(D)) + 2.0 * arma::accu(arma::log(Lc.diag()));
+  const arma::vec D = nystrom_residual_diag(U, landmarks);
+  np.F = NystromChol(U, D, landmarks, /*with_inverse=*/true);
 
   if (with_grad) {
     const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);
     np.Wt = R_ns * Kinv;
     np.PW = np.P(np.Wt);
-    const arma::uvec clamped = arma::find((1.0 - captured) <= LinearAlgebra::num_nugget);
+    const arma::uvec clamped = arma::find(D <= LinearAlgebra::num_nugget);
     np.dM.resize(d);
     np.dK.resize(d);
     np.dlow.resize(d);
