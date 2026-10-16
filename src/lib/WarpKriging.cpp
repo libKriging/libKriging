@@ -46,6 +46,16 @@ constexpr arma::uword kJointMaxIterCap = 1000;
 // Early stop of the Adam phase: steps without a relative LL gain > tol.
 constexpr arma::uword kAdamPatience = 20;
 constexpr double kAdamRelTol = 1e-6;
+// Overflow-safe softplus log(1 + e^z): the naive form is +inf for z > 709.
+inline double softplus(double z) {
+  return std::max(z, 0.0) + std::log1p(std::exp(-std::abs(z)));
+}
+// Collapse guard (#406): between two consecutive training inputs, the warp's
+// mean slope may fall down to kCollapseMinRatio times its overall mean slope
+// over the training range for free; below, the fit objective pays
+// kCollapseWeight · log²(ratio / kCollapseMinRatio) per such gap.
+constexpr double kCollapseMinRatio = 0.1;
+constexpr double kCollapseWeight = 100.0;
 }  // namespace
 
 // *************************************************************************
@@ -585,6 +595,12 @@ void WarpKumaraswamy::set_params(const arma::vec& p) {
   m_log_b = p(1);
 }
 
+void WarpKumaraswamy::param_bounds(arma::vec& lo, arma::vec& hi) const {
+  const double m = std::log(kMaxShape);
+  lo = {-m, -m};
+  hi = {m, m};
+}
+
 void WarpKumaraswamy::set_input_range(double lo, double hi) {
   if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
     m_xlo = lo;
@@ -733,7 +749,7 @@ arma::mat WarpNeuralMono::forward(const arma::vec& x) const {
     arma::vec z = W1 * to_scaled(x(i)) + m_b1;
     arma::vec h(m_H);
     for (arma::uword j = 0; j < m_H; ++j)
-      h(j) = std::log1p(std::exp(z(j)));  // softplus
+      h(j) = softplus(z(j));
 
     out(i) = arma::dot(W2, h) + m_b2;
   }
@@ -772,7 +788,7 @@ arma::vec WarpNeuralMono::backward(const arma::vec& x, const arma::mat& dL_dPhi)
     arma::vec z = W1 * ui + m_b1;
     arma::vec h(m_H), sig(m_H);
     for (arma::uword j = 0; j < m_H; ++j) {
-      h(j) = std::log1p(std::exp(z(j)));       // softplus
+      h(j) = softplus(z(j));
       sig(j) = 1.0 / (1.0 + std::exp(-z(j)));  // sigmoid = d(softplus)/dz
     }
 
@@ -1954,6 +1970,12 @@ WarpKriging::WKModel WarpKriging::make_Model(const arma::vec& theta, double sigm
 // -------------------------------------------------------------------------
 void WarpKriging::refresh_cache() {
   m_X = apply_warping(m_X_raw);
+  // Extreme warp params can overflow the features (e.g. pow() in Kumaraswamy
+  // or Box-Cox): fail here, the optimisers fall back to their best evaluated
+  // point, instead of handing a NaN matrix to chol() ("given matrix is not
+  // symmetric", #406).
+  if (!m_X.is_finite())
+    throw std::runtime_error("WarpKriging: non-finite warped features (warp parameters out of range)");
   m_dX = LinearAlgebra::compute_dX(m_X);
   m_maxdX = arma::max(arma::abs(m_dX), 1);
   refresh_cache_theta_only();
@@ -2294,6 +2316,103 @@ void WarpKriging::unpack_warp_params(const arma::vec& wp) {
   }
 }
 
+void WarpKriging::warp_param_bounds(arma::vec& lo, arma::vec& hi) const {
+  arma::uword n_warp = total_warp_params();
+  lo.set_size(n_warp);
+  hi.set_size(n_warp);
+  lo.fill(-arma::datum::inf);
+  hi.fill(arma::datum::inf);
+  if (m_is_joint)
+    return;
+  arma::uword idx = 0;
+  for (const auto& w : m_warps) {
+    arma::uword np = w->n_params();
+    if (np > 0) {
+      arma::vec l, h;
+      w->param_bounds(l, h);
+      lo.subvec(idx, idx + np - 1) = l;
+      hi.subvec(idx, idx + np - 1) = h;
+      idx += np;
+    }
+  }
+}
+
+// -------------------------------------------------------------------------
+//  collapse_penalty()  —  guard against warps collapsing training inputs
+//
+//  The concentrated LL of a noise-free GP is unbounded when a warp maps
+//  several training points with (near) equal outputs onto (near) the same
+//  feature: R gets near-duplicate rows and −½ log|R| → +∞. A monotone 1D warp
+//  can do this on a whole sub-range of its input (e.g. Kumaraswamy with a
+//  large b squeezing [0.4, 1] onto 1), a degenerate optimum with collapsed
+//  predictive variance (#406). For each guarded warp, with training inputs
+//  sorted and de-duplicated, the gap k between x_(k) and x_(k+1) has the
+//  relative mean slope
+//      g_k = |Δφ_k| / Δx_k  /  (span φ / span x)
+//  (1 everywhere for an affine warp, so a global rescaling — θ's job — is
+//  not penalised) and costs  w · max(0, log(g_min / g_k))².
+// -------------------------------------------------------------------------
+std::pair<double, arma::vec> WarpKriging::collapse_penalty() const {
+  arma::uword n_warp = total_warp_params();
+  arma::vec grad(n_warp, arma::fill::zeros);
+  double pen = 0.0;
+  if (m_is_joint || n_warp == 0 || m_X.n_rows < 3)
+    return {pen, grad};
+  const double log_gmin = std::log(kCollapseMinRatio);
+  const double tiny = 1e-300;
+
+  arma::uword col = 0, idx = 0;
+  for (arma::uword j = 0; j < m_warps.size(); ++j) {
+    const arma::uword dj = m_warps[j]->output_dim();
+    const arma::uword np = m_warps[j]->n_params();
+    if (np > 0 && dj == 1 && m_warps[j]->collapse_guard()) {
+      const arma::vec x = m_X_raw.col(j);
+      const arma::vec phi = m_X.col(col);
+      const double x_span = x.max() - x.min();
+      const arma::uword i_max = phi.index_max(), i_min = phi.index_min();
+      const double phi_span = std::max(phi(i_max) - phi(i_min), tiny);
+      if (x_span > 0) {
+        const arma::uvec ord = arma::sort_index(x);
+        const double x_tol = 1e-12 * x_span;
+        arma::vec dpen_dphi(x.n_elem, arma::fill::zeros);
+        double pen_j = 0.0;
+        double dpen_dlogspan = 0.0;  // ∂pen/∂log(span φ)
+        // Walk consecutive distinct inputs (ties carry no gap).
+        arma::uword prev = ord(0);
+        for (arma::uword k = 1; k < ord.n_elem; ++k) {
+          const arma::uword cur = ord(k);
+          const double dx = x(cur) - x(prev);
+          if (dx <= x_tol)
+            continue;
+          const double dphi = phi(cur) - phi(prev);
+          const double adphi = std::max(std::abs(dphi), tiny);
+          const double log_g = std::log(adphi) - std::log(dx) - std::log(phi_span) + std::log(x_span);
+          const double r = log_gmin - log_g;
+          if (r > 0) {
+            pen_j += kCollapseWeight * r * r;
+            // ∂pen/∂log g = −2 w r ;  log g = log|Δφ| − log span φ + const
+            const double dpen_dlogg = -2.0 * kCollapseWeight * r;
+            const double s = (dphi >= 0) ? 1.0 : -1.0;
+            dpen_dphi(cur) += dpen_dlogg * s / adphi;
+            dpen_dphi(prev) -= dpen_dlogg * s / adphi;
+            dpen_dlogspan -= dpen_dlogg;
+          }
+          prev = cur;
+        }
+        if (pen_j > 0) {
+          dpen_dphi(i_max) += dpen_dlogspan / phi_span;
+          dpen_dphi(i_min) -= dpen_dlogspan / phi_span;
+          pen += pen_j;
+          grad.subvec(idx, idx + np - 1) = m_warps[j]->backward(x, arma::mat(dpen_dphi));
+        }
+      }
+    }
+    idx += np;
+    col += dj;
+  }
+  return {pen, grad};
+}
+
 // -------------------------------------------------------------------------
 //  clone_for_thread()  —  deep copy for parallel multistart
 // -------------------------------------------------------------------------
@@ -2379,6 +2498,10 @@ void WarpKriging::optimise_joint(const std::string& method) {
   arma::vec gamma_upper = to_gamma(theta_upper);
 
   // Parse multistart count from method (shared helper).
+  // Box constraints of the warp params (±inf where unbounded).
+  arma::vec wp_lower, wp_upper;
+  warp_param_bounds(wp_lower, wp_upper);
+
   auto parsed = Optim::parse_method(method, "BFGS");
   const std::string base_method = parsed.first;
   const int multistart = parsed.second;
@@ -2397,7 +2520,9 @@ void WarpKriging::optimise_joint(const std::string& method) {
 
     // Save the initial theta for retry contraction.
     arma::vec theta0 = wk.m_theta;
-    arma::vec wp_init = (nw > 0) ? wk.pack_warp_params() : arma::vec();
+    // Starting warp params, projected onto their box constraints.
+    arma::vec wp_init
+        = (nw > 0) ? arma::vec(arma::min(arma::max(wk.pack_warp_params(), wp_lower), wp_upper)) : arma::vec();
 
     arma::vec x0(n_total);
     if (nw > 0)
@@ -2406,10 +2531,13 @@ void WarpKriging::optimise_joint(const std::string& method) {
 
     arma::vec lb(n_total), ub(n_total);
     arma::ivec btype(n_total);
-    if (nw > 0) {
-      lb.head(nw).fill(-1e20);
-      ub.head(nw).fill(1e20);
-      btype.head(nw).fill(0);
+    // Warp params: per-parameter box constraints (IWarp::param_bounds),
+    // L-BFGS-B bound type 0/1/2/3 = none/lower/both/upper.
+    for (arma::uword i = 0; i < nw; ++i) {
+      const bool has_lo = std::isfinite(wp_lower(i)), has_hi = std::isfinite(wp_upper(i));
+      lb(i) = has_lo ? wp_lower(i) : -1e20;
+      ub(i) = has_hi ? wp_upper(i) : 1e20;
+      btype(i) = has_lo ? (has_hi ? 2 : 1) : (has_hi ? 3 : 0);
     }
     lb.tail(dt) = gamma_lower;
     ub.tail(dt) = gamma_upper;
@@ -2425,12 +2553,27 @@ void WarpKriging::optimise_joint(const std::string& method) {
       if (nw > 0)
         wk.unpack_warp_params(x.head(nw));
       wk.m_theta = from_gamma(x.tail(dt));
-      wk.refresh_cache();
+      try {
+        wk.refresh_cache();
+      } catch (const std::exception&) {
+        // Point the correlation matrix cannot be factorised at (or with
+        // non-finite features), typically a too-long line-search step: report
+        // it as much worse than the best point so far, so the line search
+        // backtracks instead of the whole run stopping there (#406).
+        if (!std::isfinite(eval_best_f))
+          throw;
+        grad.zeros();
+        return eval_best_f + 1e3 * std::max(1.0, std::abs(eval_best_f));
+      }
 
       auto [ll, g_theta] = wk.concentrated_ll_and_grad_theta();
       grad.tail(dt) = -grad_theta_to_gamma(wk.m_theta, g_theta);
-      if (nw > 0)
-        grad.head(nw) = -wk.warp_gradient();
+      if (nw > 0) {
+        // Penalised objective: LL − collapse penalty (#406).
+        auto [pen, g_pen] = wk.collapse_penalty();
+        ll -= pen;
+        grad.head(nw) = -wk.warp_gradient() + g_pen;
+      }
       if (std::isfinite(ll) && -ll < eval_best_f) {
         eval_best_f = -ll;
         eval_best_x = x;
@@ -2511,8 +2654,16 @@ void WarpKriging::optimise_joint(const std::string& method) {
     opt.bfgs_pgtol = Optim::gradient_tolerance;
     opt.bfgs_factr = Optim::objective_rel_tolerance / 1E-13;
     opt.maximize = true;
+    opt.outer_lower = wp_lower;
+    opt.outer_upper = wp_upper;
 
-    arma::vec current_wp = wk.pack_warp_params();
+    arma::vec current_wp = arma::min(arma::max(wk.pack_warp_params(), wp_lower), wp_upper);
+    if (nw > 0 && arma::any(current_wp != wk.pack_warp_params())) {
+      // Start projected onto the bounds: the objective's first call only
+      // refreshes θ, so the features must match the projected params already.
+      wk.unpack_warp_params(current_wp);
+      wk.refresh_cache();
+    }
     arma::vec current_gamma = to_gamma(wk.m_theta);
 
     auto obj_fn = [&wk, &current_wp, &from_gamma, &grad_theta_to_gamma](const arma::vec& x_outer,
@@ -2536,6 +2687,10 @@ void WarpKriging::optimise_joint(const std::string& method) {
         wk.refresh_cache_theta_only();
 
       double ll = wk.concentrated_ll();
+      // Penalised objective: LL − collapse penalty (#406). The penalty only
+      // depends on the warp params, so the inner θ gradient is unchanged.
+      auto [pen, g_pen] = wk.collapse_penalty();
+      ll -= pen;
 
       if (grad_inner) {
         auto [ll2, g_theta] = wk.concentrated_ll_and_grad_theta();
@@ -2543,7 +2698,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
         (void)ll2;
       }
       if (grad_outer && x_outer.n_elem > 0) {
-        *grad_outer = wk.warp_gradient();
+        *grad_outer = wk.warp_gradient() - g_pen;
       }
       return ll;
     };
@@ -2554,7 +2709,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
       wk.unpack_warp_params(result.x_outer);
     wk.m_theta = from_gamma(result.x_inner);
     wk.refresh_cache();
-    return -wk.concentrated_ll();  // return neg LL for consistency
+    return -(wk.concentrated_ll() - wk.collapse_penalty().first);  // neg penalised LL, as the joint BFGS
   };
 
   // Structure to hold optimization results from each thread

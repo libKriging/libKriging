@@ -43,6 +43,18 @@ One warping per input column, chosen by a spec string such as `kumaraswamy` or `
 | `categorical(L,q)` | [Warping-Categorical.md](Warping-Categorical.md) |
 | `ordinal(L)` | [Warping-Ordinal.md](Warping-Ordinal.md) |
 
+**Collapse guard.** The likelihood of a noise-free GP grows without bound when a warp maps
+several training points with (near) equal outputs onto (near) the same feature: a monotone
+warp can squeeze a whole sub-range of its input onto one point, and the fit then predicts
+worse than plain Kriging with a collapsed predictive variance
+([#406](https://github.com/libKriging/libKriging/issues/406)). For `boxcox`, `kumaraswamy`,
+`neural_mono(H)` and `knots(K)`, the fit therefore maximises the log-likelihood minus a
+penalty: with the training inputs of the variable sorted, the warp's mean slope between two
+consecutive inputs, relative to its mean slope over the training range, costs
+100 · log²(ratio / 0.1) when it falls below 0.1 (an affine warp has ratio 1 everywhere).
+`logLikelihood()` reports the plain log-likelihood. Some warps also bound their parameters
+(see their page).
+
 ## See also
 
 - [../comparisons](../comparisons): the same problems solved with other Kriging / Gaussian process packages.

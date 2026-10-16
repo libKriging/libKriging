@@ -20,6 +20,20 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **WarpKriging (monotone warps)**: the fit no longer reaches degenerate warps squeezing a
+  sub-range of the training inputs onto one point, where the noise-free likelihood is
+  unbounded (Gramacy & Lee 2008, `kumaraswamy`: logLikelihood 207 vs 50 for `Kriging`, Q2
+  -0.25, min predictive stdev 3e-7). `kumaraswamy` parameters are bounded to a, b in
+  [1/3, 3], and `boxcox` / `kumaraswamy` / `neural_mono` / `knots` fits maximise the
+  log-likelihood minus a penalty on gaps between consecutive training inputs where the warp
+  is much flatter than on average (`logLikelihood()` stays the plain LL). On that benchmark
+  (8 designs, n = 40) the median Q2 of `kumaraswamy` is 0.81 (Kriging 0.75) with no negative
+  Q2 under the default optimiser; `boxcox` goes from -0.03 to 0.81. A joint `BFGS` line-search
+  step to a point where the correlation matrix cannot be factorised now backtracks instead of
+  ending the run there, and non-finite warped features raise before `chol()` (the spurious
+  "chol(): given matrix is not symmetric" warnings). `neural_mono` uses an overflow-safe
+  softplus (it gave NaN predictions for large weights)
+  ([#406](https://github.com/libKriging/libKriging/issues/406)).
 - **R**: regression test for forked workers (`parallel::mcparallel`) after a multistart
   fit, and the fork / threading constraints documented in `bindings/R/README.md`
   ([#325](https://github.com/libKriging/libKriging/issues/325)).

@@ -69,6 +69,10 @@ class AdamBFGS {
   /// 0 disables it (run all max_iter_adam steps).
   arma::uword patience = 0;
   double rel_tol = 0.0;
+  // Optional box constraints on x_outer (empty = unbounded; ±inf entries
+  // allowed): each Adam step is projected back onto [outer_lower, outer_upper].
+  arma::vec outer_lower;
+  arma::vec outer_upper;
 
   // BFGS parameters (for inner loop)
   arma::uword max_iter_bfgs = 100;
@@ -178,6 +182,8 @@ class AdamBFGS {
         arma::vec mh = mm / (1.0 - std::pow(adam_beta1, static_cast<double>(t)));
         arma::vec vh = vm / (1.0 - std::pow(adam_beta2, static_cast<double>(t)));
         x_outer += adam_lr * mh / (arma::sqrt(vh) + adam_eps);
+        if (outer_lower.n_elem == n_outer && outer_upper.n_elem == n_outer)
+          x_outer = arma::min(arma::max(x_outer, outer_lower), outer_upper);
       }
     }
 

@@ -19,9 +19,13 @@ wk <- WarpKriging(y, X, warping = c("kumaraswamy"), kernel = "gauss")
 
   w(x) = 1 − (1 − x^a)^b,    x ∈ [0, 1], a, b > 0
 
-2 learnable parameters, stored as `log_a`, `log_b` (unconstrained
-reals) so that `a = exp(log_a)`, `b = exp(log_b)` stay positive by
-construction; initialised at a = b = 1 (identity map). Inputs are
+2 learnable parameters, stored as `log_a`, `log_b` so that
+`a = exp(log_a)`, `b = exp(log_b)` stay positive by construction;
+initialised at a = b = 1 (identity map). The fit bounds them to
+a, b ∈ [1/3, 3]: beyond, the CDF can squeeze most of the training range
+onto a single point, a degenerate maximum of the likelihood
+([#406](https://github.com/libKriging/libKriging/issues/406)); the fit
+also applies the collapse guard described in [README.md](README.md). Inputs are
 clamped to `[1e−10, 1 − 1e−10]` to keep the transform well-defined at
 the boundaries.
 
