@@ -59,7 +59,8 @@ Scores score(Model& model, const arma::mat& Xt, const arma::vec& yt) {
   auto [m, s, _c, _md, _sd] = model.predict(Xt, true, false, false);
   arma::vec mean = m, sd = s;
   double q2 = 1.0 - arma::accu(arma::square(yt - mean)) / arma::accu(arma::square(yt - arma::mean(yt)));
-  double nlpd = arma::mean(0.5 * arma::log(2.0 * arma::datum::pi * arma::square(sd)) + 0.5 * arma::square((yt - mean) / sd));
+  double nlpd
+      = arma::mean(0.5 * arma::log(2.0 * arma::datum::pi * arma::square(sd)) + 0.5 * arma::square((yt - mean) / sd));
   return {q2, nlpd, sd.min()};
 }
 
