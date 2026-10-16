@@ -705,7 +705,8 @@ class WarpKriging : protected KrigingImpl {
 
   /// Typed-parameters overload: lets callers seed θ / warp params / noise.
   /// @param tuning optional string knobs ("adam_lr", "max_iter_adam",
-  ///        "max_iter_bfgs"), applied before optimisation. This lets a caller
+  ///        "max_iter_bfgs", "calibration_folds"), applied before
+  ///        optimisation. This lets a caller
   ///        pass both typed seeds and optimiser knobs in a single fit() call.
   /// @param method covariance evaluation: only "exact" is implemented for
   ///        WarpKriging (the API matches Kriging::fit); others raise.
@@ -812,6 +813,10 @@ class WarpKriging : protected KrigingImpl {
   std::string kernel() const { return m_covType; }
   arma::vec theta() const { return m_theta; }
   double sigma2() const { return m_sigma2; }
+  /// Calibration factor of the predictive variance (1 when not calibrated):
+  /// predict/simulate use σ² · var_scale(), while sigma2() stays the maximum
+  /// likelihood estimate (see the "calibration_folds" tuning knob, #407).
+  double var_scale() const { return m_var_scale; }
   const arma::vec& noise() const { return m_noise; }
   bool is_fitted() const { return m_fitted; }
   arma::uword feature_dim() const { return m_feature_dim; }
@@ -931,8 +936,9 @@ class WarpKriging : protected KrigingImpl {
   bool m_fitted = false;
 
   // ---- optimiser ----------------------------------------------------------
-  // 0 = automatic: 100 for the inner θ L-BFGS of "BFGS+Adam", and a budget
-  // growing with the number of parameters for the joint "BFGS" (see
+  // 0 = automatic: 100 for the inner θ L-BFGS of "BFGS+Adam", and for the
+  // joint "BFGS" a budget growing with the number of per-variable warp
+  // parameters, or Optim::max_iteration per call for a joint MLP (see
   // joint_bfgs_max_iter()). A positive value is used as-is for both.
   arma::uword m_max_iter_bfgs = 0;
   // Adam phase of "BFGS+Adam": with bias correction each step moves a warp
@@ -941,6 +947,15 @@ class WarpKriging : protected KrigingImpl {
   // The loop stops early once the likelihood stalls (see run_adam_bfgs).
   arma::uword m_max_iter_adam = 200;
   double m_adam_lr = 3e-2;
+  // K-fold calibration of the predictive variance of a joint MLP warp (#407):
+  // number of folds (0 disables, other warpings are never calibrated), and
+  // the resulting factor applied to σ² by predict/simulate.
+  arma::uword m_calibration_folds = 5;
+  double m_var_scale = 1.0;
+  // Starting point (θ, warp params) of the optimiser start that gave the fit:
+  // the calibration refits each fold from there.
+  arma::vec m_start_theta;
+  arma::vec m_start_warp_params;
 
   // ---- private helpers ----------------------------------------------------
   static WarpBaseKernel parse_kernel(const std::string& name);
@@ -964,6 +979,9 @@ class WarpKriging : protected KrigingImpl {
   void ensure_joint_warp(arma::uword d_in);
   // Iteration budget of the joint (warp params + θ) L-BFGS-B.
   unsigned int joint_bfgs_max_iter(arma::uword n_total) const;
+  // K-fold cross-validated calibration of the predictive variance (sets
+  // m_var_scale); only for a joint MLP warp fitted without noise.
+  void calibrate_variance();
   // Freshly drawn warp parameters (MLP weights re-initialised with `seed`,
   // other warps kept at their current values), used as multistart seeds.
   arma::vec random_warp_params(uint64_t seed) const;

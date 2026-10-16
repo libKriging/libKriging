@@ -13,7 +13,7 @@
 namespace lk = libKriging;
 
 // The recognised optimiser knobs, forwarded as a string map.
-static const std::set<std::string> kWarpTuningKeys = {"adam_lr", "max_iter_adam", "max_iter_bfgs"};
+static const std::set<std::string> kWarpTuningKeys = {"adam_lr", "max_iter_adam", "max_iter_bfgs", "calibration_folds"};
 
 // Deep-copy a numpy array/scalar into an owned arma::vec WITHOUT mutating the
 // caller's array (carma::arr_to_col may steal the source buffer).

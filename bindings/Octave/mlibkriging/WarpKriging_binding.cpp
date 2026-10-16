@@ -15,8 +15,9 @@ using libKriging::WarpKriging;
 
 // Split a MATLAB `parameters` struct into WarpKriging's typed seeds
 // (numeric `theta` / `warp_params` / `noise` fields) and the string optimiser
-// knobs (`adam_lr`, `max_iter_adam`, `max_iter_bfgs`). Numeric knob values
-// are stringified so both struct('max_iter_adam', 300) and '...', "300" work.
+// knobs (`adam_lr`, `max_iter_adam`, `max_iter_bfgs`, `calibration_folds`).
+// Numeric knob values are stringified so both struct('max_iter_adam', 300) and
+// '...', "300" work.
 static std::pair<WarpKriging::Parameters, std::map<std::string, std::string>> structToWarpParameters(const mxArray* s) {
   WarpKriging::Parameters wp;
   std::map<std::string, std::string> tuning;
@@ -37,7 +38,8 @@ static std::pair<WarpKriging::Parameters, std::map<std::string, std::string>> st
       wp.warp_params = converter<arma::vec>(val, "warp_params");
     } else if (fname == "noise") {
       wp.noise = converter<arma::vec>(val, "noise");
-    } else if (fname == "adam_lr" || fname == "max_iter_adam" || fname == "max_iter_bfgs") {
+    } else if (fname == "adam_lr" || fname == "max_iter_adam" || fname == "max_iter_bfgs"
+               || fname == "calibration_folds") {
       char* str = mxArrayToString(val);
       if (str != nullptr) {
         tuning[fname] = std::string(str);

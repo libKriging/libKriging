@@ -53,7 +53,9 @@ classMLPKriging <- function(obj) {
 #' @param optim optimiser (default "BFGS")
 #' @param objective "LL" (log-likelihood)
 #' @param parameters optional named list of tuning parameters, e.g.
-#'   \code{list(max_iter_adam = "300", adam_lr = "0.001", max_iter_bfgs = "50")}
+#'   \code{list(max_iter_adam = "300", adam_lr = "0.001", max_iter_bfgs = "50")};
+#'   \code{calibration_folds} (default \code{"5"}, \code{"0"} to disable) sets
+#'   the K-fold calibration of the predictive variance.
 #' @param method covariance method: only \code{"exact"} is implemented for
 #'   MLPKriging (same argument as \code{\link{Kriging}}).
 #'

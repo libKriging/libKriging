@@ -246,7 +246,7 @@ static void test_default_optim_branin() {
     throw std::runtime_error("MLPKriging default fit on Branin: Q2 = " + std::to_string(q2_default) + " <= 0.95");
   // No LL ordering between BFGS3 and the single start: the first multistart
   // start begins from the same point, but runs on a clone in a worker thread
-  // and, over ~1000 iterations of a non-convex problem, round-off differences
+  // and, over hundreds of iterations of a non-convex problem, round-off differences
   // (BLAS kernels, buffer alignment) can lead it to another local optimum
   // (seen on CI: single -79.4, BFGS3 -80.9; locally both -81.1).
   if (!(q2_multi > 0.95))

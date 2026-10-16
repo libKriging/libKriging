@@ -259,6 +259,9 @@ warp_knots <- function(n_knots = 3, knot_positions = NULL) {
 #'       (length n); equivalent to passing \code{noise=}.
 #'     \item \code{adam_lr}, \code{max_iter_adam}, \code{max_iter_bfgs}:
 #'       optimiser knobs, numeric or string.
+#'     \item \code{calibration_folds}: number of folds of the K-fold
+#'       calibration of the predictive variance of a joint MLP warp
+#'       (default 5, 0 disables).
 #'   }
 #' @param noise numeric vector of per-observation noise variances (length n),
 #'   or \code{NULL} (default) for noise-free interpolation. When set, the GP
@@ -349,7 +352,8 @@ summary.WarpKriging <- function(object, ...) {
 #' @param objective "LL" (log-likelihood)
 #' @param parameters optional named list of initial hyper-parameter values
 #'   (\code{theta}, \code{warp_params}, \code{noise}) and/or optimiser knobs
-#'   (\code{adam_lr}, \code{max_iter_adam}, \code{max_iter_bfgs}). See
+#'   (\code{adam_lr}, \code{max_iter_adam}, \code{max_iter_bfgs},
+#'   \code{calibration_folds}). See
 #'   \code{\link{WarpKriging}}.
 #' @param noise numeric vector of per-observation noise variances (length n),
 #'   or \code{NULL} (default) for noise-free interpolation.

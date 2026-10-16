@@ -381,6 +381,11 @@ target_link_libraries(MLPKrigingTest LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries MLPKrigingTest)
 add_test(NAME MLPKrigingTest COMMAND MLPKrigingTest)
 
+add_executable(MLPKrigingCalibrationTest MLPKrigingCalibrationTest.cpp)
+target_link_libraries(MLPKrigingCalibrationTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries MLPKrigingCalibrationTest)
+catch_discover_tests(MLPKrigingCalibrationTest)
+
 add_executable(MLPKrigingUpdateSimulateTest MLPKrigingUpdateSimulateTest.cpp)
 target_link_libraries(MLPKrigingUpdateSimulateTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries MLPKrigingUpdateSimulateTest)
