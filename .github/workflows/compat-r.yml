@@ -4,15 +4,9 @@ name: R compatibility check (Kriging vs v0.9.3)
 # numerically identical results to the separate Kriging / NoiseKriging /
 # NuggetKriging classes from the v0.9.3 release.
 
+# TEMP (drop before merge): only "Build and tests" and the C++ benchmarks on this PR.
 on:
-  push:
-    branches:
-      - '*'
-  pull_request:
-    branches:
-      - '*'
-  schedule:
-    - cron: '0 3 * * SAT'
+  workflow_dispatch:
 
 env:
   DEBUG_CI: true
