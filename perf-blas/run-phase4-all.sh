@@ -2,8 +2,8 @@
 # Phase 4 plan actually run (seeds reduced where a fit takes minutes, see the report).
 D=$(cd "$(dirname "$0")" && pwd)
 OUT=${OUT:-$D/phase4-fits.csv}; BIN=${BIN:-/home/user/baseline/bench-blas-threads}
-M=master:/home/user/baseline; B=B:/home/user/libKriging/build/src/lib
-A=A:/home/user/libKriging/build/src/lib:LK_BLAS_THREADS_MIN_N=-1
+M=master:${MASTER_LIB:-/home/user/baseline}; B=B:${BRANCH_LIB:-/home/user/branchlib}
+A=A:${BRANCH_LIB:-/home/user/branchlib}:LK_BLAS_THREADS_MIN_N=-1
 R="$D/run-phase4.sh $OUT $BIN"
 $R kriging   BFGS      "100 400 1000" 10 $M $B
 $R kriging   BFGS10    "100 400" 10 $M $A $B
