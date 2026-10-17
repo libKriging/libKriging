@@ -18,8 +18,29 @@ past release, see the corresponding entry on the
   JSON save file and reloaded into a new C++ object, which the object and its `$` methods
   share ([#327](https://github.com/libKriging/libKriging/issues/327)). Objects serialized by
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
+- **BLAS thread policy** (OpenBLAS only): `fit`, `predict` and `update` of `Kriging`,
+  `WarpKriging` and `MLPKriging` run OpenBLAS on 1 thread below 400 training observations, on
+  at most the number of physical cores above, and restore the caller's thread count
+  afterwards. Below a few hundred observations the BLAS calls are too small for a thread team
+  to pay off: its threads mostly spin-wait, which costs 2-4x the CPU time for no gain in
+  elapsed time (often a loss), and slows down parallel multistart workers and processes
+  running side by side (R `mclapply`, CI runners). Tunable with
+  `Optim::set_blas_threads_min_n` (`0`: never force 1 thread, `< 0`: leave BLAS alone) and
+  `Optim::set_blas_threads_max` (`0`: physical cores, `< 0`: no cap), or the
+  `LK_BLAS_THREADS_MIN_N` / `LK_BLAS_THREADS_MAX` environment variables; exposed in Python
+  as `Optim.set_blas_threads_min_n` / `Optim.set_blas_threads_max`. See
+  `REPORT-blas-threads.md`.
 
 ### Fixed
+- **BLAS threads**: a parallel multistart (`Kriging` `BFGS<N>`, `WarpKriging` /
+  `MLPKriging` multistart and calibration folds) no longer leaves the whole process with
+  1 OpenBLAS / OpenMP thread: the previous counts are restored on exit, instead of being
+  reset to 1. A `fork()` (R `mclapply`, `system()`) no longer leaves the parent process at
+  1 thread either (the `pthread_atfork` parent handler restores the counts; the child still
+  starts single-threaded).
+- **Kriging** `BFGS<N>`: the starts run one after the other in the calling thread, yet each
+  was given `ncpu / N` BLAS threads, i.e. a single busy core for `BFGS10` on up to 10 CPUs.
+  They now get the threads of the BLAS thread policy above.
 - **MLPKriging** / `mlp_joint`: the K refits of the predictive-variance calibration (#407)
   run concurrently in the multistart thread pool (`Optim::set_thread_pool_size`) instead of
   one after the other. The calibration made the fit 5-10x slower (n = 200, d = 4,

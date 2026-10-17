@@ -9,6 +9,7 @@ for n in $NS; do
   for s in $(seq 1 "$SEEDS"); do
     for v in "$@"; do
       IFS=: read -r label libdir envs <<< "$v"
+      grep -q "^$label,fit,$CLS,$OPTIM,$n,4,$s," "$OUT" && continue  # already measured (resume)
       line=$(env ${envs//,/ } LD_LIBRARY_PATH="$libdir" timeout 3600 "$BIN" fit "$CLS" "$OPTIM" "$n" 4 "$s" 2>/dev/null | grep '^fit,')
       [ -n "$line" ] || line="fit,$CLS,$OPTIM,$n,4,$s,,,FAIL,,"
       echo "$label,$line" >> "$OUT"
