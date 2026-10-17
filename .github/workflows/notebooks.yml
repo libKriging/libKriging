@@ -5,8 +5,16 @@ name: Notebooks
 # Only the Python notebooks: the others need R, Julia, Octave or third-party packages
 # (the comparison notebooks are covered by bench-comparison.yml).
 
-# TEMP (drop before merge): only "Build and tests" and the C++ benchmarks on this PR.
 on:
+  pull_request:
+    paths:
+      - 'bindings/Python/**'
+      - 'docs/math/*.ipynb'
+      - 'tools/notebooks/**'
+      - 'src/lib/**'
+      - '.github/workflows/notebooks.yml'
+  schedule:
+    - cron: '0 4 * * SUN'
   workflow_dispatch:
 
 env:
