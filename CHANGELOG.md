@@ -20,6 +20,14 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **Kriging** multistart `"BFGS<k>"`: the starts run one after the other in the calling
+  thread, but each was given only ncpu/k BLAS/OpenMP threads (1 thread from k ≥ ncpu on),
+  leaving the other cores idle. The starts now keep the full thread count.
+- BLAS/OpenMP thread counts are restored after a fit instead of being left at 1 thread: a
+  `Kriging` multistart or a parallel `WarpKriging` / `MLPKriging` multistart made every later
+  `predict`, `simulate` or `update` run single-threaded. The parent process of a `fork()`
+  (R `parallel::mclapply`) also gets its thread counts back once the fork returns; the
+  children still start single-threaded (#325).
 - **MLPKriging** / `mlp_joint`: the K refits of the predictive-variance calibration (#407)
   run concurrently in the multistart thread pool (`Optim::set_thread_pool_size`) instead of
   one after the other. The calibration made the fit 5-10x slower (n = 200, d = 4,

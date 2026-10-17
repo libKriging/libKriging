@@ -217,7 +217,7 @@ LIBKRIGING_EXPORT std::pair<arma::vec, arma::vec> Optim::theta_bounds(const arma
   return {theta_lower, theta_upper};
 }
 
-int Optim::thread_pool_size = get_env_or_default("LK_THREAD_POOL_SIZE", 0);  // 0 means auto-detect (ncpu/4)
+int Optim::thread_pool_size = get_env_or_default("LK_THREAD_POOL_SIZE", 0);  // 0 means auto-detect (ncpu)
 
 LIBKRIGING_EXPORT void Optim::set_thread_pool_size(int pool_size) {
   Optim::thread_pool_size = pool_size;
