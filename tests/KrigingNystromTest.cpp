@@ -6,6 +6,8 @@
 
 #include <catch2/catch.hpp>
 #include "libKriging/Kriging.hpp"
+#include <cmath>
+#include <utility>
 // clang-format on
 
 static double f2d(double x1, double x2) {
@@ -872,5 +874,92 @@ TEST_CASE("Nystrom noise-model update", "[nystrom][kriging]") {
     k.update(yu, noise_u, Xu, true);
     CHECK(k.X().n_rows == 180);
     CHECK(k.is_nystrom_light());
+  }
+}
+
+// #410: at the landmark rows the Nystrom diagonal residual is at the
+// num_nugget level, and the former Woodbury solve weighted those rows by
+// 1/num_nugget: the log-likelihood and predicted mean then depended on
+// rounding (on the CPU / BLAS kernel), by up to 60% of sd(y) at an ill
+// conditioned R_ss. A 1-ulp perturbation of X stands in for "another CPU".
+namespace {
+
+arma::vec hartmann3(const arma::mat& X) {
+  const arma::mat a = {{3.0, 10, 30}, {0.1, 10, 35}, {3.0, 10, 30}, {0.1, 10, 35}};
+  const arma::mat p
+      = {{0.3689, 0.1170, 0.2673}, {0.4699, 0.4387, 0.7470}, {0.1091, 0.8732, 0.5547}, {0.0381, 0.5743, 0.8828}};
+  const arma::vec c = {1.0, 1.2, 3.0, 3.2};
+  arma::vec y(X.n_rows, arma::fill::zeros);
+  for (arma::uword i = 0; i < 4; ++i) {
+    const arma::mat dX = X.each_row() - p.row(i);
+    y -= c(i) * arma::exp(-arma::square(dX) * a.row(i).t());
+  }
+  return y;
+}
+
+arma::vec branin01(const arma::mat& X) {
+  const double pi = arma::datum::pi;
+  const arma::vec x1 = 15 * X.col(0) - 5, x2 = 15 * X.col(1);
+  return arma::square(x2 - 5.1 / (4 * pi * pi) * arma::square(x1) + 5 / pi * x1 - 6)
+         + 10 * (1 - 1 / (8 * pi)) * arma::cos(x1) + 10;
+}
+
+arma::mat next_ulp(arma::mat X) {
+  X.transform([](double v) { return std::nextafter(v, 2.0); });
+  return X;
+}
+
+// log-likelihood and predicted mean at a fixed theta
+std::pair<double, arma::vec> ll_and_mean(const arma::vec& y,
+                                         const arma::mat& X,
+                                         const std::string& kernel,
+                                         const arma::rowvec& theta,
+                                         const std::string& method,
+                                         const arma::mat& Xt) {
+  Kriging::Parameters fixed;
+  fixed.theta = arma::mat(theta);
+  fixed.is_theta_estim = false;
+  Kriging k(y, X, kernel, Trend::RegressionModel::Constant, false, "none", "LL", fixed, method);
+  if (method == "exact")
+    return {k.logLikelihood(), std::get<0>(k.predict(Xt, false, false, false))};
+  return {k.logLikelihood("nystrom"), std::get<0>(k.predictNystrom(Xt, false))};
+}
+
+}  // namespace
+
+TEST_CASE("Nystrom is not sensitive to rounding at the landmark rows (#410)", "[nystrom][kriging]") {
+  arma::arma_rng::set_seed(410);
+
+  SECTION("k = n reproduces the exact model") {
+    const arma::mat X = arma::randu<arma::mat>(150, 3);
+    const arma::vec y = hartmann3(X);
+    const arma::mat Xt = arma::randu<arma::mat>(50, 3);
+    const arma::rowvec theta = {1.2, 0.5, 0.3};  // cond(R) ~ 1e7
+    const auto [ll_e, m_e] = ll_and_mean(y, X, "matern5_2", theta, "exact", Xt);
+    const auto [ll_n, m_n] = ll_and_mean(y, X, "matern5_2", theta, "nystrom(150)", Xt);
+    const auto [ll_u, m_u] = ll_and_mean(y, next_ulp(X), "matern5_2", theta, "nystrom(150)", Xt);
+    const double sd = arma::stddev(y);
+    INFO("LL exact " << ll_e << " nystrom(n) " << ll_n << " (1 ulp: " << ll_u << "), mean gap "
+                     << arma::abs(m_n - m_e).max() / sd << " (1 ulp: " << arma::abs(m_n - m_u).max() / sd << ")");
+    CHECK(std::abs(ll_n - ll_e) < 1e-9 * std::abs(ll_e));  // was 3e-7..2e-6
+    CHECK(arma::abs(m_n - m_e).max() < 1e-8 * sd);         // was 3e-4..6e-4
+    CHECK(std::abs(ll_n - ll_u) < 1e-9 * std::abs(ll_e));
+    CHECK(arma::abs(m_n - m_u).max() < 1e-8 * sd);
+  }
+
+  SECTION("small k with an ill-conditioned landmark block") {
+    const arma::mat X = arma::randu<arma::mat>(50, 2);
+    const arma::vec y = branin01(X);
+    const arma::mat Xt = arma::randu<arma::mat>(50, 2);
+    const arma::rowvec theta = {7.5, 9.5};  // smooth Gaussian kernel: cond(R_ss) ~ 1e10
+    const auto [ll_e, m_e] = ll_and_mean(y, X, "gauss", theta, "exact", Xt);
+    const auto [ll_n, m_n] = ll_and_mean(y, X, "gauss", theta, "nystrom(10)", Xt);
+    const auto [ll_u, m_u] = ll_and_mean(y, next_ulp(X), "gauss", theta, "nystrom(10)", Xt);
+    const double sd = arma::stddev(y);
+    INFO("LL exact " << ll_e << " nystrom(10) " << ll_n << " (1 ulp: " << ll_u << "), mean gap to exact "
+                     << arma::abs(m_n - m_e).max() / sd << ", 1 ulp: " << arma::abs(m_n - m_u).max() / sd);
+    CHECK(std::abs(ll_n - ll_u) < 1e-7 * std::abs(ll_n));
+    CHECK(arma::abs(m_n - m_u).max() < 1e-4 * sd);  // was ~0.6
+    CHECK(arma::abs(m_n - m_e).max() < 0.3 * sd);   // was ~1 (0.09 now)
   }
 }
