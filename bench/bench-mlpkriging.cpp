@@ -93,11 +93,15 @@ struct MLPConfig {
 std::vector<MLPConfig> build_configs() {
   std::vector<MLPConfig> configs;
 
-  configs.push_back({"small_selu", {16, 8}, 2, "selu", "BFGS+Adam", {}});
-  configs.push_back({"medium_selu", {32, 16}, 3, "selu", "BFGS+Adam", {}});
-  configs.push_back({"large_selu", {64, 32, 16}, 4, "selu", "BFGS+Adam", {}});
-  configs.push_back({"small_tanh", {16, 8}, 2, "tanh", "BFGS+Adam", {}});
-  configs.push_back({"adam_only", {16, 8}, 2, "selu", "Adam", {}});
+  // Time the fit itself: the K-fold calibration of the predictive variance
+  // (#407) adds K refits, which would dominate the timings and push the CI
+  // benchmark job past its timeout.
+  const std::map<std::string, std::string> no_calibration = {{"calibration_folds", "0"}};
+  configs.push_back({"small_selu", {16, 8}, 2, "selu", "BFGS+Adam", no_calibration});
+  configs.push_back({"medium_selu", {32, 16}, 3, "selu", "BFGS+Adam", no_calibration});
+  configs.push_back({"large_selu", {64, 32, 16}, 4, "selu", "BFGS+Adam", no_calibration});
+  configs.push_back({"small_tanh", {16, 8}, 2, "tanh", "BFGS+Adam", no_calibration});
+  configs.push_back({"adam_only", {16, 8}, 2, "selu", "Adam", no_calibration});
 
   return configs;
 }
