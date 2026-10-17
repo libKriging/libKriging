@@ -1,17 +1,9 @@
 name: Code Analysis
 
 # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#on
+# TEMP (drop before merge): only "Build and tests" and the C++ benchmarks on this PR.
 on:
-  push:
-    branches:
-      - '*'
-    tags-ignore:
-      - 'v*' # done in release
-  pull_request:
-    branches:
-      - '*'
-  schedule:
-    - cron: '0 2 * * SAT'
+  workflow_dispatch:
 
 # About image content:
 # https://github.com/actions/virtual-environments/blob/ubuntu18/20201210.0/images

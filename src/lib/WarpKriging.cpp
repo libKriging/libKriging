@@ -24,6 +24,7 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
@@ -61,6 +62,78 @@ inline double softplus(double z) {
 // kCollapseWeight · log²(ratio / kCollapseMinRatio) per such gap.
 constexpr double kCollapseMinRatio = 0.1;
 constexpr double kCollapseWeight = 100.0;
+
+// Runs task(0), …, task(n_tasks − 1) in a pool of Optim::thread_pool_size
+// workers (all the cores by default), inline when n_tasks == 1. Each task must
+// work on its own WarpKriging and catch its own exceptions. This requires a
+// reentrant L-BFGS-B: lbfgsb_cpp >= b6eff96, whose f2c BLAS/LINPACK helpers
+// (Lbfgsb.3.0/blas.c, linpack.c) no longer keep `static` locals that
+// concurrent optimizers would race on. No task may draw from the global RNG
+// (the warp constructors reseed it): build the models before the pool.
+void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char* label) {
+  if (n_tasks <= 1) {
+    if (n_tasks == 1)
+      task(0);
+    return;
+  }
+  // Determine thread pool size
+  unsigned int n_cpu = std::thread::hardware_concurrency();
+  int pool_size = Optim::thread_pool_size;
+  if (pool_size <= 0)
+    pool_size = std::max(1u, n_cpu);
+  pool_size = std::min(pool_size, n_tasks);
+
+  // Give each worker its share of the BLAS/OMP threads: left at the
+  // default, every worker's BLAS calls spawn all-core thread teams that
+  // contend with the other workers (≈2x slower at n = 500, mostly in
+  // system time). Declared before the joiner below, so that it is reset
+  // only once all workers have joined.
+  detail::BlasThreadGuard blas_guard;
+  const unsigned int blas_threads = std::max(1u, n_cpu / static_cast<unsigned int>(pool_size));
+  blas_guard.set(blas_threads);
+
+  if (Optim::log_level > Optim::log_none) {
+    arma::cout << "WarpKriging thread pool: " << pool_size << " workers x " << blas_threads
+               << " BLAS threads (ncpu=" << n_cpu << ", " << label << "=" << n_tasks << ")" << arma::endl;
+  }
+
+  // Thread pool with atomic task counter
+  std::atomic<int> next_task(0);
+  std::vector<std::thread> threads;
+  threads.reserve(pool_size);
+
+  // RAII guard to ensure threads are always joined (also when spawning
+  // a later thread throws)
+  struct ThreadJoiner {
+    std::vector<std::thread>& threads_ref;
+    explicit ThreadJoiner(std::vector<std::thread>& t) : threads_ref(t) {}
+    ~ThreadJoiner() {
+      for (auto& t : threads_ref)
+        if (t.joinable())
+          t.join();
+    }
+  } joiner(threads);
+
+  for (int worker_id = 0; worker_id < pool_size; worker_id++) {
+    threads.emplace_back([&]() {
+      while (true) {
+        int task_id = next_task.fetch_add(1);
+        if (task_id >= n_tasks)
+          break;
+
+        // Staggered startup delay: only for each worker's first task
+        // (applied to every task, it added up to ~(n_tasks/pool)^2
+        // delays with no benefit once the pool is running).
+        if (task_id < pool_size) {
+          int delay_ms = task_id * Optim::thread_start_delay_ms;
+          std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+        }
+
+        task(task_id);
+      }
+    });
+  }
+}
 }  // namespace
 
 // *************************************************************************
@@ -2455,9 +2528,23 @@ void WarpKriging::calibrate_variance() {
   start.warp_params = m_start_warp_params;
   const std::string method = Optim::parse_method(m_optim, "BFGS").first;
 
-  double sum_z2 = 0.0;
-  arma::uword n_z = 0;
+  // The folds are independent: refitted concurrently (see run_task_pool), the
+  // models built beforehand since their warp constructors reseed the RNG.
+  std::vector<WarpKriging> folds;
+  folds.reserve(K);
   for (arma::uword f = 0; f < K; ++f) {
+    folds.emplace_back(warping_strings(), m_covType);
+    WarpKriging& wf = folds.back();
+    wf.m_max_iter_bfgs = m_max_iter_bfgs;
+    wf.m_max_iter_adam = m_max_iter_adam;
+    wf.m_adam_lr = m_adam_lr;
+    wf.m_calibration_folds = 0;  // no nested calibration
+  }
+  std::vector<double> fold_z2(K, 0.0);
+  std::vector<arma::uword> fold_nz(K, 0);
+  std::mutex log_mutex;
+  auto refit_fold = [&](int task_id) {
+    const arma::uword f = static_cast<arma::uword>(task_id);
     // Interleaved folds: f, f + K, f + 2K, …
     arma::uvec test = arma::regspace<arma::uvec>(f, K, n - 1);
     std::vector<arma::uword> train_idx;
@@ -2467,26 +2554,33 @@ void WarpKriging::calibrate_variance() {
         train_idx.push_back(i);
     const arma::uvec train(train_idx);
     try {
-      WarpKriging wf(warping_strings(), m_covType);
-      wf.m_max_iter_bfgs = m_max_iter_bfgs;
-      wf.m_max_iter_adam = m_max_iter_adam;
-      wf.m_adam_lr = m_adam_lr;
-      wf.m_calibration_folds = 0;  // no nested calibration
+      WarpKriging& wf = folds[f];
       wf.fit(y_raw.elem(train), X_raw.rows(train), m_regmodel, m_normalize, method, "LL", start, {}, "exact");
       auto [mean, stdev, _c, _md, _sd] = wf.predict(X_raw.rows(test), true, false, false);
       for (arma::uword i = 0; i < test.n_elem; ++i) {
         const double v = stdev(i) * stdev(i);
         const double e = y_raw(test(i)) - mean(i);
         if (v > 0 && std::isfinite(v) && std::isfinite(e)) {
-          sum_z2 += e * e / v;
-          ++n_z;
+          fold_z2[f] += e * e / v;
+          ++fold_nz[f];
         }
       }
     } catch (const std::exception& e) {
-      if (Optim::log_level > Optim::log_none)
+      if (Optim::log_level > Optim::log_none) {
+        std::lock_guard<std::mutex> lock(log_mutex);
         arma::cout << "Warning: WarpKriging variance calibration, fold " << (f + 1) << " failed: " << e.what()
                    << arma::endl;
+      }
     }
+  };
+  run_task_pool(static_cast<int>(K), refit_fold, "calibration_folds");
+
+  // Summed in fold order, whatever the order the folds finished in.
+  double sum_z2 = 0.0;
+  arma::uword n_z = 0;
+  for (arma::uword f = 0; f < K; ++f) {
+    sum_z2 += fold_z2[f];
+    n_z += fold_nz[f];
   }
   if (2 * n_z < n)  // too few held-out residuals to calibrate on
     return;
@@ -2909,71 +3003,8 @@ void WarpKriging::optimise_joint(const std::string& method) {
       }
     };
 
-    // Starts run concurrently in a thread pool. This requires a reentrant
-    // L-BFGS-B: lbfgsb_cpp >= b6eff96, whose f2c BLAS/LINPACK helpers
-    // (Lbfgsb.3.0/blas.c, linpack.c) no longer keep `static` locals that
-    // concurrent optimizers would race on.
-    if (multistart == 1) {
-      worker(0);
-    } else {
-      // Determine thread pool size
-      unsigned int n_cpu = std::thread::hardware_concurrency();
-      int pool_size = Optim::thread_pool_size;
-      if (pool_size <= 0)
-        pool_size = std::max(1u, n_cpu);
-      pool_size = std::min(pool_size, multistart);
-
-      // Give each worker its share of the BLAS/OMP threads: left at the
-      // default, every worker's BLAS calls spawn all-core thread teams that
-      // contend with the other workers (≈2x slower at n = 500, mostly in
-      // system time). Declared before the joiner below, so that it is reset
-      // only once all workers have joined.
-      detail::BlasThreadGuard blas_guard;
-      const unsigned int blas_threads = std::max(1u, n_cpu / static_cast<unsigned int>(pool_size));
-      blas_guard.set(blas_threads);
-
-      if (Optim::log_level > Optim::log_none) {
-        arma::cout << "WarpKriging thread pool: " << pool_size << " workers x " << blas_threads
-                   << " BLAS threads (ncpu=" << n_cpu << ", multistart=" << multistart << ")" << arma::endl;
-      }
-
-      // Thread pool with atomic task counter
-      std::atomic<int> next_task(0);
-      std::vector<std::thread> threads;
-      threads.reserve(pool_size);
-
-      // RAII guard to ensure threads are always joined (also when spawning
-      // a later thread throws)
-      struct ThreadJoiner {
-        std::vector<std::thread>& threads_ref;
-        explicit ThreadJoiner(std::vector<std::thread>& t) : threads_ref(t) {}
-        ~ThreadJoiner() {
-          for (auto& t : threads_ref)
-            if (t.joinable())
-              t.join();
-        }
-      } joiner(threads);
-
-      for (int worker_id = 0; worker_id < pool_size; worker_id++) {
-        threads.emplace_back([&]() {
-          while (true) {
-            int task_id = next_task.fetch_add(1);
-            if (task_id >= multistart)
-              break;
-
-            // Staggered startup delay: only for each worker's first task
-            // (applied to every task, it added up to ~(multistart/pool)^2
-            // delays with no benefit once the pool is running).
-            if (task_id < pool_size) {
-              int delay_ms = task_id * Optim::thread_start_delay_ms;
-              std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-            }
-
-            worker(task_id);
-          }
-        });
-      }
-    }
+    // Starts run concurrently in a thread pool (see run_task_pool).
+    run_task_pool(multistart, worker, "multistart");
 
     // Find best result
     int best_idx = -1;
