@@ -23,6 +23,9 @@ past release, see the corresponding entry on the
 - **Kriging** multistart `"BFGS<k>"`: the starts run one after the other in the calling
   thread, but each was given only ncpu/k BLAS/OpenMP threads (1 thread from k ≥ ncpu on),
   leaving the other cores idle. The starts now keep the full thread count.
+  With a fixed seed the fit stays bit-reproducible for a given BLAS thread count, but its
+  result may change with that count (as it already did with the number of cores): see
+  [docs/dev/FAQ.md](docs/dev/FAQ.md).
 - BLAS/OpenMP thread counts are restored after a fit instead of being left at 1 thread: a
   `Kriging` multistart or a parallel `WarpKriging` / `MLPKriging` multistart made every later
   `predict`, `simulate` or `update` run single-threaded. The parent process of a `fork()`

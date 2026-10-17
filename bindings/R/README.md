@@ -85,10 +85,10 @@ Full demo: [rlibkriging/tests/testthat/test-rlibkriging-demo.R](rlibkriging/test
 
 ## Parallel R code (`mclapply`, forked workers)
 
-libKriging uses OpenMP (multistart `"BFGS<k>"`) and the system BLAS, which may be
-multithreaded. A process forked while such a thread pool is alive
-(`parallel::mclapply`, `parallel::mcparallel`, `future::multicore`) can deadlock in
-the child. libKriging quiesces its own OpenMP and OpenBLAS threads before every
+libKriging uses OpenMP (covariance loops), threads (parallel `WarpKriging` /
+`MLPKriging` multistart) and the system BLAS, which may be multithreaded. A process
+forked while such a thread pool is alive (`parallel::mclapply`, `parallel::mcparallel`,
+`future::multicore`) can deadlock in the child. libKriging quiesces its own OpenMP and OpenBLAS threads before every
 `fork()` (`pthread_atfork`), which covers the usual OpenBLAS builds. If forked workers
 still hang (e.g. with an OpenMP build of OpenBLAS, `libopenblaso`, selected as the
 system BLAS, or another threaded BLAS), make the parent single-threaded before
