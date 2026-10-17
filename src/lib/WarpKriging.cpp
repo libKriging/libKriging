@@ -88,8 +88,12 @@ void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char
   // contend with the other workers (≈2x slower at n = 500, mostly in
   // system time). Declared before the joiner below, so that it is reset
   // only once all workers have joined.
+  // The workers share the OpenBLAS threads left by the BLAS thread policy
+  // of fit() (all the CPUs for another backend).
   detail::BlasThreadGuard blas_guard;
-  const unsigned int blas_threads = std::max(1u, n_cpu / static_cast<unsigned int>(pool_size));
+  const int blas_now = detail::get_blas_threads();
+  const unsigned int blas_total = blas_now > 0 ? static_cast<unsigned int>(blas_now) : std::max(1u, n_cpu);
+  const unsigned int blas_threads = std::max(1u, blas_total / static_cast<unsigned int>(pool_size));
   blas_guard.set(blas_threads);
 
   if (Optim::log_level > Optim::log_none) {
@@ -3084,6 +3088,7 @@ void WarpKriging::fit(const arma::vec& y,
                       const std::string& method) {
   if (Kriging::fit_objective_method(objective, method).second != "exact")
     throw std::invalid_argument("WarpKriging::fit: method \"" + method + "\" is not implemented (only \"exact\" is)");
+  detail::BlasThreadScope blas_scope(X.n_rows);
   for (const auto& [key, val] : tuning) {
     if (key == "adam_lr")
       m_adam_lr = std::stod(val);
@@ -3192,6 +3197,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
   if (!m_fitted)
     throw std::runtime_error("predict: model not fitted");
   validate_discrete_columns(X_n, "predict");
+  detail::BlasThreadScope blas_scope(m_y.n_elem);
 
   // phi_fn: apply warping to normalized inputs (n × d_input) → (n × d_phi)
   // Base normalization (centerX/scaleX with 0/1 for non-continuous) is equivalent to
@@ -3367,6 +3373,7 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
                              + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
 
   validate_discrete_columns(X_u, "update");
+  detail::BlasThreadScope blas_scope(m_y.n_elem + y_u.n_elem);
 
   // Noise consistency check
   const bool has_model_noise = !m_noise.is_empty();

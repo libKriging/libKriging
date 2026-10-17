@@ -115,6 +115,27 @@ class Optim {
   static int thread_pool_size;
   LIBKRIGING_EXPORT static void set_thread_pool_size(int pool_size);
   LIBKRIGING_EXPORT static int get_thread_pool_size();
+
+  // BLAS thread policy of fit / predict / update (OpenBLAS only; see
+  // REPORT-blas-threads.md). For the duration of the call, the OpenBLAS
+  // thread count is lowered (never raised) to:
+  //   1                               if n < blas_threads_min_n,
+  //   min(current, blas_threads_max)  otherwise,
+  // n being the number of training observations, and restored afterwards.
+  // Below a few hundred observations, BLAS calls are too small for a thread
+  // team to pay off: its threads mostly spin-wait (system time), and slow
+  // down the parallel multistart workers. A multistart then splits what is
+  // left between its workers.
+  //   blas_threads_min_n: default 400 (env LK_BLAS_THREADS_MIN_N); 0 never
+  //     forces 1 thread; < 0 disables the policy (BLAS left untouched).
+  //   blas_threads_max: default 0 = number of physical cores (env
+  //     LK_BLAS_THREADS_MAX); < 0 means no cap.
+  static int blas_threads_min_n;
+  LIBKRIGING_EXPORT static void set_blas_threads_min_n(int min_n);
+  LIBKRIGING_EXPORT static int get_blas_threads_min_n();
+  static int blas_threads_max;
+  LIBKRIGING_EXPORT static void set_blas_threads_max(int max_threads);
+  LIBKRIGING_EXPORT static int get_blas_threads_max();
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINLIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_OPTIM_HPPEARALGEBRA_HPP

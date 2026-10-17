@@ -25,11 +25,19 @@
 #include "BlasThreads.hpp"
 
 #include <cassert>
+#include <fstream>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
+#include <set>
+#include <string>
 #include <thread>
 #include <tuple>
 #include <vector>
+
+#if defined(__APPLE__)
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#endif
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -71,16 +79,36 @@ openblas_set_num_threads_t get_openblas_set_num_threads() {
   }
   return func;
 }
+typedef int (*openblas_get_num_threads_t)();
+openblas_get_num_threads_t get_openblas_get_num_threads() {
+  static openblas_get_num_threads_t func = nullptr;
+  static bool initialized = false;
+  if (!initialized) {
+    initialized = true;
+    HMODULE hModule = GetModuleHandleA("libopenblas.dll");
+    if (!hModule)
+      hModule = GetModuleHandleA("openblas.dll");
+    if (hModule) {
+      func = (openblas_get_num_threads_t)GetProcAddress(hModule, "openblas_get_num_threads");
+    }
+  }
+  return func;
+}
 }  // namespace
 #else
 // GCC/Clang support weak symbols
 extern "C" {
 void openblas_set_num_threads(int num_threads) __attribute__((weak));
+int openblas_get_num_threads() __attribute__((weak));
 }
 namespace {
 typedef void (*openblas_set_num_threads_t)(int);
 openblas_set_num_threads_t get_openblas_set_num_threads() {
   return openblas_set_num_threads;
+}
+typedef int (*openblas_get_num_threads_t)();
+openblas_get_num_threads_t get_openblas_get_num_threads() {
+  return openblas_get_num_threads;
 }
 }  // namespace
 #endif
@@ -90,14 +118,19 @@ openblas_set_num_threads_t get_openblas_set_num_threads() {
 // parallel::mclapply) inherit a clean, single-threaded BLAS/OMP state instead
 // of a locked idle thread pool that causes deadlocks.
 //
-// The prepare handler runs in the parent just before fork(): it sets BLAS and
-// OMP to 1 thread so no new parallel work can start during the fork window.
-// The child handler re-asserts single-threading in case the runtime inherited
-// stale state.  The parent handler is omitted (nullptr): the next fit() call
-// will reset threads_per_worker as needed.
+// The prepare handler runs in the parent just before fork(): it records the
+// BLAS and OMP thread counts, then sets both to 1 so no new parallel work can
+// start during the fork window. The child handler re-asserts single-threading
+// in case the runtime inherited stale state (children of mclapply stay at 1
+// thread, which also avoids oversubscription). The parent handler restores
+// the recorded counts, so that a fork (mclapply, system(), ...) no longer
+// leaves the parent process single-threaded.
 #if !defined(_WIN32) && defined(_POSIX_VERSION)
 #include <pthread.h>
 namespace {
+
+int libkriging_atfork_saved_blas = 0;
+int libkriging_atfork_saved_omp = 0;
 
 void libkriging_atfork_quiesce() {
 #if !defined(__APPLE__) || !defined(__arm64__)
@@ -110,10 +143,33 @@ void libkriging_atfork_quiesce() {
 #endif
 }
 
+void libkriging_atfork_prepare() {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto get = get_openblas_get_num_threads();
+  libkriging_atfork_saved_blas = get ? get() : 0;
+#endif
+#ifdef _OPENMP
+  libkriging_atfork_saved_omp = omp_get_max_threads();
+#endif
+  libkriging_atfork_quiesce();
+}
+
+void libkriging_atfork_parent() {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_set_num_threads();
+  if (fn && libkriging_atfork_saved_blas > 0)
+    fn(libkriging_atfork_saved_blas);
+#endif
+#ifdef _OPENMP
+  if (libkriging_atfork_saved_omp > 0)
+    omp_set_num_threads(libkriging_atfork_saved_omp);
+#endif
+}
+
 struct ForkSafeRegistrar {
   ForkSafeRegistrar() {
-    pthread_atfork(libkriging_atfork_quiesce,   // prepare: quiesce before fork
-                   nullptr,                     // parent:  restored by next fit()
+    pthread_atfork(libkriging_atfork_prepare,   // prepare: record, then quiesce before fork
+                   libkriging_atfork_parent,    // parent:  restore the recorded counts
                    libkriging_atfork_quiesce);  // child:   ensure clean state
   }
 };
@@ -132,6 +188,106 @@ void set_blas_threads(unsigned int n) {
 #endif
 #ifdef _OPENMP
   omp_set_num_threads(static_cast<int>(n));
+#endif
+}
+
+int get_blas_threads() {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_get_num_threads();
+  if (fn)
+    return fn();
+#endif
+  return 0;
+}
+
+int get_omp_threads() {
+#ifdef _OPENMP
+  return omp_get_max_threads();
+#else
+  return 0;
+#endif
+}
+
+unsigned int physical_cores() {
+  static const unsigned int count = [] {
+    const unsigned int logical = std::max(1u, std::thread::hardware_concurrency());
+#if defined(__linux__)
+    std::set<std::string> cores;
+    for (unsigned int cpu = 0; cpu < logical; ++cpu) {
+      std::ifstream f("/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/topology/thread_siblings_list");
+      std::string siblings;
+      if (f && std::getline(f, siblings))
+        cores.insert(siblings);
+    }
+    if (!cores.empty())
+      return static_cast<unsigned int>(cores.size());
+#elif defined(__APPLE__)
+    int physical = 0;
+    size_t len = sizeof(physical);
+    if (sysctlbyname("hw.physicalcpu", &physical, &len, nullptr, 0) == 0 && physical > 0)
+      return static_cast<unsigned int>(physical);
+#endif
+    return logical;
+  }();
+  return count;
+}
+
+int policy_blas_threads(unsigned long n, int current) {
+  if (current <= 0 || Optim::blas_threads_min_n < 0)
+    return current;
+  if (Optim::blas_threads_min_n > 0 && n < static_cast<unsigned long>(Optim::blas_threads_min_n))
+    return 1;
+  int cap = Optim::blas_threads_max;
+  if (cap == 0)
+    cap = static_cast<int>(physical_cores());
+  return (cap > 0) ? std::min(current, cap) : current;
+}
+
+namespace {
+std::atomic<int> blas_thread_scope_depth(0);
+}
+
+BlasThreadScope::BlasThreadScope(unsigned long n) {
+  m_outer = (blas_thread_scope_depth.fetch_add(1) == 0);
+  if (!m_outer)
+    return;
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto set = get_openblas_set_num_threads();
+  const int current = get_blas_threads();
+  if (!set || current <= 0)
+    return;
+  const int target = policy_blas_threads(n, current);
+  if (target > 0 && target < current) {
+    m_saved = current;
+    set(target);
+  }
+#else
+  (void)n;
+#endif
+}
+
+BlasThreadScope::~BlasThreadScope() {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  if (m_outer && m_saved > 0) {
+    auto set = get_openblas_set_num_threads();
+    if (set)
+      set(m_saved);
+  }
+#endif
+  blas_thread_scope_depth.fetch_sub(1);
+}
+
+BlasThreadGuard::~BlasThreadGuard() {
+  if (!active)
+    return;
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_set_num_threads();
+  if (fn && saved_blas > 0)
+    fn(saved_blas);
+#endif
+#ifdef _OPENMP
+  if (saved_omp > 0)
+    omp_set_num_threads(saved_omp);
 #endif
 }
 }  // namespace detail
@@ -3346,6 +3502,7 @@ void Kriging::fit_impl(const arma::vec& y,
                        const Parameters& parameters,
                        const std::string& method) {
   const arma::uword n = X.n_rows;
+  libKriging::detail::BlasThreadScope blas_scope(n);
   // Heterogeneous noise in the ORIGINAL scale of y: the given one, or (refit
   // without new noise) the current one, read before the normalization
   // constants change below.
@@ -3648,19 +3805,11 @@ void Kriging::fit_impl(const arma::vec& y,
       auto parsed_bfgs = Optim::parse_method(optim, "BFGS");
       int multistart = parsed_bfgs.second;
 
-      // Configure threads for Armadillo/BLAS to balance nested parallelism.
-      // Each of the 'multistart' workers uses internal BLAS/OMP parallelism.
-      unsigned int n_cpu = std::thread::hardware_concurrency();
-      libKriging::detail::BlasThreadGuard thread_guard;
-
-      if (n_cpu > 0 && multistart > 1) {
-        unsigned int threads_per_worker = std::max(1u, n_cpu / multistart);
-        thread_guard.set(threads_per_worker);
-        if (Optim::log_level > Optim::log_none) {
-          arma::cout << "Threads per worker: " << threads_per_worker << " (total CPUs: " << n_cpu
-                     << ", multistart: " << multistart << ")" << arma::endl;
-        }
-      }
+      // No BLAS thread split between the starts: they run one after the
+      // other in the calling thread (see "sequential multistart" below), so
+      // each one gets the threads of the BLAS thread policy of fit(). (They
+      // used to get n_cpu / multistart threads each, i.e. 1 for BFGS10 on up
+      // to 10 CPUs: a single busy core.)
 
       arma::mat theta0_rand
           = arma::repmat(trans(theta_lower), multistart, 1)
@@ -4201,6 +4350,7 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
   // exact prediction only: no implicit switch to an approximate predictor
   check_exact_available("predict", "predict");
   const arma::uword n_o = m_X.n_rows;
+  libKriging::detail::BlasThreadScope blas_scope(n_o);
   const double lmp_scale = (m_objective.compare("LMP") == 0) ? (n_o - m_F.n_cols) / (n_o - m_F.n_cols - 2.0) : 1.0;
   if (m_noise_model == NoiseModel::Nugget) {
     const double sigma2 = m_sigma2 * lmp_scale;
@@ -4478,6 +4628,8 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
     throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
                              + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
 
+  libKriging::detail::BlasThreadScope blas_scope(m_X.n_rows + X_u.n_rows);
+
   // input validated: the last simulate(..., will_update=true) was built for
   // the model before this update (the Nugget refit below goes through fit(),
   // which clears it again)
@@ -4685,6 +4837,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u,
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
   if (noise_u.n_elem != y_u.n_elem)
     throw std::runtime_error("noise_u must have the same length as y_u");
+  libKriging::detail::BlasThreadScope blas_scope(m_X.n_rows + X_u.n_rows);
   // Rebuild de-normalized data and call fit() with the joined dataset (fit()
   // also drops the state of the last simulate(..., will_update=true))
   const arma::vec y_all = arma::join_cols(m_y * m_scaleY + m_centerY, y_u);

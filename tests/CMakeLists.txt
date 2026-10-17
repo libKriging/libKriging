@@ -283,6 +283,11 @@ catch_discover_tests(LinearAlgebraTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
 
+add_executable(BlasThreadsTest BlasThreadsTest.cpp)
+target_link_libraries(BlasThreadsTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries BlasThreadsTest)
+catch_discover_tests(BlasThreadsTest)
+
 add_executable(GetVersion GetVersion.cpp)
 target_link_libraries(GetVersion LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries GetVersion)

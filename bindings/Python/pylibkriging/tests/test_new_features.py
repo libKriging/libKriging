@@ -238,6 +238,21 @@ class TestOptim:
         finally:
             lk.Optim.set_thread_start_delay_ms(orig_delay)
             lk.Optim.set_thread_pool_size(orig_pool)
+
+    def test_optim_blas_threads_policy_settings(self):
+        """Test the BLAS thread policy configuration"""
+        orig_min_n = lk.Optim.get_blas_threads_min_n()
+        orig_max = lk.Optim.get_blas_threads_max()
+
+        try:
+            lk.Optim.set_blas_threads_min_n(123)
+            assert lk.Optim.get_blas_threads_min_n() == 123
+
+            lk.Optim.set_blas_threads_max(2)
+            assert lk.Optim.get_blas_threads_max() == 2
+        finally:
+            lk.Optim.set_blas_threads_min_n(orig_min_n)
+            lk.Optim.set_blas_threads_max(orig_max)
     
     def test_optim_affects_optimization(self):
         """Test that Optim settings actually affect model fitting"""

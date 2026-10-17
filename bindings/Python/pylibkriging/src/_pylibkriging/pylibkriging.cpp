@@ -669,5 +669,9 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def_static("get_thread_start_delay_ms", &Optim::get_thread_start_delay_ms)
       .def_static("set_thread_start_delay_ms", &Optim::set_thread_start_delay_ms)
       .def_static("get_thread_pool_size", &Optim::get_thread_pool_size)
-      .def_static("set_thread_pool_size", &Optim::set_thread_pool_size);
+      .def_static("set_thread_pool_size", &Optim::set_thread_pool_size)
+      .def_static("get_blas_threads_min_n", &Optim::get_blas_threads_min_n)
+      .def_static("set_blas_threads_min_n", &Optim::set_blas_threads_min_n)
+      .def_static("get_blas_threads_max", &Optim::get_blas_threads_max)
+      .def_static("set_blas_threads_max", &Optim::set_blas_threads_max);
 }
