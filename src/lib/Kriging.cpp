@@ -27,7 +27,6 @@
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
-#include <thread>
 #include <tuple>
 #include <vector>
 
@@ -45,7 +44,7 @@ inline int get_optimal_threads(int max_default = 2) {
 }
 #endif
 
-// Helper to get OpenBLAS thread control function (if available)
+// Helpers to get OpenBLAS thread control functions (if available)
 // Note: On macOS ARM64, use Accelerate framework instead of OpenBLAS
 #if !defined(__APPLE__) || !defined(__arm64__)
 #if defined(_MSC_VER)
@@ -56,19 +55,22 @@ inline int get_optimal_threads(int max_default = 2) {
 #include <windows.h>
 namespace {
 typedef void (*openblas_set_num_threads_t)(int);
+typedef int (*openblas_get_num_threads_t)();
+FARPROC get_openblas_proc(const char* name) {
+  // Try to load from OpenBLAS DLL (used by numpy/scipy)
+  HMODULE hModule = GetModuleHandleA("libopenblas.dll");
+  if (!hModule)
+    hModule = GetModuleHandleA("openblas.dll");
+  return hModule ? GetProcAddress(hModule, name) : nullptr;
+}
 openblas_set_num_threads_t get_openblas_set_num_threads() {
-  static openblas_set_num_threads_t func = nullptr;
-  static bool initialized = false;
-  if (!initialized) {
-    initialized = true;
-    // Try to load from OpenBLAS DLL (used by numpy/scipy)
-    HMODULE hModule = GetModuleHandleA("libopenblas.dll");
-    if (!hModule)
-      hModule = GetModuleHandleA("openblas.dll");
-    if (hModule) {
-      func = (openblas_set_num_threads_t)GetProcAddress(hModule, "openblas_set_num_threads");
-    }
-  }
+  static openblas_set_num_threads_t func
+      = reinterpret_cast<openblas_set_num_threads_t>(get_openblas_proc("openblas_set_num_threads"));
+  return func;
+}
+openblas_get_num_threads_t get_openblas_get_num_threads() {
+  static openblas_get_num_threads_t func
+      = reinterpret_cast<openblas_get_num_threads_t>(get_openblas_proc("openblas_get_num_threads"));
   return func;
 }
 }  // namespace
@@ -76,54 +78,36 @@ openblas_set_num_threads_t get_openblas_set_num_threads() {
 // GCC/Clang support weak symbols
 extern "C" {
 void openblas_set_num_threads(int num_threads) __attribute__((weak));
+int openblas_get_num_threads() __attribute__((weak));
 }
 namespace {
 typedef void (*openblas_set_num_threads_t)(int);
+typedef int (*openblas_get_num_threads_t)();
 openblas_set_num_threads_t get_openblas_set_num_threads() {
   return openblas_set_num_threads;
 }
-}  // namespace
-#endif
-#endif
-
-// Register pthread_atfork handlers so that forked child processes (e.g. R's
-// parallel::mclapply) inherit a clean, single-threaded BLAS/OMP state instead
-// of a locked idle thread pool that causes deadlocks.
-//
-// The prepare handler runs in the parent just before fork(): it sets BLAS and
-// OMP to 1 thread so no new parallel work can start during the fork window.
-// The child handler re-asserts single-threading in case the runtime inherited
-// stale state.  The parent handler is omitted (nullptr): the next fit() call
-// will reset threads_per_worker as needed.
-#if !defined(_WIN32) && defined(_POSIX_VERSION)
-#include <pthread.h>
-namespace {
-
-void libkriging_atfork_quiesce() {
-#if !defined(__APPLE__) || !defined(__arm64__)
-  auto fn = get_openblas_set_num_threads();
-  if (fn)
-    fn(1);
-#endif
-#ifdef _OPENMP
-  omp_set_num_threads(1);
-#endif
+openblas_get_num_threads_t get_openblas_get_num_threads() {
+  return openblas_get_num_threads;
 }
-
-struct ForkSafeRegistrar {
-  ForkSafeRegistrar() {
-    pthread_atfork(libkriging_atfork_quiesce,   // prepare: quiesce before fork
-                   nullptr,                     // parent:  restored by next fit()
-                   libkriging_atfork_quiesce);  // child:   ensure clean state
-  }
-};
-static ForkSafeRegistrar fork_safe_registrar;
-
 }  // namespace
-#endif  // !_WIN32 && _POSIX_VERSION
+#endif
+#endif
 
 namespace libKriging {
 namespace detail {
+BlasThreadState get_blas_threads() {
+  BlasThreadState s;
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_get_num_threads();
+  if (fn)
+    s.blas = fn();
+#endif
+#ifdef _OPENMP
+  s.omp = omp_get_max_threads();
+#endif
+  return s;
+}
+
 void set_blas_threads(unsigned int n) {
 #if !defined(__APPLE__) || !defined(__arm64__)
   auto fn = get_openblas_set_num_threads();
@@ -134,8 +118,61 @@ void set_blas_threads(unsigned int n) {
   omp_set_num_threads(static_cast<int>(n));
 #endif
 }
+
+void restore_blas_threads(const BlasThreadState& s) {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_set_num_threads();
+  if (fn && s.blas > 0)
+    fn(s.blas);
+#endif
+#ifdef _OPENMP
+  if (s.omp > 0)
+    omp_set_num_threads(s.omp);
+#endif
+}
 }  // namespace detail
 }  // namespace libKriging
+
+// Register pthread_atfork handlers so that forked child processes (e.g. R's
+// parallel::mclapply) inherit a clean, single-threaded BLAS/OMP state instead
+// of a locked idle thread pool that causes deadlocks.
+//
+// The prepare handler runs in the parent just before fork(): it records the
+// current thread counts, then sets BLAS and OMP to 1 thread so no new parallel
+// work can start during the fork window. The parent handler restores the
+// recorded counts once fork() has returned, so the parent does not stay
+// single-threaded after e.g. mclapply. The child handler re-asserts
+// single-threading in case the runtime inherited stale state.
+#if !defined(_WIN32) && defined(_POSIX_VERSION)
+#include <pthread.h>
+namespace {
+
+libKriging::detail::BlasThreadState atfork_saved;
+
+void libkriging_atfork_prepare() {
+  atfork_saved = libKriging::detail::get_blas_threads();
+  libKriging::detail::set_blas_threads(1);
+}
+
+void libkriging_atfork_parent() {
+  libKriging::detail::restore_blas_threads(atfork_saved);
+}
+
+void libkriging_atfork_child() {
+  libKriging::detail::set_blas_threads(1);
+}
+
+struct ForkSafeRegistrar {
+  ForkSafeRegistrar() {
+    pthread_atfork(libkriging_atfork_prepare,  // prepare: quiesce before fork
+                   libkriging_atfork_parent,   // parent:  restore thread counts
+                   libkriging_atfork_child);   // child:   ensure clean state
+  }
+};
+static ForkSafeRegistrar fork_safe_registrar;
+
+}  // namespace
+#endif  // !_WIN32 && _POSIX_VERSION
 
 // =============================================================================
 // Subset-of-data pre-fit reduction (see Kriging.hpp for the full doc) -- a
@@ -3648,19 +3685,10 @@ void Kriging::fit_impl(const arma::vec& y,
       auto parsed_bfgs = Optim::parse_method(optim, "BFGS");
       int multistart = parsed_bfgs.second;
 
-      // Configure threads for Armadillo/BLAS to balance nested parallelism.
-      // Each of the 'multistart' workers uses internal BLAS/OMP parallelism.
-      unsigned int n_cpu = std::thread::hardware_concurrency();
-      libKriging::detail::BlasThreadGuard thread_guard;
-
-      if (n_cpu > 0 && multistart > 1) {
-        unsigned int threads_per_worker = std::max(1u, n_cpu / multistart);
-        thread_guard.set(threads_per_worker);
-        if (Optim::log_level > Optim::log_none) {
-          arma::cout << "Threads per worker: " << threads_per_worker << " (total CPUs: " << n_cpu
-                     << ", multistart: " << multistart << ")" << arma::endl;
-        }
-      }
+      // The multistart runs sequentially in the calling thread (see below), so
+      // every start keeps the full BLAS/OMP thread count: splitting the cores
+      // between starts, as the parallel WarpKriging multistart does, would
+      // leave all but ncpu/multistart of them idle here.
 
       arma::mat theta0_rand
           = arma::repmat(trans(theta_lower), multistart, 1)

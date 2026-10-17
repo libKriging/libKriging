@@ -6,23 +6,43 @@
 namespace libKriging {
 namespace detail {
 
+/// OpenBLAS and OpenMP thread counts; 0 for a backend whose count cannot be
+/// read (no openblas_get_num_threads, no OpenMP).
+struct BlasThreadState {
+  int blas = 0;
+  int omp = 0;
+};
+
+/// Current OpenBLAS and OpenMP thread counts. Defined in Kriging.cpp.
+BlasThreadState get_blas_threads();
+
 /// Set the OpenBLAS and OpenMP thread counts (no-op for a backend without
 /// openblas_set_num_threads). Defined in Kriging.cpp.
 void set_blas_threads(unsigned int n);
 
+/// Restore counts read by get_blas_threads() (0 entries are left untouched).
+/// Defined in Kriging.cpp.
+void restore_blas_threads(const BlasThreadState& s);
+
 /// Balances nested parallelism during a parallel multistart: each worker gets
-/// `n` BLAS/OMP threads instead of all of them. Resets to 1 thread on scope
-/// exit, which also collapses the idle BLAS pool so that a later fork() (e.g.
-/// R's mclapply) does not inherit locked mutexes and deadlock.
+/// `n` BLAS/OMP threads instead of all of them. Restores the thread counts in
+/// effect before the first set() on scope exit, so that later calls (predict,
+/// simulate, ...) keep the caller's setting. Fork safety does not rely on
+/// this guard: the pthread_atfork handlers in Kriging.cpp quiesce BLAS/OMP
+/// before every fork().
 struct BlasThreadGuard {
   bool active = false;
+  BlasThreadState saved;
   void set(unsigned int n) {
-    active = true;
+    if (!active) {
+      saved = get_blas_threads();
+      active = true;
+    }
     set_blas_threads(n);
   }
   ~BlasThreadGuard() {
     if (active)
-      set_blas_threads(1);
+      restore_blas_threads(saved);
   }
 };
 
