@@ -20,6 +20,14 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **MLPKriging** / `mlp_joint`: the K refits of the predictive-variance calibration (#407)
+  run concurrently in the multistart thread pool (`Optim::set_thread_pool_size`) instead of
+  one after the other. The calibration made the fit 5-10x slower (n = 200, d = 4,
+  `hidden_dims=[16, 8]`: 6.4 s instead of 0.6 s with `BFGS+Adam`, 12.4 s instead of 1.4 s
+  with `BFGS`), which pushed the C++ benchmark CI job past its 3 h timeout; on 12 cores it
+  now takes 1.3 s and 2.9 s. The folds are independent and their residuals summed in fold
+  order, so the result depends on the pool size only through the number of BLAS threads
+  each fold gets (as a multistart).
 - **MLPKriging**: the predictive stdev is calibrated on held-out points. With more weights
   than observations, the likelihood-optimal network learns features in which the training
   outputs are almost exactly smooth, and the GP on top was overconfident: on `Branin(Wx)` in
