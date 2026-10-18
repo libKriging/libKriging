@@ -994,12 +994,12 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
     }
   };
 #ifdef LK_OMP_LOOPS
-  if (n >= 200) {
+  if (n >= libKriging::detail::kOmpMinRows) {
     // Per-row partial sums, then summed over rows in a fixed order: the result
     // does not depend on the number of threads. It differs from the sequential
-    // order kept below for small n (and without OpenMP or under TSan): on an ill-conditioned
-    // R the trace term cancels heavily, so the gradient, hence the optimum
-    // reached, may change noticeably between the two orders.
+    // order kept below kOmpMinRows (and without OpenMP or under TSan): on an
+    // ill-conditioned R the trace term cancels heavily, so the gradient, hence
+    // the optimum reached, may change noticeably between the two orders.
     arma::mat term1_rows(d, n, arma::fill::zeros);
     arma::mat term2_rows(d, n, arma::fill::zeros);
 #pragma omp parallel for schedule(dynamic, 8)

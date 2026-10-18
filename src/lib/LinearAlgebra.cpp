@@ -151,10 +151,11 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R,
 
   // Rows are independent: each entry is written once, so the result does not
   // depend on the number of threads. dynamic scheduling balances the
-  // triangular loop. The OpenMP thread count of the calling thread is the
-  // budget (a parallel multistart worker gets its share, see WarpKriging.cpp).
+  // triangular loop, from n = kOmpMinRows on (OmpLoops.hpp). The OpenMP thread
+  // count of the calling thread is the budget (a parallel multistart worker
+  // gets its share, see WarpKriging.cpp).
 #ifdef LK_OMP_LOOPS
-#pragma omp parallel for schedule(dynamic, 8) if (n >= 200)
+#pragma omp parallel for schedule(dynamic, 8) if (n >= libKriging::detail::kOmpMinRows)
 #endif
   for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
     const arma::uword i = static_cast<arma::uword>(si);
@@ -198,7 +199,10 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(
   // t0 = Bench::toc(nullptr, "    _Cov: restore old",t0);
   // New rows only, independent as in cholCov
 #ifdef LK_OMP_LOOPS
-#pragma omp parallel for schedule(dynamic, 8) if ((n - n_old) * n >= 40000)
+  // same amount of work as the full matrix at n = kOmpMinRows
+  const bool parallel_rows = static_cast<unsigned long long>(n - n_old) * n
+                             >= libKriging::detail::kOmpMinRows * libKriging::detail::kOmpMinRows / 2;
+#pragma omp parallel for schedule(dynamic, 8) if (parallel_rows)
 #endif
   for (arma::sword si = static_cast<arma::sword>(n_old); si < static_cast<arma::sword>(n); si++) {
     const arma::uword i = static_cast<arma::uword>(si);

@@ -108,16 +108,16 @@ past release, see the corresponding entry on the
   ([#388](https://github.com/libKriging/libKriging/issues/388)).
 
 ### Changed
-- **Kriging** / **WarpKriging**: the covariance matrix of the exact objectives (and its new
-  rows in `update`) is built in an OpenMP loop instead of one thread (n = 1500, d = 4, 4
-  cores: one log-likelihood evaluation 0.21 s → 0.13 s). Each entry is written once, so the
-  result does not depend on the OpenMP thread count. Each worker of a parallel multistart
-  gets its share of OpenMP threads, as of BLAS threads.
-- **Kriging**: the θ part of the log-likelihood gradient is computed in an OpenMP loop from
-  n = 200 on (n = 1500, d = 4, 4 cores: 28 ms → 12 ms per gradient), with per-row partial
-  sums added in a fixed order, so it does not depend on the thread count. This order differs
-  from the sequential one, kept below n = 200 and without OpenMP: on an ill-conditioned
-  covariance matrix the gradient, hence the optimum reached, may change (see
+- **Kriging** / **WarpKriging**: from n = 800 on, the covariance matrix of the exact
+  objectives (and its new rows in `update`) is built in an OpenMP loop instead of one thread,
+  and the θ part of the log-likelihood gradient too, with per-row partial sums added in a
+  fixed order. Neither depends on the OpenMP thread count. 4 cores, d = 4, OpenBLAS and
+  OpenMP at 4 threads, log-likelihood + gradient: 75 → 54 ms at n = 800, 364 → 215 ms at
+  n = 1500. Below n = 800 the OpenMP team competes with the spinning OpenBLAS threads and
+  was slower than one thread (3.9 → 17 ms at n = 200), hence the threshold. Each worker of a
+  parallel multistart gets its share of OpenMP threads, as of BLAS threads. The parallel
+  gradient sum differs from the sequential one: on an ill-conditioned covariance matrix the
+  gradient, hence the optimum reached, may change from n = 800 on (see
   [docs/dev/FAQ.md](docs/dev/FAQ.md)).
 - **Python**: supported CPython versions are 3.10 to 3.14: the CI tests each of them
   (3.10 and 3.14 on Linux and Windows), the release builds wheels for all of them, and

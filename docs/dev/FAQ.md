@@ -29,7 +29,7 @@ This page collects questions about libKriging development
  OpenMP loops (covariance matrix, log-likelihood gradient) write independent entries or sum in
  a fixed order. Note that OpenBLAS also reads `OMP_NUM_THREADS` when `OPENBLAS_NUM_THREADS` is
  not set, so that this variable may still change the BLAS thread count. A build without
- OpenMP sums the gradient in another order (from n = 200 on), with the same consequences.
+ OpenMP sums the gradient in another order (from n = 800 on), with the same consequences.
 
  These rounding differences stay at that level on a well-conditioned covariance matrix, but
  are amplified by its condition number: on noise-free, smooth data the optimum often lies

@@ -149,7 +149,7 @@ TEST_CASE("Objective, gradient and update do not depend on the OpenMP thread cou
   const int initial = omp_get_max_threads();
   arma::vec y;
   arma::mat X;
-  data(y, X, 450);
+  data(y, X, 1200);
   const arma::vec theta{0.3, 0.5};
   Kriging::Parameters par;
   par.theta = arma::mat(theta.t());
@@ -157,9 +157,9 @@ TEST_CASE("Objective, gradient and update do not depend on the OpenMP thread cou
 
   auto run = [&](int threads) {
     omp_set_num_threads(threads);
-    Kriging k(y.head(300), X.head_rows(300), "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", par);
+    Kriging k(y.head(900), X.head_rows(900), "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", par);
     auto [ll, grad] = k.logLikelihoodFun(theta, true, false);
-    k.update(y.tail(150), X.tail_rows(150), false);
+    k.update(y.tail(300), X.tail_rows(300), false);
     return std::make_tuple(ll, arma::vec(grad), k.logLikelihood());
   };
   const auto [ll1, grad1, llu1] = run(1);

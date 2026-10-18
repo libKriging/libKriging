@@ -18,4 +18,17 @@
 #endif
 #endif
 
+namespace libKriging {
+namespace detail {
+/// Smallest n for which the O(n^2) loops of an objective evaluation (covariance
+/// matrix, log-likelihood gradient) run in parallel. Below it, the OpenMP team
+/// competes for the cores with the OpenBLAS threads still spinning after the
+/// previous BLAS call and is slower than one thread (4 cores, OpenBLAS pthreads,
+/// both at 4 threads, d = 4: log-likelihood + gradient 3.9 -> 17 ms at n = 200,
+/// break-even around n = 700, 75 -> 48 ms at n = 800). See
+/// docs/dev/ThreadBudget-TODO.md for the shared thread budget meant to lift it.
+constexpr unsigned long long kOmpMinRows = 800;
+}  // namespace detail
+}  // namespace libKriging
+
 #endif  // LIBKRIGING_SRC_LIB_OMPLOOPS_HPP
