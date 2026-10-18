@@ -181,6 +181,50 @@ still computed from the 20 logical CPUs (step 2 not done).
   Done: `run_task_pool(..., stagger)`, off for the Kriging multistart: n = 100,
   BFGS20, 20 workers 271 → 101–113 ms (3 runs), on par with 10 workers.
 
+## 8. Step 2 build (thread budget implemented), default environment
+
+`fits-step2.csv`, `ops-step2.csv`: `build-tb` at the step 2 commit, no environment
+variable (budget = 10 physical cores; OpenBLAS starts at its default, 20, and
+each public call sets it to 10 for its duration).
+
+Full fits (ms, median of 3; 1 at n = 2000 BFGS10):
+
+| n | optim | A (before) | C (budget by env, 10/10) | step 2 default | A / step 2 |
+|---|---|---|---|---|---|
+| 500 | BFGS | 240 | 134 | 228 | 1.05 |
+| 500 | BFGS10 | 10222 | 7096 | 2993 | 3.4 |
+| 2000 | BFGS | 6272 | 3748 | 3740 | 1.68 |
+| 2000 | BFGS10 | 156478 | 74857 | 71610 | 2.19 |
+
+predict / simulate / update: step 2 default matches the best configuration of
+section 6 (`tbnc` 10/10) within the noise, ×1.5–3.8 over before, except the
+single-point predict and the small updates (unchanged, not thread-bound).
+
+**OpenBLAS pthreads cannot be reduced at run time.** n = 500, BFGS (single start),
+5 runs each:
+
+| OpenBLAS count | fit (ms) |
+|---|---|
+| `OPENBLAS_NUM_THREADS=10` (set before OpenBLAS loads) | 127–176 |
+| default 20, set to 10 by the library (`BudgetScope`) | 199–256 |
+| default 20, `openblas_set_num_threads(10)` once at program start | 229–254 |
+| same + `blas_thread_shutdown_()` (pool recreated) | 142–208; the pool comes back with 20 threads (29 threads in the process) |
+| default 20 + `OPENBLAS_THREAD_TIMEOUT=4` | 122–137 |
+
+OpenBLAS 0.3.26 pthreads creates its threads at load time; lowering the count
+afterwards does not stop the extra threads from spinning on every call. The
+library can only reach the env-level performance if `OPENBLAS_NUM_THREADS` (or
+`OPENBLAS_THREAD_TIMEOUT`) is set before OpenBLAS is loaded: documentation for
+C++ users, and possibly the R / Python bindings setting it before loading the
+bundled OpenBLAS (step 3). Larger problems (n = 2000, multistart) are not
+affected: the step 2 default already matches C there.
+
+Multistart pool size (BFGS20, median of 3): default pool = budget (10 workers ×
+1) vs `LK_THREAD_POOL_SIZE=20` (20 workers × 1, on the hyperthreads): n = 100:
+123 vs 104 ms; n = 500: 3463 vs 3258 ms (−6 to −15 % with 20 workers). With one
+thread per worker, the workers may use the logical CPUs (decision pending).
+Sequential (before): 640 / 29767 ms.
+
 ## Decision (gate of step 1)
 
 Gate: a variant gains > 10 % over the baseline for 200 ≤ n ≤ 1000 with OpenBLAS
