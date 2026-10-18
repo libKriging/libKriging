@@ -108,6 +108,11 @@ past release, see the corresponding entry on the
   ([#388](https://github.com/libKriging/libKriging/issues/388)).
 
 ### Changed
+- **Kriging** / **WarpKriging**: the covariance matrix of the exact objectives (and its new
+  rows in `update`) is built in an OpenMP loop instead of one thread (n = 1500, d = 4, 4
+  cores: one log-likelihood evaluation 0.21 s → 0.13 s). Each entry is written once, so the
+  result does not depend on the OpenMP thread count. Each worker of a parallel multistart
+  gets its share of OpenMP threads, as of BLAS threads.
 - **Python**: supported CPython versions are 3.10 to 3.14: the CI tests each of them
   (3.10 and 3.14 on Linux and Windows), the release builds wheels for all of them, and
   `python_requires` is now `>=3.10` (the end-of-life 3.7 and 3.9 jobs are dropped)

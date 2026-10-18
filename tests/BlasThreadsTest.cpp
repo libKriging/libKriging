@@ -139,3 +139,35 @@ TEST_CASE("fork() quiesces the child only and restores the parent's thread count
   CHECK(after.omp == guard.set.omp);
 }
 #endif
+
+#ifdef _OPENMP
+// The OpenMP loops (covariance matrix, log-likelihood gradient) write
+// independent entries or reduce in a fixed order: the objective, its gradient
+// and an updated model do not depend on the OpenMP thread count (the BLAS
+// thread count is left unchanged).
+TEST_CASE("Objective, gradient and update do not depend on the OpenMP thread count", "[threads]") {
+  const int initial = omp_get_max_threads();
+  arma::vec y;
+  arma::mat X;
+  data(y, X, 450);
+  const arma::vec theta{0.3, 0.5};
+  Kriging::Parameters par;
+  par.theta = arma::mat(theta.t());
+  par.is_theta_estim = false;
+
+  auto run = [&](int threads) {
+    omp_set_num_threads(threads);
+    Kriging k(y.head(300), X.head_rows(300), "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", par);
+    auto [ll, grad] = k.logLikelihoodFun(theta, true, false);
+    k.update(y.tail(150), X.tail_rows(150), false);
+    return std::make_tuple(ll, arma::vec(grad), k.logLikelihood());
+  };
+  const auto [ll1, grad1, llu1] = run(1);
+  const auto [ll4, grad4, llu4] = run(4);
+  omp_set_num_threads(initial);
+
+  CHECK(ll1 == ll4);
+  CHECK(arma::all(grad1 == grad4));
+  CHECK(llu1 == llu4);
+}
+#endif

@@ -33,6 +33,10 @@
 #include <stdexcept>
 #include <thread>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 namespace libKriging {
 
 namespace {
@@ -116,6 +120,11 @@ void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char
 
   for (int worker_id = 0; worker_id < pool_size; worker_id++) {
     threads.emplace_back([&]() {
+#ifdef _OPENMP
+      // OpenMP thread counts are per thread: without this, the OpenMP loops
+      // of each worker (covariance matrix, ...) would use all the cores.
+      omp_set_num_threads(static_cast<int>(blas_threads));
+#endif
       while (true) {
         int task_id = next_task.fetch_add(1);
         if (task_id >= n_tasks)

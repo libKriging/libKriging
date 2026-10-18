@@ -147,45 +147,20 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R,
                                                    const arma::vec diag) {
   arma::uword n = (*R).n_rows;
 
-  // auto t0 = Bench::tic();
-  for (arma::uword i = 0; i < n; i++) {
-    //(*R).at(i, i) = 1.0;
+  // Rows are independent: each entry is written once, so the result does not
+  // depend on the number of threads. dynamic scheduling balances the
+  // triangular loop. The OpenMP thread count of the calling thread is the
+  // budget (a parallel multistart worker gets its share, see WarpKriging.cpp).
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 8) if (n >= 200)
+#endif
+  for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
+    const arma::uword i = static_cast<arma::uword>(si);
     for (arma::uword j = 0; j < i; j++) {
       (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta);
     }
   }
   (*R) *= factor;  // !!! requires that diag is setup after
-  // t0 = Bench::toc(nullptr, "    _Cov: " + std::to_string(n) + "/" + std::to_string(n),t0);
-
-  // Slower:
-  // std::vector<std::thread> col_threads(n);
-  // std::vector<arma::colvec> col_vecs(n);
-  // for (arma::uword i = 0; i < n; i++) {
-  //   col_threads[i] = std::thread([i, &col_vecs, _dX, _theta, _Cov, factor, n](){
-  //     arma::colvec col_vecs_i = arma::colvec(n,arma::fill::none);
-  //     for (arma::uword j = 0; j < n; j++) {
-  //       col_vecs_i.at(j) = _Cov(_dX.col(i * n + j), _theta) * factor;
-  //     }
-  //     col_vecs[i] = col_vecs_i;
-  //   });
-  //   //(*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta) * factor;
-  //   ////t0 = Bench::toc(nullptr, "    _Cov: " + std::to_string(i) + "/" + std::to_string(n),t0);
-  // }
-  // for (arma::uword i = 0; i < n; i++) {
-  //   col_threads[i].join();
-  //   (*R).col(i) = col_vecs[i];
-  // }
-  // //t0 = Bench::toc(nullptr, "    _Cov (threads): " + std::to_string(n) + "/" + std::to_string(n),t0);
-
-  // Same speed:
-  // #pragma omp parallel for shared(*R)
-  //  for (arma::uword i = 0; i < n; i++) {
-  //    (*R).at(i, i) = 1.0;
-  //    for (arma::uword j = 0; j < i; j++) {
-  //      (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta) * factor;
-  //    }
-  //  }
-  //  //t0 = Bench::toc(nullptr, "    _Cov (omp): " + std::to_string(n) + "/" + std::to_string(n),t0);
 
   if (diag.n_elem == 0) {
     (*R).diag().ones();  //(*R).diag() = arma::vec(n, arma::fill::ones);
@@ -219,11 +194,15 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(
   (*R).submat(0, 0, n_old - 1, n_old - 1)
       = R_old;  // T_old * T_old.t();// hope that does not cost too much... (we dont save previous R)
   // t0 = Bench::toc(nullptr, "    _Cov: restore old",t0);
-  for (arma::uword i = n_old; i < n; i++) {
+  // New rows only, independent as in cholCov
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 8) if ((n - n_old) * n >= 40000)
+#endif
+  for (arma::sword si = static_cast<arma::sword>(n_old); si < static_cast<arma::sword>(n); si++) {
+    const arma::uword i = static_cast<arma::uword>(si);
     for (arma::uword j = 0; j < i; j++) {
       (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta);
     }
-    ////t0 = Bench::toc(nullptr, "    _Cov: " + std::to_string(i) + "/" + std::to_string(n),t0);
   }
   //(*R).submat(n_old, n_old, n-1, n-1) *= factor; // !!! requires that diag is setup after
   (*R).submat(n_old, 0, n - 1, n_old - 1) *= factor;
