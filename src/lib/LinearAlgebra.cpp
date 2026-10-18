@@ -26,6 +26,8 @@ inline int get_optimal_threads(int max_default = 2) {
 #include "libKriging/Covariance.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include "OmpLoops.hpp"
+
 #include <mutex>
 
 arma::solve_opts::opts LinearAlgebra::default_solve_opts = arma::solve_opts::fast + arma::solve_opts::no_approx;
@@ -151,7 +153,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R,
   // depend on the number of threads. dynamic scheduling balances the
   // triangular loop. The OpenMP thread count of the calling thread is the
   // budget (a parallel multistart worker gets its share, see WarpKriging.cpp).
-#ifdef _OPENMP
+#ifdef LK_OMP_LOOPS
 #pragma omp parallel for schedule(dynamic, 8) if (n >= 200)
 #endif
   for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
@@ -195,7 +197,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(
       = R_old;  // T_old * T_old.t();// hope that does not cost too much... (we dont save previous R)
   // t0 = Bench::toc(nullptr, "    _Cov: restore old",t0);
   // New rows only, independent as in cholCov
-#ifdef _OPENMP
+#ifdef LK_OMP_LOOPS
 #pragma omp parallel for schedule(dynamic, 8) if ((n - n_old) * n >= 40000)
 #endif
   for (arma::sword si = static_cast<arma::sword>(n_old); si < static_cast<arma::sword>(n); si++) {
@@ -424,7 +426,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
   const double* X_mem = X.memptr();
   double* dX_mem = dX.memptr();
 
-  #ifdef _OPENMP
+  #ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices
     int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
@@ -456,7 +458,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
         }
       }
     }
-  #ifdef _OPENMP
+  #ifdef LK_OMP_LOOPS
   }
   #endif
 
@@ -473,7 +475,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
 
   // First compute off-diagonal elements with OpenMP parallelization
   // Use dynamic scheduling for load balancing (lower triangle has uneven work)
-  #ifdef _OPENMP
+  #ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = get_optimal_threads(2);
@@ -493,7 +495,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
         (*R).at(i, j) = (*R).at(j, i) = cov_val;
       }
     }
-  #ifdef _OPENMP
+  #ifdef LK_OMP_LOOPS
   }
   #endif
 
@@ -524,7 +526,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
 
   // First compute off-diagonal elements with block-based OpenMP parallelization
   // Use dynamic scheduling because lower triangle has uneven work distribution
-  #ifdef _OPENMP
+  #ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = get_optimal_threads(2);
@@ -562,7 +564,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
         (*R).at(i, j) = (*R).at(j, i) = cov_val;
       }
     }
-  #ifdef _OPENMP
+  #ifdef LK_OMP_LOOPS
   }
   #endif
 
@@ -595,7 +597,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
 
   // Block-based parallelization for better cache locality
   // Rectangular matrices have uniform work distribution, use static scheduling
-  #ifdef _OPENMP
+  #ifdef LK_OMP_LOOPS
   arma::uword total_work = n1 * n2;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
@@ -639,7 +641,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
         (*R).at(i, j) = Cov(diff, theta) * factor;
       }
     }
-  #ifdef _OPENMP
+  #ifdef LK_OMP_LOOPS
   }
   #endif
 }

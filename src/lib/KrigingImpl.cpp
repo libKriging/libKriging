@@ -16,6 +16,8 @@
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 
+#include "OmpLoops.hpp"
+
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -991,11 +993,11 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
       }
     }
   };
-#ifdef _OPENMP
+#ifdef LK_OMP_LOOPS
   if (n >= 200) {
     // Per-row partial sums, then summed over rows in a fixed order: the result
     // does not depend on the number of threads. It differs from the sequential
-    // order kept below for small n (and without OpenMP): on an ill-conditioned
+    // order kept below for small n (and without OpenMP or under TSan): on an ill-conditioned
     // R the trace term cancels heavily, so the gradient, hence the optimum
     // reached, may change noticeably between the two orders.
     arma::mat term1_rows(d, n, arma::fill::zeros);
