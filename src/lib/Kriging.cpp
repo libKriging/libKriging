@@ -25,6 +25,8 @@
 #include "BlasThreads.hpp"
 
 #include <cassert>
+#include <cstdlib>
+#include <string>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
 #include <tuple>
@@ -117,6 +119,42 @@ void set_blas_threads(unsigned int n) {
 #ifdef _OPENMP
   omp_set_num_threads(static_cast<int>(n));
 #endif
+}
+
+int get_openblas_threads() {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_get_num_threads();
+  if (fn)
+    return fn();
+#endif
+  return 0;
+}
+
+void set_openblas_threads(int n) {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_set_num_threads();
+  if (fn && n > 0)
+    fn(n);
+#endif
+}
+
+BenchBlasHandoff::BenchBlasHandoff(bool parallel_loop) {
+  static const bool enabled = [] {
+    const char* v = std::getenv("LK_BENCH_BLAS_HANDOFF");
+    return v != nullptr && std::string(v) == "1";
+  }();
+  if (enabled && parallel_loop) {
+    saved = get_openblas_threads();
+    if (saved > 1)
+      set_openblas_threads(1);
+    else
+      saved = 0;
+  }
+}
+
+BenchBlasHandoff::~BenchBlasHandoff() {
+  if (saved > 0)
+    set_openblas_threads(saved);
 }
 
 void restore_blas_threads(const BlasThreadState& s) {

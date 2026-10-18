@@ -17,6 +17,9 @@ COL = "t_llgrad_ms"
 
 
 def summary(df):
+    # Repeated configurations (e.g. OpenMP OpenBLAS, whose BLAS count follows
+    # OMP_NUM_THREADS whatever OPENBLAS_NUM_THREADS says): median of the repeats.
+    df = df.groupby(["n", "d", "blas_threads", "omp_threads"], as_index=False)[COL].median()
     ncpu = df["omp_threads"].max()
     rows = []
     for (n, d), g in df.groupby(["n", "d"]):

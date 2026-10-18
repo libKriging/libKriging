@@ -10,6 +10,7 @@
 #include <chrono>
 #include <iostream>
 #include <iomanip>
+#include <string>
 
 // Synthetic test function: sum_i sin(2*pi*x_i)
 double test_function(const arma::rowvec& x) {
@@ -26,8 +27,9 @@ int main(int argc, char* argv[]) {
   // Parse arguments
   arma::uword n_train = argc > 1 ? std::atoi(argv[1]) : 400;
   arma::uword d = argc > 2 ? std::atoi(argv[2]) : 4;
+  std::string optim = argc > 3 ? argv[3] : "BFGS";
 
-  std::cout << "n=" << n_train << " d=" << d << "\n\n";
+  std::cout << "n=" << n_train << " d=" << d << " optim=" << optim << "\n\n";
 
   // Set random seed
   arma::arma_rng::set_seed(123);
@@ -46,7 +48,7 @@ int main(int argc, char* argv[]) {
   Kriging::Parameters params{std::nullopt, true, std::nullopt, true};
 
   auto start = std::chrono::high_resolution_clock::now();
-  kr.fit(y_train, X_train, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
+  kr.fit(y_train, X_train, Trend::RegressionModel::Constant, false, optim, "LL", params);
   auto end = std::chrono::high_resolution_clock::now();
 
   double total_ms = std::chrono::duration<double, std::milli>(end - start).count();

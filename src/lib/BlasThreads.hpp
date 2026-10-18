@@ -46,6 +46,21 @@ struct BlasThreadGuard {
   }
 };
 
+/// OpenBLAS thread count only (0 / no-op without openblas_*_num_threads); the
+/// OpenMP ICV is left untouched. Defined in Kriging.cpp.
+int get_openblas_threads();
+void set_openblas_threads(int n);
+
+/// Thread-budget benchmark, variant (a) of docs/dev/ThreadBudget-TODO.md step 1:
+/// with LK_BENCH_BLAS_HANDOFF=1 (read once), OpenBLAS is set to 1 thread for the
+/// lifetime of the guard (around an OpenMP loop) and restored afterwards. Off
+/// by default; to be removed or replaced in step 4.
+struct BenchBlasHandoff {
+  int saved = 0;
+  explicit BenchBlasHandoff(bool parallel_loop);
+  ~BenchBlasHandoff();
+};
+
 }  // namespace detail
 }  // namespace libKriging
 

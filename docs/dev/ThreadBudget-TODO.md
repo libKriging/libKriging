@@ -104,7 +104,7 @@ evaluation under the environment's thread counts) and `bench/bench-threads.sh`
       CPUs) they collapse (spinning OpenBLAS threads + hyperthreads).
       BLAS variant switched without root: `LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/openblas-openmp`
       (OpenMP OpenBLAS) or `.../blas:.../lapack` (reference).
-- [ ] Same two sweeps with OpenBLAS OpenMP (`openmp.csv`, `openmp-min200.csv`) and the
+- [x] Same two sweeps with OpenBLAS OpenMP (`openmp.csv`, `openmp-min200.csv`) and the
       reference BLAS (`reference.csv`; BLAS thread count irrelevant, use `T_LIST` for OpenMP only).
       State 2026-10-18 (bench stopped on request): `openmp.csv` and `openmp-min200.csv`
       complete (not analysed yet); `reference.csv` 47 / 50 rows (missing n = 3000,
@@ -119,20 +119,25 @@ evaluation under the environment's thread counts) and `bench/bench-threads.sh`
         LD_LIBRARY_PATH=$R OMP_NUM_THREADS=$to build-tb200/bench/bench-threads $n $d 7 matern5_2 >> $out
       done; done; done
       ```
-- [ ] Variant (a) "BLAS to 1 thread around OpenMP loops": add an opt-in
+- [x] Variant (a) "BLAS to 1 thread around OpenMP loops": add an opt-in
       (`LK_BENCH_BLAS_HANDOFF=1` read once) in `cholCov` / `compute_ll_grad_theta_vecs`
       calling `detail::set_blas_threads(1)` before the loop and `restore_blas_threads`
       after; sweep with `kOmpMinRows = 200` into `pthreads-handoff.csv`. Measure
       whether the spinning stops immediately (compare with `OPENBLAS_NUM_THREADS=1`).
-- [ ] Variant (b): `OPENBLAS_THREAD_TIMEOUT=4` (minimum spin, read at OpenBLAS init),
+- [x] Variant (b): `OPENBLAS_THREAD_TIMEOUT=4` (minimum spin, read at OpenBLAS init),
       `kOmpMinRows = 200`, into `pthreads-timeout.csv`.
-- [ ] Variant (c): OpenMP team reduced to `ncpu - blas_threads` (or `ncpu / 2`) with
+- [x] Variant (c): OpenMP team reduced to `ncpu - blas_threads` (or `ncpu / 2`) with
       `kOmpMinRows = 200`, into `pthreads-split.csv`.
-- [ ] Full fits: `bench-fit-profile` / `bench-kriging` with `BFGS` and `BFGS10`,
+- [x] Full fits: `bench-fit-profile` / `bench-kriging` with `BFGS` and `BFGS10`,
       n ∈ {500, 2000}, default environment, before / after each retained variant.
-- [ ] Write `bench/thread-budget/RESULTS.md`: for each BLAS variant, the best
+- [x] Write `bench/thread-budget/RESULTS.md`: for each BLAS variant, the best
       (BLAS, OpenMP) split per n, the break-even n of the OpenMP loops, and the
       speed-up of each variant vs baseline (median of ≥ 7 reps; note the spread).
+
+Step 1 done 2026-10-18 (`bench/thread-budget/RESULTS.md`). Outcome: step 4
+dropped; the gain (full fits ×1.4–2.1) comes from capping BLAS and OpenMP at the
+physical cores, which lets `kOmpMinRows` go down to 200 — the two must ship
+together (threshold 200 without the budget: up to ×13.6 slower).
 
 Decision gate (write it in RESULTS.md):
 - If no variant (a)–(c) gains > 10 % over the baseline for 200 ≤ n ≤ 1000 with

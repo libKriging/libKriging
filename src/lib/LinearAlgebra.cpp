@@ -26,6 +26,7 @@ inline int get_optimal_threads(int max_default = 2) {
 #include "libKriging/Covariance.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include "BlasThreads.hpp"
 #include "OmpLoops.hpp"
 
 #include <mutex>
@@ -154,13 +155,16 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R,
   // triangular loop, from n = kOmpMinRows on (OmpLoops.hpp). The OpenMP thread
   // count of the calling thread is the budget (a parallel multistart worker
   // gets its share, see WarpKriging.cpp).
+  {
 #ifdef LK_OMP_LOOPS
+    libKriging::detail::BenchBlasHandoff handoff(n >= libKriging::detail::kOmpMinRows);
 #pragma omp parallel for schedule(dynamic, 8) if (n >= libKriging::detail::kOmpMinRows)
 #endif
-  for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
-    const arma::uword i = static_cast<arma::uword>(si);
-    for (arma::uword j = 0; j < i; j++) {
-      (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta);
+    for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
+      const arma::uword i = static_cast<arma::uword>(si);
+      for (arma::uword j = 0; j < i; j++) {
+        (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta);
+      }
     }
   }
   (*R) *= factor;  // !!! requires that diag is setup after
