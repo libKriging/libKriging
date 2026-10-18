@@ -436,7 +436,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
 
 #ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices
-    int optimal_threads = get_optimal_threads(2);
+    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
     #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
       for (arma::sword j = i + 1; j < static_cast<arma::sword>(n); j++) {
@@ -486,7 +486,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
 #ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int optimal_threads = get_optimal_threads(2);
+    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
     #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
       for (arma::sword j = 0; j < i; j++) {
@@ -537,7 +537,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
 #ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int optimal_threads = get_optimal_threads(2);
+    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
     #pragma omp parallel for schedule(dynamic, 4) num_threads(optimal_threads) if(n >= 200)
     for (arma::sword bi = 0; bi < static_cast<arma::sword>(n); bi += BLOCK_SIZE) {
       arma::uword block_end_i = (bi + BLOCK_SIZE < n) ? bi + BLOCK_SIZE : n;
@@ -609,7 +609,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
   arma::uword total_work = n1 * n2;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int optimal_threads = get_optimal_threads(2);
+    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
     #pragma omp parallel num_threads(optimal_threads) if(total_work >= 40000)
     {
       // Pre-allocate diff vector once per thread (thread-local)

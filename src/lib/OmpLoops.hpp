@@ -32,6 +32,14 @@ namespace detail {
 #define LK_OMP_MIN_ROWS 800
 #endif
 constexpr unsigned long long kOmpMinRows = LK_OMP_MIN_ROWS;
+
+/// Cap on the OpenMP team of compute_dX, covMat_sym_*, covMat_rect and the
+/// predict / simulate R_on loops (get_optimal_threads in LinearAlgebra.cpp and
+/// KrigingImpl.cpp). LK_OMP_THREAD_CAP overrides it at compile time
+/// (thread-budget benchmarks); replaced by the budget in step 2.
+#ifndef LK_OMP_THREAD_CAP
+#define LK_OMP_THREAD_CAP 2
+#endif
 }  // namespace detail
 }  // namespace libKriging
 

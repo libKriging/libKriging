@@ -304,7 +304,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
 #ifdef _OPENMP
   arma::uword total_work = n_o * n_n;
   if (total_work >= 40000) {
-    int optimal_threads = get_optimal_threads(2);
+    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
 #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if (total_work >= 40000)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
       for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
@@ -464,7 +464,7 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
 #ifdef _OPENMP
   arma::uword total_work = n_o * n_n;
   if (total_work >= 40000) {
-    int optimal_threads = get_optimal_threads(2);
+    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
 #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if (total_work >= 40000)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
       for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {

@@ -108,6 +108,49 @@ Median fit time (ms), spread max / min ≤ 1.17:
 - Without the budget, the threshold 200 is a regression (D: ×13.6 slower at
   n = 500, BFGS): the two must ship together.
 
+## 6. predict / simulate / update
+
+`bench-threads-ops` (`ops.csv`, `bench-threads-ops.sh`): Kriging Matérn 5/2 with
+fixed theta, d = 4, one call timed (median of 7–51 reps), BLAS = OpenMP threads
+∈ {1, 10, 20}. Builds: `tb` (threshold 800, cap 2 = master), `tb200` (threshold
+200, cap 2), `tbnc` (threshold 200, `-DLK_OMP_THREAD_CAP=1024`: no cap of 2
+threads on compute_dX / covMat_* / R_on). Times in ms:
+
+| op | n | n_new | nsim | today (tb, 20) | budget (tb, 10) | budget + no cap (tbnc, 10) | no cap, no budget (tbnc, 20) | today / tbnc 10 |
+|---|---|---|---|---|---|---|---|---|
+| predict | 500 | 1 | | 0.62 | 0.44 | 0.44 | 0.62 | 1.41 |
+| predict | 500 | 100 | | 4.26 | 3.60 | **1.29** | 38.1 | 3.30 |
+| predict | 500 | 1000 | | 31.5 | 29.9 | **8.0** | 21.8 | 3.92 |
+| predict | 2000 | 1 | | 6.16 | 6.28 | 6.08 | 6.18 | 1.01 |
+| predict | 2000 | 100 | | 34.9 | 22.3 | **14.7** | 40.6 | 2.38 |
+| predict | 2000 | 1000 | | 151 | 121 | **43.7** | 80.5 | 3.47 |
+| predict + cov | 500 | 1000 | | 81.0 | 78.7 | **43.5** | 88.8 | 1.86 |
+| predict + cov | 2000 | 1000 | | 203 | 173 | **103** | 148 | 1.98 |
+| simulate | 500 | 100 | 100 | 4.87 | 4.45 | **2.15** | 32.6 | 2.27 |
+| simulate | 500 | 1000 | 100 | 98.9 | 89.3 | **55.7** | 114 | 1.77 |
+| simulate | 2000 | 100 | 100 | 36.2 | 23.0 | **16.0** | 54.4 | 2.25 |
+| simulate | 2000 | 1000 | 100 | 230 | 182 | **104** | 162 | 2.21 |
+| update (no refit) | 500 | 10 | | 8.24 | 9.02 | 8.82 | 23.1 | 0.93 |
+| update (no refit) | 500 | 100 | | 34.6 | 17.3 | **12.9** | 55.0 | 2.69 |
+| update (no refit) | 2000 | 10 | | 180 | 181 | 179 | 192 | 1.00 |
+| update (no refit) | 2000 | 100 | | 237 | 223 | **204** | 235 | 1.16 |
+
+- Same rule as the objective: at the physical-core budget, predict and simulate
+  gain ×1.8–3.9 once the cap of 2 threads is lifted; the budget alone gives
+  ×1.0–1.6. Lifting the cap **without** the budget is a regression (up to ×30
+  slower, predict n = 500, n_new = 100): cap removal and budget ship together.
+- `update(refit = true)` is a warm-restarted BFGS: same objective as `fit`,
+  covered by sections 1 and 5.
+- Not thread-bound, separate performance items:
+  - `predict` of 1 point at n = 2000 takes 6.1 ms whatever the threads (1 / 10 /
+    20); cause not profiled yet (a triangular solve of n × 1 alone is ~n² = 4·10⁶
+    flops). Matters for sequential design loops (one predict per candidate).
+  - `update` without refit at n = 2000 takes ~180 ms for 10 new points whatever
+    the threads: `update_no_refit_impl` rebuilds the whole `m_dX` (d × n² =
+    128 MB at n = 2000) instead of appending the new rows.
+- Not measured: `update_simulate` (its cache keyed on `X_u` makes repeated calls
+  hit the cache), Vecchia / Nystrom variants, NuggetKriging / NoiseKriging.
+
 ## Decision (gate of step 1)
 
 Gate: a variant gains > 10 % over the baseline for 200 ≤ n ≤ 1000 with OpenBLAS
@@ -119,7 +162,8 @@ lets the OpenMP loops run from n = 200: ×1.6–3.2 at n = 200–500, ×1.0 at n
 - Step 4 (BLAS / OpenMP arbitration): **dropped**. (a) and (c) bring nothing;
   (b) cannot be set by the library and is documented only (step 6).
 - Step 2: budget = physical cores × percentage; OpenMP loops and BLAS both at the
-  budget (no split); `kOmpMinRows` → 200 together with the budget (not before:
+  budget (no split); the cap of 2 threads (`get_optimal_threads(2)`) removed and
+  `kOmpMinRows` → 200, both together with the budget (not before:
   without it, 20/20 at n = 200 is 27–38× slower than 10/10).
 - The library has to set the OpenBLAS count to the budget when OpenBLAS's own
   default (logical CPUs) exceeds it, and restore it afterwards
