@@ -430,7 +430,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
   const double* X_mem = X.memptr();
   double* dX_mem = dX.memptr();
 
-  #ifdef LK_OMP_LOOPS
+#ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices
     int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
@@ -462,7 +462,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
         }
       }
     }
-  #ifdef LK_OMP_LOOPS
+#ifdef LK_OMP_LOOPS
   }
   #endif
 
@@ -479,7 +479,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
 
   // First compute off-diagonal elements with OpenMP parallelization
   // Use dynamic scheduling for load balancing (lower triangle has uneven work)
-  #ifdef LK_OMP_LOOPS
+#ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = get_optimal_threads(2);
@@ -499,7 +499,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
         (*R).at(i, j) = (*R).at(j, i) = cov_val;
       }
     }
-  #ifdef LK_OMP_LOOPS
+#ifdef LK_OMP_LOOPS
   }
   #endif
 
@@ -530,7 +530,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
 
   // First compute off-diagonal elements with block-based OpenMP parallelization
   // Use dynamic scheduling because lower triangle has uneven work distribution
-  #ifdef LK_OMP_LOOPS
+#ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = get_optimal_threads(2);
@@ -568,7 +568,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
         (*R).at(i, j) = (*R).at(j, i) = cov_val;
       }
     }
-  #ifdef LK_OMP_LOOPS
+#ifdef LK_OMP_LOOPS
   }
   #endif
 
@@ -601,7 +601,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
 
   // Block-based parallelization for better cache locality
   // Rectangular matrices have uniform work distribution, use static scheduling
-  #ifdef LK_OMP_LOOPS
+#ifdef LK_OMP_LOOPS
   arma::uword total_work = n1 * n2;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
@@ -645,7 +645,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
         (*R).at(i, j) = Cov(diff, theta) * factor;
       }
     }
-  #ifdef LK_OMP_LOOPS
+#ifdef LK_OMP_LOOPS
   }
   #endif
 }
