@@ -34,7 +34,9 @@ This page collects questions about libKriging development
  These rounding differences stay at that level on a well-conditioned covariance matrix, but
  are amplified by its condition number: on noise-free, smooth data the optimum often lies
  at large `theta`, where `cond(R)` reaches 1e14 or more, the objective is then only known to
- ~1e-2 and L-BFGS-B may follow a different path and end at another, equivalent, local optimum.
+ ~1e-2 and L-BFGS-B may follow a different path and end at another local optimum, which is
+ not necessarily as good: n = 40, d = 2, `"gauss"`, `"BFGS"` (cond(R) ~ 1e15 to 1e18) ends at
+ log-likelihood 34.5 or 172.8 depending only on the summation order of the gradient.
  E.g. n = 500, d = 4, `y = sum(sin(3 x))`, `"BFGS20"`: log-likelihood 3376.32 with 1 BLAS thread,
  3375.68 with 2, 3375.63 with 4.
 
