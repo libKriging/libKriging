@@ -151,6 +151,34 @@ threads on compute_dX / covMat_* / R_on). Times in ms:
 - Not measured: `update_simulate` (its cache keyed on `X_u` makes repeated calls
   hit the cache), Vecchia / Nystrom variants, NuggetKriging / NoiseKriging.
 
+## 7. Kriging multistart in the thread pool
+
+Kriging multistart moved from a sequential loop to `detail::run_task_pool`
+(`TaskPool.cpp`, shared with WarpKriging). `fits-multistart.csv`:
+`bench-fit-profile` (gauss, d = 4), `build-tb` (threshold 800, cap 2), median of 3
+reps (1 at n = 2000), spread max / min ≤ 1.41. `LK_THREAD_POOL_SIZE=1` = the former
+sequential behaviour (one worker with all the BLAS / OpenMP threads). Pool shares
+still computed from the 20 logical CPUs (step 2 not done).
+
+| n | optim | sequential (pool 1) | pool 10 (×2 threads) | default (pool = starts ≤ 20) | sequential / best |
+|---|---|---|---|---|---|
+| 100 | BFGS10 | 236 | 99 | 100 (10 × 2) | 2.4 |
+| 100 | BFGS20 | 640 | **127** | 271 (20 × 1) | 5.0 |
+| 500 | BFGS10 | 10915 | 2391 | 2356 (10 × 2) | 4.6 |
+| 500 | BFGS20 | 29767 | 5407 | **4067** (20 × 1) | 7.3 |
+| 2000 | BFGS10 | 163382 | 62250 | 63497 (10 × 2) | 2.6 |
+
+- The multistart-first split pays: ×2.4–7.3 over the sequential multistart.
+- n = 500, BFGS20: 20 single-threaded workers (all logical CPUs) beat 10 × 2. With
+  1 BLAS thread per worker there are no spinning OpenBLAS threads, and the
+  hyperthreads add throughput: the "physical cores" rule is for BLAS / OpenMP
+  teams; for the pool workers the logical CPUs may be better. To measure again in
+  step 2 (budget at 10 vs 20 workers).
+- n = 100, BFGS20: 20 workers are 2× slower than 10. The pool staggers the first
+  task of worker k by k × `Optim::thread_start_delay_ms` (10 ms): 190 ms for the
+  last of 20 workers, more than a whole n = 100 start. The delay should scale
+  with the problem or go (it was introduced for WarpKriging).
+
 ## Decision (gate of step 1)
 
 Gate: a variant gains > 10 % over the baseline for 200 ≤ n ≤ 1000 with OpenBLAS

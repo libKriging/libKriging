@@ -14,6 +14,7 @@ add_library(Kriging
         Kriging.cpp include/libKriging/Kriging.hpp
         NestedKriging.cpp include/libKriging/NestedKriging.hpp
         WarpKriging.cpp include/libKriging/WarpKriging.hpp
+        TaskPool.cpp TaskPool.hpp
         MLPKriging.cpp include/libKriging/MLPKriging.hpp
         KrigingLoader.cpp include/libKriging/KrigingLoader.hpp
         include/libKriging/KrigingException.hpp

@@ -23,6 +23,7 @@
 #include "libKriging/utils/utils.hpp"
 
 #include "BlasThreads.hpp"
+#include "TaskPool.hpp"
 
 #include <cassert>
 #include <cstdlib>
@@ -3723,10 +3724,8 @@ void Kriging::fit_impl(const arma::vec& y,
       auto parsed_bfgs = Optim::parse_method(optim, "BFGS");
       int multistart = parsed_bfgs.second;
 
-      // The multistart runs sequentially in the calling thread (see below), so
-      // every start keeps the full BLAS/OMP thread count: splitting the cores
-      // between starts, as the parallel WarpKriging multistart does, would
-      // leave all but ncpu/multistart of them idle here.
+      // The starts run in a thread pool (see run_task_pool below): the cores
+      // go to the starts first, the remaining share to their BLAS / OpenMP.
 
       arma::mat theta0_rand
           = arma::repmat(trans(theta_lower), multistart, 1)
@@ -4125,16 +4124,17 @@ void Kriging::fit_impl(const arma::vec& y,
         return result;
       };
 
-      // Execute optimizations (sequential multistart in the calling thread)
-      // Running multistart workers in std::threads even when serialized by a mutex causes MKL to
-      // produce slightly different floating-point results compared to running on the main thread,
-      // because MKL uses different code paths for secondary vs. primary threads. This breaks the
-      // BFGS20 == best-of-20×BFGS1 invariant. Running sequentially in the calling thread ensures
-      // every start uses the same BLAS/LAPACK context as a single-start BFGS1 run.
+      // Execute optimizations: the starts run concurrently in a thread pool
+      // (TaskPool.hpp), which gives the cores to the starts first and the
+      // remaining share to each start's BLAS / OpenMP calls; a single start
+      // runs inline with all of them. Each start works on its own
+      // preallocated KModel and the objectives are const. With MKL, BLAS calls
+      // from secondary threads may round differently from the calling
+      // thread's: BFGS20 matches the best of 20 BFGS1 up to that rounding
+      // (KrigingTest checks it to 1e-3 relative).
       std::vector<OptimizationResult> results(multistart);
-      for (int task_id = 0; task_id < multistart; task_id++) {
-        results[task_id] = optimize_worker(task_id);
-      }
+      libKriging::detail::run_task_pool(
+          multistart, [&](int task_id) { results[task_id] = optimize_worker(task_id); }, "multistart");
 
       // Find best result
       int best_idx = -1;

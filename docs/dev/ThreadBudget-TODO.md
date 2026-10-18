@@ -21,9 +21,10 @@ commit the results (CSV + summary) with it.
 ## Context (state after PR #414)
 
 - Parallel levels in the library:
-  1. multistart thread pool (`run_task_pool` in `src/lib/WarpKriging.cpp`;
-     WarpKriging / MLPKriging only — the Kriging multistart is sequential on purpose,
-     see `Kriging::fit_impl`);
+  1. multistart thread pool (`detail::run_task_pool`, `src/lib/TaskPool.cpp`):
+     WarpKriging / MLPKriging multistart and calibration folds, and since
+     2026-10-18 the Kriging multistart too (all noise models; it was sequential,
+     see "Decisions" 4); no nested pools (a pool started from a worker runs inline);
   2. OpenMP loops (`src/lib/LinearAlgebra.cpp`: `compute_dX`, `cholCov`,
      `update_cholCov`, `covMat_*`; `src/lib/KrigingImpl.cpp`: predict `R_on`,
      `compute_ll_grad_theta_vecs`; `Kriging.cpp`: Vecchia neighbour searches;
@@ -245,6 +246,13 @@ Decision gate (write it in RESULTS.md):
 2. No new variable before an inventory: see "Thread settings inventory" below and
    the rationalisation proposal there.
 3. The pthreads OpenBLAS of the R binary (#325 / #387) stays as is for now.
+4. **The multistart goes first**: the starts are intrinsically parallel, so the
+   budget is given to them before OpenMP and BLAS: pool = min(starts, pool size or
+   budget), each worker gets budget / pool (≥ 1) for its BLAS and OpenMP calls.
+   The Kriging multistart (all noise models) now uses the same pool as
+   WarpKriging. It was sequential so that BFGS20 matched the best of 20 BFGS1
+   bit for bit with MKL (secondary threads round differently); `KrigingTest`
+   checks that invariant to 1e-3 relative, which still holds.
 - Work locally only: no GitHub Actions run (no push of this branch, no
   `workflow_dispatch`) until told otherwise. The open item on #414 is to be
   reproduced locally, not through CI.
@@ -255,7 +263,7 @@ Read by the library:
 
 | Setting | Where | Default | Effect |
 |---|---|---|---|
-| `LK_THREAD_POOL_SIZE` / `Optim::set_thread_pool_size` | `Optim.cpp`, `run_task_pool` | 0 = `hardware_concurrency()` | multistart workers (WarpKriging / MLPKriging only), clamped to the number of starts |
+| `LK_THREAD_POOL_SIZE` / `Optim::set_thread_pool_size` | `Optim.cpp`, `run_task_pool` | 0 = `hardware_concurrency()` | multistart workers (Kriging, WarpKriging, MLPKriging), clamped to the number of starts |
 | `LK_THREAD_START_DELAY_MS` / `Optim::set_thread_start_delay_ms` | `Optim.cpp`, `run_task_pool` | 10 | stagger of the first task of each worker (not a thread count) |
 
 Implicit (hard-coded) in the library:
