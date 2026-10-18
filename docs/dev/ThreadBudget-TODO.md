@@ -15,6 +15,7 @@ commit the results (CSV + summary) with it.
   `TARGET=COOPERLAKE` and 0.3.26, AVX-512 Xeon). Working hypothesis: OpenBLAS
   0.3.20 kernel selection on that CPU. See the comment on PR #414; check the
   Octave Linux job of the current head and its `lscpu` lines first.
+  Local only (see Decisions): try OpenBLAS 0.3.20 `DYNAMIC_ARCH` here.
 - [ ] Resolve the item above before merging #414 (this branch is stacked on it).
 
 ## Context (state after PR #414)
@@ -52,11 +53,11 @@ commit the results (CSV + summary) with it.
 
 ## Step 0 — machine setup
 
-- [ ] Record the machine: `lscpu`, `nproc`, `free -g`, OS, compiler, OpenBLAS version
+- [x] Record the machine: `lscpu`, `nproc`, `free -g`, OS, compiler, OpenBLAS version
       (`ls -l /usr/lib/x86_64-linux-gnu/libopenblas*`), into `bench/thread-budget/machine.txt`.
-- [ ] Install the BLAS variants (Debian/Ubuntu):
+- [x] Install the BLAS variants (Debian/Ubuntu):
       `sudo apt install libopenblas0-pthread libopenblas0-openmp libopenblas-dev liblapack-dev libblas-dev`
-- [ ] Build (Release, tests + benches):
+- [x] Build (Release, tests + benches):
       ```
       git submodule update --init --recursive
       cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
@@ -66,10 +67,16 @@ commit the results (CSV + summary) with it.
       ```
       Done when: all tests pass (`KrigingWarmRestartTest` is a timing test, known to be
       flaky under load; re-run it alone before reporting it).
-- [ ] Check the BLAS in use: `ldd build/src/lib/libKriging.so | grep -i blas`.
+      2026-10-18, i9-10900K (10 cores / 20 threads, no AVX-512), build dir `build-tb`:
+      216/218 with `-j8`; `KrigingWarmRestartTest` and "NuggetKriging multistart and
+      parallel tests" failed under load and pass alone (the latter sets
+      `OPENBLAS_NUM_THREADS` / `OMP_NUM_THREADS`: keep an eye on it in step 5).
+- [x] Check the BLAS in use: `ldd build/src/lib/libKriging.so | grep -i blas`.
       Switch variant with `sudo update-alternatives --config libblas.so.3-x86_64-linux-gnu`
       (and `liblapack.so.3-...`); `bench-threads` prints `blas_kind`
       (0 sequential, 1 pthreads, 2 OpenMP, -1 not OpenBLAS) in every row.
+      Here: OpenBLAS 0.3.26 pthreads (default) and reference BLAS installed;
+      OpenMP OpenBLAS (`libopenblas0-openmp`) still to install.
 
 ## Step 1 — measure (go / no-go for steps 4–5)
 
@@ -79,13 +86,39 @@ evaluation under the environment's thread counts) and `bench/bench-threads.sh`
 `t_chol_ms` (Cholesky alone), `t_cov_ms` (difference = covariance loop),
 `t_ll_ms`, `t_llgrad_ms` (`logLikelihoodFun` without / with gradient).
 
-- [ ] Baseline sweep, OpenBLAS pthreads, `kOmpMinRows` as is:
+- [x] Baseline sweep, OpenBLAS pthreads, `kOmpMinRows` as is:
       `T_LIST="1 2 4 10 20" bench/bench-threads.sh build bench/thread-budget/pthreads.csv`
-- [ ] Same with the loops forced on from n = 200: temporarily set
-      `kOmpMinRows = 200` in `src/lib/OmpLoops.hpp`, rebuild, sweep into
-      `bench/thread-budget/pthreads-min200.csv`, then restore 800.
+- [x] Same with the loops forced on from n = 200: build with
+      `-DCMAKE_CXX_FLAGS=-DLK_OMP_MIN_ROWS=200` (build dir `build-tb200`; the default
+      stays 800), sweep `N_LIST="200 500 1000"` into `bench/thread-budget/pthreads-min200.csv`.
+      2026-10-18, i9-10900K, `t_llgrad_ms`, d = 10 (d = 2 similar):
+
+      | n | default 20/20, min 800 | best, min 800 | 10/10, min 200 | 20/20, min 200 |
+      |---|---|---|---|---|
+      | 200 | 6.4 | 4.9 | 1.5 | 41 |
+      | 500 | 44.6 | 32.4 | 10.3 | 28 |
+      | 1000 | 74 | 49.3 (10/10) | 48.6 | 76 |
+
+      With BLAS and OpenMP both at the physical-core count (10), the loops are
+      worth it from n = 200 on (×3 at n = 200 and 500); with either at 20 (logical
+      CPUs) they collapse (spinning OpenBLAS threads + hyperthreads).
+      BLAS variant switched without root: `LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/openblas-openmp`
+      (OpenMP OpenBLAS) or `.../blas:.../lapack` (reference).
 - [ ] Same two sweeps with OpenBLAS OpenMP (`openmp.csv`, `openmp-min200.csv`) and the
       reference BLAS (`reference.csv`; BLAS thread count irrelevant, use `T_LIST` for OpenMP only).
+      State 2026-10-18 (bench stopped on request): `openmp.csv` and `openmp-min200.csv`
+      complete (not analysed yet); `reference.csv` 47 / 50 rows (missing n = 3000,
+      d = 10, OpenMP 4 / 10 / 20); `reference-min200.csv` not started. To resume:
+      ```
+      R=/usr/lib/x86_64-linux-gnu/blas:/usr/lib/x86_64-linux-gnu/lapack
+      for to in 4 10 20; do LD_LIBRARY_PATH=$R OMP_NUM_THREADS=$to \
+        build-tb/bench/bench-threads 3000 10 7 matern5_2 >> bench/thread-budget/reference.csv; done
+      out=bench/thread-budget/reference-min200.csv
+      LD_LIBRARY_PATH=$R build-tb200/bench/bench-threads 10 2 1 matern5_2 --header | head -1 > $out
+      for n in 200 500 1000; do for d in 2 10; do for to in 1 2 4 10 20; do
+        LD_LIBRARY_PATH=$R OMP_NUM_THREADS=$to build-tb200/bench/bench-threads $n $d 7 matern5_2 >> $out
+      done; done; done
+      ```
 - [ ] Variant (a) "BLAS to 1 thread around OpenMP loops": add an opt-in
       (`LK_BENCH_BLAS_HANDOFF=1` read once) in `cholCov` / `compute_ll_grad_theta_vecs`
       calling `detail::set_blas_threads(1)` before the loop and `restore_blas_threads`
@@ -125,9 +158,9 @@ Decision gate (write it in RESULTS.md):
       };
       }
       ```
-      `total()` resolution: API value (step 3) > `LK_NUM_THREADS` > explicit
+      `total()` resolution: API value (step 3) > `LK_NUM_THREADS_PERCENT` > explicit
       `OMP_NUM_THREADS` / `OPENBLAS_NUM_THREADS` (never exceeded) >
-      `std::thread::hardware_concurrency()`.
+      number of physical cores (see Decisions), `hardware_concurrency()` as fallback.
 - [ ] All OpenMP loops use `num_threads(detail::ThreadBudget::omp_threads())`;
       remove the three copies of `get_optimal_threads(2)`; remove the
       `omp_set_num_threads` call of the pool workers (`ScopedShare` instead).
@@ -140,7 +173,9 @@ Decision gate (write it in RESULTS.md):
 
 ## Step 3 — public API and bindings
 
-- [ ] `Optim::set_num_threads(int)` / `Optim::get_num_threads()` (0 = automatic) in
+- [ ] `Optim::set_num_threads_percent(double x)` (x <= 1: ratio, x > 1: percentage;
+      0 = automatic = 100 %), `Optim::get_num_threads_percent()` and
+      `Optim::get_num_threads()` (resolved `total`, read only) in
       `src/lib/include/libKriging/Optim.hpp` + `Optim.cpp`; `set_thread_pool_size`
       clamped by `total`.
 - [ ] Expose in the bindings next to `set_thread_pool_size`:
@@ -174,7 +209,7 @@ Decision gate (write it in RESULTS.md):
 
 ## Step 6 — documentation
 
-- [ ] `docs/dev/FAQ.md`: thread settings (`Optim::set_num_threads`, `LK_NUM_THREADS`,
+- [ ] `docs/dev/FAQ.md`: thread settings (`Optim::set_num_threads_percent`, `LK_NUM_THREADS_PERCENT`,
       BLAS variants, nested-parallelism rule), reproducibility paragraph updated.
 - [ ] Bindings READMEs (R: `parallel::mclapply` → one thread per worker advice).
 - [ ] `CHANGELOG.md` (Unreleased).
@@ -185,10 +220,75 @@ Decision gate (write it in RESULTS.md):
       Each PR: commands run, CSV excerpts, `ctest` result, and what was not verified
       (MSVC, MKL, macOS).
 
-## Open questions (to decide before step 3)
+## Decisions (2026-10-18)
 
-1. Default `total`: all cores (current behaviour) or fewer? With R `parallel` /
-   Python `multiprocessing` every process takes all cores; the library cannot detect it.
-2. Add `LK_NUM_THREADS`, or rely on the existing environment variables only?
-3. Revisit the pthreads OpenBLAS choice of the R binary (#325 / #387)? Out of scope,
-   but the only change that removes the contention at the root.
+1. Default `total` = all the cores (100 %, current behaviour). Expose a way to set
+   a **percentage** of the resources (only that, no absolute count), so that a
+   host running several processes (R `parallel`, Python `multiprocessing`) can
+   give each one a share.
+   **100 % = the physical cores**, not the logical CPUs: on the i9-10900K
+   (10 cores / 20 threads) OpenBLAS at 20 threads is slower than at 10 in every
+   configuration measured (preliminary run, syncthing active; n = 1000, d = 10: 181 vs 143 ms with OpenMP at 1;
+   default 20 / 20 = 92.6 ms vs 48.6 ms at 10 / 10). `std::thread::hardware_concurrency()`
+   (used by `run_task_pool` today) counts logical CPUs: step 2 needs a
+   physical-core count (Linux: `/sys/devices/system/cpu/cpu*/topology/core_cpus_list`
+   or `sched_getaffinity` + topology, honouring the affinity mask / cgroup quota;
+   macOS: `sysctl hw.physicalcpu`; Windows: `GetLogicalProcessorInformationEx`),
+   with `hardware_concurrency()` as the fallback.
+2. No new variable before an inventory: see "Thread settings inventory" below and
+   the rationalisation proposal there.
+3. The pthreads OpenBLAS of the R binary (#325 / #387) stays as is for now.
+- Work locally only: no GitHub Actions run (no push of this branch, no
+  `workflow_dispatch`) until told otherwise. The open item on #414 is to be
+  reproduced locally, not through CI.
+
+## Thread settings inventory (state after #414)
+
+Read by the library:
+
+| Setting | Where | Default | Effect |
+|---|---|---|---|
+| `LK_THREAD_POOL_SIZE` / `Optim::set_thread_pool_size` | `Optim.cpp`, `run_task_pool` | 0 = `hardware_concurrency()` | multistart workers (WarpKriging / MLPKriging only), clamped to the number of starts |
+| `LK_THREAD_START_DELAY_MS` / `Optim::set_thread_start_delay_ms` | `Optim.cpp`, `run_task_pool` | 10 | stagger of the first task of each worker (not a thread count) |
+
+Implicit (hard-coded) in the library:
+
+| Setting | Where | Effect |
+|---|---|---|
+| `get_optimal_threads(2)` (3 copies) | `LinearAlgebra.cpp` (`compute_dX`, `covMat_*`), `KrigingImpl.cpp` (predict `R_on` ×2), `Kriging.cpp` | caps those loops at **2** OpenMP threads whatever the machine |
+| no `num_threads` | `LinearAlgebra.cpp` `cholCov` / `update_cholCov`, `KrigingImpl.cpp` gradient loop, `Kriging.cpp` Vecchia ×2, `NestedKriging.cpp` pair loop | use `omp_get_max_threads()` of the calling thread (all cores by default) |
+| thresholds | `kOmpMinRows = 800` (cov / gradient), `n >= 200` (`compute_dX`, `covMat_*`), `work >= 40000` (predict, Vecchia, Nested) | serial below |
+| pool share | `run_task_pool` | BLAS = `ncpu / pool` (process-global, via `BlasThreadGuard`), OpenMP = same value per worker (`omp_set_num_threads` in each worker) |
+| `set_blas_threads(n)` | `Kriging.cpp` | sets **both** OpenBLAS and the calling thread's OpenMP ICV (restored by the guard) |
+| `pthread_atfork` handlers | `Kriging.cpp` | BLAS / OpenMP to 1 thread around `fork()` |
+
+Read by the runtimes, not by the library (only documented):
+`OMP_NUM_THREADS`, `OMP_THREAD_LIMIT`, `GOMP_SPINCOUNT` (libgomp);
+`OPENBLAS_NUM_THREADS` (falls back on `OMP_NUM_THREADS`), `OPENBLAS_THREAD_TIMEOUT`
+(OpenBLAS); `MKL_NUM_THREADS`; `VECLIB_MAXIMUM_THREADS` (Accelerate). In-tree
+uses: `docs/dev/FAQ.md` (reproducibility), `bindings/R/README.md`
+(`OMP_THREAD_LIMIT=1 GOMP_SPINCOUNT=0 OPENBLAS_NUM_THREADS=1`), CI scripts
+(`OMP_NUM_THREADS=1` on Windows and the notebooks), tests
+(`NoiseKrigingTest`, `NuggetKrigingTest`, `threading_test.py`).
+
+Rationalisation proposal (to validate before step 3):
+
+- **One** new budget setting (decided 2026-10-18), a share of the physical cores:
+  `Optim::set_num_threads_percent(double x)` and `LK_NUM_THREADS_PERCENT=x`, with
+  x <= 1 read as a ratio (0.5) and x > 1 as a percentage (50); 0 or unset = 100 %.
+  `total = max(1, round(share × physical cores))`. No absolute-count setter.
+  `Optim::get_num_threads_percent()` returns the setting, `Optim::get_num_threads()`
+  the resolved `total`.
+- `total` = the setting above, never more than the counts in effect when the
+  library is first used (`omp_get_max_threads()`, `openblas_get_num_threads()`),
+  so that an explicit `OMP_NUM_THREADS` / `OPENBLAS_NUM_THREADS` is respected
+  without the library reading them itself.
+- `LK_THREAD_POOL_SIZE` kept (pool size inside `total`, clamped by it).
+- `LK_THREAD_START_DELAY_MS` kept as a tuning knob, out of the budget.
+- Removed: the three `get_optimal_threads(2)` (the cap of 2 becomes the budget
+  share), the per-worker `omp_set_num_threads`, and the OpenMP part of
+  `set_blas_threads` (OpenMP counts go through `num_threads(...)` only, so the
+  host ICV is never touched).
+- Thresholds (`kOmpMinRows`, `n >= 200`, `>= 40000`): one place (`OmpLoops.hpp`),
+  values from step 1.
+- Runtime variables stay the user's tools; documented in the FAQ, not read.

@@ -27,7 +27,11 @@ namespace detail {
 /// both at 4 threads, d = 4: log-likelihood + gradient 3.9 -> 17 ms at n = 200,
 /// break-even around n = 700, 75 -> 48 ms at n = 800). See
 /// docs/dev/ThreadBudget-TODO.md for the shared thread budget meant to lift it.
-constexpr unsigned long long kOmpMinRows = 800;
+/// LK_OMP_MIN_ROWS overrides it at compile time (thread-budget benchmarks).
+#ifndef LK_OMP_MIN_ROWS
+#define LK_OMP_MIN_ROWS 800
+#endif
+constexpr unsigned long long kOmpMinRows = LK_OMP_MIN_ROWS;
 }  // namespace detail
 }  // namespace libKriging
 
