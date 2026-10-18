@@ -103,3 +103,5 @@ Testing/
 
 # Custom params
 AGENTS.md
+# thread-budget measurements are committed (docs/dev/ThreadBudget-TODO.md)
+!bench/thread-budget/*.csv
