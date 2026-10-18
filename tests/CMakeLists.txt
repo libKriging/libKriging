@@ -352,6 +352,11 @@ endif()
 catch_discover_tests(WarpKrigingUpdateSimulateTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
+add_executable(BlasThreadsTest BlasThreadsTest.cpp)
+target_link_libraries(BlasThreadsTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries BlasThreadsTest)
+catch_discover_tests(BlasThreadsTest)
+
 add_executable(SimulateStateResetTest SimulateStateResetTest.cpp)
 target_link_libraries(SimulateStateResetTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries SimulateStateResetTest)
