@@ -25,13 +25,18 @@ This page collects questions about libKriging development
  The result may change with the BLAS thread count (`OPENBLAS_NUM_THREADS`, the number of cores),
  the BLAS library or its version, or the CPU (OpenBLAS selects AVX2 / AVX-512 kernels at run
  time): a multithreaded BLAS splits its sums by thread, so the rounding of the objective and of
- its gradient changes, by ~1e-15 relative. The OpenMP thread count (`OMP_NUM_THREADS`) has no
- effect. These rounding differences stay at that level on a well-conditioned covariance matrix,
- but are amplified by its condition number: on noise-free, smooth data the optimum often lies
+ its gradient changes, by ~1e-15 relative. The OpenMP thread count has no effect: the
+ OpenMP loops (covariance matrix, log-likelihood gradient) write independent entries or sum in
+ a fixed order. Note that OpenBLAS also reads `OMP_NUM_THREADS` when `OPENBLAS_NUM_THREADS` is
+ not set, so that this variable may still change the BLAS thread count. A build without
+ OpenMP sums the gradient in another order (from n = 200 on), with the same consequences.
+
+ These rounding differences stay at that level on a well-conditioned covariance matrix, but
+ are amplified by its condition number: on noise-free, smooth data the optimum often lies
  at large `theta`, where `cond(R)` reaches 1e14 or more, the objective is then only known to
  ~1e-2 and L-BFGS-B may follow a different path and end at another, equivalent, local optimum.
- E.g. n = 500, d = 4, `y = sum(sin(3 x))`, `"BFGS20"`: log-likelihood 3376.36 with 1 BLAS thread,
- 3375.21 with 4.
+ E.g. n = 500, d = 4, `y = sum(sin(3 x))`, `"BFGS20"`: log-likelihood 3376.32 with 1 BLAS thread,
+ 3375.68 with 2, 3375.63 with 4.
 
  To get the same result on several machines, set the same BLAS thread count everywhere (e.g.
  `OPENBLAS_NUM_THREADS=1`, at the cost of speed) and use the same BLAS build; a nugget or noise

@@ -976,20 +976,46 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
   // its complexity class.
   arma::mat dX_local;
   const arma::mat& dX = m_dX.is_empty() ? (dX_local = LinearAlgebra::compute_dX(m_X)) : m_dX;
-  for (arma::uword i = 0; i < n; i++) {
+  // Adds the contributions of the pairs (i, j < i) of row i to t1 / t2.
+  auto add_row = [&](arma::uword i, double* t1, double* t2) {
+    const double x_i = x.at(i);
     for (arma::uword j = 0; j < i; j++) {
       arma::vec dlnCov = _DlnCovDtheta(dX.col(i * n + j), theta);
       double R_ij = R.at(i, j);
-      double x_i = x.at(i);
       double x_j = x.at(j);
       double Rinv_ij = Rinv.at(i, j);
       for (arma::uword k = 0; k < d; k++) {
         double gradR_k_ij = R_ij * dlnCov.at(k);
-        term1_vec.at(k) += 2.0 * x_i * gradR_k_ij * x_j;
-        term2_vec.at(k) -= 2.0 * Rinv_ij * gradR_k_ij;
+        t1[k] += 2.0 * x_i * gradR_k_ij * x_j;
+        t2[k] -= 2.0 * Rinv_ij * gradR_k_ij;
       }
     }
+  };
+#ifdef _OPENMP
+  if (n >= 200) {
+    // Per-row partial sums, then summed over rows in a fixed order: the result
+    // does not depend on the number of threads. It differs from the sequential
+    // order kept below for small n (and without OpenMP): on an ill-conditioned
+    // R the trace term cancels heavily, so the gradient, hence the optimum
+    // reached, may change noticeably between the two orders.
+    arma::mat term1_rows(d, n, arma::fill::zeros);
+    arma::mat term2_rows(d, n, arma::fill::zeros);
+#pragma omp parallel for schedule(dynamic, 8)
+    for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
+      const arma::uword i = static_cast<arma::uword>(si);
+      add_row(i, term1_rows.colptr(i), term2_rows.colptr(i));
+    }
+    for (arma::uword i = 0; i < n; i++) {
+      for (arma::uword k = 0; k < d; k++) {
+        term1_vec.at(k) += term1_rows.at(k, i);
+        term2_vec.at(k) += term2_rows.at(k, i);
+      }
+    }
+    return;
   }
+#endif
+  for (arma::uword i = 0; i < n; i++)
+    add_row(i, term1_vec.memptr(), term2_vec.memptr());
 }
 
 arma::vec KrigingImpl::compute_lmp_theta_ans(const KModel& m,

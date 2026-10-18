@@ -113,6 +113,12 @@ past release, see the corresponding entry on the
   cores: one log-likelihood evaluation 0.21 s → 0.13 s). Each entry is written once, so the
   result does not depend on the OpenMP thread count. Each worker of a parallel multistart
   gets its share of OpenMP threads, as of BLAS threads.
+- **Kriging**: the θ part of the log-likelihood gradient is computed in an OpenMP loop from
+  n = 200 on (n = 1500, d = 4, 4 cores: 28 ms → 12 ms per gradient), with per-row partial
+  sums added in a fixed order, so it does not depend on the thread count. This order differs
+  from the sequential one, kept below n = 200 and without OpenMP: on an ill-conditioned
+  covariance matrix the gradient, hence the optimum reached, may change (see
+  [docs/dev/FAQ.md](docs/dev/FAQ.md)).
 - **Python**: supported CPython versions are 3.10 to 3.14: the CI tests each of them
   (3.10 and 3.14 on Linux and Windows), the release builds wheels for all of them, and
   `python_requires` is now `>=3.10` (the end-of-life 3.7 and 3.9 jobs are dropped)
