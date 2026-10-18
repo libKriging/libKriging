@@ -19,8 +19,12 @@ namespace detail {
 /// and not draw from the global RNG (draw the starting points before). This
 /// requires a reentrant L-BFGS-B: lbfgsb_cpp >= b6eff96, whose f2c BLAS /
 /// LINPACK helpers (Lbfgsb.3.0/blas.c, linpack.c) no longer keep `static`
-/// locals that concurrent optimizers would race on. Defined in TaskPool.cpp.
-void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char* label);
+/// locals that concurrent optimizers would race on.
+///
+/// stagger: delay the first task of worker k by k × Optim::thread_start_delay_ms
+/// (WarpKriging); off for short tasks such as a Kriging start, where 20 workers
+/// waited up to 190 ms, longer than a whole start at n = 100. Defined in TaskPool.cpp.
+void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char* label, bool stagger = true);
 
 }  // namespace detail
 }  // namespace libKriging

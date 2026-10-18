@@ -178,6 +178,8 @@ still computed from the 20 logical CPUs (step 2 not done).
   task of worker k by k × `Optim::thread_start_delay_ms` (10 ms): 190 ms for the
   last of 20 workers, more than a whole n = 100 start. The delay should scale
   with the problem or go (it was introduced for WarpKriging).
+  Done: `run_task_pool(..., stagger)`, off for the Kriging multistart: n = 100,
+  BFGS20, 20 workers 271 → 101–113 ms (3 runs), on par with 10 workers.
 
 ## Decision (gate of step 1)
 

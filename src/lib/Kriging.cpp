@@ -4134,7 +4134,10 @@ void Kriging::fit_impl(const arma::vec& y,
       // (KrigingTest checks it to 1e-3 relative).
       std::vector<OptimizationResult> results(multistart);
       libKriging::detail::run_task_pool(
-          multistart, [&](int task_id) { results[task_id] = optimize_worker(task_id); }, "multistart");
+          multistart,
+          [&](int task_id) { results[task_id] = optimize_worker(task_id); },
+          "multistart",
+          /*stagger=*/false);
 
       // Find best result
       int best_idx = -1;

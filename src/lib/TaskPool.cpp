@@ -24,7 +24,7 @@ namespace {
 thread_local bool in_pool_worker = false;
 }  // namespace
 
-void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char* label) {
+void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char* label, bool stagger) {
   if (n_tasks <= 1 || in_pool_worker) {
     for (int i = 0; i < n_tasks; i++)
       task(i);
@@ -84,7 +84,7 @@ void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char
         // Staggered startup delay: only for each worker's first task
         // (applied to every task, it added up to ~(n_tasks/pool)^2
         // delays with no benefit once the pool is running).
-        if (task_id < pool_size) {
+        if (stagger && task_id < pool_size) {
           int delay_ms = task_id * Optim::thread_start_delay_ms;
           std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
         }
