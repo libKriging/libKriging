@@ -24,6 +24,7 @@
 
 #include "BlasThreads.hpp"
 #include "TaskPool.hpp"
+#include "ThreadBudget.hpp"
 
 #include <cassert>
 #include <cstdlib>
@@ -35,16 +36,6 @@
 
 #ifdef _OPENMP
 #include <omp.h>
-
-// Helper function to safely get optimal thread count
-// Windows MSVC OpenMP can sometimes return unexpected values
-inline int get_optimal_threads(int max_default = 2) {
-  int max_threads = omp_get_max_threads();
-  if (max_threads <= 0) {
-    return 1;
-  }
-  return (max_threads > max_default) ? max_default : max_threads;
-}
 #endif
 
 // Helpers to get OpenBLAS thread control functions (if available)
@@ -1467,6 +1458,7 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodVecchiaFun
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const arma::mat& X_n,
                                                                            bool return_stdev,
                                                                            arma::uword m) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const arma::uword n = m_X.n_rows;
   const arma::uword d = m_X.n_cols;
   const arma::uword q = X_n.n_rows;
@@ -1500,7 +1492,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
   const double* xp = Xt.memptr();
 
 #if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
-#pragma omp parallel for schedule(dynamic, 16) if (q > 32 && n * m >= 40000)
+#pragma omp parallel for schedule(dynamic, 16) num_threads(libKriging::detail::omp_threads()) if (q > 32 && n * m >= 40000)
 #endif
   for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
     // m nearest observations (normalized space), partial selection
@@ -1575,6 +1567,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
                                                      arma::uword m,
                                                      bool with_nugget,
                                                      const arma::vec& with_noise) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const arma::uword n = m_X.n_rows;
   const arma::uword d = m_X.n_cols;
   const arma::uword q = X_n.n_rows;
@@ -1608,7 +1601,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
   const arma::mat Xt = m_X.t();
   const double* xp = Xt.memptr();
 #if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
-#pragma omp parallel for schedule(dynamic, 16) if (q > 32 && n * m_obs >= 40000)
+#pragma omp parallel for schedule(dynamic, 16) num_threads(libKriging::detail::omp_threads()) if (q > 32 && n * m_obs >= 40000)
 #endif
   for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
     std::vector<std::pair<double, arma::uword>> cand(n);
@@ -2164,6 +2157,7 @@ void Kriging::check_not_nystrom_light(const char* what) const {
  * universal-kriging-style with the committed beta; variance is the
  * simple-kriging one (beta treated as known, like predictVecchia). */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const arma::mat& X_n, bool return_stdev) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (m_nystrom_U.is_empty())
     throw std::runtime_error("predictNystrom: model was not fitted with method=\"nystrom(k)\"");
   const arma::uword d = m_X.n_cols;
@@ -2213,6 +2207,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::simulateNystrom(int nsim, int seed, const arma::mat& X_n) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (m_nystrom_U.is_empty())
     throw std::runtime_error("simulateNystrom: model was not fitted with method=\"nystrom(k)\"");
   const arma::uword d = m_X.n_cols;
@@ -3421,6 +3416,7 @@ void Kriging::fit_impl(const arma::vec& y,
                        const std::string& objective_in,
                        const Parameters& parameters,
                        const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const arma::uword n = X.n_rows;
   // Heterogeneous noise in the ORIGINAL scale of y: the given one, or (refit
   // without new noise) the current one, read before the normalization
@@ -4267,6 +4263,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
 Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   // exact prediction only: no implicit switch to an approximate predictor
   check_exact_available("predict", "predict");
   const arma::uword n_o = m_X.n_rows;
@@ -4300,6 +4297,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::m
     bool return_cov,
     bool return_deriv,
     const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "predict");
   check_nystrom_rank(am, m_nystrom_k, "predict");
   if (am.kind == ApproxMethod::Exact)
@@ -4316,6 +4314,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const arma::mat& X_n,
                                               const std::string& method,
                                               const bool will_update) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "simulate");
   check_nystrom_rank(am, m_nystrom_k, "simulate");
   if (am.kind == ApproxMethod::Exact)
@@ -4332,6 +4331,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const bool with_nugget,
                                               const bool will_update,
                                               const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "simulate");
   check_nystrom_rank(am, m_nystrom_k, "simulate");
   if (am.kind == ApproxMethod::Exact)
@@ -4356,6 +4356,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const arma::vec& with_noise,
                                               const bool will_update,
                                               const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "simulate");
   check_nystrom_rank(am, m_nystrom_k, "simulate");
   if (am.kind == ApproxMethod::Exact)
@@ -4387,6 +4388,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
                                               const int seed,
                                               const arma::mat& X_n,
                                               const bool will_update) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   check_exact_available("simulate", "simulate");
   if (m_noise_model == NoiseModel::Nugget)
     return simulate(nsim, seed, X_n, /*with_nugget=*/false, will_update);
@@ -4412,6 +4414,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const arma::mat& X_n,
                                               const bool with_nugget,
                                               const bool will_update) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   check_exact_available("simulate", "simulate");
   const double alpha = m_alpha;
   const arma::vec diag_nn = with_nugget ? arma::vec(X_n.n_rows, arma::fill::ones) : arma::vec();
@@ -4437,6 +4440,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const arma::mat& X_n,
                                               const arma::vec& with_noise,
                                               const bool will_update) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const arma::uword n_n = X_n.n_rows;
   if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
     throw std::runtime_error("Noise vector should have same length as X_n");
@@ -4468,6 +4472,7 @@ void Kriging::clear_simulate_state() {
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   // the noise of the new observations is needed (checked before any state change)
   if (m_noise_model == NoiseModel::Heterogeneous)
     throw std::invalid_argument("heterogeneous noise model: use update_simulate(y_u, noise_u, X_u)");
@@ -4502,6 +4507,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
                                                      const arma::vec& noise_u,
                                                      const arma::mat& X_u) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension mismatch: y_u and X_u");
   if (X_u.n_cols != m_X.n_cols)
@@ -4536,6 +4542,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
  * @param refit is true if we want to re-fit the model
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   // the noise of the new observations is needed (checked before any state change)
   if (m_noise_model == NoiseModel::Heterogeneous)
     throw std::invalid_argument("heterogeneous noise model: use update(y_u, noise_u, X_u)");
@@ -4747,6 +4754,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u,
                                        const arma::vec& noise_u,
                                        const arma::mat& X_u,
                                        const bool refit) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (m_noise_model != NoiseModel::Heterogeneous)
     throw std::runtime_error("update(y, noise, X) requires NoiseModel::Heterogeneous");
   if (y_u.n_elem != X_u.n_rows)

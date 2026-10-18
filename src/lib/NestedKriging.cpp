@@ -4,6 +4,8 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
 
+#include "ThreadBudget.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -184,6 +186,7 @@ void NestedKriging::fit(const arma::vec& y,
                         const Kriging::Parameters& parameters,
                         const std::vector<std::string>& warping,
                         const std::string& method_in) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("y and X should have the same number of rows");
   if (nb_groups < 1 || nb_groups > X.n_rows / (X.n_cols + 2))
@@ -369,6 +372,7 @@ void NestedKriging::precompute_nk() {
 // =============================================================================
 
 std::tuple<arma::vec, arma::vec> NestedKriging::predict(const arma::mat& X_n, bool return_stdev) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (!m_is_fitted)
     throw std::runtime_error("NestedKriging is not fitted");
   if (X_n.n_cols != m_X.n_cols)
@@ -474,7 +478,7 @@ std::tuple<arma::vec, arma::vec> NestedKriging::predict_nk(const arma::mat& X_n,
     const arma::sword npairs = static_cast<arma::sword>(p * (p - 1) / 2);
 #if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
     const arma::uword pair_work = (p > 1) ? (m_X.n_rows * m_X.n_rows) / p * qc : 0;
-#pragma omp parallel for schedule(dynamic) if (npairs > 1 && pair_work >= 40000)
+#pragma omp parallel for schedule(dynamic) num_threads(libKriging::detail::omp_threads()) if (npairs > 1 && pair_work >= 40000)
 #endif
     for (arma::sword k = 0; k < npairs; ++k) {
       // unrank pair index k -> (i, j), i < j

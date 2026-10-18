@@ -150,6 +150,28 @@ Decision gate (write it in RESULTS.md):
 
 ## Step 2 — single source of truth: `detail::ThreadBudget` (private)
 
+Done 2026-10-18 (differs from the plan below where noted):
+- `src/lib/ThreadBudget.hpp/.cpp` (new file; `BlasThreads.hpp` kept for the
+  fork handlers and the BLAS get/set): `physical_cores()` (Linux sysfs topology
+  of the affinity mask + cgroup v2 quota; macOS `hw.physicalcpu`; Windows
+  `GetLogicalProcessorInformationEx` — the last two not compiled here),
+  `budget_total()`, `omp_threads()`, `ScopedShare`, `ScopedBlasThreads`,
+  `BudgetScope` (OpenBLAS at the budget for each public fit / predict /
+  simulate / update / update_simulate of Kriging, WarpKriging, NestedKriging;
+  no-op in pool workers).
+- `Optim::set_num_threads_percent` / `get_num_threads_percent` /
+  `get_num_threads`, `LK_NUM_THREADS_PERCENT` (C++ only; bindings: step 3).
+- Every OpenMP loop: `num_threads(omp_threads())`; `get_optimal_threads(2)` ×3
+  and the cap of 2 removed; the pool workers no longer call
+  `omp_set_num_threads` (no ICV of any thread is changed, except by the fork
+  handlers).
+- `kOmpMinRows`: 200 on Linux, 800 elsewhere (#416, #417).
+- Pool (`TaskPool.cpp`): pool = min(starts, `thread_pool_size` or budget),
+  share = budget / pool for BLAS (process-global, restored) and OpenMP (per
+  worker). The remainder of budget / pool is not distributed (budget 5, 4 starts:
+  4 × 1).
+- ctest 218/218.
+
 - [ ] Rename `src/lib/BlasThreads.hpp` → `src/lib/ThreadBudget.hpp`; keep
       `BlasThreadGuard` (restore-on-exit) and the `pthread_atfork` handlers unchanged.
 - [ ] Add:

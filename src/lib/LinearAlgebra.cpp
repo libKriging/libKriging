@@ -10,16 +10,6 @@
 #ifdef _OPENMP
 #include <omp.h>
 
-// Helper function to safely get optimal thread count
-// Windows MSVC OpenMP can sometimes return unexpected values
-inline int get_optimal_threads(int max_default = 2) {
-  int max_threads = omp_get_max_threads();
-  // Defensive: ensure we get a valid thread count
-  if (max_threads <= 0) {
-    return 1;  // Fallback to serial if OpenMP returns invalid value
-  }
-  return (max_threads > max_default) ? max_default : max_threads;
-}
 #endif
 
 #include "libKriging/Bench.hpp"
@@ -27,6 +17,7 @@ inline int get_optimal_threads(int max_default = 2) {
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "BlasThreads.hpp"
+#include "ThreadBudget.hpp"
 #include "OmpLoops.hpp"
 
 #include <mutex>
@@ -158,7 +149,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R,
   {
 #ifdef LK_OMP_LOOPS
     libKriging::detail::BenchBlasHandoff handoff(n >= libKriging::detail::kOmpMinRows);
-#pragma omp parallel for schedule(dynamic, 8) if (n >= libKriging::detail::kOmpMinRows)
+#pragma omp parallel for schedule(dynamic, 8) num_threads(libKriging::detail::omp_threads()) if (n >= libKriging::detail::kOmpMinRows)
 #endif
     for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
       const arma::uword i = static_cast<arma::uword>(si);
@@ -206,7 +197,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(
   // same amount of work as the full matrix at n = kOmpMinRows
   const bool parallel_rows = static_cast<unsigned long long>(n - n_old) * n
                              >= libKriging::detail::kOmpMinRows * libKriging::detail::kOmpMinRows / 2;
-#pragma omp parallel for schedule(dynamic, 8) if (parallel_rows)
+#pragma omp parallel for schedule(dynamic, 8) num_threads(libKriging::detail::omp_threads()) if (parallel_rows)
 #endif
   for (arma::sword si = static_cast<arma::sword>(n_old); si < static_cast<arma::sword>(n); si++) {
     const arma::uword i = static_cast<arma::uword>(si);
@@ -436,7 +427,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
 
 #ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices
-    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
+    int optimal_threads = libKriging::detail::omp_threads();
     #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
       for (arma::sword j = i + 1; j < static_cast<arma::sword>(n); j++) {
@@ -486,7 +477,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
 #ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
+    int optimal_threads = libKriging::detail::omp_threads();
     #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
       for (arma::sword j = 0; j < i; j++) {
@@ -537,7 +528,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
 #ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
+    int optimal_threads = libKriging::detail::omp_threads();
     #pragma omp parallel for schedule(dynamic, 4) num_threads(optimal_threads) if(n >= 200)
     for (arma::sword bi = 0; bi < static_cast<arma::sword>(n); bi += BLOCK_SIZE) {
       arma::uword block_end_i = (bi + BLOCK_SIZE < n) ? bi + BLOCK_SIZE : n;
@@ -609,7 +600,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
   arma::uword total_work = n1 * n2;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
+    int optimal_threads = libKriging::detail::omp_threads();
     #pragma omp parallel num_threads(optimal_threads) if(total_work >= 40000)
     {
       // Pre-allocate diff vector once per thread (thread-local)

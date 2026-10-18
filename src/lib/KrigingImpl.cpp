@@ -17,6 +17,7 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 
 #include "BlasThreads.hpp"
+#include "ThreadBudget.hpp"
 #include "OmpLoops.hpp"
 
 #include <stdexcept>
@@ -26,15 +27,6 @@
 
 #ifdef _OPENMP
 #include <omp.h>
-namespace {
-inline int get_optimal_threads(int max_default = 2) {
-  int max_threads = omp_get_max_threads();
-  if (max_threads <= 0) {
-    return 1;
-  }
-  return (max_threads > max_default) ? max_default : max_threads;
-}
-}  // namespace
 #endif
 
 namespace {
@@ -304,7 +296,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
 #ifdef _OPENMP
   arma::uword total_work = n_o * n_n;
   if (total_work >= 40000) {
-    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
+    int optimal_threads = libKriging::detail::omp_threads();
 #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if (total_work >= 40000)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
       for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
@@ -464,7 +456,7 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
 #ifdef _OPENMP
   arma::uword total_work = n_o * n_n;
   if (total_work >= 40000) {
-    int optimal_threads = get_optimal_threads(LK_OMP_THREAD_CAP);
+    int optimal_threads = libKriging::detail::omp_threads();
 #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if (total_work >= 40000)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
       for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
@@ -1005,7 +997,7 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
     arma::mat term2_rows(d, n, arma::fill::zeros);
     {
       libKriging::detail::BenchBlasHandoff handoff(true);
-#pragma omp parallel for schedule(dynamic, 8)
+#pragma omp parallel for schedule(dynamic, 8) num_threads(libKriging::detail::omp_threads())
       for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
         const arma::uword i = static_cast<arma::uword>(si);
         add_row(i, term1_rows.colptr(i), term2_rows.colptr(i));

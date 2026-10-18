@@ -21,25 +21,20 @@
 namespace libKriging {
 namespace detail {
 /// Smallest n for which the O(n^2) loops of an objective evaluation (covariance
-/// matrix, log-likelihood gradient) run in parallel. Below it, the OpenMP team
-/// competes for the cores with the OpenBLAS threads still spinning after the
-/// previous BLAS call and is slower than one thread (4 cores, OpenBLAS pthreads,
-/// both at 4 threads, d = 4: log-likelihood + gradient 3.9 -> 17 ms at n = 200,
-/// break-even around n = 700, 75 -> 48 ms at n = 800). See
-/// docs/dev/ThreadBudget-TODO.md for the shared thread budget meant to lift it.
-/// LK_OMP_MIN_ROWS overrides it at compile time (thread-budget benchmarks).
+/// matrix, log-likelihood gradient) run in parallel. With BLAS and OpenMP both
+/// at the thread budget (physical cores, ThreadBudget.hpp) they pay off from
+/// n = 200 on Linux (i9-10900K, OpenBLAS pthreads / OpenMP, libgomp: x3 at
+/// n = 200-500, bench/thread-budget/RESULTS.md). Elsewhere (libomp, Accelerate,
+/// Windows OpenBLAS) not measured yet: kept at 800, see #416 (macOS) and #417
+/// (Windows). LK_OMP_MIN_ROWS overrides it at compile time.
 #ifndef LK_OMP_MIN_ROWS
+#if defined(__linux__)
+#define LK_OMP_MIN_ROWS 200
+#else
 #define LK_OMP_MIN_ROWS 800
 #endif
-constexpr unsigned long long kOmpMinRows = LK_OMP_MIN_ROWS;
-
-/// Cap on the OpenMP team of compute_dX, covMat_sym_*, covMat_rect and the
-/// predict / simulate R_on loops (get_optimal_threads in LinearAlgebra.cpp and
-/// KrigingImpl.cpp). LK_OMP_THREAD_CAP overrides it at compile time
-/// (thread-budget benchmarks); replaced by the budget in step 2.
-#ifndef LK_OMP_THREAD_CAP
-#define LK_OMP_THREAD_CAP 2
 #endif
+constexpr unsigned long long kOmpMinRows = LK_OMP_MIN_ROWS;
 }  // namespace detail
 }  // namespace libKriging
 

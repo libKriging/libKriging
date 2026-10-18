@@ -100,18 +100,22 @@ class Optim {
   LIBKRIGING_EXPORT static void set_thread_start_delay_ms(int delay_ms);
   LIBKRIGING_EXPORT static int get_thread_start_delay_ms();
 
-  // Thread pool size for BFGS multistart optimization
-  // Purpose: Limit concurrent threads to avoid oversubscription
-  //
-  // Default: ncpu/8 (conservative to allow nested BLAS parallelism)
-  // - Each worker thread can use multiple CPU cores for BLAS operations
-  // - Prevents thread thrashing and memory bandwidth saturation
-  // - Can be set to 0 to use unlimited threads (one per multistart)
-  //
-  // Example: On a 20-core system:
-  //   - pool_size = 20/8 = 2 workers at a time
-  //   - Each worker uses ~10 BLAS threads (20/2)
-  //   - BFGS20 runs as 10 batches of 2 workers each
+  // Thread budget of the library: the share of the physical cores it uses,
+  // x <= 1 a ratio (0.5), x > 1 a percentage (50), 0 = automatic = 100 %.
+  // Default from LK_NUM_THREADS_PERCENT. Never more than an explicit
+  // OMP_NUM_THREADS / omp_set_num_threads of the calling thread nor the
+  // OpenBLAS count (OPENBLAS_NUM_THREADS) in effect when the library is first
+  // used. The multistart pool gets it first (one worker per start, up to the
+  // budget), each worker's BLAS / OpenMP calls the rest (budget / workers).
+  static double num_threads_percent;
+  LIBKRIGING_EXPORT static void set_num_threads_percent(double x);
+  LIBKRIGING_EXPORT static double get_num_threads_percent();
+  /// Resolved thread budget (number of threads), read only.
+  LIBKRIGING_EXPORT static int get_num_threads();
+
+  // Number of multistart workers (Kriging, WarpKriging, MLPKriging), at most
+  // the number of starts; 0 = automatic = the thread budget (one thread per
+  // worker when the starts outnumber it). Default from LK_THREAD_POOL_SIZE.
   static int thread_pool_size;
   LIBKRIGING_EXPORT static void set_thread_pool_size(int pool_size);
   LIBKRIGING_EXPORT static int get_thread_pool_size();
