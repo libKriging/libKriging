@@ -5,6 +5,18 @@ run on a dedicated machine with ~20 cores. Each step lists its commands, what to
 record and when it is done. Tick the boxes in this file as work progresses and
 commit the results (CSV + summary) with it.
 
+## Hand-off state (2026-10-18)
+
+- PR #414 head `fb8315a`; its CI was still running at hand-off. Open item on it:
+  `build (Octave Linux, ubuntu-22.04, ...)` failed on d7d5ffc (wrong gradients,
+  failed Cholesky, also for n < 200) on an Intel Xeon 6973P runner, and passed on
+  52a7288 on an AMD EPYC 7763. That job links Ubuntu 22.04's OpenBLAS 0.3.20
+  (pthreads, `DYNAMIC_ARCH`). Not reproduced locally (GCC 11, OpenBLAS 0.3.20
+  `TARGET=COOPERLAKE` and 0.3.26, AVX-512 Xeon). Working hypothesis: OpenBLAS
+  0.3.20 kernel selection on that CPU. See the comment on PR #414; check the
+  Octave Linux job of the current head and its `lscpu` lines first.
+- [ ] Resolve the item above before merging #414 (this branch is stacked on it).
+
 ## Context (state after PR #414)
 
 - Parallel levels in the library:
