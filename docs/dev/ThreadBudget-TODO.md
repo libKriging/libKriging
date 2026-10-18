@@ -134,7 +134,9 @@ evaluation under the environment's thread counts) and `bench/bench-threads.sh`
       (BLAS, OpenMP) split per n, the break-even n of the OpenMP loops, and the
       speed-up of each variant vs baseline (median of ≥ 7 reps; note the spread).
 
-Step 1 done 2026-10-18 (`bench/thread-budget/RESULTS.md`). Outcome: step 4
+Step 1 done 2026-10-18 (`bench/thread-budget/RESULTS.md`). Linux only: macOS
+(Accelerate, libomp, P/E cores) in #416, Windows (OpenBLAS DLL lookup, libomp,
+OpenMP hangs) in #417; `kOmpMinRows` stays 800 on both until measured. Outcome: step 4
 dropped; the gain (full fits ×1.4–2.1) comes from capping BLAS and OpenMP at the
 physical cores, which lets `kOmpMinRows` go down to 200 — the two must ship
 together (threshold 200 without the budget: up to ×13.6 slower).
