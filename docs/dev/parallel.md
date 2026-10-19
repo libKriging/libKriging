@@ -128,8 +128,10 @@ Full fits (Kriging gauss, d = 4), no environment variable, 300 ms warm-up,
 | 2000 | BFGS | 6.22 s | 3.64 s | 1.7 |
 
 n = 100 with a single start (8 vs 58 ms) is not comparable: the BLAS thread count
-changes the last bits of theta, which flips the restart test of the fit; the
-slower run restarts 3 times and reaches a much better optimum (RESULTS.md 10).
+changes the last bits of the objective, which turns the L-BFGS-B outcome from
+`CONVERGENCE` into `ABNORMAL_TERMINATION_IN_LNSRCH` and triggers the restarts of
+the fit; the slower run restarts 3 times and reaches a much better optimum
+(RESULTS.md 10).
 
 predict / simulate / update: ×1.5–3.8 (single-point predict and small updates
 unchanged, not thread-bound). Multistart in the pool instead of sequential:
@@ -185,11 +187,11 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
    20 workers are 0–10 % faster than 10 for `BFGS20` (n = 100, 500), within 1 %
    for `BFGS10` (after the warm-up; the 6–15 % measured before included the
    start-up transient).
-6. **Restart test of the fit** (`sol_to_lb < eps` in `Kriging::fit_impl`):
-   flips on the last bits of theta, so a single-start fit can end at a much
-   better or worse optimum depending on the BLAS thread count (n = 100:
-   f = 46.2 vs 107.2). Independent of the budget; to be made robust (tolerance
-   relative to the bounds) in its own issue.
+6. **Restarts of the fit** (`Kriging::fit_impl`): they are triggered by the
+   L-BFGS-B outcome (`ABNORMAL_TERMINATION_IN_LNSRCH`), which flips on the last
+   bits of the objective, so a single-start fit can end at a much better or
+   worse optimum depending on the BLAS thread count (n = 100: f = 46.2 vs
+   107.2). Independent of the budget; its own issue.
 4. **Bindings setting `OPENBLAS_NUM_THREADS`** to the physical cores before
    loading their OpenBLAS (R binary), or documentation only.
 5. **Other BLAS**: MKL (`mkl_set_num_threads_local` gives a real per-worker

@@ -328,11 +328,12 @@ Spread max / min ≤ 1.03 except n = 100 (≤ 1.5) and n = 500 BFGS (≤ 1.5).
 - n = 100, BFGS: **not a thread-efficiency regression but a different optimizer
   path**. With OpenBLAS at 20 threads, L-BFGS-B stops after its first run
   (f = 107.178, 6 iterations); at 10 threads (also with the "before" code and
-  `OPENBLAS_NUM_THREADS=10`: 56–79 ms) the same first run (f = 107.178) is
-  followed by 3 restarts and ends at **f = 46.216**, a much better optimum. The
-  restart test of `Kriging::fit_impl` (stuck at the lower bound:
-  `sol_to_lb < eps`, at machine precision) flips on the last bits of theta, which
-  depend on the BLAS thread count. Standalone OpenBLAS at n = 100 shows no slow-down
+  `OPENBLAS_NUM_THREADS=10`: 56–79 ms) the same first run (f = 107.178, 6
+  iterations) ends with `ABNORMAL_TERMINATION_IN_LNSRCH` instead of
+  `CONVERGENCE: REL_REDUCTION_OF_F`, which triggers the restarts of
+  `Kriging::fit_impl` (`sol_to_lb` = 7.6: not the bound test); 3 restarts end at
+  **f = 46.216**, a much better optimum. The line-search outcome flips on the
+  last bits of the objective / gradient, which depend on the BLAS thread count. Standalone OpenBLAS at n = 100 shows no slow-down
   at 10 threads (`dpotrf` 0.052 vs 0.060 ms at 20). Separate robustness issue: the
   quality of a single-start fit depends on the BLAS thread count through that test.
 
