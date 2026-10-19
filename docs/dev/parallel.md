@@ -220,6 +220,47 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
      change of rounding (BLAS build, CPU kernels) gives the same effect; the open
      item of #414 (wrong gradients and failed Cholesky on an Intel Xeon 6973P
      runner only) may be the same phenomenon.
+
+   Experiment A (2026-10-19): a fixed jitter added to the diagonal of the
+   correlation matrix before every Cholesky of the fit (temporary hook, not
+   kept), 40 data sets per case, prediction RMSE on 1000 test points
+   (`bench/thread-budget/fit_repro_study.cpp`, `fit-repro-*.csv`):
+
+   | kernel, n, d | jitter | results differing across 1 / 10 / 20 threads | median RMSE | median sd / RMSE |
+   |---|---|---|---|---|
+   | gauss, 100, 2 | 0 | 52 % | 1.0e-1 | 0.25 |
+   | | 1e-10 | 52 % | 1.0e-1 | 0.25 |
+   | | 1e-8 | 0 % | **4.9e-4** | 0.26 |
+   | | 1e-6 | 0 % | 1.5e-3 | 0.42 |
+   | gauss, 200, 4 | 0 | 75 % | 1.46e-1 | 0.39 |
+   | | 1e-8 | 2 % | 1.53e-1 | 0.40 |
+   | | 1e-6 | 0 % | 1.54e-1 | 0.43 |
+   | matern5_2, 100, 2 | 0 | 42 % | 2.9e-4 | 0.83 |
+   | | 1e-10 | 0 % | 5.7e-4 | 0.96 |
+   | | 1e-8 | 0 % | 1.05e-3 | 1.03 |
+   | | 1e-6 | 0 % | 2.9e-3 | 0.94 |
+   | matern5_2, 200, 4 | 0 | 2 % | 1.5e-3 | 0.96 |
+   | | 1e-10 | 0 % | 3.1e-3 | 1.09 |
+   | | 1e-8 | 0 % | 6.8e-3 | 1.02 |
+   | | 1e-6 | 0 % | 1.6e-2 | 1.01 |
+
+   - A fixed jitter makes the fit a continuous function of theta: the stepwise
+     numerical nugget is never triggered and the results become bit-identical
+     across thread counts, from 1e-10 (matern5_2) or 1e-6–1e-8 (gauss).
+   - Without it, the outcome is a lottery: on one gauss data set (n = 100,
+     d = 2) the RMSE is 7.6e-5 with 20 threads and 0.075–0.105 with 1 or 10.
+   - Accuracy trade-off on these noise-free data: gauss low-d gains a lot
+     (median RMSE 0.10 → 4.9e-4 at 1e-8: most fits without jitter end at a poor
+     optimum); gauss n = 200, d = 4 loses ~5 % (0.147 → 0.154 at 1e-6);
+     matern5_2 loses ×2 at 1e-10 and more for larger jitters (the model no
+     longer interpolates), in absolute terms 3e-4 → 6e-4 and 1.5e-3 → 3e-3.
+   - matern5_2, n = 100: fit 100 ms → 8 ms with the jitter (the optimizer no
+     longer wanders in the near-singular region).
+   - gauss predictive sd is overconfident in every case (sd / RMSE 0.25–0.43);
+     matern5_2 is calibrated (≈ 1).
+
+   Decision pending: default behaviour (jitter on / off, per kernel, value) or an
+   opt-in setting.
 4. **Bindings do not set `OPENBLAS_NUM_THREADS`** (decided 2026-10-19): it would
    only remove the start-up transient of 6.2; documented instead
    (`OPENBLAS_NUM_THREADS` = physical cores or `OPENBLAS_THREAD_TIMEOUT=4` for short
