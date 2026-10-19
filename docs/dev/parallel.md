@@ -194,6 +194,32 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
    worse optimum depending on the BLAS thread count (n = 100: f = 46.2 vs
    107.2). Independent of the budget; worked on in this branch after the merge
    of #414 into #415 (decided 2026-10-19).
+
+   Study (2026-10-19; 100 data sets per case, y = Σ sin(2π x_j) without noise,
+   single-start `BFGS`, the same data fitted with 1, 10 and 20 BLAS threads in
+   one process via `set_num_threads_percent`):
+
+   | kernel | n, d | result differs (> 1 log-likelihood unit) | max gap |
+   |---|---|---|---|
+   | gauss | 50–200, d = 2–4 | 7–61 % | 13–1450 |
+   | gauss | d = 8 | 1–18 % | 2–27 |
+   | matern5_2 | 100, 2 / 200, 4 | 52 % / 2 % | 152 / 89 |
+   | matern3_2, exp | 100, 2 / 200, 4 | 0 % (bit-identical) | 0 |
+
+   - In 47 of the 52 differing gauss cases (n = 100, d = 2) the first L-BFGS-B
+     run already differs (the path diverges); in 5 only the termination flag
+     (and so the restarts) differs.
+   - Every one of these fits goes through `safe_chol_lower`'s fallback (a
+     numerical nugget 1e-10 × 10^k added when the Cholesky fails or
+     rcond < 1e-18): with smooth kernels and dense designs the optimizer enters
+     the near-singular region, where the objective is numerically noisy and
+     discontinuous (pass / fail of the Cholesky and of the rcond threshold flip on
+     the last bits). Rough kernels never get there.
+   - Not caused by the budget (it only changes the default BLAS thread count,
+     hence which of the outcomes a user gets) and not specific to threads: any
+     change of rounding (BLAS build, CPU kernels) gives the same effect; the open
+     item of #414 (wrong gradients and failed Cholesky on an Intel Xeon 6973P
+     runner only) may be the same phenomenon.
 4. **Bindings do not set `OPENBLAS_NUM_THREADS`** (decided 2026-10-19): it would
    only remove the start-up transient of 6.2; documented instead
    (`OPENBLAS_NUM_THREADS` = physical cores or `OPENBLAS_THREAD_TIMEOUT=4` for short
