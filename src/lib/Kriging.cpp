@@ -1078,8 +1078,10 @@ double Kriging::_logLikelihoodVecchia(const arma::vec& _gamma,
   // gradient directions: theta (d), plus the extra parameter if asked for
   const bool grad_extra = with_grad && (grad_out->n_elem > d) && (is_nugget || is_hetero);
   const arma::uword nd = grad_extra ? d + 1 : d;
-  // diagonal of the noisy correlation (and its d/dsigma2 for Heterogeneous)
-  auto diag_of = [&](arma::uword j) { return is_hetero ? 1.0 + m_noise(j) / extra : 1.0; };
+  // diagonal of the noisy correlation (and its d/dsigma2 for Heterogeneous);
+  // noise-free: 1 + the fixed Cholesky jitter of the exact path (populate_Model)
+  const double jitter = (m_noise_model == NoiseModel::None ? LinearAlgebra::kernel_chol_jitter(m_covType) : 0.0);
+  auto diag_of = [&](arma::uword j) { return is_hetero ? 1.0 + m_noise(j) / extra : 1.0 + jitter; };
   auto ddiag_of = [&](arma::uword j) { return is_hetero ? -m_noise(j) / (extra * extra) : 0.0; };
 
   arma::vec u(n);     // y_i - a' y_N  (trend-free residual numerator)
@@ -1461,6 +1463,8 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
   const bool is_nugget = (m_noise_model == NoiseModel::Nugget);
   const bool is_hetero = (m_noise_model == NoiseModel::Heterogeneous);
   const double f = is_nugget ? m_alpha : 1.0;
+  // noise-free observations: the fixed Cholesky jitter of the exact path
+  const double jitter = (m_noise_model == NoiseModel::None ? LinearAlgebra::kernel_chol_jitter(m_covType) : 0.0);
   const double lmp_scale = (m_objective == "LMP") ? (n - m_F.n_cols) / (n - m_F.n_cols - 2.0) : 1.0;
   const double var_scale = m_sigma2 * lmp_scale / f;
 
@@ -1507,7 +1511,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
         const arma::vec dx = (m_X.row(Ni(a)) - m_X.row(Ni(b))).t();
         RN(a, b) = RN(b, a) = f * _Cov(dx, m_theta);
       }
-      RN(a, a) = (is_hetero ? 1.0 + m_noise(Ni(a)) / m_sigma2 : 1.0) + LinearAlgebra::num_nugget;
+      RN(a, a) = (is_hetero ? 1.0 + m_noise(Ni(a)) / m_sigma2 : 1.0 + jitter) + LinearAlgebra::num_nugget;
       const arma::vec dx = (m_X.row(Ni(a)) - x_t).t();
       // as predict(): a prediction point equal to an observation gets the
       // observation's (noisy) covariance 1 in Nugget mode
@@ -1625,11 +1629,13 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
       return 1.0;  // noisy simulated response at an observed location
     return f * _Cov(dx, m_theta);
   };
-  // variance (units sigma2 / f) of a candidate
+  // variance (units sigma2 / f) of a candidate; observations: noise-free with
+  // the fixed Cholesky jitter of the exact path (populate_Model)
+  const double jitter = (m_noise_model == NoiseModel::None ? LinearAlgebra::kernel_chol_jitter(m_covType) : 0.0);
   auto var_of = [&](arma::uword c) {
     if (c >= n)
       return sim_var;
-    return is_hetero ? 1.0 + m_noise(c) / m_sigma2 : 1.0;
+    return is_hetero ? 1.0 + m_noise(c) / m_sigma2 : 1.0 + jitter;
   };
 
   std::vector<std::pair<double, arma::uword>> cand;
@@ -1928,8 +1934,10 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
     U = U0;
     D = D0 + m_noise / extra;
   } else {
+    // noise-free: the fixed Cholesky jitter of the exact path (populate_Model),
+    // so that k = n reproduces the exact model
     U = U0;
-    D = D0;
+    D = D0 + LinearAlgebra::kernel_chol_jitter(m_covType);
   }
 
   const NystromChol Rf(U, D, m_nystrom_landmarks, /*with_inverse=*/grad_out != nullptr);
@@ -4479,6 +4487,10 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
                                 /*R_un_coincident_to_one=*/false,
                                 /*Sigma_divisor=*/alpha);
   }
+  // noise-free: the new observations are conditioned on exactly (no fixed
+  // Cholesky jitter on R_uu): an update point on the simulation design is
+  // reproduced exactly; update() adds the jitter (populate_Model), a 1e-10..1e-8
+  // relative difference only (docs/dev/CholJitter-TODO.md)
   return update_simulate_impl(y_u,
                               X_u,
                               allow_cache,

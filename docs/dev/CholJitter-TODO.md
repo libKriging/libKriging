@@ -60,7 +60,8 @@ Implemented (`git show HEAD` after the WIP commit):
   fit, the final model and `update` (`cholCov` / `update_cholCov` in
   `KrigingImpl::populate_Model`).
 
-ctest with the jitter on: **214 / 218**, 4 failures, all understood:
+ctest with the jitter on: **214 / 218** at the first hand-off, 4 failures, all
+understood (3 and 4 fixed since, see 3.1; **216 / 218** now, tests 1 and 2 left):
 
 | # | Test | Cause | Planned fix |
 |---|---|---|---|
@@ -75,17 +76,33 @@ All 4 pass with `LK_CHOL_JITTER=0`.
 
 1. **Consistency of every path building a training covariance** (otherwise exact,
    Nystrom, Vecchia, Nested, Warp disagree):
-   - [ ] NestedKriging (test 3).
-   - [ ] Nystrom (test 4): landmark block and whatever is compared with the exact
-         path.
-   - [ ] Vecchia (`_logLikelihoodVecchia`, `predictVecchia`, `simulateVecchia`):
-         neighbourhood blocks.
+   - [x] NestedKriging (test 3): `precompute_nk` factorizes each group with
+         `kernel_chol_jitter` when > 0 (else its own 1e-10, also for warped
+         submodels); the PoE-family mean check of the test relaxed 1e-8 → 1e-6
+         (the expert and the aggregate factorize R separately and R is now
+         conditioned ~1e8 for gauss: ~1e-8 gaps), same tolerance as the NK check.
+   - [x] Nystrom (test 4): `D = D0 + kernel_chol_jitter` in the noise-free branch
+         of `_logLikelihoodNystrom` (the stored `m_nystrom_D` used by
+         predictNystrom / simulateNystrom comes from there); k = n reproduces the
+         exact model again.
+   - [x] Vecchia: observation diagonals `1 + jitter` in the noise-free mode of
+         `_logLikelihoodVecchia` (`diag_of`), `predictVecchia` (`RN`) and
+         `simulateVecchia` (`var_of`, observations only, not the simulated
+         points). 28 / 28 Vecchia tests pass.
    - [ ] WarpKriging: already adds `LinearAlgebra::num_nugget` (1e-10)
          unconditionally in `WarpKriging::populate_Model`; decide whether to
          align it with `kernel_chol_jitter` (gauss would move 1e-10 → 1e-8).
-   - [ ] predict / simulate / update / update_simulate: they reuse `m_T` / `m_R`
-         from `populate_Model` (jittered); check that no other place rebuilds the
-         training R without it (`grep -n "covMat_sym\|cholCov" src/lib`).
+   - [x] predict / simulate / update reuse `m_T` / `m_R` from `populate_Model`
+         (jittered); the other `covMat_sym_X` calls build R_nn of new points or
+         the Nystrom landmark block (latent, no jitter, correct).
+   - [x] update_simulate: **no** jitter on the new observations (R_uu), on
+         purpose: with it, an update point on the simulation design is no longer
+         reproduced exactly (the jitter acts as an observation noise of sd
+         sqrt(J)·sigma: 1.7e-5 for matern5_2, `KrigingUpdateSimulateTest`),
+         while update() differs from it by J only (1e-10..1e-8 relative).
+   - Consequence to document: with the jitter, conditional simulations (and
+     predictions) at an observed point are no longer exact but within
+     ~sqrt(J)·sigma (1e-5·sigma matern5_2, 1e-4·sigma gauss) and ~J·|y|.
    - [ ] Save / load (JSON): the jitter changes `m_T`; decide whether to store the
          jitter value in the model file so that a reloaded model is consistent
          with the setting it was fitted with.

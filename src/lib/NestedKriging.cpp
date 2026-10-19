@@ -1,5 +1,7 @@
 #include "libKriging/NestedKriging.hpp"
 
+#include "libKriging/LinearAlgebra.hpp"
+
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
@@ -357,10 +359,15 @@ void NestedKriging::precompute_nk() {
   const arma::uword p = m_groups.size();
   m_L.assign(p, arma::mat());
   m_alpha.assign(p, arma::vec());
+  // Same diagonal as the (Kriging) submodels: their fixed Cholesky jitter when
+  // there is one (LinearAlgebra::kernel_chol_jitter), else this class's own;
+  // warped submodels add LinearAlgebra::num_nugget (= jitter by default).
+  const double kernel_jitter = warped() ? 0.0 : LinearAlgebra::kernel_chol_jitter(m_covType);
+  const double group_jitter = kernel_jitter > 0.0 ? kernel_jitter : jitter;
   for (arma::uword g = 0; g < p; ++g) {
     const arma::uvec& idx = m_groups[g];
     arma::mat R = corrMat(m_X.rows(idx), m_X.rows(idx));
-    R.diag() += jitter;
+    R.diag() += group_jitter;
     m_L[g] = arma::chol(R, "lower");
     const arma::vec r = m_y(idx) - m_beta0;
     m_alpha[g] = arma::solve(arma::trimatu(m_L[g].t()), arma::solve(arma::trimatl(m_L[g]), r));

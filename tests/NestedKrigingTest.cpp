@@ -53,7 +53,10 @@ TEST_CASE("NestedKriging with one group reduces to plain Kriging", "[nested][kri
     auto [m1, s1] = nk1.predict(Xt, true);
     auto [mk, sk, c1, d1, e1] = const_cast<Kriging&>(nk1.submodel(0)).predict(Xt, true, false, false);
     INFO("aggregation = " << NestedKriging::aggregationToString(agg));
-    CHECK(arma::abs(m1 - mk).max() < 1e-8);
+    // same tolerance as the NK check above: the expert's and the aggregate's
+    // solves factorize R separately, and with the fixed Cholesky jitter of
+    // gauss (1e-8, LinearAlgebra::kernel_chol_jitter) R is conditioned ~1e8
+    CHECK(arma::abs(m1 - mk).max() < 1e-6);
     if (agg != NestedKriging::Aggregation::rBCM)
       CHECK(arma::abs(s1 - sk).max() < 1e-6);
   }
