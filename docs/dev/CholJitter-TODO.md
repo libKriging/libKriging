@@ -61,7 +61,7 @@ Implemented (`git show HEAD` after the WIP commit):
   `KrigingImpl::populate_Model`).
 
 ctest with the jitter on: **214 / 218** at the first hand-off, 4 failures, all
-understood (3 and 4 fixed since, see 3.1; **217 / 219** now with the save/load test, tests 1 and 2 left):
+understood (1, 3 and 4 fixed since, see 3.1 / 3.2; **218 / 219** now with the save/load test, test 2 left):
 
 | # | Test | Cause | Planned fix |
 |---|---|---|---|
@@ -118,8 +118,9 @@ All 4 pass with `LK_CHOL_JITTER=0`.
          `num_nugget`, the former behaviour). Test `fixed Cholesky jitter is
          kept with the model (save & reload)` (tests/KrigingTest.cpp).
 2. **Tests**:
-   - [ ] Test 1: larger FD step.
-   - [ ] Test 2: decide (see 1 above) and adapt.
+   - [x] Test 1: FD step h = 1e-6 → 1e-4 (both sections), passes.
+   - [ ] Test 2: the user asked for more cases before deciding; study done
+         (4b below), decision pending.
    - [ ] New test: same single-start fit (gauss, matern5_2, noise-free) with
          `Optim::set_num_threads_percent` 10 / 100 / 200 → bit-identical theta and
          LL (the property the jitter is for).
@@ -137,8 +138,51 @@ All 4 pass with `LK_CHOL_JITTER=0`.
    - [ ] noisy data (Nugget / Heterogeneous unaffected by design, check the
          noise-free fit of slightly noisy data), d ∈ {1, 2, 4, 8, 16}, n up to
          2000, other test functions (Branin, Hartmann, ...), multistart (BFGS10).
-   - [ ] how often a single start ends worse than before (test 2 pattern) vs
-         better (study: gauss d = 2) — the statistical cost of the default.
+   - [x] how often a single start ends worse than before (test 2 pattern) vs
+         better — see 4b.
+   - [ ] **4b. Test 2 study (2026-10-19).**
+     - *The test case* (`bench/thread-budget/unstable_ll_profile.cpp`): the LL
+       profile has a single maximum, theta = 0.1506, LL = 2.288, identical with
+       and without jitter (BFGS10 finds it in every setting). Beyond
+       theta ≈ 0.5 the two profiles differ: without jitter the LL keeps falling
+       (-41 at theta = 2) until the Cholesky fails, then becomes erratic (the
+       stepwise nugget: -19.7 / -46 / -23 between 2.5 and 4); with jitter it
+       flattens into a bumpy plateau (-12 to -19 for theta in 0.6..10: the
+       jitter acts as a nugget, the long-range limit is "trend + tiny noise").
+       The single BFGS start is random in the theta bounds; it lands in the tail
+       and stops on a plateau bump (theta 1.37, LL -14.0). It passed before only
+       with the test's own settings (`num_nugget = 1e-15` + rcond check): with
+       the *default* settings and no jitter, the same single start already
+       ended at theta = 9.06, LL = -22.2.
+     - *800 data sets per kernel* (`jitter_multistart_study.cpp`,
+       `jitter-ms-*.csv`, `summarize_jitter_ms.py`; 100 sets × {unstable n 7 /
+       15 d 1, sin n 10 d 1 / 20 d 2 / 50 d 2 / 50 d 4, branin n 15 / 30};
+       default settings; "miss" = BFGS LL < BFGS10 LL - 0.01):
+
+       | kernel | miss, jitter off | miss, jitter on | sets newly missed / newly found with jitter |
+       |---|---|---|---|
+       | gauss | 353 / 800 (44 %) | 322 / 800 (40 %) | 132 / 163 |
+       | matern5_2 | 96 / 800 (12 %) | 83 / 800 (10 %) | 11 / 24 |
+       | matern3_2 (jitter 0) | identical | identical | 0 / 0 |
+
+       The jitter does not make a single start miss more often; it changes
+       *which* data sets miss (with jitter, misses sit on the long-range
+       plateau, median theta 2–5). A single start of gauss misses the optimum
+       in ~40 % of the cases either way. Per-family rates: off → on 27 → 47 %
+       (branin 15), 27 → 40 % (sin 20 d 2), but 39 → 16 % (sin 10 d 1),
+       40 → 25 % (unstable 7), 28 → 11 % (unstable 15).
+     - *Accuracy* (median ratio of normalized test RMSE, on / off, BFGS10):
+       gauss 1.0–1.9 (1.81 branin 30, 1.64 sin 10 d 1, 1.88 unstable 15),
+       matern5_2 1.0–1.6 (1.58 sin 50 d 2). Consistent with 8.6: the jitter
+       smooths the interpolation (point 3 of 4 above, calibration / accuracy,
+       still to weigh).
+     - *Reading of test 2*: its section "unstable LL fixed using rcond
+       failover" exercises the rcond/num_nugget failover, which the jitter
+       bypasses (the Cholesky no longer fails). Options: (i) run that section
+       with `set_chol_jitter(0)` (it tests the failover) and add a jitter-on
+       check "BFGS10 finds theta ≈ 0.15 and LL(BFGS10) ≥ LL(BFGS)";
+       (ii) keep it as a blocker until a single start is made robust to the
+       plateau (e.g. a deterministic first start instead of a random one).
    - [ ] calibration (predictive sd / RMSE): gauss is overconfident (0.25–0.43)
          with or without jitter; matern5_2 ≈ 1.
 5. **Docs**: parallel.md 8.6 (decision a, values, how to disable), FAQ
