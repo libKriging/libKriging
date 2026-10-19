@@ -5,6 +5,15 @@ run on a dedicated machine with ~20 cores. Each step lists its commands, what to
 record and when it is done. Tick the boxes in this file as work progresses and
 commit the results (CSV + summary) with it.
 
+## Hand-off state (2026-10-19, second hand-off)
+
+Read first: `docs/dev/parallel.md` (what is implemented and why, measurements,
+decisions) and `docs/dev/CholJitter-TODO.md` (work in progress: fixed Cholesky
+jitter, option (a)). Steps 0–2 done, step 4 dropped, Kriging multistart moved to
+the thread pool; remaining here: steps 3, 5, 6 and the #414 Octave item.
+Local commits only (no push: no GitHub Actions run until told otherwise);
+PR #415 now targets `master` and includes #414 (closed).
+
 ## Hand-off state (2026-10-18)
 
 - PR #414 head `fb8315a`; its CI was still running at hand-off. Open item on it:
@@ -16,7 +25,10 @@ commit the results (CSV + summary) with it.
   0.3.20 kernel selection on that CPU. See the comment on PR #414; check the
   Octave Linux job of the current head and its `lscpu` lines first.
   Local only (see Decisions): try OpenBLAS 0.3.20 `DYNAMIC_ARCH` here.
-- [ ] Resolve the item above before merging #414 (this branch is stacked on it).
+- [ ] Resolve the item above before merging #415 (#414 is now part of it). Likely
+      the same phenomenon as docs/dev/parallel.md 8.6 (fits of smooth kernels
+      sensitive to rounding in the near-singular region): check it once the
+      fixed jitter (CholJitter-TODO.md) is in.
 
 ## Context (state after PR #414)
 
@@ -172,9 +184,9 @@ Done 2026-10-18 (differs from the plan below where noted):
   4 × 1).
 - ctest 218/218.
 
-- [ ] Rename `src/lib/BlasThreads.hpp` → `src/lib/ThreadBudget.hpp`; keep
+- [x] Rename `src/lib/BlasThreads.hpp` → `src/lib/ThreadBudget.hpp`; keep
       `BlasThreadGuard` (restore-on-exit) and the `pthread_atfork` handlers unchanged.
-- [ ] Add:
+- [x] Add:
       ```cpp
       namespace libKriging::detail {
       struct ThreadBudget {
@@ -191,19 +203,19 @@ Done 2026-10-18 (differs from the plan below where noted):
       `total()` resolution: API value (step 3) > `LK_NUM_THREADS_PERCENT` > explicit
       `OMP_NUM_THREADS` / `OPENBLAS_NUM_THREADS` (never exceeded) >
       number of physical cores (see Decisions), `hardware_concurrency()` as fallback.
-- [ ] All OpenMP loops use `num_threads(detail::ThreadBudget::omp_threads())`;
+- [x] All OpenMP loops use `num_threads(detail::ThreadBudget::omp_threads())`;
       remove the three copies of `get_optimal_threads(2)`; remove the
       `omp_set_num_threads` call of the pool workers (`ScopedShare` instead).
-- [ ] Replace `kOmpMinRows` by a threshold from step 1 (keep the constant if the
+- [x] Replace `kOmpMinRows` by a threshold from step 1 (keep the constant if the
       decision gate says so).
-- [ ] `run_task_pool`: `ScopedShare(total / pool, total / pool)` per worker; the BLAS
+- [x] `run_task_pool`: `ScopedShare(total / pool, total / pool)` per worker; the BLAS
       count stays process-global (set once by the guard, as today).
 - Done when: `ctest` passes; `grep -rn "get_optimal_threads\|omp_set_num_threads" src/lib`
   only finds `ThreadBudget.hpp` / the guard and the atfork handlers.
 
 ## Step 3 — public API and bindings
 
-- [ ] `Optim::set_num_threads_percent(double x)` (x <= 1: ratio, x > 1: percentage;
+- [x] `Optim::set_num_threads_percent(double x)` (x <= 1: ratio, x > 1: percentage;
       0 = automatic = 100 %), `Optim::get_num_threads_percent()` and
       `Optim::get_num_threads()` (resolved `total`, read only) in
       `src/lib/include/libKriging/Optim.hpp` + `Optim.cpp`; `set_thread_pool_size`
@@ -216,7 +228,7 @@ Done 2026-10-18 (differs from the plan below where noted):
 - [ ] Binding tests next to the existing `thread_pool_size` ones
       (`test_new_features.py`, `test-new-features.R`, `test_new_features.m`).
 
-## Step 4 — BLAS / OpenMP arbitration (only if the step 1 gate says so)
+## Step 4 — BLAS / OpenMP arbitration — DROPPED (RESULTS.md: decision, sections 8–9)
 
 - [ ] Implement the retained variant, keyed on `ThreadBudget::blas_kind()`:
       0 or 2 (sequential / OpenMP OpenBLAS) → nothing; 1 (pthreads) → the variant.

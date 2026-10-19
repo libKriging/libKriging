@@ -1,6 +1,7 @@
 #ifndef LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
 #define LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
 
+#include <string>
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/libKriging_exports.h"
@@ -12,6 +13,23 @@ class LinearAlgebra {
   static double num_nugget;
   LIBKRIGING_EXPORT static void set_num_nugget(double nugget);
   LIBKRIGING_EXPORT static double get_num_nugget();
+
+  // Fixed jitter added to the diagonal of the training correlation matrix of a
+  // noise-free Kriging fit, before every Cholesky. It keeps the objective a
+  // continuous function of theta in the near-singular region of smooth kernels,
+  // where the stepwise num_nugget fallback of safe_chol_lower otherwise makes the
+  // fit depend on the rounding (BLAS thread count, BLAS build, CPU):
+  // docs/dev/parallel.md 8.6.
+  //   x < 0: automatic (default): kernel_chol_jitter(kernel)
+  //   x = 0: disabled (former behaviour)
+  //   x > 0: this value for every kernel
+  // Default from LK_CHOL_JITTER.
+  static double chol_jitter;
+  LIBKRIGING_EXPORT static void set_chol_jitter(double x);
+  LIBKRIGING_EXPORT static double get_chol_jitter();
+  /// Jitter used for `kernel`: 1e-8 for gauss, 1e-10 for matern5_2, 0 otherwise
+  /// (automatic mode), or the value set by set_chol_jitter.
+  LIBKRIGING_EXPORT static double kernel_chol_jitter(const std::string& kernel);
 
   static bool warn_chol;
   LIBKRIGING_EXPORT static void set_chol_warning(bool warn);

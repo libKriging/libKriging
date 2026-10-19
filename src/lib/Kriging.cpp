@@ -367,6 +367,11 @@ void Kriging::populate_Model(KModel& m,
   } else {
     update_eligible = !m_is_empty && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
                       && (m_T.memptr() != nullptr) && (m_X.n_rows > m_T.n_rows);
+    // Noise-free: fixed jitter on the diagonal (LinearAlgebra::set_chol_jitter);
+    // the Nugget / Heterogeneous modes are regularized by their own diagonal.
+    const double jitter = LinearAlgebra::kernel_chol_jitter(m_covType);
+    if (jitter > 0.0)
+      diag = arma::vec(m_X.n_rows, arma::fill::value(1.0 + jitter));
   }
 
   KrigingImpl::populate_Model(m, theta, alpha, diag, update_eligible, bench);

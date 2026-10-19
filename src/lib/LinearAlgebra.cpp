@@ -20,7 +20,9 @@
 #include "ThreadBudget.hpp"
 #include "OmpLoops.hpp"
 
+#include <cstdlib>
 #include <mutex>
+#include <string>
 
 arma::solve_opts::opts LinearAlgebra::default_solve_opts = arma::solve_opts::fast + arma::solve_opts::no_approx;
 
@@ -33,6 +35,38 @@ LIBKRIGING_EXPORT void LinearAlgebra::set_num_nugget(double nugget) {
 LIBKRIGING_EXPORT double LinearAlgebra::get_num_nugget() {
   return LinearAlgebra::num_nugget;
 };
+
+double LinearAlgebra::chol_jitter = [] {
+  const char* v = std::getenv("LK_CHOL_JITTER");
+  if (v == nullptr)
+    return -1.0;
+  try {
+    return std::stod(v);
+  } catch (...) {
+    return -1.0;
+  }
+}();
+
+LIBKRIGING_EXPORT void LinearAlgebra::set_chol_jitter(double x) {
+  LinearAlgebra::chol_jitter = x;
+}
+
+LIBKRIGING_EXPORT double LinearAlgebra::get_chol_jitter() {
+  return LinearAlgebra::chol_jitter;
+}
+
+LIBKRIGING_EXPORT double LinearAlgebra::kernel_chol_jitter(const std::string& kernel) {
+  if (LinearAlgebra::chol_jitter >= 0.0)
+    return LinearAlgebra::chol_jitter;
+  // Smallest values that made single-start fits bit-identical across BLAS
+  // thread counts on noise-free data (bench/thread-budget/fit_repro_study.cpp);
+  // matern3_2 and exp never reach the near-singular region there.
+  if (kernel == "gauss")
+    return 1e-8;
+  if (kernel == "matern5_2")
+    return 1e-10;
+  return 0.0;
+}
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {
   return LinearAlgebra::safe_chol_lower_retry(X, 0);
