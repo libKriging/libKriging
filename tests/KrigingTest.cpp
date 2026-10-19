@@ -10,6 +10,7 @@
 #include <fstream>
 #include <libKriging/Kriging.hpp>
 #include <libKriging/KrigingLoader.hpp>
+#include <libKriging/LinearAlgebra.hpp>
 #include <libKriging/Trend.hpp>
 #include <sstream>
 #include <vector>
@@ -73,6 +74,44 @@ TEST_CASE("save & reload") {
     theta_vec.fill(theta);
     return std::get<1>(ok_reloaded.logLikelihoodFun(theta_vec, true, false));
   });
+}
+
+TEST_CASE("fixed Cholesky jitter is kept with the model (save & reload)") {
+  arma::arma_rng::set_seed(123);
+  const arma::mat X = arma::randu(30, 2);
+  const arma::vec y = arma::sin(6 * X.col(0)) + X.col(1);
+  const arma::mat Xu = arma::randu(5, 2);
+  const arma::vec yu = arma::sin(6 * Xu.col(0)) + Xu.col(1);
+  const arma::mat Xt = arma::randu(20, 2);
+
+  LinearAlgebra::set_chol_jitter(-1);  // per-kernel default
+  Kriging ok("gauss");
+  ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+  CHECK(ok.chol_jitter() == 1e-8);
+  Kriging ok32("matern3_2");
+  ok32.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+  CHECK(ok32.chol_jitter() == 0.0);
+  ok.save("dump_jitter.json");
+
+  // a different global setting must not change a fitted / reloaded model
+  LinearAlgebra::set_chol_jitter(0);
+  Kriging ok_reloaded = Kriging::load("dump_jitter.json");
+  CHECK(ok_reloaded.chol_jitter() == 1e-8);
+  ok.update(yu, Xu, false);
+  ok_reloaded.update(yu, Xu, false);
+  const arma::vec m = std::get<0>(ok.predict(Xt, false, false, false));
+  const arma::vec m_reloaded = std::get<0>(ok_reloaded.predict(Xt, false, false, false));
+  CHECK(arma::abs(m - m_reloaded).max() < 1e-12);
+
+  // a fit with the jitter disabled stores none (file as before the jitter)
+  Kriging ok0("gauss");
+  ok0.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+  CHECK(ok0.chol_jitter() == 0.0);
+  ok0.save("dump_jitter0.json");
+  std::ifstream f("dump_jitter0.json");
+  const std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+  CHECK(content.find("chol_jitter") == std::string::npos);
+  LinearAlgebra::set_chol_jitter(-1);
 }
 
 TEST_CASE("fit benchmark", "[.benchmark]") {

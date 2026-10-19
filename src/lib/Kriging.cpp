@@ -367,11 +367,10 @@ void Kriging::populate_Model(KModel& m,
   } else {
     update_eligible = !m_is_empty && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
                       && (m_T.memptr() != nullptr) && (m_X.n_rows > m_T.n_rows);
-    // Noise-free: fixed jitter on the diagonal (LinearAlgebra::set_chol_jitter);
+    // Noise-free: fixed jitter on the diagonal (m_chol_jitter, set by the fit);
     // the Nugget / Heterogeneous modes are regularized by their own diagonal.
-    const double jitter = LinearAlgebra::kernel_chol_jitter(m_covType);
-    if (jitter > 0.0)
-      diag = arma::vec(m_X.n_rows, arma::fill::value(1.0 + jitter));
+    if (m_chol_jitter > 0.0)
+      diag = arma::vec(m_X.n_rows, arma::fill::value(1.0 + m_chol_jitter));
   }
 
   KrigingImpl::populate_Model(m, theta, alpha, diag, update_eligible, bench);
@@ -1080,7 +1079,7 @@ double Kriging::_logLikelihoodVecchia(const arma::vec& _gamma,
   const arma::uword nd = grad_extra ? d + 1 : d;
   // diagonal of the noisy correlation (and its d/dsigma2 for Heterogeneous);
   // noise-free: 1 + the fixed Cholesky jitter of the exact path (populate_Model)
-  const double jitter = (m_noise_model == NoiseModel::None ? LinearAlgebra::kernel_chol_jitter(m_covType) : 0.0);
+  const double jitter = m_chol_jitter;  // 0 unless noise-free (fit_impl)
   auto diag_of = [&](arma::uword j) { return is_hetero ? 1.0 + m_noise(j) / extra : 1.0 + jitter; };
   auto ddiag_of = [&](arma::uword j) { return is_hetero ? -m_noise(j) / (extra * extra) : 0.0; };
 
@@ -1464,7 +1463,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
   const bool is_hetero = (m_noise_model == NoiseModel::Heterogeneous);
   const double f = is_nugget ? m_alpha : 1.0;
   // noise-free observations: the fixed Cholesky jitter of the exact path
-  const double jitter = (m_noise_model == NoiseModel::None ? LinearAlgebra::kernel_chol_jitter(m_covType) : 0.0);
+  const double jitter = m_chol_jitter;  // 0 unless noise-free (fit_impl)
   const double lmp_scale = (m_objective == "LMP") ? (n - m_F.n_cols) / (n - m_F.n_cols - 2.0) : 1.0;
   const double var_scale = m_sigma2 * lmp_scale / f;
 
@@ -1631,7 +1630,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
   };
   // variance (units sigma2 / f) of a candidate; observations: noise-free with
   // the fixed Cholesky jitter of the exact path (populate_Model)
-  const double jitter = (m_noise_model == NoiseModel::None ? LinearAlgebra::kernel_chol_jitter(m_covType) : 0.0);
+  const double jitter = m_chol_jitter;  // 0 unless noise-free (fit_impl)
   auto var_of = [&](arma::uword c) {
     if (c >= n)
       return sim_var;
@@ -1937,7 +1936,7 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
     // noise-free: the fixed Cholesky jitter of the exact path (populate_Model),
     // so that k = n reproduces the exact model
     U = U0;
-    D = D0 + LinearAlgebra::kernel_chol_jitter(m_covType);
+    D = D0 + m_chol_jitter;
   }
 
   const NystromChol Rf(U, D, m_nystrom_landmarks, /*with_inverse=*/grad_out != nullptr);
@@ -3426,6 +3425,8 @@ void Kriging::fit_impl(const arma::vec& y,
   const std::string objective = internal_fit_objective(objective_method.first, objective_method.second);
   // the last simulate(..., will_update=true) was built for the previous model
   clear_simulate_state();
+  // Fixed Cholesky jitter of this fit (noise-free only), kept with the model
+  m_chol_jitter = (m_noise_model == NoiseModel::None) ? LinearAlgebra::kernel_chol_jitter(m_covType) : 0.0;
   m_optim = optim;
   m_objective = objective_method.first;
   m_method = objective_method.second;
@@ -4826,6 +4827,9 @@ void Kriging::dump_to_json(nlohmann::json& j) const {
     j["est_nugget"] = m_est_nugget;
     j["alpha"] = m_alpha;
   }
+  // Only when non-zero, so files without a fixed jitter stay byte-identical
+  if (m_chol_jitter > 0.0)
+    j["chol_jitter"] = m_chol_jitter;
   // Nystrom fits carry no m_T/m_R/... (dump_common_to_json serializes those
   // as empty, harmlessly): the committed low-rank factors/landmarks are the
   // extra state that reconstructs the model, stored only when present so
@@ -4867,6 +4871,8 @@ Kriging Kriging::load_from_json(const nlohmann::json& j, const std::string& file
     kr.m_est_nugget = j["est_nugget"].template get<bool>();
     kr.m_alpha = j["alpha"].template get<double>();
   }
+  // Absent on files without a fixed jitter (all files before it existed)
+  kr.m_chol_jitter = j.contains("chol_jitter") ? j["chol_jitter"].template get<double>() : 0.0;
   // Absent on pre-Nystrom save files: defaults to a normal (non-Nystrom) load.
   if (j.contains("nystrom_light") && j["nystrom_light"].template get<bool>()) {
     kr.m_nystrom_light = true;

@@ -61,7 +61,7 @@ Implemented (`git show HEAD` after the WIP commit):
   `KrigingImpl::populate_Model`).
 
 ctest with the jitter on: **214 / 218** at the first hand-off, 4 failures, all
-understood (3 and 4 fixed since, see 3.1; **216 / 218** now, tests 1 and 2 left):
+understood (3 and 4 fixed since, see 3.1; **217 / 219** now with the save/load test, tests 1 and 2 left):
 
 | # | Test | Cause | Planned fix |
 |---|---|---|---|
@@ -89,9 +89,13 @@ All 4 pass with `LK_CHOL_JITTER=0`.
          `_logLikelihoodVecchia` (`diag_of`), `predictVecchia` (`RN`) and
          `simulateVecchia` (`var_of`, observations only, not the simulated
          points). 28 / 28 Vecchia tests pass.
-   - [ ] WarpKriging: already adds `LinearAlgebra::num_nugget` (1e-10)
-         unconditionally in `WarpKriging::populate_Model`; decide whether to
-         align it with `kernel_chol_jitter` (gauss would move 1e-10 → 1e-8).
+   - [x] WarpKriging (decided: align): `populate_Model` adds
+         `kernel_chol_jitter` when > 0, else `LinearAlgebra::num_nugget`
+         (1e-10) as before (gauss moves 1e-10 → 1e-8, matern5_2 unchanged);
+         NestedKriging uses the same rule for warped submodels. The interpolation
+         check of `NestedKriging warped hyperparameters come from a subsample
+         fit` relaxed 1e-3 → 2e-3 (1.03e-3 measured with 1e-8, passes with 0
+         or 1e-10).
    - [x] predict / simulate / update reuse `m_T` / `m_R` from `populate_Model`
          (jittered); the other `covMat_sym_X` calls build R_nn of new points or
          the Nystrom landmark block (latent, no jitter, correct).
@@ -103,9 +107,16 @@ All 4 pass with `LK_CHOL_JITTER=0`.
    - Consequence to document: with the jitter, conditional simulations (and
      predictions) at an observed point are no longer exact but within
      ~sqrt(J)·sigma (1e-5·sigma matern5_2, 1e-4·sigma gauss) and ~J·|y|.
-   - [ ] Save / load (JSON): the jitter changes `m_T`; decide whether to store the
-         jitter value in the model file so that a reloaded model is consistent
-         with the setting it was fitted with.
+   - [x] Save / load (decided: store it): `KrigingImpl::m_chol_jitter` is set
+         by the fit (Kriging: `kernel_chol_jitter` if noise-free, else 0;
+         WarpKriging: rule above) and used by every later factorization
+         (populate_Model, Nystrom D, Vecchia diagonals), so changing
+         `set_chol_jitter` after a fit no longer changes the model; public
+         getter `chol_jitter()`. JSON key `chol_jitter`: Kriging writes it only
+         when > 0 (files without jitter stay byte-identical; absent → 0, the
+         former behaviour); WarpKriging always writes it (absent → current
+         `num_nugget`, the former behaviour). Test `fixed Cholesky jitter is
+         kept with the model (save & reload)` (tests/KrigingTest.cpp).
 2. **Tests**:
    - [ ] Test 1: larger FD step.
    - [ ] Test 2: decide (see 1 above) and adapt.

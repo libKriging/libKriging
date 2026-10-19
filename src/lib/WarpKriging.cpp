@@ -1958,15 +1958,16 @@ void WarpKriging::populate_Model(WKModel& m, const arma::vec& theta, double sigm
 
   // Preemptive nugget: Embedding/Ordinal warpings can collapse same-level
   // training rows in Phi, making R rank-deficient in a way Kriging never
-  // encounters. Add LinearAlgebra::num_nugget (default 1e-10, configurable
-  // via set_num_nugget()) on the diagonal to stabilize Cholesky and its
-  // derivative. Set num_nugget=0 to get exact Kriging equivalence at
-  // warping="none".
+  // encounters. Add m_chol_jitter on the diagonal to stabilize Cholesky and
+  // its derivative: the kernel's fixed jitter (LinearAlgebra::kernel_chol_jitter,
+  // same as Kriging) when it has one, else LinearAlgebra::num_nugget (default
+  // 1e-10, set_num_nugget()). Set num_nugget=0 to get exact Kriging
+  // equivalence at warping="none".
   //
   // When m_noise is non-empty, the normalized covariance becomes
   //   C̃ = R_off-diag + diag(1 + nug + noise_i/σ²)
   // so the same cholCov(factor=1, diag) path carries observation-noise.
-  arma::vec diag(n, arma::fill::value(1.0 + LinearAlgebra::num_nugget));
+  arma::vec diag(n, arma::fill::value(1.0 + m_chol_jitter));
   if (!m_noise.is_empty()) {
     diag += m_noise / sigma2;
   }
@@ -3050,6 +3051,10 @@ void WarpKriging::fit(const arma::vec& y,
   m_X_raw = X;
   m_regmodel = regmodel;
   m_normalize = normalize;
+  {
+    const double kernel_jitter = LinearAlgebra::kernel_chol_jitter(m_covType);
+    m_chol_jitter = kernel_jitter > 0.0 ? kernel_jitter : LinearAlgebra::num_nugget;
+  }
 
   // Per-observation noise (optional). When set, populate_Model carries
   // noise_i/σ² on the diagonal and refresh_cache_theta_only runs an inner
@@ -3475,6 +3480,7 @@ void WarpKriging::dump_to_json(nlohmann::json& j) const {
   // dX, maxdX, F, T, R, M, star, circ, z, Rinv,
   // beta/est_beta, theta/est_theta, sigma2/est_sigma2, noise
   dump_common_to_json(j);
+  j["chol_jitter"] = m_chol_jitter;
 }
 
 void WarpKriging::load_from_json(const nlohmann::json& j) {
@@ -3509,6 +3515,8 @@ void WarpKriging::load_from_json(const nlohmann::json& j) {
     m_maxdX = arma::max(arma::abs(m_dX), 1);
     m_is_empty = false;
   }
+  // Absent from files saved before the fixed jitter: they used num_nugget
+  m_chol_jitter = j.contains("chol_jitter") ? j["chol_jitter"].template get<double>() : LinearAlgebra::num_nugget;
   // Warp-specific extras (present in both v2 and v3)
   m_logdet = j["logdet"].template get<double>();
   if (j.contains("is_continuous"))
