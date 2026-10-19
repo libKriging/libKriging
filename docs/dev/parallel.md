@@ -114,14 +114,22 @@ its own MKL (`maxNumCompThreads`).
 
 ### 6.1 What the budget gives
 
-Full fits (Kriging gauss, d = 4), no environment variable:
+Full fits (Kriging gauss, d = 4), no environment variable, 300 ms warm-up,
+"before" = branch start (#414 head: sequential multistart, threshold 800, cap of
+2 threads):
 
-| n | optim | before | budget (step 2) | gain |
+| n | optim | before | budget | gain |
 |---|---|---|---|---|
-| 500 | BFGS | 240 ms | 228 ms | 1.05 |
-| 500 | BFGS10 | 10.2 s | 3.0 s | 3.4 |
-| 2000 | BFGS | 6.3 s | 3.7 s | 1.7 |
-| 2000 | BFGS10 | 156 s | 72 s | 2.2 |
+| 100 | BFGS10 | 167 ms | 40 ms | 4.2 |
+| 100 | BFGS20 | 445 ms | 103 ms | 4.3 |
+| 500 | BFGS | 265 ms | 127 ms | 2.1 |
+| 500 | BFGS10 | 10.0 s | 2.84 s | 3.5 |
+| 500 | BFGS20 | 27.7 s | 3.38 s | 8.2 |
+| 2000 | BFGS | 6.22 s | 3.64 s | 1.7 |
+
+n = 100 with a single start (8 vs 58 ms) is not comparable: the BLAS thread count
+changes the last bits of theta, which flips the restart test of the fit; the
+slower run restarts 3 times and reaches a much better optimum (RESULTS.md 10).
 
 predict / simulate / update: ×1.5–3.8 (single-point predict and small updates
 unchanged, not thread-bound). Multistart in the pool instead of sequential:
@@ -174,7 +182,14 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 2. ~~OpenBLAS loaded with fewer threads than the budget capped the whole
    budget.~~ Fixed: it bounds the BLAS only (section 2).
 3. **Pool workers on the logical CPUs** when each worker has one thread:
-   20 workers are 6–15 % faster than 10 for `BFGS20` (n = 100, 500).
+   20 workers are 0–10 % faster than 10 for `BFGS20` (n = 100, 500), within 1 %
+   for `BFGS10` (after the warm-up; the 6–15 % measured before included the
+   start-up transient).
+6. **Restart test of the fit** (`sol_to_lb < eps` in `Kriging::fit_impl`):
+   flips on the last bits of theta, so a single-start fit can end at a much
+   better or worse optimum depending on the BLAS thread count (n = 100:
+   f = 46.2 vs 107.2). Independent of the budget; to be made robust (tolerance
+   relative to the bounds) in its own issue.
 4. **Bindings setting `OPENBLAS_NUM_THREADS`** to the physical cores before
    loading their OpenBLAS (R binary), or documentation only.
 5. **Other BLAS**: MKL (`mkl_set_num_threads_local` gives a real per-worker

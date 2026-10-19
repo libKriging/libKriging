@@ -302,3 +302,37 @@ short ones (n = 200–500 single evaluations, a few ms each) fall inside the win
 - The `compute_dX` slow-down (6 ms instead of 0.25 ms with BLAS at 20) was mostly
   the transient: 0.04–1.0 ms after the warm-up in every configuration but one.
 
+## 10. Before / after with the warm-up (2026-10-19)
+
+`fits-warm.csv`: `bench-fit-profile` (gauss, d = 4), 300 ms busy-wait, median of 5
+(3 at n = 2000). "before" = branch start `bf8cb8d9` (#414 head: OpenBLAS default,
+sequential Kriging multistart, threshold 800, cap 2), built in a separate
+worktree with the same bench source; "after" = budget (`60fff82d`), default
+environment.
+
+| n | optim | before | after | before / after | after with 20 workers |
+|---|---|---|---|---|---|
+| 100 | BFGS | 8 ms | 58 ms | 0.14 (see below) | — |
+| 100 | BFGS10 | 167 ms | 40 ms | 4.2 | 40 ms |
+| 100 | BFGS20 | 445 ms | 103 ms | 4.3 | 94 ms |
+| 500 | BFGS | 265 ms | 127 ms | 2.1 | — |
+| 500 | BFGS10 | 10.0 s | 2.84 s | 3.5 | 2.87 s |
+| 500 | BFGS20 | 27.7 s | 3.38 s | 8.2 | 3.23 s |
+| 2000 | BFGS | 6.22 s | 3.64 s | 1.7 | — |
+
+Spread max / min ≤ 1.03 except n = 100 (≤ 1.5) and n = 500 BFGS (≤ 1.5).
+
+- 20 workers (logical CPUs) instead of 10 when each has one thread: 0–10 %
+  (n = 100 BFGS20: 94 vs 103 ms; n = 500 BFGS20: 3.23 vs 3.38 s), within 1 % for
+  BFGS10. The 6–15 % of section 8 included the start-up transient.
+- n = 100, BFGS: **not a thread-efficiency regression but a different optimizer
+  path**. With OpenBLAS at 20 threads, L-BFGS-B stops after its first run
+  (f = 107.178, 6 iterations); at 10 threads (also with the "before" code and
+  `OPENBLAS_NUM_THREADS=10`: 56–79 ms) the same first run (f = 107.178) is
+  followed by 3 restarts and ends at **f = 46.216**, a much better optimum. The
+  restart test of `Kriging::fit_impl` (stuck at the lower bound:
+  `sol_to_lb < eps`, at machine precision) flips on the last bits of theta, which
+  depend on the BLAS thread count. Standalone OpenBLAS at n = 100 shows no slow-down
+  at 10 threads (`dpotrf` 0.052 vs 0.060 ms at 20). Separate robustness issue: the
+  quality of a single-start fit depends on the BLAS thread count through that test.
+
