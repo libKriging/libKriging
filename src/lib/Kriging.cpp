@@ -130,25 +130,6 @@ void set_openblas_threads(int n) {
 #endif
 }
 
-BenchBlasHandoff::BenchBlasHandoff(bool parallel_loop) {
-  static const bool enabled = [] {
-    const char* v = std::getenv("LK_BENCH_BLAS_HANDOFF");
-    return v != nullptr && std::string(v) == "1";
-  }();
-  if (enabled && parallel_loop) {
-    saved = get_openblas_threads();
-    if (saved > 1)
-      set_openblas_threads(1);
-    else
-      saved = 0;
-  }
-}
-
-BenchBlasHandoff::~BenchBlasHandoff() {
-  if (saved > 0)
-    set_openblas_threads(saved);
-}
-
 void restore_blas_threads(const BlasThreadState& s) {
 #if !defined(__APPLE__) || !defined(__arm64__)
   auto fn = get_openblas_set_num_threads();

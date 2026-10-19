@@ -138,7 +138,7 @@ int physical_cores_os() {
 #endif
 
 // OpenBLAS count when the library was first used (OPENBLAS_NUM_THREADS or
-// OpenBLAS's default), 0 without OpenBLAS: a ceiling for the budget.
+// OpenBLAS's default, the logical CPUs), 0 without OpenBLAS.
 int initial_blas_threads() {
   static const int n = get_openblas_threads();
   return n;
@@ -170,10 +170,22 @@ int budget_total() {
   if (omp_limit > 0 && !tl_in_pool)  // pool workers: their share is set below
     total = std::min(total, omp_limit);
 #endif
-  const int blas0 = initial_blas_threads();
-  if (blas0 > 0)
-    total = std::min(total, blas0);
+  // The OpenBLAS count (OPENBLAS_NUM_THREADS) bounds the BLAS only, not the
+  // pool and the OpenMP loops: see blas_threads_for().
   return std::max(1, total);
+}
+
+int blas_threads_for(int share) {
+  const int b0 = initial_blas_threads();
+  if (b0 <= 0 || share <= 0)
+    return 0;  // no OpenBLAS: nothing to set
+  if (b0 <= share)
+    return 0;  // the count it was loaded with (OPENBLAS_NUM_THREADS) fits: left as it is
+  // Loaded with more threads than the share (its default: the logical CPUs).
+  // Lowering the count at run time is as fast as OPENBLAS_NUM_THREADS once
+  // the threads created at load have gone to sleep (~100 ms after loading:
+  // bench/thread-budget/RESULTS.md, section 9).
+  return share;
 }
 
 int omp_threads() {
@@ -209,9 +221,7 @@ ScopedBlasThreads::~ScopedBlasThreads() {
     set_openblas_threads(saved);
 }
 
-BudgetScope::BudgetScope() : blas(in_pool_worker() ? 0 : budget_total()) {
-  initial_blas_threads();  // record the host's count before any change
-}
+BudgetScope::BudgetScope() : blas(in_pool_worker() ? 0 : blas_threads_for(budget_total())) {}
 
 }  // namespace detail
 }  // namespace libKriging

@@ -50,6 +50,19 @@ double median(std::vector<double> t) {
 
 }  // namespace
 
+// LK_BENCH_WARMUP_MS (default 300): busy-wait before measuring. OpenBLAS
+// pthreads threads spin for ~100 ms after the library is loaded
+// (OPENBLAS_THREAD_TIMEOUT); measured inside that window, a short run sees
+// them as contention (bench/thread-budget/RESULTS.md, section 9).
+static void bench_warmup() {
+  const char* v = std::getenv("LK_BENCH_WARMUP_MS");
+  const int ms = v ? std::atoi(v) : 300;
+  const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+  volatile double x = 0;
+  while (std::chrono::steady_clock::now() < end)
+    x = x + 1;
+}
+
 int main(int argc, char** argv) {
   if (argc < 5) {
     std::fprintf(stderr, "usage: %s <predict|predict_cov|simulate|update> <n> <d> <n_new> [nsim=1] [reps=7] [--header]\n",
@@ -95,6 +108,7 @@ int main(int argc, char** argv) {
   par.is_theta_estim = false;
   Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", par);
 
+  bench_warmup();
   std::vector<double> t(reps);
   for (int r = 0; r < reps; ++r) {
     if (op == "predict") {

@@ -35,7 +35,7 @@ void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char
   // teams that contend with the other workers (≈2x slower at n = 500, mostly
   // in system time). The OpenBLAS count is process-global: set once here,
   // restored once all workers have joined (declared before the joiner).
-  ScopedBlasThreads blas_share(share);
+  ScopedBlasThreads blas_share(blas_threads_for(share));
 
   if (Optim::log_level > Optim::log_none) {
     arma::cout << "Thread pool: " << pool_size << " workers x " << share << " BLAS/OpenMP threads (budget=" << total

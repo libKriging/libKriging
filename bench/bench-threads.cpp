@@ -55,6 +55,19 @@ double median_ms(int reps, F&& f) {
 
 }  // namespace
 
+// LK_BENCH_WARMUP_MS (default 300): busy-wait before measuring. OpenBLAS
+// pthreads threads spin for ~100 ms after the library is loaded
+// (OPENBLAS_THREAD_TIMEOUT); measured inside that window, a short run sees
+// them as contention (bench/thread-budget/RESULTS.md, section 9).
+static void bench_warmup() {
+  const char* v = std::getenv("LK_BENCH_WARMUP_MS");
+  const int ms = v ? std::atoi(v) : 300;
+  const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+  volatile double x = 0;
+  while (std::chrono::steady_clock::now() < end)
+    x = x + 1;
+}
+
 int main(int argc, char** argv) {
   if (argc < 3) {
     std::fprintf(stderr, "usage: %s <n> <d> [reps=7] [kernel=matern5_2] [--header]\n", argv[0]);
@@ -90,6 +103,7 @@ int main(int argc, char** argv) {
   arma::mat dX = LinearAlgebra::compute_dX(X);
   arma::mat R(n, n, arma::fill::none);
 
+  bench_warmup();
   const double t_dX = median_ms(reps, [&] { dX = LinearAlgebra::compute_dX(X); });
   const double t_cholcov = median_ms(reps, [&] { LinearAlgebra::cholCov(&R, dX, theta, cov, 1.0, arma::vec()); });
   const double t_chol = median_ms(reps, [&] { arma::mat L = LinearAlgebra::safe_chol_lower(R); });

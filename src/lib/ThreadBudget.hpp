@@ -21,9 +21,13 @@ int physical_cores();
 /// Thread budget: round(share × physical_cores()), share = Optim::num_threads_percent
 /// (x <= 1: ratio, x > 1: percentage, 0 = 100 %), at least 1, never more than the
 /// calling thread's OpenMP limit (omp_get_max_threads(): OMP_NUM_THREADS,
-/// omp_set_num_threads) nor the OpenBLAS count in effect when the library was
-/// first used (OPENBLAS_NUM_THREADS).
+/// omp_set_num_threads). The OpenBLAS count bounds the BLAS only.
 int budget_total();
+
+/// OpenBLAS count for a call with `share` threads, 0 = leave it as it is: no
+/// OpenBLAS, or OpenBLAS loaded with at most `share` threads (an explicit
+/// OPENBLAS_NUM_THREADS below the budget is kept); otherwise `share`.
+int blas_threads_for(int share);
 
 /// Threads for an OpenMP loop of the calling thread: its pool share inside a
 /// pool worker, budget_total() otherwise. Use as num_threads(omp_threads()).
@@ -60,9 +64,10 @@ struct ScopedBlasThreads {
 };
 
 /// Entry-point guard of the public fit / predict / simulate / update methods:
-/// sets OpenBLAS to the budget for the call (OpenBLAS defaults to the logical
-/// CPUs, which costs 1.3-2x on a hyperthreaded machine), no-op inside a pool
-/// worker (the pool has set the worker's share).
+/// OpenBLAS at blas_threads_for(budget) for the call
+/// (OpenBLAS defaults to the logical CPUs, which costs 1.3-2x on a
+/// hyperthreaded machine), restored after; no-op inside a pool worker (the
+/// pool has set the worker's share).
 struct BudgetScope {
   BudgetScope();
   BudgetScope(const BudgetScope&) = delete;

@@ -9,6 +9,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <cstdlib>
 #include <iomanip>
 #include <string>
 
@@ -19,6 +20,19 @@ double test_function(const arma::rowvec& x) {
     sum += std::sin(2.0 * M_PI * x(i));
   }
   return sum;
+}
+
+// LK_BENCH_WARMUP_MS (default 300): busy-wait before measuring. OpenBLAS
+// pthreads threads spin for ~100 ms after the library is loaded
+// (OPENBLAS_THREAD_TIMEOUT); measured inside that window, a short run sees
+// them as contention (bench/thread-budget/RESULTS.md, section 9).
+static void bench_warmup() {
+  const char* v = std::getenv("LK_BENCH_WARMUP_MS");
+  const int ms = v ? std::atoi(v) : 300;
+  const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+  volatile double x = 0;
+  while (std::chrono::steady_clock::now() < end)
+    x = x + 1;
 }
 
 int main(int argc, char* argv[]) {
@@ -47,6 +61,7 @@ int main(int argc, char* argv[]) {
   Kriging kr("gauss");
   Kriging::Parameters params{std::nullopt, true, std::nullopt, true};
 
+  bench_warmup();
   auto start = std::chrono::high_resolution_clock::now();
   kr.fit(y_train, X_train, Trend::RegressionModel::Constant, false, optim, "LL", params);
   auto end = std::chrono::high_resolution_clock::now();

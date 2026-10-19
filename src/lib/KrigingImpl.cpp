@@ -995,13 +995,10 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
     // the optimum reached, may change noticeably between the two orders.
     arma::mat term1_rows(d, n, arma::fill::zeros);
     arma::mat term2_rows(d, n, arma::fill::zeros);
-    {
-      libKriging::detail::BenchBlasHandoff handoff(true);
 #pragma omp parallel for schedule(dynamic, 8) num_threads(libKriging::detail::omp_threads())
-      for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
-        const arma::uword i = static_cast<arma::uword>(si);
-        add_row(i, term1_rows.colptr(i), term2_rows.colptr(i));
-      }
+    for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
+      const arma::uword i = static_cast<arma::uword>(si);
+      add_row(i, term1_rows.colptr(i), term2_rows.colptr(i));
     }
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword k = 0; k < d; k++) {

@@ -200,8 +200,9 @@ predict / simulate / update: step 2 default matches the best configuration of
 section 6 (`tbnc` 10/10) within the noise, ×1.5–3.8 over before, except the
 single-point predict and the small updates (unchanged, not thread-bound).
 
-**OpenBLAS pthreads cannot be reduced at run time.** n = 500, BFGS (single start),
-5 runs each:
+**~~OpenBLAS pthreads cannot be reduced at run time.~~ Superseded by section 9**:
+the gap below is a start-up transient (every row is the first fit of a fresh
+process), not a steady-state cost. n = 500, BFGS (single start), 5 runs each:
 
 | OpenBLAS count | fit (ms) |
 |---|---|
@@ -242,3 +243,62 @@ lets the OpenMP loops run from n = 200: ×1.6–3.2 at n = 200–500, ×1.0 at n
 - The library has to set the OpenBLAS count to the budget when OpenBLAS's own
   default (logical CPUs) exceeds it, and restore it afterwards
   (`BlasThreadGuard`), since OpenBLAS pthreads at 20 threads costs 1.3–2× by itself.
+
+## 9. Start-up transient of OpenBLAS pthreads (2026-10-19)
+
+The section 8 gap (single-start fit, n = 500: ~215 ms with OpenBLAS loaded at 20
+threads and set to 10 by the library vs ~125 ms with `OPENBLAS_NUM_THREADS=10`)
+was investigated:
+
+- Same optimizer path: 8 BFGS iterations, same optimum, in every configuration.
+- Only the **first fit of the process** is slow: three fits in a row (default
+  OpenBLAS) take 215–225, 123–151, 121–133 ms; with `OPENBLAS_NUM_THREADS=10`:
+  132–135, 127–135, 126–127 ms.
+- Not page faults (`GLIBC_TUNABLES` mmap / trim thresholds: 3× fewer minor faults,
+  same first fit). Involuntary context switches: 959 (default) vs 135 (env 10):
+  more runnable threads than CPUs.
+- OpenBLAS alone (C program, `dpotrf` n = 500) shows no such cost.
+- Busy-waiting before the first fit (main thread, CPU kept at full clock), median
+  of 5 runs:
+
+  | wait | default (20, set to 10) | `OPENBLAS_NUM_THREADS=10` | `OPENBLAS_THREAD_TIMEOUT=4` |
+  |---|---|---|---|
+  | 0 ms | 204–250 ms | 127–151 ms | 111–126 ms |
+  | 150 ms | 113–147 ms | 112–121 ms | 111–122 ms |
+  | 500 ms | 113–169 ms | 112–140 ms | 109–132 ms |
+
+  (`sleep` instead of busy-wait gives noisy results for every configuration: the
+  CPU clocks down while idle.)
+
+Cause: OpenBLAS pthreads starts its threads when it is loaded; they spin for
+`OPENBLAS_THREAD_TIMEOUT` (~2^28 cycles, ~50–100 ms here) before sleeping. Work
+done in that window competes with 19 spinning threads. Afterwards, the threads
+beyond the count set by the library are never woken again: **lowering the
+OpenBLAS count at run time is as fast as `OPENBLAS_NUM_THREADS`**. Per
+evaluation (`bench-threads`, OpenBLAS loaded with 20, set once to 10 vs 1):
+
+| n | set to 10 | set to 1 | `OPENBLAS_NUM_THREADS=10` |
+|---|---|---|---|
+| 200 | 1.17–1.22 ms | 1.62–1.68 ms | 1.20 ms |
+| 500 | 8.2–9.2 ms | 11.5–13.7 ms | 8.2 ms |
+| 1000 | 32.8–33.8 ms | 61.9–63.4 ms | 37.3 ms |
+| 2000 | 203–208 ms | 438–442 ms | — |
+
+Setting OpenBLAS to 1 thread is slower everywhere (`blas-switch.csv`: also
+predict / simulate, ×1.3–5.7); the size-dependent switch to 1 thread considered
+for decision 8.1 is dropped. Full fits compared across fresh processes also differ
+by their optimizer path when the BLAS thread count changes (rounding), which made
+that file's fit columns unusable for a crossover.
+
+Effect on the earlier measurements: every bench run is a fresh process, and the
+short ones (n = 200–500 single evaluations, a few ms each) fall inside the window.
+`warmup-check.csv` re-measures the key cells with and without a 300 ms busy-wait
+(`LK_BENCH_WARMUP_MS`, now 300 by default in `bench-threads`, `bench-threads-ops`,
+`bench-fit-profile`):
+
+- The step 1 conclusion holds in steady state: with the loops from n = 200,
+  (BLAS 10, OpenMP 10) gives 1.5 ms at n = 200 and 10 ms at n = 500; with either at
+  20, 19–43 ms and 31–50 ms; at n = 1000, 43–50 ms vs 79–103 ms.
+- The `compute_dX` slow-down (6 ms instead of 0.25 ms with BLAS at 20) was mostly
+  the transient: 0.04–1.0 ms after the warm-up in every configuration but one.
+
