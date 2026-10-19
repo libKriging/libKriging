@@ -279,6 +279,11 @@ Done 2026-10-18 (differs from the plan below where noted):
   `workflow_dispatch`) until told otherwise. The open item on #414 is to be
   reproduced locally, not through CI.
 
+5. (2026-10-19) Pool workers stay on the physical cores; bindings do not set
+   `OPENBLAS_NUM_THREADS` (start-up transient only, documented); #414 merged into
+   #415 (base `master`); the fit restart robustness (parallel.md 8.6) is worked
+   on in this branch. Reference: `docs/dev/parallel.md`.
+
 ## Thread settings inventory (state after #414)
 
 Read by the library:

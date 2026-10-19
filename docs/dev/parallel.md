@@ -3,7 +3,7 @@
 How the library uses threads, how to control it, and what was measured. Plan
 and history: [ThreadBudget-TODO.md](ThreadBudget-TODO.md); measurements:
 [bench/thread-budget/RESULTS.md](../../bench/thread-budget/RESULTS.md).
-Status: branch `perf/thread-budget` (PR #415), Linux measurements only; macOS in
+Status: branch `perf/thread-budget` (PR #415, which includes #414), Linux measurements only; macOS in
 #416, Windows in #417.
 
 ## 1. Three levels of parallelism
@@ -174,7 +174,7 @@ as fast as setting `OPENBLAS_NUM_THREADS` before loading (RESULTS.md, section 9)
 build deadlocks in forked workers). With `mclapply`, give each worker one thread
 (`Optim::set_num_threads_percent` small, or `OPENBLAS_NUM_THREADS=1`).
 
-## 8. Open decisions
+## 8. Decisions
 
 1. ~~OpenBLAS loaded with more threads than the budget: leave it, run OpenMP
    and the multistart on 1 thread.~~ Dropped: the cost it addressed is the
@@ -183,7 +183,8 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
    (slower at every size in steady state).
 2. ~~OpenBLAS loaded with fewer threads than the budget capped the whole
    budget.~~ Fixed: it bounds the BLAS only (section 2).
-3. **Pool workers on the logical CPUs** when each worker has one thread:
+3. **Pool workers stay on the physical cores** (decided 2026-10-19), although
+   with one thread each they could use the logical CPUs:
    20 workers are 0–10 % faster than 10 for `BFGS20` (n = 100, 500), within 1 %
    for `BFGS10` (after the warm-up; the 6–15 % measured before included the
    start-up transient).
@@ -191,9 +192,12 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
    L-BFGS-B outcome (`ABNORMAL_TERMINATION_IN_LNSRCH`), which flips on the last
    bits of the objective, so a single-start fit can end at a much better or
    worse optimum depending on the BLAS thread count (n = 100: f = 46.2 vs
-   107.2). Independent of the budget; its own issue.
-4. **Bindings setting `OPENBLAS_NUM_THREADS`** to the physical cores before
-   loading their OpenBLAS (R binary), or documentation only.
+   107.2). Independent of the budget; worked on in this branch after the merge
+   of #414 into #415 (decided 2026-10-19).
+4. **Bindings do not set `OPENBLAS_NUM_THREADS`** (decided 2026-10-19): it would
+   only remove the start-up transient of 6.2; documented instead
+   (`OPENBLAS_NUM_THREADS` = physical cores or `OPENBLAS_THREAD_TIMEOUT=4` for short
+   programs).
 5. **Other BLAS**: MKL (`mkl_set_num_threads_local` gives a real per-worker
    share), FlexiBLAS, BLIS — not driven yet.
 
