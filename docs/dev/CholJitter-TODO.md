@@ -152,7 +152,12 @@ All 4 pass with `LK_CHOL_JITTER=0`.
      simulate (lines 55-60 plot even under GITHUB_ACTION), no display in the
      sandbox, unrelated; R (libKriging installed in build-tb/installed,
      package in the scratchpad, `LD_LIBRARY_PATH` needed at install):
-     binding-consistency 49 / 49, full suite: see below.
+     binding-consistency 49 / 49; full suite (32 files, 695 tests) only
+     `test-unstableLL.R` "unstable LL fixed using rcond failover" fails (the
+     R twin of test 2, same decision) — run it with
+     `test_dir(".", package = "rlibkriging", load_package = "installed")`:
+     without the package environment `load.NestedKriging` (S3, not exported)
+     is not found.
 4. **Wider study before release** (`bench/thread-budget/fit_repro_study.cpp`, add
    the jitter hook back as a call to `set_chol_jitter` instead of the removed
    `TMP_JITTER`):
