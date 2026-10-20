@@ -2735,9 +2735,13 @@ void WarpKriging::optimise_joint(const std::string& method) {
       }
       arma::vec theta_cur = from_gamma(x.tail(dt));
       double sol_to_lb = arma::min(arma::abs(theta_cur - theta_lower));
+      // "No improvement" within the optimizer's own tolerance (as Kriging):
+      // a difference at the rounding level must not decide a restart.
+      const double f_tol = optimizer.factr * arma::datum::eps * std::max(1.0, std::abs(best_f));
+      const bool worse = res.f_opt > best_f + f_tol;
       if ((retry < Optim::max_restart)
           && ((res.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) || (res.num_iters <= 2)
-              || (sol_to_lb < arma::datum::eps) || (res.f_opt > best_f))) {
+              || (sol_to_lb < arma::datum::eps) || worse)) {
         // Contract theta starting point toward lower bound.
         arma::vec theta_restart = (theta0 + theta_lower) / std::pow(2.0, retry + 1);
         x.tail(dt) = to_gamma(theta_restart);
@@ -2889,7 +2893,11 @@ void WarpKriging::optimise_joint(const std::string& method) {
 
   // Helper: run parallel multistart with a given optimizer function
   auto run_parallel_multistart = [&](auto& optimizer_fn) {
-    // Generate random starting points for θ in [theta_lower, theta_upper]
+    // Random starting points for θ, uniform in [theta_lower, theta_upper].
+    // Not log-uniform as Kriging: with a joint MLP, θ lives on the scale of the
+    // learnt features and long-range starts let the weights adapt, the
+    // log-uniform draw lost 124 LL units (median) on a projected Branin
+    // (docs/dev/CholJitter-TODO.md 4f).
     arma::mat theta0_rand(multistart, d_theta);
     for (int i = 0; i < multistart; ++i)
       theta0_rand.row(i) = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));

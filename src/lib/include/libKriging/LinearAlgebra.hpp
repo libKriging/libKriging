@@ -27,13 +27,15 @@ class LinearAlgebra {
   static double chol_jitter;
   LIBKRIGING_EXPORT static void set_chol_jitter(double x);
   LIBKRIGING_EXPORT static double get_chol_jitter();
-  /// Jitter used for `kernel`: 1e-8 for gauss, 1e-10 for matern5_2, 0 otherwise
+  /// Jitter used for `kernel`: 1e-9 for gauss, 1e-10 for matern5_2, 0 otherwise
   /// (automatic mode), or the value set by set_chol_jitter.
   LIBKRIGING_EXPORT static double kernel_chol_jitter(const std::string& kernel);
   /// Jitter of the committed model, once theta is chosen: at most num_nugget
   /// (1e-10), so the model interpolates the observations again
   /// (min(kernel_chol_jitter, num_nugget), 0 when kernel_chol_jitter is 0).
   LIBKRIGING_EXPORT static double model_chol_jitter(const std::string& kernel);
+  /// Same, from the search jitter `kernel_jitter` a model was fitted with.
+  LIBKRIGING_EXPORT static double model_chol_jitter(double kernel_jitter);
 
   static bool warn_chol;
   LIBKRIGING_EXPORT static void set_chol_warning(bool warn);

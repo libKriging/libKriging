@@ -108,7 +108,7 @@ rlibkriging:::linalg_check_chol_rcond(default_rcond_checked)
 rlibkriging:::linalg_set_num_nugget(default_num_nugget)
 rlibkriging:::linalg_set_chol_jitter(default_chol_jitter)
 
-# With the fixed jitter (default, gauss 1e-8) the LL profile has the same
+# With the fixed jitter (default, gauss 1e-9) the LL profile has the same
 # single maximum (theta = 0.1506) but its long-range tail is a bumpy plateau:
 # a single random start may stop there; the multistart finds the maximum
 # (docs/dev/CholJitter-TODO.md 4b)

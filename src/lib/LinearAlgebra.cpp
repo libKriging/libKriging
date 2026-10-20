@@ -61,17 +61,22 @@ LIBKRIGING_EXPORT double LinearAlgebra::kernel_chol_jitter(const std::string& ke
     return LinearAlgebra::chol_jitter;
   // Smallest values that made single-start fits bit-identical across BLAS
   // thread counts on noise-free data (bench/thread-budget/fit_repro_study.cpp);
-  // matern3_2 and exp never reach the near-singular region there.
+  // matern3_2 and exp never reach the near-singular region there. gauss: 1e-9
+  // is as reproducible as 1e-8 with the log-uniform starts and far less
+  // biased on very smooth functions (docs/dev/CholJitter-TODO.md 4e).
   if (kernel == "gauss")
-    return 1e-8;
+    return 1e-9;
   if (kernel == "matern5_2")
     return 1e-10;
   return 0.0;
 }
 
 LIBKRIGING_EXPORT double LinearAlgebra::model_chol_jitter(const std::string& kernel) {
-  const double jitter = LinearAlgebra::kernel_chol_jitter(kernel);
-  return jitter > 0.0 ? std::min(jitter, LinearAlgebra::num_nugget) : 0.0;
+  return LinearAlgebra::model_chol_jitter(LinearAlgebra::kernel_chol_jitter(kernel));
+}
+
+LIBKRIGING_EXPORT double LinearAlgebra::model_chol_jitter(double kernel_jitter) {
+  return kernel_jitter > 0.0 ? std::min(kernel_jitter, LinearAlgebra::num_nugget) : 0.0;
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {

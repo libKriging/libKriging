@@ -3420,7 +3420,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 void Kriging::commit_model_chol_jitter() {
   if (m_noise_model != NoiseModel::None || m_is_empty)
     return;
-  m_model_chol_jitter = LinearAlgebra::model_chol_jitter(m_covType);
+  // from the search jitter kept with the model (not the current setting), so
+  // a warm-restart update of a loaded model commits the same factorization
+  m_model_chol_jitter = LinearAlgebra::model_chol_jitter(m_chol_jitter);
   if (m_model_chol_jitter == m_chol_jitter)
     return;  // the optimizer's last model is already the committed one
   KModel m = make_committed_Model(m_theta, m_sigma2);
@@ -3697,7 +3699,7 @@ void Kriging::fit_impl(const arma::vec& y,
       extra_param = (sigma2 > 0) ? sigma2 : m_sigma2;
     } else {
       extra_param = m_sigma2;  // ignored for None
-      m_model_chol_jitter = LinearAlgebra::model_chol_jitter(m_covType);
+      m_model_chol_jitter = LinearAlgebra::model_chol_jitter(m_chol_jitter);
     }
 
     Kriging::KModel m = make_committed_Model(m_theta, extra_param);

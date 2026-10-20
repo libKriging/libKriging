@@ -350,7 +350,7 @@ TEST_CASE("NestedKriging warped hyperparameters come from a subsample fit", "[ne
 
   // NK interpolation is a property of the aggregation, not of the
   // hyperparameters: it must hold even with subsampled hyperparameters
-  // (up to the gauss fixed Cholesky jitter 1e-8, which smooths the training
+  // (up to the gauss fixed Cholesky jitter 1e-9, which smooths the training
   // values by about sqrt(jitter) of the process scale: 1.03e-3 measured)
   auto [mean, stdev] = nk.predict(X, true);
   CHECK(arma::abs(mean - y).max() < 2e-3);

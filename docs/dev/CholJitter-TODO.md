@@ -344,7 +344,7 @@ All 4 pass with `LK_CHOL_JITTER=0`.
        (`gaussjitter-<J>-*.csv`): see 4e.
      - ctest 220 / 220 (KrigingWarmRestartTest timing-flaky under -j8, passes
        alone). Binding tests to rerun (reference values may move with A).
-   - [ ] **4e. gauss objective jitter with A + C (2026-10-20)**
+   - [x] **4e. gauss objective jitter with A + C (2026-10-20)**
      (`gaussjitter-<J>-gauss-*.csv`, `summarize_jitter_scale.py gaussjitter-<J>`;
      240 data sets: Branin 50, sin n 50 / 100 / 200 d 2, 200 / 500 d 4, 200 d 8,
      Hartmann6 60 / 300, BFGS10 sin 200 d 2):
@@ -360,7 +360,48 @@ All 4 pass with `LK_CHOL_JITTER=0`.
      on Branin (very smooth, polynomial-like: the exact optimum needs an even
      higher conditioning); 1e-10 loses reproducibility (sin d 4: 20–50 %).
      Remaining divergence with 1e-8 / 1e-9: sin d 4 n 200 / 500 (10–20 %),
-     the iteration-limit / path chaos of 4d point 4(b). Decision pending.
+     the iteration-limit / path chaos of 4d point 4(b). **Decided (user,
+     2026-10-20): gauss 1e-9** (`LinearAlgebra::kernel_chol_jitter`; matern5_2
+     stays 1e-10).
+   - [ ] **4f. Alignment of the *Kriging classes (2026-10-20)**. MLPKriging is a
+     WarpKriging; NestedKriging fits Kriging / WarpKriging submodels.
+     - Fixed: NestedKriging `precompute_nk` used the current `LinearAlgebra`
+       setting instead of each submodel's stored jitter (a model reloaded after
+       `set_chol_jitter` no longer matched its submodels); now
+       `model_chol_jitter()` (Kriging) / `m_chol_jitter` (WarpKriging) of the
+       submodel.
+     - Fixed: `Kriging::commit_model_chol_jitter` (and `optim = "none"`) derive
+       the committed jitter from the stored search jitter
+       (`LinearAlgebra::model_chol_jitter(double)`), not the current setting, so
+       a warm-restart `update` of a loaded model commits the same factorization.
+     - Aligned: WarpKriging joint-BFGS restart criterion "no improvement" with
+       the optimizer tolerance (C).
+     - **Not aligned: the log-uniform start draw (A)** in WarpKriging
+       (`warp_start_study.cpp`, `summarize_warp_start.py`, `warpstart-*.csv`,
+       20 data sets per row, LL / Q2 / NLPD paired with the uniform draw):
+
+       | config | LL log − unif (median) | log better / worse (> 0.1) | Q2 log / unif |
+       |---|---|---|---|
+       | MLP proj-Branin d 5 n 60 matern5_2 BFGS4 | **−124** | 0 / 20 | −0.08 / 0.97 |
+       | MLP sin d 3 n 60 gauss BFGS4 | 0 | 2 / 8 | −0.21 / −0.11 |
+       | MLP sin d 3 n 60 matern5_2 BFGS4 | 0 | 7 / 3 | −0.17 / −0.15 |
+       | kumaraswamy sin d 2 n 30 gauss BFGS4 | 0 | 5 / 0 | 0.84 / 0.84 |
+       | kumaraswamy sin d 2 n 30 matern5_2 BFGS4 | 0 | 1 / 0 | 0.84 / 0.84 |
+       | kumaraswamy Branin n 30 gauss BFGS4 | 0 | 0 / 0 | 1.00 / 1.00 |
+       | none sin d 2 n 100 gauss BFGS4 | 0 | 4 / 2 | 1 / 1 |
+       | single start (BFGS) rows | 0 | 0 / 0 | identical |
+
+       The single start of WarpKriging is deterministic (theta = 1, not drawn),
+       so only the multistart is affected. With a joint MLP, theta lives on the
+       scale of the learnt features (bounds [0.09, 45] here vs [0.02, 10] for
+       per-variable warps): long-range starts (most of a uniform draw) let the
+       weights adapt, short ones with random weights fall into a poor basin
+       (`MLPKrigingCalibrationTest` BFGS4 fails with the log draw). Per-variable
+       warps: neutral to slightly better. Kept uniform for all for now; open:
+       log-uniform for per-variable warps only?
+     - Left as is: WarpKriging draws its starts from the Armadillo RNG (seeded
+       by the warp constructors), not `Random` (`Random::reset_seed` has no
+       effect on it); first start theta = 1 (Kriging: random).
    - [ ] calibration (predictive sd / RMSE): gauss is overconfident (0.25–0.43)
          with or without jitter; matern5_2 ≈ 1.
 5. **Docs**: parallel.md 8.6 (decision a, values, how to disable), FAQ

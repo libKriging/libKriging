@@ -87,8 +87,8 @@ TEST_CASE("fixed Cholesky jitter is kept with the model (save & reload)") {
   LinearAlgebra::set_chol_jitter(-1);  // per-kernel default
   Kriging ok("gauss");
   ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
-  // the objective uses the gauss jitter (1e-8), the committed model num_nugget (1e-10)
-  CHECK(ok.chol_jitter() == 1e-8);
+  // the objective uses the gauss jitter (1e-9), the committed model num_nugget (1e-10)
+  CHECK(ok.chol_jitter() == 1e-9);
   CHECK(ok.model_chol_jitter() == 1e-10);
   // logLikelihood() is the optimized objective
   CHECK(ok.logLikelihood() == std::get<0>(ok.logLikelihoodFun(ok.theta(), false, false)));
@@ -100,7 +100,7 @@ TEST_CASE("fixed Cholesky jitter is kept with the model (save & reload)") {
   // a different global setting must not change a fitted / reloaded model
   LinearAlgebra::set_chol_jitter(0);
   Kriging ok_reloaded = Kriging::load("dump_jitter.json");
-  CHECK(ok_reloaded.chol_jitter() == 1e-8);
+  CHECK(ok_reloaded.chol_jitter() == 1e-9);
   CHECK(ok_reloaded.model_chol_jitter() == 1e-10);
   ok.update(yu, Xu, false);
   ok_reloaded.update(yu, Xu, false);

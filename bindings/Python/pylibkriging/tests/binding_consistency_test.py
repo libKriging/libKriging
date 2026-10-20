@@ -47,7 +47,7 @@ def check_find_dir():
 @pytest.fixture(scope="module", autouse=True)
 def exact_objective():
     # The references evaluate the exact LL / LOO formulas: no fixed Cholesky
-    # jitter (gauss uses 1e-8 by default in the fit objective)
+    # jitter (gauss uses 1e-9 by default in the fit objective)
     saved = lk.LinearAlgebra.get_chol_jitter()
     lk.LinearAlgebra.set_chol_jitter(0)
     yield

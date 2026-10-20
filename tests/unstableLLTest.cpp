@@ -210,7 +210,7 @@ TEST_CASE("Fit: unstable LL (long range with 1D Gauss kernel)", "[fit][unstable]
   }
 
   SECTION("LL / Fit: unstable LL with the fixed Cholesky jitter (default) - BFGS vs BFGS10") {
-    // With the jitter (gauss 1e-8) the LL profile has the same single maximum
+    // With the jitter (gauss 1e-9) the LL profile has the same single maximum
     // (theta = 0.1506, LL = 2.288) but its long-range tail is a bumpy plateau
     // instead of an erratic fall: a single random start that lands there
     // stops on a bump (theta 1.37, LL -14.0). The multistart finds the
