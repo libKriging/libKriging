@@ -15,8 +15,8 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static double get_num_nugget();
 
   // Fixed jitter added to the diagonal of the training correlation matrix of a
-  // noise-free Kriging fit, before every Cholesky. It keeps the objective a
-  // continuous function of theta in the near-singular region of smooth kernels,
+  // noise-free Kriging fit, before every Cholesky of the optimization. It keeps
+  // the objective a continuous function of theta in the near-singular region of smooth kernels,
   // where the stepwise num_nugget fallback of safe_chol_lower otherwise makes the
   // fit depend on the rounding (BLAS thread count, BLAS build, CPU):
   // docs/dev/parallel.md 8.6.
@@ -30,6 +30,10 @@ class LinearAlgebra {
   /// Jitter used for `kernel`: 1e-8 for gauss, 1e-10 for matern5_2, 0 otherwise
   /// (automatic mode), or the value set by set_chol_jitter.
   LIBKRIGING_EXPORT static double kernel_chol_jitter(const std::string& kernel);
+  /// Jitter of the committed model, once theta is chosen: at most num_nugget
+  /// (1e-10), so the model interpolates the observations again
+  /// (min(kernel_chol_jitter, num_nugget), 0 when kernel_chol_jitter is 0).
+  LIBKRIGING_EXPORT static double model_chol_jitter(const std::string& kernel);
 
   static bool warn_chol;
   LIBKRIGING_EXPORT static void set_chol_warning(bool warn);

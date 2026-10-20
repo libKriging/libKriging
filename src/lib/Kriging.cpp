@@ -352,6 +352,14 @@ void Kriging::populate_Model(KModel& m,
                              const arma::vec& theta,
                              double extra_param,
                              std::map<std::string, double>* bench) const {
+  populate_Model_jitter(m, theta, extra_param, m_chol_jitter, bench);
+}
+
+void Kriging::populate_Model_jitter(KModel& m,
+                                    const arma::vec& theta,
+                                    double extra_param,
+                                    double chol_jitter,
+                                    std::map<std::string, double>* bench) const {
   double alpha = 1.0;
   arma::vec diag = KrigingImpl::ones;
   bool update_eligible = false;
@@ -365,12 +373,14 @@ void Kriging::populate_Model(KModel& m,
     update_eligible = !m_is_empty && (extra_param == m_sigma2) && (m_theta.size() == theta.size())
                       && (theta - m_theta).is_zero() && (m_T.memptr() != nullptr) && (m_X.n_rows > m_T.n_rows);
   } else {
+    // (m_T was factorized with m_model_chol_jitter)
     update_eligible = !m_is_empty && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
-                      && (m_T.memptr() != nullptr) && (m_X.n_rows > m_T.n_rows);
-    // Noise-free: fixed jitter on the diagonal (m_chol_jitter, set by the fit);
-    // the Nugget / Heterogeneous modes are regularized by their own diagonal.
-    if (m_chol_jitter > 0.0)
-      diag = arma::vec(m_X.n_rows, arma::fill::value(1.0 + m_chol_jitter));
+                      && (m_T.memptr() != nullptr) && (m_X.n_rows > m_T.n_rows) && (chol_jitter == m_model_chol_jitter);
+    // Noise-free: fixed jitter on the diagonal (objective: m_chol_jitter;
+    // committed model: m_model_chol_jitter, see make_committed_Model); the
+    // Nugget / Heterogeneous modes are regularized by their own diagonal.
+    if (chol_jitter > 0.0)
+      diag = arma::vec(m_X.n_rows, arma::fill::value(1.0 + chol_jitter));
   }
 
   KrigingImpl::populate_Model(m, theta, alpha, diag, update_eligible, bench);
@@ -394,6 +404,13 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta,
 Kriging::KModel Kriging::make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const {
   KModel m = allocate_KModel();
   populate_Model(m, theta, bench);
+  return m;
+}
+
+Kriging::KModel Kriging::make_committed_Model(const arma::vec& theta, double extra_param) const {
+  KModel m = allocate_KModel();
+  populate_Model_jitter(
+      m, theta, extra_param, (m_noise_model == NoiseModel::None) ? m_model_chol_jitter : 0.0, nullptr);
   return m;
 }
 
@@ -3400,6 +3417,31 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   fit_impl(y, nullptr, X, regmodel, normalize, optim, objective, parameters, method);
 }
 
+void Kriging::commit_model_chol_jitter() {
+  if (m_noise_model != NoiseModel::None || m_is_empty)
+    return;
+  m_model_chol_jitter = LinearAlgebra::model_chol_jitter(m_covType);
+  if (m_model_chol_jitter == m_chol_jitter)
+    return;  // the optimizer's last model is already the committed one
+  KModel m = make_committed_Model(m_theta, m_sigma2);
+  m_T = std::move(m.L);
+  m_R = std::move(m.R);
+  m_M = std::move(m.Fstar);
+  m_circ = std::move(m.Rstar);
+  m_star = std::move(m.Qstar);
+  m_Rinv = std::move(m.Rinv);
+  if (m_est_beta) {
+    m_beta = std::move(m.betahat);
+    m_z = std::move(m.Estar);
+  } else {
+    m_z = std::move(m.ystar) - m_M * m_beta;
+  }
+  if (m_est_sigma2) {
+    const arma::uword n = m_X.n_rows;
+    m_sigma2 = (m_objective == "LMP") ? m.SSEstar / (n - m_F.n_cols) : m.SSEstar / n;
+  }
+}
+
 void Kriging::fit_impl(const arma::vec& y,
                        const arma::vec* noise,
                        const arma::mat& X,
@@ -3425,8 +3467,14 @@ void Kriging::fit_impl(const arma::vec& y,
   const std::string objective = internal_fit_objective(objective_method.first, objective_method.second);
   // the last simulate(..., will_update=true) was built for the previous model
   clear_simulate_state();
-  // Fixed Cholesky jitter of this fit (noise-free only), kept with the model
+  // Fixed Cholesky jitter (noise-free only): m_chol_jitter, the kernel's
+  // value, for the objective (optimization, logLikelihood(Fun); reproducible
+  // theta); m_model_chol_jitter, at most num_nugget, for the committed exact
+  // factorization (commit_model_chol_jitter; predict / simulate / update).
+  // Vecchia / Nystrom keep the objective value (their committed state comes
+  // from the objective itself).
   m_chol_jitter = (m_noise_model == NoiseModel::None) ? LinearAlgebra::kernel_chol_jitter(m_covType) : 0.0;
+  m_model_chol_jitter = m_chol_jitter;
   m_optim = optim;
   m_objective = objective_method.first;
   m_method = objective_method.second;
@@ -3648,11 +3696,11 @@ void Kriging::fit_impl(const arma::vec& y,
     } else if (m_noise_model == NoiseModel::Heterogeneous) {
       extra_param = (sigma2 > 0) ? sigma2 : m_sigma2;
     } else {
-      extra_param = m_sigma2;  // ignored by 2-param populate_Model for None
+      extra_param = m_sigma2;  // ignored for None
+      m_model_chol_jitter = LinearAlgebra::model_chol_jitter(m_covType);
     }
 
-    Kriging::KModel m = (m_noise_model != NoiseModel::None) ? make_Model(m_theta, extra_param, nullptr)
-                                                            : make_Model(m_theta, nullptr);
+    Kriging::KModel m = make_committed_Model(m_theta, extra_param);
     m_is_empty = false;
     m_T = std::move(m.L);
     m_R = std::move(m.R);
@@ -4222,6 +4270,7 @@ void Kriging::fit_impl(const arma::vec& y,
           arma::cout << "\nBest solution from start point " << (best_idx + 1) << " with objective: " << min_ofn
                      << arma::endl;
         }
+        commit_model_chol_jitter();
       }
 
     } else
@@ -4740,12 +4789,15 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
       if (m_objective == "LMP")
         m_sigma2 = km.SSEstar / (n - m_F.n_cols);
     }
+    commit_model_chol_jitter();
   } else {  // incremental update without parameter re-optimization
     update_no_refit_impl(
         y_u,
         X_u,
         /*extend_class_data=*/[] {},
-        /*build_model=*/[this] { return make_Model(m_theta, nullptr); });
+        /*build_model=*/[this] {
+          return make_committed_Model(m_theta, (m_noise_model == NoiseModel::Nugget) ? m_alpha : m_sigma2);
+        });
   }
 }
 
@@ -4830,6 +4882,8 @@ void Kriging::dump_to_json(nlohmann::json& j) const {
   // Only when non-zero, so files without a fixed jitter stay byte-identical
   if (m_chol_jitter > 0.0)
     j["chol_jitter"] = m_chol_jitter;
+  if (m_model_chol_jitter > 0.0)
+    j["model_chol_jitter"] = m_model_chol_jitter;
   // Nystrom fits carry no m_T/m_R/... (dump_common_to_json serializes those
   // as empty, harmlessly): the committed low-rank factors/landmarks are the
   // extra state that reconstructs the model, stored only when present so
@@ -4873,6 +4927,7 @@ Kriging Kriging::load_from_json(const nlohmann::json& j, const std::string& file
   }
   // Absent on files without a fixed jitter (all files before it existed)
   kr.m_chol_jitter = j.contains("chol_jitter") ? j["chol_jitter"].template get<double>() : 0.0;
+  kr.m_model_chol_jitter = j.contains("model_chol_jitter") ? j["model_chol_jitter"].template get<double>() : 0.0;
   // Absent on pre-Nystrom save files: defaults to a normal (non-Nystrom) load.
   if (j.contains("nystrom_light") && j["nystrom_light"].template get<bool>()) {
     kr.m_nystrom_light = true;

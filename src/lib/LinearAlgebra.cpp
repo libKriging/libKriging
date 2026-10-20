@@ -2,6 +2,7 @@
 // MUST BE at the beginning before any other <cmath> include (e.g. in armadillo's headers)
 #define _USE_MATH_DEFINES // required for Visual Studio
 #include <cmath>
+#include <algorithm>
 // clang-format on
 
 #include "libKriging/LinearAlgebra.hpp"
@@ -66,6 +67,11 @@ LIBKRIGING_EXPORT double LinearAlgebra::kernel_chol_jitter(const std::string& ke
   if (kernel == "matern5_2")
     return 1e-10;
   return 0.0;
+}
+
+LIBKRIGING_EXPORT double LinearAlgebra::model_chol_jitter(const std::string& kernel) {
+  const double jitter = LinearAlgebra::kernel_chol_jitter(kernel);
+  return jitter > 0.0 ? std::min(jitter, LinearAlgebra::num_nugget) : 0.0;
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {

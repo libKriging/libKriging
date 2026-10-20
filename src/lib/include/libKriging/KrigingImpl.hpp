@@ -38,7 +38,7 @@ class KrigingImpl {
   };
 
   [[nodiscard]] const std::string& kernel() const { return m_covType; };
-  /// Fixed jitter added to the correlation diagonal by the fit
+  /// Fixed jitter added to the correlation diagonal of the fit objective
   [[nodiscard]] double chol_jitter() const { return m_chol_jitter; };
   [[nodiscard]] const std::string& optim() const { return m_optim; };
   [[nodiscard]] const std::string& objective() const { return m_objective; };
@@ -128,9 +128,10 @@ class KrigingImpl {
   double m_sigma2{};
   bool m_est_sigma2{};
   bool m_is_empty = true;  // forces the model to be made from scratch first time (no update)
-  /// Fixed jitter on the correlation diagonal, chosen at fit time
-  /// (LinearAlgebra::kernel_chol_jitter) and kept with the model (save/load)
-  /// so that update / predict / simulate keep factorizing the same matrix.
+  /// Fixed jitter on the correlation diagonal of the objective, chosen at fit
+  /// time (LinearAlgebra::kernel_chol_jitter) and kept with the model
+  /// (save/load). WarpKriging also factorizes its model with it; Kriging
+  /// commits its exact factorization with m_model_chol_jitter (<= num_nugget).
   double m_chol_jitter = 0.0;
 
   // Simulation stored data (members common to all three variants)

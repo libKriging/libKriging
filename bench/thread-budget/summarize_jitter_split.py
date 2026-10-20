@@ -6,8 +6,10 @@ import glob, csv, statistics as st
 V = ['off', 'on', 'on>0', 'on>10', 'on~0']
 print('| kernel | data | n | d | optim | ' + ' | '.join(f'RMSE {v}' for v in V) + ' | ' + ' | '.join(f'div {v}' for v in V) + ' |')
 print('|' + '---|' * (5 + 2 * len(V)))
-for fn in sorted(glob.glob('jitter-split-*.csv')):
-    _, _, k, fam, n, d, o = fn[:-4].split('-')
+import sys
+prefix = sys.argv[1] if len(sys.argv) > 1 else 'jitter-split'
+for fn in sorted(glob.glob(prefix + '-*.csv')):
+    k, fam, n, d, o = fn[len(prefix) + 1:-4].split('-')
     D = {}
     for r in csv.DictReader(open(fn)):
         if r['variant'] == 'error':

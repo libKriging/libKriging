@@ -61,7 +61,7 @@ Implemented (`git show HEAD` after the WIP commit):
   `KrigingImpl::populate_Model`).
 
 ctest with the jitter on: **214 / 218** at the first hand-off, 4 failures, all
-understood (1, 3 and 4 fixed since, see 3.1 / 3.2; **218 / 219** now with the save/load test, test 2 left):
+understood (1, 3 and 4 fixed since, see 3.1 / 3.2 / 4c; **218 / 219** now with the save/load test, test 2 left):
 
 | # | Test | Cause | Planned fix |
 |---|---|---|---|
@@ -118,7 +118,7 @@ All 4 pass with `LK_CHOL_JITTER=0`.
          `num_nugget`, the former behaviour). Test `fixed Cholesky jitter is
          kept with the model (save & reload)` (tests/KrigingTest.cpp).
 2. **Tests**:
-   - [x] Test 1: FD step h = 1e-6 → 1e-4 (both sections), passes.
+   - [x] Test 1: FD step h = 1e-6 → 1e-3 (both sections, see 4c), passes.
    - [ ] Test 2: the user asked for more cases before deciding; study done
          (4b below), decision pending.
    - [ ] New test: same single-start fit (gauss, matern5_2, noise-free) with
@@ -222,10 +222,41 @@ All 4 pass with `LK_CHOL_JITTER=0`.
        theta as `on`; it would only recover the smoothing part, which `on>0`
        recovers already. A jitter growing with n (conditioning grows with n:
        gauss 1e-8 still left 2 % divergence at n = 200, d = 4) is still open.
-     - Candidate: `on>0` (search with the jitter, final model without it, or
-       with num_nugget) — decision pending; consequences: logLikelihood() of
-       the model is the exact LL at theta, not the optimized objective;
-       save/load / update keep the final jitter (m_chol_jitter).
+     - **Decided (2026-10-20): `on>10`, implemented.** Two jitters in Kriging:
+       - `m_chol_jitter` (`chol_jitter()`): the objective's,
+         `kernel_chol_jitter` (gauss 1e-8, matern5_2 1e-10): optimization,
+         `logLikelihood()` / `logLikelihoodFun()` / LOO / LMP (so
+         `logLikelihood() == logLikelihoodFun(theta())` is still the optimized
+         value), Vecchia and Nystrom (their committed state comes from the
+         objective);
+       - `m_model_chol_jitter` (`model_chol_jitter()`): the committed exact
+         factorization (m_T: predict / simulate / update), 
+         `LinearAlgebra::model_chol_jitter` = min(kernel jitter, num_nugget)
+         (gauss 1e-10, matern5_2 1e-10, 0 when the kernel jitter is 0).
+         `Kriging::commit_model_chol_jitter` rebuilds the model at the optimal
+         theta after the BFGS commit and after the warm-restart update;
+         `optim = "none"` and update(refit = false) build it directly
+         (`make_committed_Model`).
+       - JSON: `model_chol_jitter` written when > 0 (absent → 0).
+       - NestedKriging: non-warped groups use `model_chol_jitter` (as its
+         Kriging submodels, fitted with `optim = "none"`); WarpKriging still
+         uses its one jitter for both (kernel jitter, else num_nugget).
+       - Check (`jitter-impl-*.csv`, same driver after the change): the
+         default (`on` column) now equals the former `on>10` in every row
+         (RMSE gauss branin 0.059 → 0.048, sin 10 0.037 → 0.030, unstable
+         0.0098 → 0.0081, sin1 100 5.8e-4 → 2.4e-4; matern5_2 unchanged) with
+         0 % divergence across thread budgets.
+       - Tests: `KrigingFitTest` (BFGS LL >= grid LL) needed
+         logLikelihood(Fun) to stay the objective (it failed with a single
+         jitter at 1e-10 after the search); `KrigingPredictTest` FD step
+         1e-4 → 1e-3 (the committed R is conditioned ~1e10 again);
+         ctest 218 / 219 (test 2 left). Python binding (build-py): 19 / 20,
+         `binding_consistency` fails: LL / LOO at theta = 0.3 against the
+         DiceKriging references (tests/references, gauss) at 1e-12, off by
+         1e-10..1.4e-5 relative because of the objective jitter 1e-8 (already
+         the case since option a). Fix: expose set_chol_jitter in the bindings
+         (3.3) and run the reference-consistency tests with jitter 0 (they
+         check the formula); the R reference tests probably need the same.
    - [ ] calibration (predictive sd / RMSE): gauss is overconfident (0.25–0.43)
          with or without jitter; matern5_2 ≈ 1.
 5. **Docs**: parallel.md 8.6 (decision a, values, how to disable), FAQ

@@ -87,7 +87,11 @@ TEST_CASE("fixed Cholesky jitter is kept with the model (save & reload)") {
   LinearAlgebra::set_chol_jitter(-1);  // per-kernel default
   Kriging ok("gauss");
   ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+  // the objective uses the gauss jitter (1e-8), the committed model num_nugget (1e-10)
   CHECK(ok.chol_jitter() == 1e-8);
+  CHECK(ok.model_chol_jitter() == 1e-10);
+  // logLikelihood() is the optimized objective
+  CHECK(ok.logLikelihood() == std::get<0>(ok.logLikelihoodFun(ok.theta(), false, false)));
   Kriging ok32("matern3_2");
   ok32.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
   CHECK(ok32.chol_jitter() == 0.0);
@@ -97,6 +101,7 @@ TEST_CASE("fixed Cholesky jitter is kept with the model (save & reload)") {
   LinearAlgebra::set_chol_jitter(0);
   Kriging ok_reloaded = Kriging::load("dump_jitter.json");
   CHECK(ok_reloaded.chol_jitter() == 1e-8);
+  CHECK(ok_reloaded.model_chol_jitter() == 1e-10);
   ok.update(yu, Xu, false);
   ok_reloaded.update(yu, Xu, false);
   const arma::vec m = std::get<0>(ok.predict(Xt, false, false, false));
@@ -107,6 +112,7 @@ TEST_CASE("fixed Cholesky jitter is kept with the model (save & reload)") {
   Kriging ok0("gauss");
   ok0.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
   CHECK(ok0.chol_jitter() == 0.0);
+  CHECK(ok0.model_chol_jitter() == 0.0);
   ok0.save("dump_jitter0.json");
   std::ifstream f("dump_jitter0.json");
   const std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());

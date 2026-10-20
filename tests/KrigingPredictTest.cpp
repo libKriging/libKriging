@@ -40,9 +40,11 @@ TEST_CASE("KrigingPredictTest - Check gradient vs finite differences", "[predict
     CHECK(mean_deriv.n_cols == d);
     
     // Check gradient using finite differences
-    // h = 1e-4: with the gauss fixed jitter the fit reaches a long range (R
-    // conditioned ~1e8) and a smaller step is dominated by rounding noise
-    const double h = 1e-4;
+    // h = 1e-3: with the gauss fixed jitter the fit reaches a long range
+    // (theta 6.6, 1.1; the committed R, jitter 1e-10, is conditioned ~1e10) and
+    // a smaller step is dominated by rounding noise (FD error 2e-6 at 1e-3,
+    // 4e-5 at 1e-4, 5e-3 at 1e-6: bench/thread-budget/predict_fd_probe.cpp)
+    const double h = 1e-3;
     const double tol = 1e-4;  // Tolerance for finite difference comparison
     
     for (arma::uword i = 0; i < X_new.n_rows; ++i) {
@@ -79,7 +81,7 @@ TEST_CASE("KrigingPredictTest - Check gradient vs finite differences", "[predict
     CHECK(stdev_deriv.n_cols == d);
     
     // Check gradient using finite differences
-    const double h = 1e-4;  // see the mean gradient section
+    const double h = 1e-3;  // see the mean gradient section
     const double tol = 1e-4;
     
     for (arma::uword i = 0; i < X_new.n_rows; ++i) {

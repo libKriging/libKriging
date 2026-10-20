@@ -359,10 +359,11 @@ void NestedKriging::precompute_nk() {
   const arma::uword p = m_groups.size();
   m_L.assign(p, arma::mat());
   m_alpha.assign(p, arma::vec());
-  // Same diagonal as the submodels: their fixed Cholesky jitter when there is
-  // one (LinearAlgebra::kernel_chol_jitter, Kriging and WarpKriging alike),
-  // else this class's own (= LinearAlgebra::num_nugget, the warped default).
-  const double kernel_jitter = LinearAlgebra::kernel_chol_jitter(m_covType);
+  // Same diagonal as the submodels: their committed Cholesky jitter when there
+  // is one (Kriging: LinearAlgebra::model_chol_jitter; WarpKriging:
+  // kernel_chol_jitter), else this class's own (= num_nugget, the warped default).
+  const double kernel_jitter = warped() ? LinearAlgebra::kernel_chol_jitter(m_covType)
+                                        : LinearAlgebra::model_chol_jitter(m_covType);
   const double group_jitter = kernel_jitter > 0.0 ? kernel_jitter : jitter;
   for (arma::uword g = 0; g < p; ++g) {
     const arma::uvec& idx = m_groups[g];
