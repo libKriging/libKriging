@@ -363,7 +363,7 @@ All 4 pass with `LK_CHOL_JITTER=0`.
      the iteration-limit / path chaos of 4d point 4(b). **Decided (user,
      2026-10-20): gauss 1e-9** (`LinearAlgebra::kernel_chol_jitter`; matern5_2
      stays 1e-10).
-   - [ ] **4f. Alignment of the *Kriging classes (2026-10-20)**. MLPKriging is a
+   - [x] **4f. Alignment of the *Kriging classes (2026-10-20)**. MLPKriging is a
      WarpKriging; NestedKriging fits Kriging / WarpKriging submodels.
      - Fixed: NestedKriging `precompute_nk` used the current `LinearAlgebra`
        setting instead of each submodel's stored jitter (a model reloaded after
@@ -397,11 +397,32 @@ All 4 pass with `LK_CHOL_JITTER=0`.
        per-variable warps): long-range starts (most of a uniform draw) let the
        weights adapt, short ones with random weights fall into a poor basin
        (`MLPKrigingCalibrationTest` BFGS4 fails with the log draw). Per-variable
-       warps: neutral to slightly better. Kept uniform for all for now; open:
-       log-uniform for per-variable warps only?
-     - Left as is: WarpKriging draws its starts from the Armadillo RNG (seeded
-       by the warp constructors), not `Random` (`Random::reset_seed` has no
-       effect on it); first start theta = 1 (Kriging: random).
+       warps: neutral to slightly better.
+     - **Decided (user, 2026-10-20), done**: log-uniform for per-variable warps,
+       uniform for the joint MLP (`m_is_joint`); starts drawn from `Random`
+       (reset to its seed at each fit, as Kriging) instead of the Armadillo RNG
+       (seeded by the warp constructors), so `Random::reset_seed` applies to
+       WarpKriging too (check added in `WarpKrigingTest` test 18). First start
+       still theta = 1 (Kriging: random). Committed rule against the former
+       uniform / Armadillo draw (`summarize_warp_start.py final`):
+
+       | config | LL new − unif (median) | new better / worse (> 0.1) | Q2 new / unif |
+       |---|---|---|---|
+       | kumaraswamy Branin n 30 gauss | 0 | 1 / 0 | 1.00 / 1.00 |
+       | kumaraswamy sin d 2 n 30 gauss | 0 | 6 / 0 | 0.82 / 0.84 |
+       | kumaraswamy sin d 2 n 30 matern5_2 | 0 | 3 / 0 | 0.84 / 0.84 |
+       | none sin d 2 n 100 gauss | 0 | 4 / 0 | 1 / 1 |
+       | MLP proj-Branin d 5 n 60 matern5_2 (uniform both) | −9.4 | 7 / 13 | 0.89 / 0.97 |
+       | MLP sin d 3 n 60 gauss (uniform both) | 0 | 7 / 4 | −0.06 / −0.11 |
+       | MLP sin d 3 n 60 matern5_2 (uniform both) | 0 | 1 / 4 | −0.14 / −0.15 |
+
+       Per-variable warps: the LL is never worse (the NLPD median moves either
+       way, gauss is overconfident, see the calibration item). MLP rows only
+       change the random generator: a BFGS4 joint MLP fit depends on its 3
+       random starts by ~10 LL units, i.e. 4 starts are few for it.
+     - Found on the way: `WarpKrigingTest` / `MLPKrigingTest` check with
+       `assert`, compiled out in Release (`-DNDEBUG`): they checked nothing in
+       the Release CI. Now `#undef NDEBUG` at their top; both pass.
    - [ ] calibration (predictive sd / RMSE): gauss is overconfident (0.25–0.43)
          with or without jitter; matern5_2 ≈ 1.
 5. **Docs**: parallel.md 8.6 (decision a, values, how to disable), FAQ

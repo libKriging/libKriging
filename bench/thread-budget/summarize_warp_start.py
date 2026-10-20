@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""Summarize warp_start_study.cpp CSVs: log-uniform (warpstart-log-*) against
-uniform (warpstart-unif-*) starting points, paired by data set."""
+"""Summarize warp_start_study.cpp CSVs, paired by data set: warpstart-<prefix>-*
+(default prefix "log": log-uniform draw for all warps; "final": the committed
+rule, log-uniform for per-variable warps, uniform for the joint MLP, from the
+Random generator) against warpstart-unif-* (uniform, Armadillo generator).
+Usage: summarize_warp_start.py [prefix]"""
 import csv, glob, statistics as st, sys
 
 def load(p):
@@ -10,10 +13,11 @@ def load(p):
 def med(v):
     return st.median(v) if v else float("nan")
 
-print("| config | LL log − unif (median) | log better / worse (> 0.1) | Q2 log / unif (median) | NLPD log / unif (median) | ms log / unif |")
+print("| config | LL new − unif (median) | new better / worse (> 0.1) | Q2 new / unif (median) | NLPD new / unif (median) | ms new / unif |")
 print("|---|---|---|---|---|---|")
-for pl in sorted(glob.glob("warpstart-log-*.csv")):
-    cfg = pl[len("warpstart-log-"):-4]
+prefix = sys.argv[1] if len(sys.argv) > 1 else "log"
+for pl in sorted(glob.glob(f"warpstart-{prefix}-*.csv")):
+    cfg = pl[len(f"warpstart-{prefix}-"):-4]
     a, b = load(pl), load("warpstart-unif-" + cfg + ".csv")
     keys = [k for k in a if k in b and a[k]["ll"] != "nan" and b[k]["ll"] != "nan"]
     dll = [float(a[k]["ll"]) - float(b[k]["ll"]) for k in keys]

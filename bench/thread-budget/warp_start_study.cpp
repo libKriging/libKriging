@@ -1,7 +1,9 @@
 // Study driver (not built by CMake, see fit_repro_study.cpp for the build):
-// WarpKriging / MLPKriging multistart starting points, log-uniform (default)
-// against uniform in the theta bounds. The log draw was a temporary hook
-// (LK_TMP_WARP_UNIFORM=1 selected uniform), not kept: WarpKriging draws uniform.
+// WarpKriging / MLPKriging multistart starting points: fits with the start
+// draw of the library it is linked to. warpstart-log-* / -unif-* came from a
+// temporary hook (log-uniform for all warps / uniform, Armadillo RNG),
+// warpstart-final-* from the committed rule (log-uniform for per-variable
+// warps, uniform for the joint MLP, Random generator).
 // Usage: warp_start_study <model> <family> <kernel> <n> <d> <sets> <optim>
 //   model: mlp (MLPKriging({8}, 2, tanh)), kuma (kumaraswamy per variable),
 //          none (WarpKriging with "none" warps, i.e. plain Kriging)

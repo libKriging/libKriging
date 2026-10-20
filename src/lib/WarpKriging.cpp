@@ -2893,14 +2893,22 @@ void WarpKriging::optimise_joint(const std::string& method) {
 
   // Helper: run parallel multistart with a given optimizer function
   auto run_parallel_multistart = [&](auto& optimizer_fn) {
-    // Random starting points for θ, uniform in [theta_lower, theta_upper].
-    // Not log-uniform as Kriging: with a joint MLP, θ lives on the scale of the
-    // learnt features and long-range starts let the weights adapt, the
-    // log-uniform draw lost 124 LL units (median) on a projected Branin
-    // (docs/dev/CholJitter-TODO.md 4f).
-    arma::mat theta0_rand(multistart, d_theta);
-    for (int i = 0; i < multistart; ++i)
-      theta0_rand.row(i) = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
+    // Random starting points for θ, from the same generator as Kriging
+    // (Random, reset to its seed at each fit: Random::reset_seed applies).
+    // Per-variable warps: log-uniform in [theta_lower, theta_upper] as Kriging
+    // (θ is a scale parameter, theta_lower > 0). Joint MLP: uniform, θ lives on
+    // the scale of the learnt features and long-range starts let the weights
+    // adapt; the log-uniform draw lost 124 LL units (median) on a projected
+    // Branin (docs/dev/CholJitter-TODO.md 4f).
+    Random::init();
+    arma::mat theta0_rand = Random::randu_mat(multistart, d_theta);
+    for (arma::uword j = 0; j < d_theta; ++j) {
+      const double lo = theta_lower.at(j), up = theta_upper.at(j);
+      if (m_is_joint)
+        theta0_rand.col(j) = lo + theta0_rand.col(j) * (up - lo);
+      else
+        theta0_rand.col(j) = arma::exp(std::log(lo) + theta0_rand.col(j) * (std::log(up) - std::log(lo)));
+    }
     // First start uses the current theta
     theta0_rand.row(0) = m_theta.t();
 
