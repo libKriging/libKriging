@@ -344,6 +344,23 @@ All 4 pass with `LK_CHOL_JITTER=0`.
        (`gaussjitter-<J>-*.csv`): see 4e.
      - ctest 220 / 220 (KrigingWarmRestartTest timing-flaky under -j8, passes
        alone). Binding tests to rerun (reference values may move with A).
+   - [ ] **4e. gauss objective jitter with A + C (2026-10-20)**
+     (`gaussjitter-<J>-gauss-*.csv`, `summarize_jitter_scale.py gaussjitter-<J>`;
+     240 data sets: Branin 50, sin n 50 / 100 / 200 d 2, 200 / 500 d 4, 200 d 8,
+     Hartmann6 60 / 300, BFGS10 sin 200 d 2):
+
+     | J (objective) | div (theta differs across thread budgets) | median RMSE ratio on / off | Branin 50 RMSE quartiles |
+     |---|---|---|---|
+     | 0 (off) | 43 / 240 (18 %) | 1 | 2.5e-4 / 5.2e-4 / 4.5e-3 |
+     | 1e-8 (current) | 5 / 240 (2.1 %) | 1.0–1.24, Branin 246 | 0.13 / 0.14 / 0.16 |
+     | 1e-9 | 4 / 240 (1.7 %) | 1.0–1.06, Branin 3.8 | 1.5e-3 / 0.058 / 0.15 |
+     | 1e-10 | 15 / 240 (6.2 %) | 1.00, Branin 3.8 | 1.1e-3 / 3.5e-3 / 0.14 |
+
+     1e-9 keeps the reproducibility of 1e-8 with almost no accuracy cost but
+     on Branin (very smooth, polynomial-like: the exact optimum needs an even
+     higher conditioning); 1e-10 loses reproducibility (sin d 4: 20–50 %).
+     Remaining divergence with 1e-8 / 1e-9: sin d 4 n 200 / 500 (10–20 %),
+     the iteration-limit / path chaos of 4d point 4(b). Decision pending.
    - [ ] calibration (predictive sd / RMSE): gauss is overconfident (0.25–0.43)
          with or without jitter; matern5_2 ≈ 1.
 5. **Docs**: parallel.md 8.6 (decision a, values, how to disable), FAQ
