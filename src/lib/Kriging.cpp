@@ -3766,11 +3766,21 @@ void Kriging::fit_impl(const arma::vec& y,
       // The starts run in a thread pool (see run_task_pool below): the cores
       // go to the starts first, the remaining share to their BLAS / OpenMP.
 
-      arma::mat theta0_rand
-          = arma::repmat(trans(theta_lower), multistart, 1)
-            + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
-      // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
-      //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
+      // Log-uniform draw in [theta_lower, theta_upper] (theta is a scale
+      // parameter): with the default bounds [0.02, 10] x maxdX a uniform draw
+      // puts 90 % of the starts above 1 x maxdX, where R is near singular and
+      // the LL flat (fixed Cholesky jitter) or erratic, and a start reaches
+      // the short-range region of every dimension with probability ~0.1^d
+      // (#418, docs/dev/CholJitter-TODO.md 4d). Uniform for a dimension whose
+      // lower bound is not positive.
+      arma::mat theta0_rand = Random::randu_mat(multistart, d);
+      for (arma::uword j = 0; j < d; ++j) {
+        const double lo = theta_lower.at(j), up = theta_upper.at(j);
+        if (lo > 0.0)
+          theta0_rand.col(j) = arma::exp(std::log(lo) + theta0_rand.col(j) * (std::log(up) - std::log(lo)));
+        else
+          theta0_rand.col(j) = lo + theta0_rand.col(j) * (up - lo);
+      }
 
       // Nystrom warm start: with no given theta, every multistart worker
       // otherwise begins from a fully random point in theta_bounds, so how
@@ -4060,6 +4070,13 @@ void Kriging::fit_impl(const arma::vec& y,
                          << ", num_iters=" << opt_result.num_iters << ", task=" << opt_result.task << arma::endl;
             }
 
+            // "No improvement" below the optimizer's own relative tolerance
+            // (factr * epsmch) is no change: an exact comparison of two equal
+            // optima made the restart decision depend on the rounding (BLAS
+            // thread count, docs/dev/CholJitter-TODO.md 4d)
+            const double f_tol = optimizer.factr * arma::datum::eps
+                                 * std::max(1.0, std::abs(std::min(best_f_opt, opt_result.f_opt)));
+            const bool worse = (best_f_opt < arma::datum::inf) && (opt_result.f_opt > best_f_opt + f_tol);
             if (opt_result.f_opt < best_f_opt) {
               best_f_opt = opt_result.f_opt;
               best_gamma = gamma_tmp;
@@ -4086,7 +4103,7 @@ void Kriging::fit_impl(const arma::vec& y,
                 && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)  // Check for abnormal termination
                     || (opt_result.num_iters <= 2)          // Start point is strangely quite optimal...
                     || (sol_to_lb < arma::datum::eps)       // Stuck at lower bound
-                    || (opt_result.f_opt > best_f_opt))) {  // No improvement
+                    || worse)) {                            // No improvement
 
               if (Optim::log_level > Optim::log_none) {
                 arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << (retry + 1)

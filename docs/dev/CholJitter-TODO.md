@@ -330,6 +330,20 @@ All 4 pass with `LK_CHOL_JITTER=0`.
         not added there).
      5. Fit time with the jitter: median ratio on / off 0.12–1.35, mostly
         < 1 (fewer restarts).
+     **Decided (2026-10-20): A, B (ii), C.**
+     - A. Log-uniform draw of the BFGS starting points in `Kriging::fit_impl`
+       (`theta0_rand`; uniform for a dimension with a non-positive lower
+       bound). WarpKriging unchanged (its first start is the current theta).
+       Effect on the tests: `KrigingPredictTest` back to its original FD step
+       (the fit now reaches the short-range optimum, theta 0.85 / 0.53, as
+       without jitter before); NestedKriging one-group rBCM mean tolerance
+       1e-6 → 1e-5 (committed R conditioned ~1e13, 1.8e-6 measured).
+     - C. Restart "no improvement" criterion with the optimizer's own relative
+       tolerance (`factr * epsmch`) instead of an exact comparison.
+     - B (ii). gauss objective jitter 1e-8 / 1e-9 / 1e-10 measured with A and C
+       (`gaussjitter-<J>-*.csv`): see 4e.
+     - ctest 220 / 220 (KrigingWarmRestartTest timing-flaky under -j8, passes
+       alone). Binding tests to rerun (reference values may move with A).
    - [ ] calibration (predictive sd / RMSE): gauss is overconfident (0.25–0.43)
          with or without jitter; matern5_2 ≈ 1.
 5. **Docs**: parallel.md 8.6 (decision a, values, how to disable), FAQ

@@ -2,11 +2,12 @@
 // the fixed Cholesky jitter (current default: kernel jitter for the
 // objective, <= num_nugget for the committed model) against no jitter, on a
 // wider grid. Each fit is run with Optim::set_num_threads_percent 10 / 100 / 200.
-// Usage: jitter_scale_study <family> <kernel> <n> <d> <sets> <optim> [noise]
+// Usage: jitter_scale_study <family> <kernel> <n> <d> <sets> <optim> [noise] [jitter]
 //   family: sin (sum_j sin(2 pi f_j x_j), f_j ~ U[0.5, 3]), branin (d = 2),
 //           hartmann6 (d = 6)
 //   noise: observation noise sd relative to sd(y) (default 0), the fit is
 //          still noise-free (interpolating slightly noisy data)
+//   jitter: set_chol_jitter value of the "on" fits (default -1: per kernel)
 // Output CSV: set,jitter,pct,theta0,ll,rmse,ms
 // See docs/dev/CholJitter-TODO.md 4d.
 #define _USE_MATH_DEFINES
@@ -57,6 +58,7 @@ int main(int argc, char** argv) {
   const int nsets = std::atoi(argv[5]);
   const std::string optim = argv[6];
   const double noise = argc > 7 ? std::atof(argv[7]) : 0.0;
+  const double jitter_on = argc > 8 ? std::atof(argv[8]) : -1.0;
   { auto e = std::chrono::steady_clock::now() + std::chrono::milliseconds(300); volatile double x = 0; while (std::chrono::steady_clock::now() < e) x = x + 1; }
   std::printf("set,jitter,pct,theta0,ll,rmse,ms\n");
   for (int s = 0; s < nsets; ++s) {
@@ -69,7 +71,7 @@ int main(int argc, char** argv) {
     arma::arma_rng::set_seed(777);
     const arma::mat Xt(500, d, arma::fill::randu);
     const arma::vec yt = f(family, Xt, freq);
-    for (double jitter : {0.0, -1.0}) {
+    for (double jitter : {0.0, jitter_on}) {
       LinearAlgebra::set_chol_jitter(jitter);
       for (double pct : {10.0, 100.0, 200.0}) {
         Optim::set_num_threads_percent(pct);
@@ -80,10 +82,10 @@ int main(int argc, char** argv) {
           const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
           const arma::vec m = std::get<0>(k.predict(Xt, false, false, false));
           const double rmse = std::sqrt(arma::mean(arma::square(m - yt))) / arma::stddev(yt);
-          std::printf("%d,%s,%g,%.17g,%.17g,%.6g,%.1f\n", s, jitter < 0 ? "on" : "off", pct, k.theta()(0),
+          std::printf("%d,%s,%g,%.17g,%.17g,%.6g,%.1f\n", s, jitter != 0.0 ? "on" : "off", pct, k.theta()(0),
                       k.logLikelihood(), rmse, ms);
         } catch (const std::exception& e) {
-          std::printf("%d,%s,%g,nan,nan,nan,nan\n", s, jitter < 0 ? "on" : "off", pct);
+          std::printf("%d,%s,%g,nan,nan,nan,nan\n", s, jitter != 0.0 ? "on" : "off", pct);
         }
         std::fflush(stdout);
       }

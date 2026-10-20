@@ -26,6 +26,8 @@ int main(int argc, char** argv) {
   for (double h : {1e-3, 1e-4, 1e-5, 1e-6, 1e-7}) {
     arma::mat Xp = Xn, Xm = Xn; Xp(2, 0) += h; Xm(2, 0) -= h;
     double fd = (std::get<0>(kr.predict(Xp, false, false, false))(2) - std::get<0>(kr.predict(Xm, false, false, false))(2)) / (2 * h);
-    std::printf("h=%g fd=%.8f analytical=%.8f\n", h, fd, md(2, 0));
+    const arma::mat sdd = std::get<4>(r);
+    double fds = (std::get<1>(kr.predict(Xp, true, false, false))(2) - std::get<1>(kr.predict(Xm, true, false, false))(2)) / (2 * h);
+    std::printf("h=%g mean: fd=%.8f analytical=%.8f | stdev: fd=%.8f analytical=%.8f\n", h, fd, md(2, 0), fds, sdd(2, 0));
   }
 }
