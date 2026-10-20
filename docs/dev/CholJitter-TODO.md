@@ -125,12 +125,22 @@ All 4 pass with `LK_CHOL_JITTER=0`.
          LL(BFGS10) >= LL(BFGS). Same in R (`test-unstableLL.R`). The
          single-start robustness (option 2: starting-point strategy) is
          issue #418. ctest 219 / 219.
-   - [ ] New test: same single-start fit (gauss, matern5_2, noise-free) with
-         `Optim::set_num_threads_percent` 10 / 100 / 200 → bit-identical theta and
-         LL (the property the jitter is for).
-   - [ ] New test: `set_chol_jitter(0)` restores the former results (regression
-         guard) and `LK_CHOL_JITTER` is read.
-   - [ ] Full `ctest`, then the Python / R / Octave binding tests locally
+   - [x] New test (`tests/CholJitterTest.cpp`, 2026-10-20): same single-start
+         fit with `Optim::set_num_threads_percent` 10 / 100 / 200 on gauss
+         n 200 d 2 seed 1, gauss d 4 seed 8, matern5_2 d 4 seed 1 (without the
+         jitter, theta spreads 31 % / 0.3 % across budgets here) → theta within
+         1e-4 relative, LL within 1e-4. **Not bit-identical**: with the jitter
+         the rounding still moves theta by ~1e-8 (inside the optimizer
+         tolerance); what the jitter removes is the change of optimum. (The
+         earlier "bit-identical" of fit-repro-*.csv no longer holds with the
+         current optimizer path; comment of `kernel_chol_jitter` fixed.)
+   - [x] New test: the objective has exactly the jitter on its diagonal
+         (concentrated LL computed independently for `set_chol_jitter` -1 / 0 /
+         1e-6; a 1e-9 error is detected), `set_chol_jitter(0)` gives the exact
+         objective, per-kernel values; hidden `[.env]` case run as
+         `CholJitterTest/LK_CHOL_JITTER` with `LK_CHOL_JITTER=0` checks that the
+         variable is read.
+   - [x] Full `ctest`, then the Python / R / Octave binding tests locally (see 4f)
          (reference values against DiceKriging / RobustGaSP may move for gauss and
          matern5_2: list every changed expectation and why).
 3. **API in the bindings** — done (2026-10-20):

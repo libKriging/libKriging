@@ -59,8 +59,10 @@ LIBKRIGING_EXPORT double LinearAlgebra::get_chol_jitter() {
 LIBKRIGING_EXPORT double LinearAlgebra::kernel_chol_jitter(const std::string& kernel) {
   if (LinearAlgebra::chol_jitter >= 0.0)
     return LinearAlgebra::chol_jitter;
-  // Smallest values that made single-start fits bit-identical across BLAS
-  // thread counts on noise-free data (bench/thread-budget/fit_repro_study.cpp);
+  // Smallest values that keep single-start fits in the same optimum across
+  // BLAS thread counts on noise-free data (theta equal to the optimizer
+  // tolerance, rounding still moves it by ~1e-8: tests/CholJitterTest.cpp,
+  // bench/thread-budget/fit_repro_study.cpp, jitter_scale_study.cpp);
   // matern3_2 and exp never reach the near-singular region there. gauss: 1e-9
   // is as reproducible as 1e-8 with the log-uniform starts and far less
   // biased on very smooth functions (docs/dev/CholJitter-TODO.md 4e).

@@ -56,6 +56,14 @@ endif()
 catch_discover_tests(KrigingTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
+add_executable(CholJitterTest CholJitterTest.cpp)
+target_link_libraries(CholJitterTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries CholJitterTest)
+catch_discover_tests(CholJitterTest)
+# the hidden [.env] case checks that LK_CHOL_JITTER is read at load time
+add_test(NAME CholJitterTest/LK_CHOL_JITTER COMMAND CholJitterTest "[.env]")
+set_tests_properties(CholJitterTest/LK_CHOL_JITTER PROPERTIES ENVIRONMENT "LK_CHOL_JITTER=0")
+
 add_executable(KrigingFitTest KrigingFitTest.cpp)
 target_link_libraries(KrigingFitTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingFitTest)
