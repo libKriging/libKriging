@@ -423,6 +423,12 @@ All 4 pass with `LK_CHOL_JITTER=0`.
      - Found on the way: `WarpKrigingTest` / `MLPKrigingTest` check with
        `assert`, compiled out in Release (`-DNDEBUG`): they checked nothing in
        the Release CI. Now `#undef NDEBUG` at their top; both pass.
+     - Local binding runs after A + C + gauss 1e-9 + 4f (2026-10-20, commit
+       65e128e4): C++ ctest 220 / 220 (Julia 12 / 12 included;
+       `KrigingWarmRestartTest` re-run alone under `-j8`); Python build-py
+       228 / 228; R full suite 32 files / 696 tests, 0 failed (lib reinstalled
+       with `cmake --install build-tb`); Octave 16 / 17 (`mLibKriging-Demo`:
+       no display for its plots, unrelated). No reference value moved.
    - [ ] calibration (predictive sd / RMSE): gauss is overconfident (0.25–0.43)
          with or without jitter; matern5_2 ≈ 1.
 5. **Docs**: parallel.md 8.6 (decision a, values, how to disable), FAQ
