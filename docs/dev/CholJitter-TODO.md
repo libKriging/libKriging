@@ -289,6 +289,47 @@ All 4 pass with `LK_CHOL_JITTER=0`.
          the case since option a). Fix: expose set_chol_jitter in the bindings
          (3.3) and run the reference-consistency tests with jitter 0 (they
          check the formula); the R reference tests probably need the same.
+   - [x] **4d. Wider grid (2026-10-20)** (`jitter_scale_study.cpp`,
+     `jitter-scale-*.csv`, `summarize_jitter_scale.py`; gauss / matern5_2;
+     sin d 1–16, n 50–2000, Branin, Hartmann6, BFGS10, noisy data fitted
+     noise-free; jitter off vs on (current default), pct 10 / 100 / 200;
+     "div" = theta differs by > 1e-3 across the thread budgets). Findings:
+     1. **The jitter plateau traps the starts** (blocker for the default):
+        gauss sin n 200 d 2, 12 / 30 single starts and **6 / 20 BFGS10** end
+        at theta ≈ 7–10 (upper bound 10) with RMSE 0.6–0.9 vs ~1e-4 without
+        jitter. Optimizer miss, not the objective: the jittered LL at the
+        no-jitter theta is +490..+1120 vs -170..-310 on the plateau
+        (scratch probe). Cause: the uniform draw in [0.02, 10] x maxdX puts a
+        start in the useful region (all theta_j < 1 x maxdX) with probability
+        0.1^d (1 % in d = 2); without jitter the erratic tail made the
+        restart criteria (`num_iters <= 2`, ABNORMAL) send the start towards
+        short ranges; the smooth plateau does not trigger them (issue #418,
+        comment: restart diagnosis).
+     2. **Log-uniform draw fixes it** (temporary `LK_TMP_LOG_START` hook in
+        `fit_impl`, reverted; `jitter-logstart-*.csv`): with the jitter,
+        gauss sin 200 d 2 BFGS RMSE 0.63 → 2.0e-4, BFGS10 2.0e-4 → 1.5e-4,
+        sin 200 d 4 0.74 → 0.54, sin 50 d 2 0.17 → 0.095, Hartmann6 60
+        0.96 → 0.86; divergence with jitter 0–3 % (without jitter matern5_2
+        stays at 73–87 %).
+     3. **Accuracy cost of the gauss objective jitter on very smooth
+        functions**, revealed once the starts are good: Branin n 50 with log
+        start, RMSE 4.9e-4 without jitter vs 0.126 with (×24): the exact
+        optimum needs a conditioning that 1e-8 forbids (theta-choice part of
+        the cost, see 4c).
+     4. **Residual divergence with the jitter** (uniform start): up to 20 %
+        (gauss Hartmann6 300), 40 % (matern5_2 Hartmann6 300), 60 % (matern5_2
+        sin 2000 d 8), some severe (dLL 100s, RMSE ×1000). Causes (scratch
+        probes with the BFGS log): (a) restart decisions on rounding-level
+        differences: `f_opt > best_f_opt` compares two equal optima
+        (63.8263 vs 63.8263) exactly, and the line-search outcome
+        (ABNORMAL vs CONVERGENCE) flips; (b) `max_iteration` (20) reached on a
+        flat objective (matern5_2 d 8): the path itself is rounding-chaotic;
+        (c) the rcond check uses `rcond(L)^2`, pessimistic by ~n^2, against
+        1e-18: at large n it may still trigger the stepwise nugget despite
+        the jitter (warnings at 2.2e-16 for n 500, below n x 1e-18; nugget
+        not added there).
+     5. Fit time with the jitter: median ratio on / off 0.12–1.35, mostly
+        < 1 (fewer restarts).
    - [ ] calibration (predictive sd / RMSE): gauss is overconfident (0.25–0.43)
          with or without jitter; matern5_2 ≈ 1.
 5. **Docs**: parallel.md 8.6 (decision a, values, how to disable), FAQ
