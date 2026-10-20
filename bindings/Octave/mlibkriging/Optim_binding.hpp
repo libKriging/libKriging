@@ -26,4 +26,11 @@ void get_thread_pool_size(int nlhs, mxArray** plhs, int nrhs, const mxArray** pr
 void set_thread_pool_size(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace OptimBinding
 
+namespace LinearAlgebraBinding {
+void get_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_num_nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_num_nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+}  // namespace LinearAlgebraBinding
+
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_OPTIM_BINDING_HPP

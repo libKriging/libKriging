@@ -1,5 +1,6 @@
 #include "Optim_binding.hpp"
 
+#include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
 
 #include "tools/MxMapper.hpp"
@@ -187,3 +188,43 @@ void set_thread_pool_size(int nlhs, mxArray** plhs, int nrhs, const mxArray** pr
 }
 
 }  // namespace OptimBinding
+
+namespace LinearAlgebraBinding {
+
+void get_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{0}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  output.set(0, LinearAlgebra::get_chol_jitter(), "chol_jitter");
+}
+
+void set_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  LinearAlgebra::set_chol_jitter(input.get<double>(0, "chol_jitter"));
+}
+
+void get_num_nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{0}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  output.set(0, LinearAlgebra::get_num_nugget(), "num_nugget");
+}
+
+void set_num_nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  LinearAlgebra::set_num_nugget(input.get<double>(0, "num_nugget"));
+}
+
+}  // namespace LinearAlgebraBinding

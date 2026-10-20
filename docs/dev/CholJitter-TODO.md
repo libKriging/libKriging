@@ -129,9 +129,30 @@ All 4 pass with `LK_CHOL_JITTER=0`.
    - [ ] Full `ctest`, then the Python / R / Octave binding tests locally
          (reference values against DiceKriging / RobustGaSP may move for gauss and
          matern5_2: list every changed expectation and why).
-3. **API in the bindings**: expose `set_chol_jitter` / `get_chol_jitter` next to
-   `set_num_nugget` (Python `pylibkriging.cpp`, R `bindings/R/rlibkriging/src`,
-   Octave `bindings/Octave/mlibkriging`), with tests.
+3. **API in the bindings** — done (2026-10-20):
+   - Python: class `LinearAlgebra` (static `get/set_chol_jitter`,
+     `get/set_num_nugget`) in `pylibkriging.cpp`;
+   - R: internal `rlibkriging:::linalg_get/set_chol_jitter` in
+     `src/linalg.cpp` (as `linalg_set_num_nugget`);
+   - Octave: class `LinearAlgebra.m` (same four methods), routes
+     `LinearAlgebra::*` in `mLibKriging.cpp`, `LinearAlgebraBinding` in
+     `Optim_binding.cpp`;
+   - Julia: not done (no LinearAlgebra settings exposed there yet);
+   - not exposed: `Kriging.chol_jitter()` / `model_chol_jitter()` getters.
+   - The three `binding_consistency` tests (references from DiceKriging, exact
+     LL / LOO at theta = 0.3, 1e-12) now run with `set_chol_jitter(0)` and
+     restore it; they also check the setter.
+   - Local runs: Python (build-py, `-DPYTHON_EXECUTABLE=$(which python3)`,
+     else CMake picks /usr/bin/python3.7 without pytest) 20 / 20; Octave
+     (build-oct, static) 16 / 17 — the Flatpak Octave cannot load the mex
+     (libblas.so.3 / liblapack.so.3 not in the sandbox): local workaround
+     `build-oct/flatpak-shim` (links to /app/lib/libopenblas.so.0 and an
+     octave wrapper with `--env=LD_LIBRARY_PATH`, set as OCTAVE_EXECUTABLE);
+     the remaining failure, `mLibKriging-Demo`, aborts in the plotting after
+     simulate (lines 55-60 plot even under GITHUB_ACTION), no display in the
+     sandbox, unrelated; R (libKriging installed in build-tb/installed,
+     package in the scratchpad, `LD_LIBRARY_PATH` needed at install):
+     binding-consistency 49 / 49, full suite: see below.
 4. **Wider study before release** (`bench/thread-budget/fit_repro_study.cpp`, add
    the jitter hook back as a call to `set_chol_jitter` instead of the removed
    `TMP_JITTER`):

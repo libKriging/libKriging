@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <libKriging/KrigingLoader.hpp>
+#include <libKriging/LinearAlgebra.hpp>
 #include <libKriging/Optim.hpp>
 #include <mutex>
 #include <unordered_set>
@@ -670,4 +671,13 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def_static("set_thread_start_delay_ms", &Optim::set_thread_start_delay_ms)
       .def_static("get_thread_pool_size", &Optim::get_thread_pool_size)
       .def_static("set_thread_pool_size", &Optim::set_thread_pool_size);
+
+  // LinearAlgebra class - static settings of the Cholesky factorizations
+  // (fixed jitter of noise-free fits: < 0 automatic per kernel, 0 disabled,
+  // > 0 this value; numerical nugget of the fallback and committed models)
+  py::class_<LinearAlgebra>(m, "LinearAlgebra")
+      .def_static("get_chol_jitter", &LinearAlgebra::get_chol_jitter)
+      .def_static("set_chol_jitter", &LinearAlgebra::set_chol_jitter, py::arg("jitter"))
+      .def_static("get_num_nugget", &LinearAlgebra::get_num_nugget)
+      .def_static("set_num_nugget", &LinearAlgebra::set_num_nugget, py::arg("nugget"));
 }

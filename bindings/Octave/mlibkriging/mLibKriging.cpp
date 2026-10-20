@@ -421,6 +421,14 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return OptimBinding::get_thread_start_delay_ms(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::set_thread_start_delay_ms"_hash:
       return OptimBinding::set_thread_start_delay_ms(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::get_chol_jitter"_hash:
+      return LinearAlgebraBinding::get_chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::set_chol_jitter"_hash:
+      return LinearAlgebraBinding::set_chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::get_num_nugget"_hash:
+      return LinearAlgebraBinding::get_num_nugget(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::set_num_nugget"_hash:
+      return LinearAlgebraBinding::set_num_nugget(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::get_thread_pool_size"_hash:
       return OptimBinding::get_thread_pool_size(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::set_thread_pool_size"_hash:

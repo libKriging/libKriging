@@ -44,6 +44,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/WarpKriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/MLPKriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/Optim.m
+        ${CMAKE_CURRENT_SOURCE_DIR}/LinearAlgebra.m
         ${CMAKE_CURRENT_SOURCE_DIR}/Params.m
         ${CMAKE_CURRENT_SOURCE_DIR}/class_saved.m
         ${CMAKE_CURRENT_SOURCE_DIR}/load_kriging.m
