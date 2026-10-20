@@ -183,6 +183,49 @@ All 4 pass with `LK_CHOL_JITTER=0`.
        check "BFGS10 finds theta ≈ 0.15 and LL(BFGS10) ≥ LL(BFGS)";
        (ii) keep it as a blocker until a single start is made robust to the
        plateau (e.g. a deterministic first start instead of a random one).
+   - [ ] **4c. Other jitter strategies (2026-10-20, question of the user).**
+     `jitter_split_study.cpp`, `jitter-split-*.csv`, `summarize_jitter_split.py`
+     (60 sets per row, pct 10 / 100 / 200; "div" = relative spread of theta
+     > 1e-3 across the thread budgets). Variants: `off` (jitter 0), `on`
+     (current), `on>0` / `on>10` (theta of `on`, final model rebuilt at that
+     theta with jitter 0 / 1e-10), `on~0` (continuation: a last BFGS with
+     jitter 0 started from the theta of `on`). Median normalized test RMSE:
+
+     | kernel | data | optim | off | on | on>0 | on>10 | on~0 | div off | div on, on>0, on>10 | div on~0 |
+     |---|---|---|---|---|---|---|---|---|---|---|
+     | gauss | branin 30 | BFGS10 | 0.0217 | 0.059 | 0.0374 | 0.0484 | 0.0324 | 15 % | 0 % | 2 % |
+     | gauss | sin 10 d 1 | BFGS10 | 0.0222 | 0.0365 | 0.0324 | 0.0302 | 0.0219 | 0 % | 0 % | 0 % |
+     | gauss | sin 50 d 2 | BFGS | 0.193 | 0.405 | 0.401 | 0.401 | 0.131 | 5 % | 0 % | 8 % |
+     | gauss | sin 50 d 2 | BFGS10 | 0.0653 | 0.0959 | 0.0831 | 0.0834 | 0.0395 | 3 % | 0 % | 3 % |
+     | gauss | sin1 100 d 2 | BFGS | 0.101 | 5.8e-4 | 2.4e-4 | 2.4e-4 | 1.1e-4 | 55 % | 0 % | 0 % |
+     | gauss | unstable 15 | BFGS10 | 0.0057 | 0.0098 | 0.0067 | 0.0081 | 0.0068 | 0 % | 0 % | 15 % |
+     | matern5_2 | sin 50 d 2 | BFGS / BFGS10 | 0.0106 | 0.0173 | 0.0153 | 0.0173 | 0.0106 | 13 / 0 % | 0 % | 2 / 5 % |
+     | matern5_2 | sin1 100 d 2 | BFGS | 2.7e-4 | 5.7e-4 | 4.8e-4 | 5.7e-4 | 2.7e-4 | 98 % | 0 % | 93 % |
+     | matern5_2 | branin 30, sin 10, unstable 15 | BFGS10 | ≈ | ≈ | ≈ | ≈ | ≈ | 0 % | 0 % | 0 % |
+
+     Reading:
+     - the accuracy cost of `on` has two parts: the smoothing of the final
+       predictor (recovered by `on>0`: about half for gauss, e.g. branin
+       0.059 → 0.037, unstable 0.0098 → 0.0067) and the theta it selects
+       (the jitter caps the conditioning where the optimum of the exact LL
+       sits: matern5_2 sin1 off LL is erratic, 357–444 for theta 5–10);
+     - `on>0` keeps the reproducibility (theta is that of `on`; prediction
+       spread across thread budgets of the same order as `on`: median
+       1e-10..1e-6, max ~5e-4 on branin, scale ~50);
+     - `on~0` gets the best accuracy (≈ off, better than off when the
+       jittered search found a better basin: gauss sin 50 0.0395 vs 0.0653)
+       but loses the reproducibility (up to 93 %): its last stage is the
+       former, rounding-sensitive objective;
+     - not measured: a theta-dependent continuous jitter (J(theta) from an
+       a-priori bound of lambda_min, zero where R is well conditioned): at the
+       optimum R is usually ill-conditioned, so it would select the same
+       theta as `on`; it would only recover the smoothing part, which `on>0`
+       recovers already. A jitter growing with n (conditioning grows with n:
+       gauss 1e-8 still left 2 % divergence at n = 200, d = 4) is still open.
+     - Candidate: `on>0` (search with the jitter, final model without it, or
+       with num_nugget) — decision pending; consequences: logLikelihood() of
+       the model is the exact LL at theta, not the optimized objective;
+       save/load / update keep the final jitter (m_chol_jitter).
    - [ ] calibration (predictive sd / RMSE): gauss is overconfident (0.25–0.43)
          with or without jitter; matern5_2 ≈ 1.
 5. **Docs**: parallel.md 8.6 (decision a, values, how to disable), FAQ
