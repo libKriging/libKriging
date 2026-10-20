@@ -119,8 +119,12 @@ All 4 pass with `LK_CHOL_JITTER=0`.
          kept with the model (save & reload)` (tests/KrigingTest.cpp).
 2. **Tests**:
    - [x] Test 1: FD step h = 1e-6 → 1e-3 (both sections, see 4c), passes.
-   - [ ] Test 2: the user asked for more cases before deciding; study done
-         (4b below), decision pending.
+   - [x] Test 2 (decided 2026-10-20: option 1): the "rcond failover" section
+         runs with `set_chol_jitter(0)` (the jitter bypasses the failover); a
+         new section checks the default: BFGS10 finds theta = 0.1506 and
+         LL(BFGS10) >= LL(BFGS). Same in R (`test-unstableLL.R`). The
+         single-start robustness (option 2: starting-point strategy) is
+         issue #418. ctest 219 / 219.
    - [ ] New test: same single-start fit (gauss, matern5_2, noise-free) with
          `Optim::set_num_threads_percent` 10 / 100 / 200 → bit-identical theta and
          LL (the property the jitter is for).
@@ -137,7 +141,9 @@ All 4 pass with `LK_CHOL_JITTER=0`.
    - Octave: class `LinearAlgebra.m` (same four methods), routes
      `LinearAlgebra::*` in `mLibKriging.cpp`, `LinearAlgebraBinding` in
      `Optim_binding.cpp`;
-   - Julia: not done (no LinearAlgebra settings exposed there yet);
+   - Julia: `get/set_chol_jitter`, `get/set_num_nugget` (exported functions;
+     C API `lk_linalg_*` in `csrc/libkriging_c.{h,cpp}`), test
+     `tests/chol_jitter_test.jl`; Julia ctest 12 / 12;
    - not exposed: `Kriging.chol_jitter()` / `model_chol_jitter()` getters.
    - The three `binding_consistency` tests (references from DiceKriging, exact
      LL / LOO at theta = 0.3, 1e-12) now run with `set_chol_jitter(0)` and
