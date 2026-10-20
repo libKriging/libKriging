@@ -5,6 +5,11 @@
 #library(testthat)
 default_rcond_checked = rlibkriging:::linalg_chol_rcond_checked()
 default_num_nugget = rlibkriging:::linalg_get_num_nugget()
+# The script below checks the rcond / num_nugget failover of the Cholesky,
+# which the fixed jitter bypasses (the factorization no longer fails): run it
+# without the jitter (the default is checked at the end)
+default_chol_jitter = rlibkriging:::linalg_get_chol_jitter()
+rlibkriging:::linalg_set_chol_jitter(0)
 
 context("Fit: unstable LL (long range with 1D Gauss kernel)")
 
@@ -101,3 +106,16 @@ test_that(desc=paste0("LL / Fit: unstable LL fixed using rcond failover (linalg_
 
 rlibkriging:::linalg_check_chol_rcond(default_rcond_checked)
 rlibkriging:::linalg_set_num_nugget(default_num_nugget)
+rlibkriging:::linalg_set_chol_jitter(default_chol_jitter)
+
+# With the fixed jitter (default, gauss 1e-8) the LL profile has the same
+# single maximum (theta = 0.1506) but its long-range tail is a bumpy plateau:
+# a single random start may stop there; the multistart finds the maximum
+# (docs/dev/CholJitter-TODO.md 4b)
+kj <- Kriging(y, X, kernel="gauss", optim="BFGS")
+kj10 <- Kriging(y, X, kernel="gauss", optim="BFGS10")
+test_that("LL / Fit: unstable LL with the fixed Cholesky jitter: the multistart finds the maximum", {
+  expect_equal(as.numeric(kj10$theta()), 0.1506, tolerance = 1e-3, scale = 1)
+  expect_true(is.finite(kj$logLikelihood()))
+  expect_gte(kj10$logLikelihood(), kj$logLikelihood() - 1e-8)
+})
