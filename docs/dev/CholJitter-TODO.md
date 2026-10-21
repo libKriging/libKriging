@@ -300,6 +300,9 @@ All 4 pass with `LK_CHOL_JITTER=0`.
          the case since option a). Fix: expose set_chol_jitter in the bindings
          (3.3) and run the reference-consistency tests with jitter 0 (they
          check the formula); the R reference tests probably need the same.
+   - [x] **Jitter per class and method: [CholJitter-usage.md](CholJitter-usage.md)** (2026-10-21),
+     with the inconsistencies left (WarpKriging final model, Vecchia / Nystrom LOO / LMP, simulate
+     conditional covariance).
    - [x] **4g. Committed model without jitter (`on>0`, 2026-10-21, decided by the user:
      "ok pour B").** The CI `python-sdist` check (n = 10, d = 2, gauss, default fit,
      `predict(X)` must give y to 1e-6) failed: 1.0e-5. At the fitted theta ~ (1, 9.3)

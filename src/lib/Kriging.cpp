@@ -4559,9 +4559,9 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
                                 /*Sigma_divisor=*/alpha);
   }
   // noise-free: the new observations are conditioned on exactly (no fixed
-  // Cholesky jitter on R_uu): an update point on the simulation design is
-  // reproduced exactly; update() adds the jitter (populate_Model), a 1e-10..1e-8
-  // relative difference only (docs/dev/CholJitter-TODO.md)
+  // Cholesky jitter on R_uu), as update() does (committed model, exact): an
+  // update point on the simulation design is reproduced exactly
+  // (docs/dev/CholJitter-usage.md)
   return update_simulate_impl(y_u,
                               X_u,
                               allow_cache,
