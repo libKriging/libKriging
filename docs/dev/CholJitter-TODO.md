@@ -441,10 +441,11 @@ All 4 pass with `LK_CHOL_JITTER=0`.
        no display for its plots, unrelated). No reference value moved.
    - [ ] calibration (predictive sd / RMSE): gauss is overconfident (0.25–0.43)
          with or without jitter; matern5_2 ≈ 1.
-5. **Docs**: parallel.md 8.6 (decision a, values, how to disable), FAQ
-   reproducibility paragraph, CHANGELOG (behaviour change for gauss / matern5_2
-   noise-free fits, `set_chol_jitter(0)` / `LK_CHOL_JITTER=0` to get the former
-   behaviour).
+5. [x] **Docs** (2026-10-21): parallel.md 4 / 8.6 (decision, values, objective vs
+   committed model, starts, measurements) / 9 (`LK_CHOL_JITTER`), FAQ
+   reproducibility paragraph, CHANGELOG Unreleased / Changed (fixed jitter;
+   log-uniform starts, WarpKriging `Random`, restart tolerance). R exposes
+   `linalg_set_chol_jitter` unexported (`rlibkriging:::`), as `linalg_set_num_nugget`.
 6. **Then**: re-check the #414 Octave item (ThreadBudget-TODO.md, hand-off).
 
 ## 4. Remaining thread-budget work (ThreadBudget-TODO.md)

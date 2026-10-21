@@ -85,7 +85,11 @@ Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
 
 - Results do not depend on the OpenMP thread count: each loop writes disjoint
   entries or sums per-row partial results in a fixed order (`BlasThreadsTest`).
-- They may depend on the BLAS thread count and build (FAQ).
+- They may depend on the BLAS thread count and build (FAQ), by rounding. On
+  noise-free data with smooth kernels this rounding used to change the optimum
+  itself; the fixed Cholesky jitter (8.6) keeps the optimum, theta then moving
+  only within the optimizer tolerance (~1e-8 relative, not bit-identical:
+  `CholJitterTest`).
 - `BFGS20` matches the best of 20 `BFGS1` runs up to rounding: with MKL, BLAS
   calls from secondary threads may round differently (checked to 1e-3 relative in
   `KrigingTest`). The Kriging multistart was sequential before for that reason.
@@ -259,8 +263,36 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
    - gauss predictive sd is overconfident in every case (sd / RMSE 0.25–0.43);
      matern5_2 is calibrated (≈ 1).
 
-   Decision pending: default behaviour (jitter on / off, per kernel, value) or an
-   opt-in setting.
+   **Decided (2026-10-20): fixed jitter on by default** (details and studies:
+   `docs/dev/CholJitter-TODO.md`):
+
+   - Noise-free fits only (Nugget / Heterogeneous noise already keep R away from
+     singular). Value per kernel, `LinearAlgebra::kernel_chol_jitter`: gauss
+     1e-9, matern5_2 1e-10, matern3_2 / exp 0 (they never reach the
+     near-singular region). `LinearAlgebra::set_chol_jitter(x)` /
+     `LK_CHOL_JITTER`: x < 0 per kernel (default), 0 off (former behaviour),
+     x > 0 that value for every kernel.
+   - Kriging: the objective (optimization, `logLikelihoodFun`, LOO, LMP, Vecchia,
+     Nystrom) uses that jitter; the committed model (`predict`, `simulate`,
+     `update`) is factorized at the optimum with min(jitter, `num_nugget`) =
+     1e-10, so it still interpolates. `logLikelihood()` stays the optimized
+     objective. Both values are saved with the model (`chol_jitter`,
+     `model_chol_jitter`; absent = 0, files saved before load as before) and a
+     later `set_chol_jitter` does not change a fitted or reloaded model.
+   - WarpKriging: one jitter, the kernel's or else `num_nugget` (its former
+     constant diagonal); NestedKriging: each submodel's own.
+   - With it, the starting points matter more (the smooth long-range plateau of
+     the LL traps starts that used to bounce off the erratic tail), hence:
+     log-uniform starting points in the theta bounds (Kriging, per-variable
+     warps; uniform for the joint MLP), WarpKriging starts from `Random` like
+     Kriging, and the restart criterion "no improvement" within the optimizer
+     tolerance (#418).
+   - Measured, 240 data sets (gauss, Branin / sin d 2–8 / Hartmann6, n 50–500),
+     theta differing (> 1e-3 relative) across thread budgets 10 / 100 / 200 %:
+     18 % without the jitter, 1.7 % with 1e-9 (1e-8: 2.1 %, 1e-10: 6.2 %);
+     median test RMSE within 6 % of the no-jitter fits, except Branin n = 50
+     (very smooth: 5e-4 → 0.058 median). The remaining divergences are
+     iteration-limit paths on flat objectives (sin d = 4).
 4. **Bindings do not set `OPENBLAS_NUM_THREADS`** (decided 2026-10-19): it would
    only remove the start-up transient of 6.2; documented instead
    (`OPENBLAS_NUM_THREADS` = physical cores or `OPENBLAS_THREAD_TIMEOUT=4` for short
@@ -275,6 +307,7 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 | `LK_NUM_THREADS_PERCENT` | libKriging | budget share (x <= 1 ratio, x > 1 percentage) |
 | `LK_THREAD_POOL_SIZE` | libKriging | cap on the multistart workers |
 | `LK_THREAD_START_DELAY_MS` | libKriging | WarpKriging start stagger (10 ms) |
+| `LK_CHOL_JITTER` | libKriging at load | fixed Cholesky jitter of noise-free fits (< 0 per kernel, default; 0 off; > 0 value), see 8.6 |
 | `LK_BENCH_WARMUP_MS` | benchmarks | busy-wait before measuring (300 ms, see 6.2) |
 | `OMP_NUM_THREADS` | OpenMP runtime | caps the budget |
 | `OPENBLAS_NUM_THREADS` | OpenBLAS at load | size of its thread pool; below the budget, kept by libKriging |

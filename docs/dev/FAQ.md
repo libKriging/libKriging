@@ -40,6 +40,16 @@ This page collects questions about libKriging development
  E.g. n = 500, d = 4, `y = sum(sin(3 x))`, `"BFGS20"`: log-likelihood 3376.32 with 1 BLAS thread,
  3375.68 with 2, 3375.63 with 4.
 
+ Since the fixed Cholesky jitter (noise-free `gauss` and `matern5_2` fits), this mostly no longer
+ changes the optimum: a small constant (1e-9 for `gauss`, 1e-10 for `matern5_2`) is added to the
+ diagonal of the correlation matrix during the optimization, which keeps the objective smooth
+ where `cond(R)` explodes; the model at the optimum is then factorized with 1e-10 and still
+ interpolates. Across BLAS thread counts `theta` then differs only within the optimizer
+ tolerance (~1e-8 relative, not bit-identical); on 240 noise-free test cases a different optimum
+ was reached in 1.7 % of fits instead of 18 %. `LinearAlgebra::set_chol_jitter(0)` (or the
+ environment variable `LK_CHOL_JITTER=0`) restores the former, exact objective; a fitted or
+ saved model keeps the jitter it was fitted with. See [parallel.md](parallel.md) 8.6.
+
  To get the same result on several machines, set the same BLAS thread count everywhere (e.g.
  `OPENBLAS_NUM_THREADS=1`, at the cost of speed) and use the same BLAS build; a nugget or noise
  model, or tighter `theta` bounds, also reduce the sensitivity.

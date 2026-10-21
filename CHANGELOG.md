@@ -108,6 +108,30 @@ past release, see the corresponding entry on the
   ([#388](https://github.com/libKriging/libKriging/issues/388)).
 
 ### Changed
+- **Kriging** / **WarpKriging** / **NestedKriging**, noise-free fits with `gauss` or
+  `matern5_2`: a fixed jitter is added to the diagonal of the correlation matrix during the
+  optimization (1e-9 for `gauss`, 1e-10 for `matern5_2`, none for `matern3_2` / `exp`). On
+  smooth noise-free data the optimizer reaches the near-singular region, where the stepwise
+  numerical nugget added when a Cholesky fails made the objective discontinuous: a
+  single-start fit ended at a different optimum depending on the BLAS thread count, BLAS build
+  or CPU (18 % of 240 `gauss` test cases across thread counts; 1.7 % with the jitter, `theta`
+  otherwise equal within the optimizer tolerance). `Kriging` factorizes the model at the
+  optimum with 1e-10, so `predict` still interpolates, and `logLikelihood()` stays the
+  optimized objective. The jitter is saved with the model (`chol_jitter`,
+  `model_chol_jitter`; older files load unchanged). Fitted `theta`, predictions and
+  log-likelihoods of these fits change; accuracy is within a few % of the former fits, except
+  on very smooth functions (Branin, n = 50: median test RMSE 5e-4 → 0.058).
+  `LinearAlgebra::set_chol_jitter(0)` or `LK_CHOL_JITTER=0` restores the former behaviour
+  (Python / Octave `LinearAlgebra.set_chol_jitter`, Julia `set_chol_jitter`, R
+  `rlibkriging:::linalg_set_chol_jitter`). See [docs/dev/parallel.md](docs/dev/parallel.md) 8.6.
+- **Kriging** / **WarpKriging** multistart: the random starting points of `theta` are drawn
+  log-uniformly in their bounds instead of uniformly (`theta` is a scale parameter): with the
+  default bounds `[0.02, 10] × max |dX|` a uniform draw put 90 % of the starts in the
+  long-range region where the likelihood is flat. The joint MLP of `MLPKriging` / `mlp_joint`
+  keeps the uniform draw (long-range starts let its weights adapt). `WarpKriging` now draws
+  them from the same generator as `Kriging` (`Random::reset_seed` applies), not Armadillo's.
+  The restart of a start whose result is "not better" now ignores differences below the
+  optimizer tolerance ([#418](https://github.com/libKriging/libKriging/issues/418)).
 - **Kriging** / **WarpKriging**: from n = 800 on, the covariance matrix of the exact
   objectives (and its new rows in `update`) is built in an OpenMP loop instead of one thread,
   and the θ part of the log-likelihood gradient too, with per-row partial sums added in a
