@@ -25,10 +25,19 @@ PR #415 now targets `master` and includes #414 (closed).
   0.3.20 kernel selection on that CPU. See the comment on PR #414; check the
   Octave Linux job of the current head and its `lscpu` lines first.
   Local only (see Decisions): try OpenBLAS 0.3.20 `DYNAMIC_ARCH` here.
-- [ ] Resolve the item above before merging #415 (#414 is now part of it). Likely
+- [x] Resolve the item above before merging #415 (#414 is now part of it). Likely
       the same phenomenon as docs/dev/parallel.md 8.6 (fits of smooth kernels
       sensitive to rounding in the near-singular region): check it once the
       fixed jitter (CholJitter-TODO.md) is in.
+      **Resolved (2026-10-21, CI of 0ecd1a1a).** Runner Intel Xeon Platinum
+      8573C: OpenBLAS 0.3.20 `DYNAMIC_ARCH` does not know this CPU and falls back
+      to its `Prescott` (SSE3) kernels (`openblas_get_corename()` in the job log),
+      hence other roundings than on the AMD EPYC runners. With the fixed jitter
+      only one test still failed, `Octave/NestedKrigingAccessors` (also in the
+      Coverage job): it compared stdev at design points, sqrt(rounding) ~1e-8,
+      against 1e-8; now at new points. Reproduced locally with
+      `OPENBLAS_CORETYPE=Prescott` (0.3.26 `DYNAMIC_ARCH`); with it the whole
+      C++ suite (228) and the Octave suite pass.
 
 ## Context (state after PR #414)
 
