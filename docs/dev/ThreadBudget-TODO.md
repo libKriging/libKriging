@@ -267,10 +267,11 @@ Done 2026-10-18 (differs from the plan below where noted):
 
 ## Step 6 — documentation
 
-- [ ] `docs/dev/FAQ.md`: thread settings (`Optim::set_num_threads_percent`, `LK_NUM_THREADS_PERCENT`,
+- [x] `docs/dev/FAQ.md` (2026-10-21, "How many threads does libKriging use?"): thread settings (`Optim::set_num_threads_percent`, `LK_NUM_THREADS_PERCENT`,
       BLAS variants, nested-parallelism rule), reproducibility paragraph updated.
-- [ ] Bindings READMEs (R: `parallel::mclapply` → one thread per worker advice).
-- [ ] `CHANGELOG.md` (Unreleased).
+- [x] Bindings READMEs (R: forked children start with 1 thread, PSOCK workers get
+      `optim_set_num_threads_percent(1 / k)`; Python: Threads section).
+- [x] `CHANGELOG.md` (Unreleased, Added: thread budget).
 
 ## Delivery
 

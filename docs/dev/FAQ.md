@@ -16,6 +16,30 @@ This page collects questions about libKriging development
  
  
  
+# How many threads does libKriging use?
+
+ One setting, the thread budget, bounds all of them: by default the physical cores of the
+ machine (in the process's CPU affinity, within a container's CPU quota). The starts of a
+ multistart fit (`"BFGS10"`, ...) get it first, one start per thread; what remains goes to the
+ BLAS and the OpenMP loops of each start. Change it with `Optim::set_num_threads_percent(x)` or
+ the environment variable `LK_NUM_THREADS_PERCENT=x` (x <= 1: a ratio, x > 1: a percentage of
+ the cores, 0: 100 %); `Optim::get_num_threads()` returns the resulting number of threads.
+
+ | | set | read |
+ |---|---|---|
+ | C++ | `Optim::set_num_threads_percent(50)` | `Optim::get_num_threads()` |
+ | Python | `lk.Optim.set_num_threads_percent(50)` | `lk.Optim.get_num_threads()` |
+ | R | `rlibkriging:::optim_set_num_threads_percent(50)` | `rlibkriging:::optim_get_num_threads()` |
+ | Octave | `Optim.set_num_threads_percent(50)` | `Optim.get_num_threads()` |
+
+ An explicit limit is never exceeded: `OMP_NUM_THREADS` (or `omp_set_num_threads` in the calling
+ thread) caps the whole budget, `OPENBLAS_NUM_THREADS` the BLAS only. If you run several fits at
+ once yourself (Python `multiprocessing`, R PSOCK / `future` workers, MPI, a job array on one
+ node), each process uses the whole machine by default: give each one its part, e.g.
+ `set_num_threads_percent(1 / k)` for k concurrent processes, or `OPENBLAS_NUM_THREADS=1
+ OMP_NUM_THREADS=1` for many. Children of a `fork()` (R `parallel::mclapply`) already start
+ with 1 thread. Details and measurements: [parallel.md](parallel.md).
+
 # Is a fit reproducible with a fixed seed?
 
  With a fixed seed (`Random::reset_seed`, 123 by default) the multistart starting points are
