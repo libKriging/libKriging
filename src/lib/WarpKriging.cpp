@@ -353,7 +353,10 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
       // Could be an integer K or a single float knot position
       bool is_int = true;
       for (char c : kparts[0]) {
-        if (!std::isdigit(c)) { is_int = false; break; }
+        if (!std::isdigit(c)) {
+          is_int = false;
+          break;
+        }
       }
       if (is_int) {
         arma::uword K = static_cast<arma::uword>(std::stoul(kparts[0]));
@@ -1515,8 +1518,9 @@ WarpKnots::WarpKnots(arma::uword n_knots, const std::vector<double>& knot_positi
 
   for (arma::uword k = 0; k < m_K + 1; ++k) {
     if (m_breaks[k] >= m_breaks[k + 1])
-      throw std::invalid_argument("WarpKnots: breakpoints must be strictly increasing; "
-                                  "knot positions must lie strictly in (0,1)");
+      throw std::invalid_argument(
+          "WarpKnots: breakpoints must be strictly increasing; "
+          "knot positions must lie strictly in (0,1)");
   }
 
   m_log_slopes = arma::zeros<arma::vec>(m_K + 1);
@@ -1751,7 +1755,9 @@ void WarpKriging::recalibrate_warps(const arma::mat& X_ref) {
   Xn.each_row() -= m_centerX;
   Xn.each_row() /= m_scaleX;
   calibrate_warps(Xn);
+  m_cache_jitter = m_chol_jitter;
   refresh_cache();
+  commit_model_chol_jitter();
 }
 
 void WarpKriging::ensure_joint_warp(arma::uword d_in) {
@@ -1958,16 +1964,16 @@ void WarpKriging::populate_Model(WKModel& m, const arma::vec& theta, double sigm
 
   // Preemptive nugget: Embedding/Ordinal warpings can collapse same-level
   // training rows in Phi, making R rank-deficient in a way Kriging never
-  // encounters. Add m_chol_jitter on the diagonal to stabilize Cholesky and
-  // its derivative: the kernel's fixed jitter (LinearAlgebra::kernel_chol_jitter,
-  // same as Kriging) when it has one, else LinearAlgebra::num_nugget (default
-  // 1e-10, set_num_nugget()). Set num_nugget=0 to get exact Kriging
-  // equivalence at warping="none".
+  // encounters. m_cache_jitter on the diagonal stabilizes Cholesky and its
+  // derivative during the search: m_chol_jitter, the kernel's fixed jitter
+  // (LinearAlgebra::kernel_chol_jitter, same as Kriging) when it has one, else
+  // LinearAlgebra::num_nugget (default 1e-10, set_num_nugget()). The
+  // committed model keeps at most num_nugget (committed_chol_jitter).
   //
   // When m_noise is non-empty, the normalized covariance becomes
   //   C̃ = R_off-diag + diag(1 + nug + noise_i/σ²)
   // so the same cholCov(factor=1, diag) path carries observation-noise.
-  arma::vec diag(n, arma::fill::value(1.0 + m_chol_jitter));
+  arma::vec diag(n, arma::fill::value(1.0 + m_cache_jitter));
   if (!m_noise.is_empty()) {
     diag += m_noise / sigma2;
   }
@@ -2073,7 +2079,26 @@ double WarpKriging::concentrated_ll() const {
 double WarpKriging::logLikelihood() const {
   if (!m_fitted)
     throw std::runtime_error("WarpKriging: model not fitted");
-  return concentrated_ll();
+  return std::isnan(m_objective_ll) ? concentrated_ll() : m_objective_ll;
+}
+
+double WarpKriging::committed_chol_jitter() const {
+  // At most num_nugget (1e-10), not 0 as Kriging: warps can bring training
+  // rows together in Phi (Kumaraswamy, saturated MLP, categorical levels), and
+  // an exact factorization then leaves no predictive variance there (stdev 0,
+  // NaN stdev derivative / NLPD: WarpKrigingPerWarpTest, WarpKrigingCollapseTest).
+  // docs/dev/CholJitter-usage.md.
+  return std::min(m_chol_jitter, LinearAlgebra::num_nugget);
+}
+
+void WarpKriging::commit_model_chol_jitter() {
+  m_cache_jitter = m_chol_jitter;
+  refresh_cache_theta_only();
+  m_objective_ll = concentrated_ll();
+  m_model_chol_jitter = committed_chol_jitter();
+  m_cache_jitter = m_model_chol_jitter;
+  if (m_model_chol_jitter != m_chol_jitter)
+    refresh_cache_theta_only();
 }
 
 std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arma::vec& theta,
@@ -2081,7 +2106,9 @@ std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arm
                                                                        bool /*return_hess*/) const {
   auto* self = const_cast<WarpKriging*>(this);
   arma::vec old_theta = m_theta;
+  const double old_cache_jitter = m_cache_jitter;
   self->m_theta = theta;
+  self->m_cache_jitter = m_chol_jitter;  // the objective: search jitter
   self->refresh_cache();
 
   double ll = concentrated_ll();
@@ -2093,6 +2120,7 @@ std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arm
   }
 
   self->m_theta = old_theta;
+  self->m_cache_jitter = old_cache_jitter;
   self->refresh_cache();
   return {ll, grad, arma::mat()};
 }
@@ -2551,6 +2579,10 @@ WarpKriging WarpKriging::clone_for_thread() const {
   c.m_adam_lr = m_adam_lr;
   c.m_calibration_folds = m_calibration_folds;
   c.m_var_scale = m_var_scale;
+  c.m_chol_jitter = m_chol_jitter;  // the clones search with the same diagonal
+  c.m_model_chol_jitter = m_model_chol_jitter;
+  c.m_cache_jitter = m_cache_jitter;
+  c.m_objective_ll = m_objective_ll;
   c.m_fitted = true;
 
   // Copy mutable GP state
@@ -3070,6 +3102,8 @@ void WarpKriging::fit(const arma::vec& y,
   {
     const double kernel_jitter = LinearAlgebra::kernel_chol_jitter(m_covType);
     m_chol_jitter = kernel_jitter > 0.0 ? kernel_jitter : LinearAlgebra::num_nugget;
+    m_cache_jitter = m_chol_jitter;  // search; committed after optimise_joint
+    m_objective_ll = arma::datum::nan;
   }
 
   // Per-observation noise (optional). When set, populate_Model carries
@@ -3133,6 +3167,7 @@ void WarpKriging::fit(const arma::vec& y,
   // σ̂² is concentrated — computed in refresh_cache
   refresh_cache();
   optimise_joint(optim);
+  commit_model_chol_jitter();
   m_optim = optim;
   m_var_scale = 1.0;
   if (Optim::parse_method(optim, "BFGS").first != "none")
@@ -3372,6 +3407,7 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
     calibrate_warps();  // re-tie Knots to the enlarged input range before re-fit
     if (!m_noise.is_empty() && m_normalize)
       m_noise /= (m_scaleY * m_scaleY);
+    m_cache_jitter = m_chol_jitter;  // search; committed after optimise_joint
     refresh_cache();
 
     // The refit is warm-started from the current fit: keep the starting point
@@ -3386,6 +3422,7 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
       optimise_joint("BFGS+Adam");
       m_max_iter_adam = saved_adam;
     }
+    commit_model_chol_jitter();
     m_start_theta = start_theta;
     m_start_warp_params = start_warp_params;
     calibrate_variance();
@@ -3428,6 +3465,8 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
         [&]() { return make_Model(m_theta, m_sigma2); });
 
     m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
+    // no search here: logLikelihood() is the committed model's own
+    m_objective_ll = arma::datum::nan;
   }
 }
 
@@ -3497,6 +3536,9 @@ void WarpKriging::dump_to_json(nlohmann::json& j) const {
   // beta/est_beta, theta/est_theta, sigma2/est_sigma2, noise
   dump_common_to_json(j);
   j["chol_jitter"] = m_chol_jitter;
+  j["model_chol_jitter"] = m_model_chol_jitter;
+  if (!std::isnan(m_objective_ll))
+    j["objective_ll"] = m_objective_ll;
 }
 
 void WarpKriging::load_from_json(const nlohmann::json& j) {
@@ -3533,6 +3575,10 @@ void WarpKriging::load_from_json(const nlohmann::json& j) {
   }
   // Absent from files saved before the fixed jitter: they used num_nugget
   m_chol_jitter = j.contains("chol_jitter") ? j["chol_jitter"].template get<double>() : LinearAlgebra::num_nugget;
+  // Absent from files saved before the exact committed model: one jitter for both
+  m_model_chol_jitter = j.contains("model_chol_jitter") ? j["model_chol_jitter"].template get<double>() : m_chol_jitter;
+  m_cache_jitter = m_model_chol_jitter;
+  m_objective_ll = j.contains("objective_ll") ? j["objective_ll"].template get<double>() : arma::datum::nan;
   // Warp-specific extras (present in both v2 and v3)
   m_logdet = j["logdet"].template get<double>();
   if (j.contains("is_continuous"))

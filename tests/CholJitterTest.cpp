@@ -7,6 +7,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/WarpKriging.hpp"
 #include <cmath>
 #include <cstdlib>
 #include <string>
@@ -144,6 +145,30 @@ TEST_CASE("fixed Cholesky jitter: the fitted model interpolates the observations
     const arma::vec yp = std::get<0>(m.predict(X, false, false, false));
     CHECK(arma::abs(yp - y).max() < 1e-8);
   }
+  LinearAlgebra::set_chol_jitter(saved);
+}
+
+TEST_CASE("WarpKriging: the multistart searches the jittered objective", "[jitter][warp]") {
+  // The parallel starts run on clones (clone_for_thread), which must carry
+  // the jitter: they optimized the objective without it, so the result was
+  // not a maximum of the reported logLikelihood (4 to 19 lower on such data).
+  arma::arma_rng::set_seed(4);
+  const arma::mat X = arma::randu(60, 2);
+  const arma::vec y = arma::sin(6 * X.col(0)) + arma::cos(4 * X.col(1));
+  const double saved = LinearAlgebra::get_chol_jitter();
+  LinearAlgebra::set_chol_jitter(-1);
+  libKriging::WarpKriging wk(y, X, {"none", "none"}, "gauss", Trend::RegressionModel::Constant, true, "BFGS8");
+  const arma::vec theta = wk.theta();
+  const double ll = wk.logLikelihood();
+  CHECK(std::abs(ll - std::get<0>(wk.logLikelihoodFun(theta, false, false))) < 1e-10 * std::max(1.0, std::abs(ll)));
+  // a maximum of that objective along each theta axis
+  for (arma::uword k = 0; k < theta.n_elem; ++k)
+    for (const double f : {0.99, 1.01}) {
+      arma::vec t = theta;
+      t(k) *= f;
+      INFO("theta " << theta.t() << "axis " << k << " factor " << f);
+      CHECK(std::get<0>(wk.logLikelihoodFun(t, false, false)) <= ll + 1e-6 * std::abs(ll));
+    }
   LinearAlgebra::set_chol_jitter(saved);
 }
 

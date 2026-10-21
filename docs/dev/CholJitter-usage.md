@@ -1,7 +1,10 @@
 # Diagonal jitter: what each class and method adds to the correlation matrix
 
-State of `perf/thread-budget` after 9efff162 (2026-10-21). Background and decisions:
-[CholJitter-TODO.md](CholJitter-TODO.md) (4e, 4g), [parallel.md](parallel.md) 8.6.
+State of `perf/thread-budget` after 4h (2026-10-22). Background and decisions:
+[CholJitter-TODO.md](CholJitter-TODO.md) (4e, 4g, 4h), [parallel.md](parallel.md) 8.6.
+
+Rule: the search adds `J`; the committed model is exact for Kriging, at most `N` for WarpKriging;
+an approximate method keeps the diagonal of its objective.
 
 ## The three mechanisms
 
@@ -33,10 +36,10 @@ called directly (noted "no retry").
 | method | diagonal |
 |---|---|
 | Vecchia LL (fit, `logLikelihood`), `predictVecchia`, `simulateVecchia` | neighbour blocks 1 + `J` + `N` |
-| Vecchia `LOO` / `LMP` objectives (`build_vecchia_precision`) | neighbour blocks 1 + `N` (**no `J`**) |
+| Vecchia `LOO` / `LMP` objectives (`build_vecchia_precision`) | neighbour blocks 1 + `J` + `N` |
 | `update` (Vecchia, Nystrom) | the model's objective again (warm restart if `refit`), then the light commit (`commit_approx`): as the rows above |
 | Nystrom LL, `predictNystrom`, `simulate` (Nystrom) | landmark block + `N` (no retry); residual `D0 + J`, `D0` floored at `N` |
-| Nystrom `LOO` / `LMP` objectives (`build_nystrom_precision`) | landmark block + `N`; residual `D0` floored at `N` (**no `J`**) |
+| Nystrom `LOO` / `LMP` objectives (`build_nystrom_precision`) | landmark block + `N` (no retry); residual `D0 + J`, `D0` floored at `N` |
 | `simulate` (Nystrom) conditional covariance | eigenvalues floored at max(`N`, sqrt(eps)·max eigenvalue), then `safe_chol_lower` |
 
 The approximate methods keep the search diagonal in their committed state (it comes from the objective):
@@ -49,27 +52,32 @@ for the objective, the committed model, `predict`, `simulate`, `update` and `upd
 
 ## WarpKriging, MLPKriging
 
-`MLPKriging` is a facade over `WarpKriging(mlp_joint)`: same rules. One value, `m_chol_jitter` = `J` if > 0,
-else `N`, used by `populate_Model` for everything: objective, committed model, `predict`, `simulate`,
-`update` (both forms), with or without observation noise (the noise adds to it). Exceptions:
+`MLPKriging` is a facade over `WarpKriging(mlp_joint)`: same rules. Two values, as Kriging:
+`m_chol_jitter` (search: `J` if > 0, else `N`) and `m_model_chol_jitter` (committed model:
+min(`m_chol_jitter`, `N`)); `m_cache_jitter` is the one of the current cache (the search's while
+optimizing). Observation noise adds to either.
 
 | method | diagonal |
 |---|---|
-| `update_simulate` | `R_uu` exact (1, or 1 + noise / sigma2), **no `J`**, while `update` adds it |
+| fit / `update(refit = true)` objective, every start (the parallel clones too), `logLikelihoodFun` | 1 + `m_chol_jitter` |
+| `logLikelihood()` | the optimized objective (saved as `objective_ll`); after `update(refit = false)`, the committed model's own |
+| committed model (`commit_model_chol_jitter`), `predict`, `simulate`, `update(refit = false)` | 1 + min(`m_chol_jitter`, `N`): gauss 1e-10 |
+| `update_simulate` | `R_uu` exact (1, or 1 + noise / sigma2) |
 | `simulate` conditional covariance | 0 + retry (`simulate_impl`, as Kriging) |
-| `load` of a file without `chol_jitter` | `N` (its former constant diagonal) |
+| `load` of a file without `model_chol_jitter` | `m_chol_jitter` (one jitter for both, as saved) |
 
-So a noise-free WarpKriging does not interpolate exactly: on the python-sdist data (n = 10, gauss,
-warping `"none"`) the error at the design points is 5.6e-5 (`J` = 1e-9), 1.0e-5 with `set_chol_jitter(0)`
-(`N`); Kriging: 1.4e-11.
+Not exact, unlike Kriging: an exact factorization lost the predictive variance where warps bring
+training rows together in the feature space (Kumaraswamy, saturated tanh MLP: stdev 0, NaN stdev
+derivative and NLPD in WarpKrigingPerWarpTest / WarpKrigingCollapseTest). Interpolation error on the
+python-sdist data: warping `"none"` 1.0e-5 (5.6e-5 with `J` = 1e-9), Kumaraswamy 1.1e-6.
 
 ## NestedKriging
 
 | step | diagonal |
 |---|---|
 | fit of the common prior | `Kriging` (or `WarpKriging` when warped) on the data: rules above |
-| submodels (`optim = "none"`) | Kriging: committed, 1 (exact); WarpKriging: its `m_chol_jitter` |
-| `precompute_nk` group factors | the submodel's: Kriging exact (`safe_chol_lower`), WarpKriging its jitter, else `N` |
+| submodels (`optim = "none"`) | their committed model: Kriging 1 (exact), WarpKriging 1 + min(`J`, `N`) |
+| `precompute_nk` group factors | the submodel's committed diagonal (`safe_chol_lower`) |
 | `predict`, PoE family (PoE, gPoE, BCM, rBCM) | each submodel's `predict` |
 | `predict`, NK aggregation | group factors as above; aggregation matrix `K_M` + `N` (`solve`, `pinv` fallback, no retry) |
 
@@ -77,17 +85,13 @@ No `simulate` / `update`.
 
 ## Inconsistencies left
 
-1. **WarpKriging / MLPKriging**: the final model keeps the search jitter (it does not interpolate:
-   5.6e-5 above), unlike Kriging since 4g; and `update_simulate` is exact while `update` is not (the
-   situation Kriging had before 4g). Aligning on Kriging would mean a committed exact factorization in
-   WarpKriging (a second value, as `m_model_chol_jitter`), keeping `N` for the warpings that collapse rows
-   (embedding / ordinal), for which the preemptive nugget was introduced.
-2. **Vecchia / Nystrom LOO and LMP** use `N` but not `J`, while their LL uses `J`: for gauss the
-   objective diagonal is 1e-10 for LOO / LMP and 1e-9 + 1e-10 for LL.
-3. **`simulate` conditional covariance** (Kriging and WarpKriging, exact method) still relies on the
+1. **WarpKriging / MLPKriging** commit with `N` instead of exactly (see above; a deliberate
+   difference), and their `update_simulate` is exact while `update` keeps `N` (a 1e-10 relative
+   difference).
+2. **`simulate` conditional covariance** (Kriging and WarpKriging, exact method) still relies on the
    stepwise retry: at points close to the design (or close to each other) the covariance is singular
-   and the added nugget, `N`·10^k, depends on which Cholesky fails, so on rounding. Not measured across
-   thread budgets yet; a fixed floor (as `simulateNystrom` does with its eigenvalue floor) would remove
-   the step.
-4. **NestedKriging NK aggregation** adds `N` to `K_M` regardless of the kernel (no `J`, no retry, `pinv`
+   and the added nugget, `N`·10^k, depends on which Cholesky fails, so on rounding. To be measured
+   across thread budgets; a fixed floor (as `simulateNystrom` does with its eigenvalue floor) would
+   remove the step.
+3. **NestedKriging NK aggregation** adds `N` to `K_M` regardless of the kernel (no `J`, no retry, `pinv`
    fallback): fine for stability, noted for completeness.

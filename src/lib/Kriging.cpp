@@ -2040,9 +2040,9 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
 
     const arma::vec& x = Rinve;
 
-    const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);           // R_ss^-1
-    const arma::mat W = Kinv * R_ns.t();                             // k x n = R_ss^-1 * R_ns.t()
-    const arma::mat RM = Rf.solve(R_ns);                             // n x k = Rinv * R_ns
+    const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);  // R_ss^-1
+    const arma::mat W = Kinv * R_ns.t();                    // k x n = R_ss^-1 * R_ns.t()
+    const arma::mat RM = Rf.solve(R_ns);                    // n x k = Rinv * R_ns
     const arma::vec& diagRinv = Rf.diag_inv;
 
     const arma::vec Mtx = R_ns.t() * x;    // k
@@ -2594,7 +2594,10 @@ VecchiaPrecision build_vecchia_precision(const arma::mat& X,
                                          const arma::vec& theta,
                                          const std::function<double(const arma::vec&, const arma::vec&)>& Cov,
                                          const std::function<arma::vec(const arma::vec&, const arma::vec&)>& DlnCov,
-                                         bool with_grad) {
+                                         bool with_grad,
+                                         double jitter) {
+  // jitter: the fixed Cholesky jitter of the noise-free objective
+  // (m_chol_jitter), on the diagonal as in _logLikelihoodVecchia
   constexpr double v_floor = 1e-15;  // as in _logLikelihoodVecchia
   VecchiaPrecision vp;
   vp.n = X.n_rows;
@@ -2644,11 +2647,11 @@ VecchiaPrecision build_vecchia_precision(const arma::mat& X,
           dr(i, k) = c * dln(k);
       }
     }
-    RN.diag() += LinearAlgebra::num_nugget;
+    RN.diag() += jitter + LinearAlgebra::num_nugget;
     const arma::mat LN = LinearAlgebra::safe_chol_lower(RN);
     const arma::vec a_vec = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), r));
     vp.a[t] = a_vec;
-    vp.v(t) = std::max(1.0 - arma::dot(r, a_vec), v_floor);
+    vp.v(t) = std::max(1.0 + jitter - arma::dot(r, a_vec), v_floor);
     if (with_grad) {
       arma::mat dA(mi, d);
       for (arma::uword k = 0; k < d; ++k) {
@@ -2732,7 +2735,10 @@ NystromPrecision build_nystrom_precision(const arma::mat& X,
                                          const arma::vec& theta,
                                          const std::function<double(const arma::vec&, const arma::vec&)>& Cov,
                                          const std::function<arma::vec(const arma::vec&, const arma::vec&)>& DlnCov,
-                                         bool with_grad) {
+                                         bool with_grad,
+                                         double jitter) {
+  // jitter: as in build_vecchia_precision (residual diagonal D0 + jitter, as
+  // _logLikelihoodNystrom)
   NystromPrecision np;
   const arma::uword n = X.n_rows;
   const arma::uword d = X.n_cols;
@@ -2748,14 +2754,15 @@ NystromPrecision build_nystrom_precision(const arma::mat& X,
   R_ss.diag() += LinearAlgebra::num_nugget;
   const arma::mat L_ss = arma::chol(R_ss, "lower");
   const arma::mat U = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));
-  const arma::vec D = nystrom_residual_diag(U, landmarks);
+  const arma::vec D0 = nystrom_residual_diag(U, landmarks);
+  const arma::vec D = D0 + jitter;
   np.F = NystromChol(U, D, landmarks, /*with_inverse=*/true);
 
   if (with_grad) {
     const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);
     np.Wt = R_ns * Kinv;
     np.PW = np.P(np.Wt);
-    const arma::uvec clamped = arma::find(D <= LinearAlgebra::num_nugget);
+    const arma::uvec clamped = arma::find(D0 <= LinearAlgebra::num_nugget);
     np.dM.resize(d);
     np.dK.resize(d);
     np.dlow.resize(d);
@@ -2899,11 +2906,11 @@ double Kriging::_leaveOneOutApprox(bool vecchia,
     grad_out->set_size(_theta.n_elem);
   if (vecchia) {
     const VecchiaPrecision P = build_vecchia_precision(
-        m_X, m_vecchia_order, m_vecchia_neighbors, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+        m_X, m_vecchia_order, m_vecchia_neighbors, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr, m_chol_jitter);
     return approx_loo(P, m_y, m_F, est_beta, m_beta, grad_out, yhat_out);
   }
-  const NystromPrecision P
-      = build_nystrom_precision(m_X, m_nystrom_landmarks, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+  const NystromPrecision P = build_nystrom_precision(
+      m_X, m_nystrom_landmarks, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr, m_chol_jitter);
   return approx_loo(P, m_y, m_F, est_beta, m_beta, grad_out, yhat_out);
 }
 
@@ -2912,11 +2919,11 @@ double Kriging::_logMargPostApprox(bool vecchia, const arma::vec& _theta, arma::
     grad_out->set_size(_theta.n_elem);
   if (vecchia) {
     const VecchiaPrecision P = build_vecchia_precision(
-        m_X, m_vecchia_order, m_vecchia_neighbors, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+        m_X, m_vecchia_order, m_vecchia_neighbors, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr, m_chol_jitter);
     return approx_lmp(P, m_y, m_F, m_X, _theta, m_est_sigma2, m_sigma2, grad_out);
   }
-  const NystromPrecision P
-      = build_nystrom_precision(m_X, m_nystrom_landmarks, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+  const NystromPrecision P = build_nystrom_precision(
+      m_X, m_nystrom_landmarks, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr, m_chol_jitter);
   return approx_lmp(P, m_y, m_F, m_X, _theta, m_est_sigma2, m_sigma2, grad_out);
 }
 

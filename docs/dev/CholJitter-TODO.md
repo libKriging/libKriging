@@ -303,6 +303,36 @@ All 4 pass with `LK_CHOL_JITTER=0`.
    - [x] **Jitter per class and method: [CholJitter-usage.md](CholJitter-usage.md)** (2026-10-21),
      with the inconsistencies left (WarpKriging final model, Vecchia / Nystrom LOO / LMP, simulate
      conditional covariance).
+   - [x] **4h. Alignment of WarpKriging and of the approximate objectives (2026-10-22, user: "Oui"
+     to items 1 and 3 of the proposal; usage table: CholJitter-usage.md).**
+     - *Bug found on the way*: `WarpKriging::clone_for_thread` did not copy `m_chol_jitter`, so the
+       parallel starts of a multistart searched with diagonal 1 (no jitter, not even num_nugget) and
+       `*this` then reported the LL with the jitter at their optimum. Kumaraswamy x 2, gauss,
+       n = 60, BFGS8, 12 data sets: reported LL 4 to 19 lower than with the fix (255.6 → 257.1,
+       249.7 → 268.4, ...), test RMSE equal within 1 % (2.120e-3 vs 2.133e-3, ...). Introduced
+       with the fixed jitter (before, populate_Model read num_nugget directly). Fixed; new
+       CholJitterTest "[warp]" case (theta a maximum of logLikelihoodFun along each axis; fails
+       without the fix: 263.68 > 263.44). The warp start study of 4f ran multistarts with this bug
+       (its single-start rows are unaffected).
+     - *Item 1, committed model exact as Kriging*: tried, three tests failed
+       (WarpKrigingPerWarpTest predict derivative and warp gradient vs FD, WarpKrigingCollapseTest
+       #406): where warps bring training rows together (Kumaraswamy, tanh MLP) the exact model has
+       predictive variance clamped at 0 (stdev 0, NaN stdev derivative / NLPD). Kept instead:
+       committed model with min(J, num_nugget) = 1e-10 for gauss (the former WarpKriging diagonal),
+       search with J. Implemented as Kriging: `m_model_chol_jitter`, `m_cache_jitter` (the cache is
+       the objective while optimizing), `commit_model_chol_jitter()` after `optimise_joint` (fit,
+       update refit, recalibrate_warps), `logLikelihood()` returns the optimized objective
+       (`m_objective_ll`, JSON `objective_ll`), `logLikelihoodFun` evaluates with J and restores the
+       committed cache. NestedKriging warped groups use the submodel's committed diagonal.
+       Interpolation on the sdist data: none 5.6e-5 → 1.0e-5, Kumaraswamy 1.1e-6.
+     - *Item 3*: `build_vecchia_precision` / `build_nystrom_precision` (LOO / LMP objectives of
+       `vecchia(m)` / `nystrom(k)`) add `m_chol_jitter` as the LL does (Vecchia: neighbour blocks and
+       conditional variance; Nystrom: D0 + J, the clamp test on D0).
+     - Local: C++ ctest 230 / 230 (KrigingWarmRestartTest is a timing check, 1 / 30 runs fails:
+       2.79 ms warm vs 0.8 x 3.32 ms cold), Python 238 / 238, R 941 tests 0 failed, Octave 17 / 18
+       (Demo, display). R pitfall: `R CMD INSTALL` reuses `bindings/R/rlibkriging/src/*.o` (gitignored):
+       after a header change (WarpKriging members) the stale objects crashed R ("irrecoverable
+       exception"); delete them first.
    - [x] **4g. Committed model without jitter (`on>0`, 2026-10-21, decided by the user:
      "ok pour B").** The CI `python-sdist` check (n = 10, d = 2, gauss, default fit,
      `predict(X)` must give y to 1e-6) failed: 1.0e-5. At the fitted theta ~ (1, 9.3)

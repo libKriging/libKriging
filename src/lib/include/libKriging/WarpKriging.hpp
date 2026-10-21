@@ -933,6 +933,22 @@ class WarpKriging : protected KrigingImpl {
 
   double m_logdet = 0.0;
 
+  // Diagonal jitter (docs/dev/CholJitter-usage.md): m_chol_jitter (base) is
+  // the search's; m_model_chol_jitter the committed model's,
+  // min(m_chol_jitter, num_nugget) (committed_chol_jitter);
+  // m_cache_jitter the one of the current cache (m_T, m_sigma2, m_logdet):
+  // the search's while optimizing, the committed one otherwise.
+  double m_model_chol_jitter = 0.0;
+  double m_cache_jitter = 0.0;
+  // Optimized objective (search jitter) at the committed parameters, what
+  // logLikelihood() returns; NaN: the committed cache's own (no search jitter).
+  double m_objective_ll = arma::datum::nan;
+  /// m_model_chol_jitter from the warpings (fit / load)
+  double committed_chol_jitter() const;
+  /// After an optimization (cache at the search jitter): keep the objective
+  /// for logLikelihood(), then rebuild the cache with m_model_chol_jitter.
+  void commit_model_chol_jitter();
+
   bool m_fitted = false;
 
   // ---- optimiser ----------------------------------------------------------
