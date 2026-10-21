@@ -244,12 +244,23 @@ Done 2026-10-18 (differs from the plan below where noted):
 
 ## Step 5 — tests
 
-- [ ] Extend `tests/BlasThreadsTest.cpp`:
-  - [ ] `pool × omp share ≤ total` and `pool × BLAS ≤ total` during a WarpKriging
-        parallel multistart (record the shares seen by the workers);
-  - [ ] an explicit `OMP_NUM_THREADS` / `OPENBLAS_NUM_THREADS` is never exceeded;
-  - [ ] the calling thread's OpenMP ICV is unchanged after `fit` / `predict`;
-  - [ ] objective, gradient and `update` bit-identical for `total` ∈ {1, 2, 4, 20}.
+- [x] Extend `tests/BlasThreadsTest.cpp` (2026-10-21):
+  - [x] BLAS count ≤ budget during a Kriging / WarpKriging `BFGS4` and a single
+        start (budget 2, caller's count pinned to 1, a monitoring thread reads
+        `openblas_get_num_threads()`: max seen = 2 = budget). The OpenMP share of
+        the workers is not observable from outside the library (private
+        `detail::` functions, not exported): not tested.
+  - [x] an explicit OpenMP limit of the calling thread caps the budget;
+        `OPENBLAS_NUM_THREADS=1` at load is kept (hidden `[.openblas_env]` case,
+        `BlasThreadsTest/OPENBLAS_NUM_THREADS`). Note: the library takes the
+        count OpenBLAS has at its *first use* as the loaded one, so a caller's
+        `openblas_set_num_threads` before any libKriging call counts as
+        `OPENBLAS_NUM_THREADS`.
+  - [x] predict / simulate / update leave the caller's BLAS / OpenMP counts
+        (fits: existing cases).
+  - [x] objective, gradient and `update` for budgets 1 thread .. 200 %:
+        bit-identical here (OpenBLAS 0.3.26), checked to 1e-12 relative (another
+        BLAS may split its sums by thread).
 - [ ] TSan job: OpenMP loops stay compiled out (`LK_OMP_LOOPS`); fork-safety R test.
 - [ ] Optional CI job running `bench-threads.sh` with a small grid, no threshold
       (runners are too noisy for a pass/fail on timings).

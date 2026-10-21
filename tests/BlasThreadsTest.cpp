@@ -7,6 +7,11 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/Optim.hpp"
 #include "libKriging/WarpKriging.hpp"
+#include <algorithm>
+#include <atomic>
+#include <cstdlib>
+#include <string>
+#include <thread>
 // clang-format on
 
 #ifdef _OPENMP
@@ -81,6 +86,39 @@ void data(arma::vec& y, arma::mat& X, arma::uword n = 40) {
   X = arma::randu(n, 2);
   y = arma::sum(arma::sin(3 * X), 1);
 }
+
+// Largest OpenBLAS thread count seen by a monitoring thread while `run` runs
+// (0 when OpenBLAS is absent): the library sets it to the budget for a call,
+// to each worker's share in a multistart pool.
+template <typename F>
+int max_blas_threads_during(F run) {
+#ifdef LK_TEST_OPENBLAS
+  if (!openblas_get_num_threads)
+    return (run(), 0);
+  std::atomic<bool> done{false};
+  std::atomic<int> seen{0};
+  std::thread monitor([&] {
+    while (!done.load()) {
+      const int b = openblas_get_num_threads();
+      if (b > seen.load())
+        seen.store(b);
+      std::this_thread::yield();
+    }
+  });
+  run();
+  done.store(true);
+  monitor.join();
+  return seen.load();
+#else
+  return (run(), 0);
+#endif
+}
+
+// Restores the thread budget setting at the end of a test.
+struct BudgetGuard {
+  double saved = Optim::get_num_threads_percent();
+  ~BudgetGuard() { Optim::set_num_threads_percent(saved); }
+};
 
 }  // namespace
 
@@ -171,3 +209,140 @@ TEST_CASE("Objective, gradient and update do not depend on the OpenMP thread cou
   CHECK(llu1 == llu4);
 }
 #endif
+
+TEST_CASE("The BLAS thread count never exceeds the thread budget during a fit", "[threads]") {
+#ifdef LK_TEST_OPENBLAS
+  if (!openblas_get_num_threads || !openblas_set_num_threads) {
+    WARN("no OpenBLAS in this build");
+    return;
+  }
+  BudgetGuard guard;
+  // a budget of 2 threads, below the count OpenBLAS was loaded with (by
+  // default the logical CPUs)
+  Optim::set_num_threads_percent(100);
+  const int full = Optim::get_num_threads();
+  if (full < 2 || openblas_get_num_threads() <= 2) {
+    WARN("fewer than 2 physical cores or OpenBLAS loaded with <= 2 threads: nothing to bound");
+    return;
+  }
+  Optim::set_num_threads_percent(2.0 / full);
+  const int budget = Optim::get_num_threads();
+  REQUIRE(budget == 2);
+  arma::vec y;
+  arma::mat X;
+  data(y, X, 60);
+  // the library reads the count OpenBLAS was loaded with at its first use:
+  // use it once before changing the caller's count
+  Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS");
+  // the caller's own count at 1: any larger value seen comes from the library
+  const int initial = openblas_get_num_threads();
+  openblas_set_num_threads(1);
+  const int kriging_max = max_blas_threads_during(
+      [&] { Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS4"); });
+  const int warp_max = max_blas_threads_during([&] {
+    libKriging::WarpKriging w(y, X, {"affine", "affine"}, "gauss", Trend::RegressionModel::Constant, false, "BFGS4");
+  });
+  // single start: run inline with the whole budget (also shows that the
+  // monitor sees the count set by the library)
+  arma::vec y2;
+  arma::mat X2;
+  data(y2, X2, 300);
+  const int single_max = max_blas_threads_during(
+      [&] { Kriging k(y2, X2, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS"); });
+  const int after = openblas_get_num_threads();
+  openblas_set_num_threads(initial);
+  INFO("budget " << budget << ", OpenBLAS max seen: Kriging BFGS4 " << kriging_max << ", WarpKriging BFGS4 "
+                 << warp_max << ", Kriging BFGS " << single_max);
+  CHECK(kriging_max <= budget);
+  CHECK(warp_max <= budget);
+  CHECK(single_max == budget);
+  CHECK(after == 1);
+#else
+  WARN("no OpenBLAS in this build");
+#endif
+}
+
+#ifdef _OPENMP
+TEST_CASE("An explicit OpenMP limit of the calling thread caps the thread budget", "[threads]") {
+  BudgetGuard guard;
+  const int initial = omp_get_max_threads();
+  Optim::set_num_threads_percent(200);
+  omp_set_num_threads(2);
+  CHECK(Optim::get_num_threads() <= 2);
+  omp_set_num_threads(1);
+  CHECK(Optim::get_num_threads() == 1);
+  omp_set_num_threads(initial);
+}
+#endif
+
+TEST_CASE("predict, simulate and update leave the caller's BLAS / OpenMP thread counts", "[threads]") {
+  ThreeThreads guard;
+  if (!readable(guard.set)) {
+    WARN("no readable BLAS / OpenMP thread count in this build");
+    return;
+  }
+  arma::vec y;
+  arma::mat X;
+  data(y, X, 60);
+  Kriging k(y.head(50), X.head_rows(50), "matern5_2", Trend::RegressionModel::Constant, false, "BFGS");
+  const arma::mat Xn = arma::randu(30, 2);
+  k.predict(Xn, true, true, false);
+  k.simulate(10, 123, Xn, false);
+  k.update(y.tail(10), X.tail_rows(10), false);
+  const Threads after = get_threads();
+  CHECK(after.blas == guard.set.blas);
+  CHECK(after.omp == guard.set.omp);
+}
+
+// The budget changes only how many threads run the computations: the
+// objective, its gradient and an updated model agree to rounding for budgets
+// of 1 to 2x the cores (bit-identical with OpenBLAS here; another BLAS may
+// split its sums by thread).
+TEST_CASE("Objective, gradient and update do not depend on the thread budget", "[threads]") {
+  BudgetGuard guard;
+  arma::vec y;
+  arma::mat X;
+  data(y, X, 1200);
+  const arma::vec theta{0.3, 0.5};
+  Kriging::Parameters par;
+  par.theta = arma::mat(theta.t());
+  par.is_theta_estim = false;
+
+  auto run = [&](double percent) {
+    Optim::set_num_threads_percent(percent);
+    Kriging k(y.head(900), X.head_rows(900), "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", par);
+    auto [ll, grad] = k.logLikelihoodFun(theta, true, false);
+    k.update(y.tail(300), X.tail_rows(300), false);
+    return std::make_tuple(ll, arma::vec(grad), k.logLikelihood());
+  };
+  const auto [ll0, grad0, llu0] = run(1e-6);  // 1 thread
+  for (const double percent : {20.0, 50.0, 100.0, 200.0}) {
+    const auto [ll, grad, llu] = run(percent);
+    INFO("budget " << Optim::get_num_threads() << " threads");
+    CHECK(std::abs(ll - ll0) <= 1e-12 * std::abs(ll0));
+    CHECK(arma::norm(grad - grad0) <= 1e-12 * arma::norm(grad0));
+    CHECK(std::abs(llu - llu0) <= 1e-12 * std::abs(llu0));
+  }
+}
+
+// Hidden: run by the BlasThreadsTest/OPENBLAS_NUM_THREADS test with
+// OPENBLAS_NUM_THREADS=1 in its environment (tests/CMakeLists.txt): an OpenBLAS
+// loaded with fewer threads than the budget is kept as it is, the budget
+// itself (pool, OpenMP) is not reduced.
+TEST_CASE("An OpenBLAS loaded with fewer threads than the budget keeps its count", "[.openblas_env]") {
+  const char* v = std::getenv("OPENBLAS_NUM_THREADS");
+  REQUIRE(v != nullptr);
+  const int loaded = std::stoi(v);
+  BudgetGuard guard;
+  Optim::set_num_threads_percent(100);
+  arma::vec y;
+  arma::mat X;
+  data(y, X, 60);
+  const int seen = max_blas_threads_during(
+      [&] { Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS4"); });
+  INFO("OPENBLAS_NUM_THREADS " << loaded << ", budget " << Optim::get_num_threads() << ", OpenBLAS max seen " << seen);
+  CHECK(seen <= loaded);
+#ifndef _OPENMP
+  CHECK(Optim::get_num_threads() >= 1);
+#endif
+}
