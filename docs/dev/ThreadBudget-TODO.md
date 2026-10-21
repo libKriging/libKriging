@@ -220,13 +220,18 @@ Done 2026-10-18 (differs from the plan below where noted):
       `Optim::get_num_threads()` (resolved `total`, read only) in
       `src/lib/include/libKriging/Optim.hpp` + `Optim.cpp`; `set_thread_pool_size`
       clamped by `total`.
-- [ ] Expose in the bindings next to `set_thread_pool_size`:
+- [x] Expose in the bindings next to `set_thread_pool_size` (2026-10-21; Julia:
+      neither, as before; R unexported like the other `optim_*`):
       `bindings/Python/pylibkriging/src/_pylibkriging/pylibkriging.cpp`,
       `bindings/R/rlibkriging/src/optim.cpp` (+ R wrapper / NAMESPACE / Rd),
       `bindings/Octave/mlibkriging/Optim_binding.cpp` + `Optim.m` (Julia does not expose
       `set_thread_pool_size` today: add both or neither).
-- [ ] Binding tests next to the existing `thread_pool_size` ones
+- [x] Binding tests next to the existing `thread_pool_size` ones
       (`test_new_features.py`, `test-new-features.R`, `test_new_features.m`).
+      `test_new_features.m` was not registered in CMake (never ran) and failed on
+      `Optim.set_log_level(2)`: the int setters of `Optim.m` now pass `int32`;
+      registered as `Octave/NewFeatures`. Local: Python NewFeatures ok, Octave 17 / 18
+      (`mLibKriging-Demo`: no display), R 697 tests 0 failed.
 
 ## Step 4 — BLAS / OpenMP arbitration — DROPPED (RESULTS.md: decision, sections 8–9)
 

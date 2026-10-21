@@ -12,6 +12,16 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- **Thread budget**: one setting bounds the threads of the multistart pool, the OpenMP loops
+  and the BLAS together: `Optim::set_num_threads_percent(x)` (x <= 1 a ratio, x > 1 a
+  percentage of the physical cores, 0 = 100 %) or `LK_NUM_THREADS_PERCENT`;
+  `Optim::get_num_threads()` returns the resolved number of threads. The starts of a multistart
+  get the budget first, each start's BLAS / OpenMP the rest; an explicit `OMP_NUM_THREADS` or
+  `OPENBLAS_NUM_THREADS` is never exceeded. Bindings: Python / Octave
+  `Optim.set_num_threads_percent`, `get_num_threads_percent`, `get_num_threads`; R
+  `rlibkriging:::optim_set_num_threads_percent` (and `_get_`), `optim_get_num_threads`
+  (Julia: not exposed, like `set_thread_pool_size`). See
+  [docs/dev/parallel.md](docs/dev/parallel.md).
 - **R**: `Kriging`, `NestedKriging`, `WarpKriging` and `MLPKriging` objects survive R
   serialization: `saveRDS()` / `readRDS()`, `save()` / `load()` of a workspace,
   `serialize()`, and shipping to PSOCK / `future` workers. The current model is stored as its
@@ -20,6 +30,10 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **Octave**: `Optim.set_log_level`, `set_max_iteration`, `set_thread_start_delay_ms` and
+  `set_thread_pool_size` failed with "is not an unsigned 64bits int" when given a plain
+  number (`Optim.set_log_level(2)`); they now convert it to `int32`. Their tests
+  (`test_new_features.m`) were not registered in CMake and never ran; they now do.
 - **Kriging** multistart `"BFGS<k>"`: the starts run one after the other in the calling
   thread, but each was given only ncpu/k BLAS/OpenMP threads (1 thread from k ≥ ncpu on),
   leaving the other cores idle. The starts now keep the full thread count.

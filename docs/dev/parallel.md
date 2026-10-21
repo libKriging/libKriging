@@ -39,7 +39,7 @@ share  = Optim::set_num_threads_percent(x) / LK_NUM_THREADS_PERCENT=x
   still get the whole budget.
 - `Optim::get_num_threads()` returns the resolved budget.
 
-API (C++; bindings to come):
+API (C++; Python / Octave `Optim.<same name>`, R `rlibkriging:::optim_<same name>`; not in Julia):
 
 ```cpp
 Optim::set_num_threads_percent(50);   // or 0.5: half of the physical cores
