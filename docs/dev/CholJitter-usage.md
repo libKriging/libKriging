@@ -90,8 +90,14 @@ No `simulate` / `update`.
    difference).
 2. **`simulate` conditional covariance** (Kriging and WarpKriging, exact method) still relies on the
    stepwise retry: at points close to the design (or close to each other) the covariance is singular
-   and the added nugget, `N`·10^k, depends on which Cholesky fails, so on rounding. To be measured
-   across thread budgets; a fixed floor (as `simulateNystrom` does with its eigenvalue floor) would
-   remove the step.
+   and the added nugget, `N`·10^k, could depend on which Cholesky fails, so on rounding. Measured
+   (2026-10-22, `bench/thread-budget/sim_retry_probe.cpp`, 5 configurations x 10 data sets, budgets
+   10 / 100 / 200 %, 50 simulations at 200 random points, optionally + design points / a 1e-7
+   cluster): the retry fires in nearly every gauss case (the conditional covariance of 200 smooth
+   points is numerically singular) and in matern5_2 only with design points or clusters, always
+   at the first level (`N`), never at a different level across budgets; simulations differ by at
+   most 4e-11 relative across budgets. In practice the retry acts as a fixed `N` here. A fixed floor
+   (as `simulateNystrom`'s eigenvalue floor) would remove the residual risk: rcond values of 2e-18,
+   next to the 1e-18 threshold of the rcond check, were seen (gauss n = 10). Not changed.
 3. **NestedKriging NK aggregation** adds `N` to `K_M` regardless of the kernel (no `J`, no retry, `pinv`
    fallback): fine for stability, noted for completeness.

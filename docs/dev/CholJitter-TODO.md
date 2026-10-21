@@ -328,6 +328,9 @@ All 4 pass with `LK_CHOL_JITTER=0`.
      - *Item 3*: `build_vecchia_precision` / `build_nystrom_precision` (LOO / LMP objectives of
        `vecchia(m)` / `nystrom(k)`) add `m_chol_jitter` as the LL does (Vecchia: neighbour blocks and
        conditional variance; Nystrom: D0 + J, the clamp test on D0).
+     - *Item 2 (measure only)*: `simulate` conditional covariance across thread budgets, see
+       CholJitter-usage.md inconsistency 2: retry always at its first level, the same at every
+       budget, simulations within 4e-11 relative. No change.
      - Local: C++ ctest 230 / 230 (KrigingWarmRestartTest is a timing check, 1 / 30 runs fails:
        2.79 ms warm vs 0.8 x 3.32 ms cold), Python 238 / 238, R 941 tests 0 failed, Octave 17 / 18
        (Demo, display). R pitfall: `R CMD INSTALL` reuses `bindings/R/rlibkriging/src/*.o` (gitignored):
