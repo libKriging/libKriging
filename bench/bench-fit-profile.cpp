@@ -8,9 +8,9 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <chrono>
-#include <iostream>
 #include <cstdlib>
 #include <iomanip>
+#include <iostream>
 #include <string>
 
 // Synthetic test function: sum_i sin(2*pi*x_i)

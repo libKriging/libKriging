@@ -486,7 +486,8 @@ std::tuple<arma::vec, arma::vec> NestedKriging::predict_nk(const arma::mat& X_n,
     const arma::sword npairs = static_cast<arma::sword>(p * (p - 1) / 2);
 #if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
     const arma::uword pair_work = (p > 1) ? (m_X.n_rows * m_X.n_rows) / p * qc : 0;
-#pragma omp parallel for schedule(dynamic) num_threads(libKriging::detail::omp_threads()) if (npairs > 1 && pair_work >= 40000)
+#pragma omp parallel for schedule(dynamic) \
+    num_threads(libKriging::detail::omp_threads()) if (npairs > 1 && pair_work >= 40000)
 #endif
     for (arma::sword k = 0; k < npairs; ++k) {
       // unrank pair index k -> (i, j), i < j

@@ -25,7 +25,8 @@ static arma::vec f(const std::string& family, const arma::mat& X, const arma::ro
       y(i) = 1.0 - 0.5 * (std::sin(4.0 * x) / (1.0 + x) + 2.0 * std::cos(12.0 * x) * std::pow(x, 6.0) + 0.7);
     } else if (family == "branin") {
       const double x1 = 15 * X(i, 0) - 5, x2 = 15 * X(i, 1);
-      y(i) = std::pow(x2 - 5.1 / (4 * M_PI * M_PI) * x1 * x1 + 5 / M_PI * x1 - 6, 2) + 10 * (1 - 1 / (8 * M_PI)) * std::cos(x1) + 10;
+      y(i) = std::pow(x2 - 5.1 / (4 * M_PI * M_PI) * x1 * x1 + 5 / M_PI * x1 - 6, 2)
+             + 10 * (1 - 1 / (8 * M_PI)) * std::cos(x1) + 10;
     } else {
       for (arma::uword j = 0; j < X.n_cols; ++j)
         y(i) += std::sin(2 * M_PI * freq(j) * X(i, j));
@@ -60,8 +61,8 @@ int main(int argc, char** argv) {
           k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", p);
           const arma::vec m = std::get<0>(k.predict(Xt, false, false, false));
           const double rmse = std::sqrt(arma::mean(arma::square(m - yt))) / arma::stddev(yt);
-          std::printf("%d,%s,%s,%.6g,%.10g,%.6g\n", s, jitter < 0 ? "on" : "off", optim, k.theta()(0),
-                      k.logLikelihood(), rmse);
+          std::printf(
+              "%d,%s,%s,%.6g,%.10g,%.6g\n", s, jitter < 0 ? "on" : "off", optim, k.theta()(0), k.logLikelihood(), rmse);
         } catch (const std::exception& e) {
           std::printf("%d,%s,%s,nan,nan,nan\n", s, jitter < 0 ? "on" : "off", optim);
         }

@@ -17,8 +17,8 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 
 #include "BlasThreads.hpp"
-#include "ThreadBudget.hpp"
 #include "OmpLoops.hpp"
+#include "ThreadBudget.hpp"
 
 #include <stdexcept>
 #include <string>

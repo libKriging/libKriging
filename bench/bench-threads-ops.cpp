@@ -65,7 +65,8 @@ static void bench_warmup() {
 
 int main(int argc, char** argv) {
   if (argc < 5) {
-    std::fprintf(stderr, "usage: %s <predict|predict_cov|simulate|update> <n> <d> <n_new> [nsim=1] [reps=7] [--header]\n",
+    std::fprintf(stderr,
+                 "usage: %s <predict|predict_cov|simulate|update> <n> <d> <n_new> [nsim=1] [reps=7] [--header]\n",
                  argv[0]);
     return 2;
   }

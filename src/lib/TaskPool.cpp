@@ -11,7 +11,6 @@
 #include <thread>
 #include <vector>
 
-
 namespace libKriging {
 namespace detail {
 

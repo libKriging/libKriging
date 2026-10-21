@@ -23,8 +23,8 @@
 
 static arma::vec f(const std::string& family, const arma::mat& X, const arma::rowvec& freq) {
   arma::vec y(X.n_rows, arma::fill::zeros);
-  static const double A[4][6] = {{10, 3, 17, 3.5, 1.7, 8}, {0.05, 10, 17, 0.1, 8, 14},
-                                 {3, 3.5, 1.7, 10, 17, 8}, {17, 8, 0.05, 10, 0.1, 14}};
+  static const double A[4][6]
+      = {{10, 3, 17, 3.5, 1.7, 8}, {0.05, 10, 17, 0.1, 8, 14}, {3, 3.5, 1.7, 10, 17, 8}, {17, 8, 0.05, 10, 0.1, 14}};
   static const double P[4][6] = {{0.1312, 0.1696, 0.5569, 0.0124, 0.8283, 0.5886},
                                  {0.2329, 0.4135, 0.8307, 0.3736, 0.1004, 0.9991},
                                  {0.2348, 0.1451, 0.3522, 0.2883, 0.3047, 0.6650},
@@ -59,7 +59,12 @@ int main(int argc, char** argv) {
   const std::string optim = argv[6];
   const double noise = argc > 7 ? std::atof(argv[7]) : 0.0;
   const double jitter_on = argc > 8 ? std::atof(argv[8]) : -1.0;
-  { auto e = std::chrono::steady_clock::now() + std::chrono::milliseconds(300); volatile double x = 0; while (std::chrono::steady_clock::now() < e) x = x + 1; }
+  {
+    auto e = std::chrono::steady_clock::now() + std::chrono::milliseconds(300);
+    volatile double x = 0;
+    while (std::chrono::steady_clock::now() < e)
+      x = x + 1;
+  }
   std::printf("set,jitter,pct,theta0,ll,rmse,ms\n");
   for (int s = 0; s < nsets; ++s) {
     arma::arma_rng::set_seed(9000 + s);
@@ -82,8 +87,14 @@ int main(int argc, char** argv) {
           const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
           const arma::vec m = std::get<0>(k.predict(Xt, false, false, false));
           const double rmse = std::sqrt(arma::mean(arma::square(m - yt))) / arma::stddev(yt);
-          std::printf("%d,%s,%g,%.17g,%.17g,%.6g,%.1f\n", s, jitter != 0.0 ? "on" : "off", pct, k.theta()(0),
-                      k.logLikelihood(), rmse, ms);
+          std::printf("%d,%s,%g,%.17g,%.17g,%.6g,%.1f\n",
+                      s,
+                      jitter != 0.0 ? "on" : "off",
+                      pct,
+                      k.theta()(0),
+                      k.logLikelihood(),
+                      rmse,
+                      ms);
         } catch (const std::exception& e) {
           std::printf("%d,%s,%g,nan,nan,nan,nan\n", s, jitter != 0.0 ? "on" : "off", pct);
         }

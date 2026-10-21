@@ -23,7 +23,8 @@ int main() {
     LinearAlgebra::set_num_nugget(test_settings ? 1e-15 : default_nugget);
     for (double jitter : {0.0, -1.0}) {
       LinearAlgebra::set_chol_jitter(jitter);
-      std::printf("== settings=%s jitter=%s\n", test_settings ? "test(nugget 1e-15, rcond)" : "default",
+      std::printf("== settings=%s jitter=%s\n",
+                  test_settings ? "test(nugget 1e-15, rcond)" : "default",
                   jitter < 0 ? "default(1e-8)" : "0");
       for (const char* optim : {"BFGS", "BFGS10", "BFGS20"}) {
         Kriging k("gauss");

@@ -18,8 +18,8 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "BlasThreads.hpp"
-#include "ThreadBudget.hpp"
 #include "OmpLoops.hpp"
+#include "ThreadBudget.hpp"
 
 #include <cstdlib>
 #include <mutex>
@@ -194,7 +194,8 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R,
   // count of the calling thread is the budget (a parallel multistart worker
   // gets its share, see WarpKriging.cpp).
 #ifdef LK_OMP_LOOPS
-#pragma omp parallel for schedule(dynamic, 8) num_threads(libKriging::detail::omp_threads()) if (n >= libKriging::detail::kOmpMinRows)
+#pragma omp parallel for schedule(dynamic, 8) \
+    num_threads(libKriging::detail::omp_threads()) if (n >= libKriging::detail::kOmpMinRows)
 #endif
   for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
     const arma::uword i = static_cast<arma::uword>(si);
@@ -472,7 +473,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
 #ifdef LK_OMP_LOOPS
   if (n >= 200) {  // Only use OpenMP for large enough matrices
     int optimal_threads = libKriging::detail::omp_threads();
-    #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
+#pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
       for (arma::sword j = i + 1; j < static_cast<arma::sword>(n); j++) {
         arma::uword ij = i * n + j;
@@ -522,7 +523,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = libKriging::detail::omp_threads();
-    #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
+#pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
       for (arma::sword j = 0; j < i; j++) {
         double cov_val = Cov(dX.col(i * n + j), theta) * factor;
@@ -573,7 +574,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = libKriging::detail::omp_threads();
-    #pragma omp parallel for schedule(dynamic, 4) num_threads(optimal_threads) if(n >= 200)
+#pragma omp parallel for schedule(dynamic, 4) num_threads(optimal_threads) if(n >= 200)
     for (arma::sword bi = 0; bi < static_cast<arma::sword>(n); bi += BLOCK_SIZE) {
       arma::uword block_end_i = (bi + BLOCK_SIZE < n) ? bi + BLOCK_SIZE : n;
 
@@ -645,7 +646,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = libKriging::detail::omp_threads();
-    #pragma omp parallel num_threads(optimal_threads) if(total_work >= 40000)
+#pragma omp parallel num_threads(optimal_threads) if(total_work >= 40000)
     {
       // Pre-allocate diff vector once per thread (thread-local)
       arma::vec diff(d);

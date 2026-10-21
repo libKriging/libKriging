@@ -28,9 +28,9 @@
 
 #include <cassert>
 #include <cstdlib>
-#include <string>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -1498,7 +1498,8 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
   const double* xp = Xt.memptr();
 
 #if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
-#pragma omp parallel for schedule(dynamic, 16) num_threads(libKriging::detail::omp_threads()) if (q > 32 && n * m >= 40000)
+#pragma omp parallel for schedule(dynamic, 16) \
+    num_threads(libKriging::detail::omp_threads()) if (q > 32 && n * m >= 40000)
 #endif
   for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
     // m nearest observations (normalized space), partial selection
@@ -1607,7 +1608,8 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
   const arma::mat Xt = m_X.t();
   const double* xp = Xt.memptr();
 #if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
-#pragma omp parallel for schedule(dynamic, 16) num_threads(libKriging::detail::omp_threads()) if (q > 32 && n * m_obs >= 40000)
+#pragma omp parallel for schedule(dynamic, 16) \
+    num_threads(libKriging::detail::omp_threads()) if (q > 32 && n * m_obs >= 40000)
 #endif
   for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
     std::vector<std::pair<double, arma::uword>> cand(n);
@@ -4076,8 +4078,8 @@ void Kriging::fit_impl(const arma::vec& y,
             // (factr * epsmch) is no change: an exact comparison of two equal
             // optima made the restart decision depend on the rounding (BLAS
             // thread count, docs/dev/CholJitter-TODO.md 4d)
-            const double f_tol = optimizer.factr * arma::datum::eps
-                                 * std::max(1.0, std::abs(std::min(best_f_opt, opt_result.f_opt)));
+            const double f_tol
+                = optimizer.factr * arma::datum::eps * std::max(1.0, std::abs(std::min(best_f_opt, opt_result.f_opt)));
             const bool worse = (best_f_opt < arma::datum::inf) && (opt_result.f_opt > best_f_opt + f_tol);
             if (opt_result.f_opt < best_f_opt) {
               best_f_opt = opt_result.f_opt;
@@ -4103,9 +4105,9 @@ void Kriging::fit_impl(const arma::vec& y,
             // Check abnormal termination or convergence at bounds to decide on restart
             if ((retry < Optim::max_restart)
                 && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)  // Check for abnormal termination
-                    || (opt_result.num_iters <= 2)          // Start point is strangely quite optimal...
-                    || (sol_to_lb < arma::datum::eps)       // Stuck at lower bound
-                    || worse)) {                            // No improvement
+                    || (opt_result.num_iters <= 2)     // Start point is strangely quite optimal...
+                    || (sol_to_lb < arma::datum::eps)  // Stuck at lower bound
+                    || worse)) {                       // No improvement
 
               if (Optim::log_level > Optim::log_none) {
                 arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << (retry + 1)
@@ -4814,9 +4816,8 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
         y_u,
         X_u,
         /*extend_class_data=*/[] {},
-        /*build_model=*/[this] {
-          return make_committed_Model(m_theta, (m_noise_model == NoiseModel::Nugget) ? m_alpha : m_sigma2);
-        });
+        /*build_model=*/
+        [this] { return make_committed_Model(m_theta, (m_noise_model == NoiseModel::Nugget) ? m_alpha : m_sigma2); });
   }
 }
 

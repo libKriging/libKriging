@@ -61,7 +61,8 @@ int cgroup_cpu_limit() {
       if (line.rfind("0::", 0) == 0)
         rel = line.substr(3);
   }
-  for (const std::string& path : {std::string("/sys/fs/cgroup") + rel + "/cpu.max", std::string("/sys/fs/cgroup/cpu.max")}) {
+  for (const std::string& path :
+       {std::string("/sys/fs/cgroup") + rel + "/cpu.max", std::string("/sys/fs/cgroup/cpu.max")}) {
     std::ifstream f(path);
     std::string quota;
     long period = 0;

@@ -12,11 +12,11 @@
 // Output CSV: set,pct,variant,theta0,ll,rmse,pred0 (prediction at the first test point)
 // See docs/dev/CholJitter-TODO.md 4c.
 #define _USE_MATH_DEFINES
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include <chrono>
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
@@ -30,7 +30,8 @@ static arma::vec f(const std::string& family, const arma::mat& X, const arma::ro
       y(i) = 1.0 - 0.5 * (std::sin(4.0 * x) / (1.0 + x) + 2.0 * std::cos(12.0 * x) * std::pow(x, 6.0) + 0.7);
     } else if (family == "branin") {
       const double x1 = 15 * X(i, 0) - 5, x2 = 15 * X(i, 1);
-      y(i) = std::pow(x2 - 5.1 / (4 * M_PI * M_PI) * x1 * x1 + 5 / M_PI * x1 - 6, 2) + 10 * (1 - 1 / (8 * M_PI)) * std::cos(x1) + 10;
+      y(i) = std::pow(x2 - 5.1 / (4 * M_PI * M_PI) * x1 * x1 + 5 / M_PI * x1 - 6, 2)
+             + 10 * (1 - 1 / (8 * M_PI)) * std::cos(x1) + 10;
     } else {
       for (arma::uword j = 0; j < X.n_cols; ++j)
         y(i) += std::sin(2 * M_PI * (family == "sin1" ? 1.0 : freq(j)) * X(i, j));
@@ -45,7 +46,12 @@ int main(int argc, char** argv) {
   const int nsets = std::atoi(argv[5]);
   const std::string optim = argv[6];
   std::printf("set,pct,variant,theta0,ll,rmse,pred0\n");
-  { auto e = std::chrono::steady_clock::now() + std::chrono::milliseconds(300); volatile double x = 0; while (std::chrono::steady_clock::now() < e) x = x + 1; }
+  {
+    auto e = std::chrono::steady_clock::now() + std::chrono::milliseconds(300);
+    volatile double x = 0;
+    while (std::chrono::steady_clock::now() < e)
+      x = x + 1;
+  }
   for (int s = 0; s < nsets; ++s) {
     arma::arma_rng::set_seed(5000 + s);
     arma::mat X(n, d, arma::fill::randu);
@@ -59,39 +65,39 @@ int main(int argc, char** argv) {
     const arma::mat Xt(500, d, arma::fill::randu);
     const arma::vec yt = f(family, Xt, freq);
     for (double pct : {10.0, 100.0, 200.0}) {
-    Optim::set_num_threads_percent(pct);
-    auto report = [&](const char* variant, Kriging& k) {
-      const arma::vec m = std::get<0>(k.predict(Xt, false, false, false));
-      const double rmse = std::sqrt(arma::mean(arma::square(m - yt))) / arma::stddev(yt);
-      std::printf("%d,%g,%s,%.17g,%.17g,%.6g,%.17g\n", s, pct, variant, k.theta()(0), k.logLikelihood(), rmse, m(0));
-    };
-    try {
-      LinearAlgebra::set_chol_jitter(0);
-      Kriging k_off(kernel);
-      k_off.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", Kriging::Parameters{});
-      report("off", k_off);
-      LinearAlgebra::set_chol_jitter(-1);
-      Kriging k_on(kernel);
-      k_on.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", Kriging::Parameters{});
-      report("on", k_on);
-      for (double final_jitter : {0.0, 1e-10}) {
-        LinearAlgebra::set_chol_jitter(final_jitter);
-        Kriging k(kernel);
-        Kriging::Parameters p;
-        p.theta = arma::mat(k_on.theta().t());
-        p.is_theta_estim = false;
-        k.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL", p);
-        report(final_jitter == 0.0 ? "on>0" : "on>10", k);
+      Optim::set_num_threads_percent(pct);
+      auto report = [&](const char* variant, Kriging& k) {
+        const arma::vec m = std::get<0>(k.predict(Xt, false, false, false));
+        const double rmse = std::sqrt(arma::mean(arma::square(m - yt))) / arma::stddev(yt);
+        std::printf("%d,%g,%s,%.17g,%.17g,%.6g,%.17g\n", s, pct, variant, k.theta()(0), k.logLikelihood(), rmse, m(0));
+      };
+      try {
+        LinearAlgebra::set_chol_jitter(0);
+        Kriging k_off(kernel);
+        k_off.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", Kriging::Parameters{});
+        report("off", k_off);
+        LinearAlgebra::set_chol_jitter(-1);
+        Kriging k_on(kernel);
+        k_on.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", Kriging::Parameters{});
+        report("on", k_on);
+        for (double final_jitter : {0.0, 1e-10}) {
+          LinearAlgebra::set_chol_jitter(final_jitter);
+          Kriging k(kernel);
+          Kriging::Parameters p;
+          p.theta = arma::mat(k_on.theta().t());
+          p.is_theta_estim = false;
+          k.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL", p);
+          report(final_jitter == 0.0 ? "on>0" : "on>10", k);
+        }
+        LinearAlgebra::set_chol_jitter(0);
+        Kriging k_cont(kernel);
+        Kriging::Parameters pc;
+        pc.theta = arma::mat(k_on.theta().t());
+        k_cont.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", pc);
+        report("on~0", k_cont);
+      } catch (const std::exception& e) {
+        std::printf("%d,%g,error,nan,nan,nan,nan\n", s, pct);
       }
-      LinearAlgebra::set_chol_jitter(0);
-      Kriging k_cont(kernel);
-      Kriging::Parameters pc;
-      pc.theta = arma::mat(k_on.theta().t());
-      k_cont.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", pc);
-      report("on~0", k_cont);
-    } catch (const std::exception& e) {
-      std::printf("%d,%g,error,nan,nan,nan,nan\n", s, pct);
-    }
     }
   }
   LinearAlgebra::set_chol_jitter(-1);

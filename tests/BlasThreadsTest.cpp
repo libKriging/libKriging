@@ -251,8 +251,8 @@ TEST_CASE("The BLAS thread count never exceeds the thread budget during a fit", 
       [&] { Kriging k(y2, X2, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS"); });
   const int after = openblas_get_num_threads();
   openblas_set_num_threads(initial);
-  INFO("budget " << budget << ", OpenBLAS max seen: Kriging BFGS4 " << kriging_max << ", WarpKriging BFGS4 "
-                 << warp_max << ", Kriging BFGS " << single_max);
+  INFO("budget " << budget << ", OpenBLAS max seen: Kriging BFGS4 " << kriging_max << ", WarpKriging BFGS4 " << warp_max
+                 << ", Kriging BFGS " << single_max);
   CHECK(kriging_max <= budget);
   CHECK(warp_max <= budget);
   CHECK(single_max == budget);
