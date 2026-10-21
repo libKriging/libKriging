@@ -30,9 +30,9 @@ class LinearAlgebra {
   /// Jitter used for `kernel`: 1e-9 for gauss, 1e-10 for matern5_2, 0 otherwise
   /// (automatic mode), or the value set by set_chol_jitter.
   LIBKRIGING_EXPORT static double kernel_chol_jitter(const std::string& kernel);
-  /// Jitter of the committed model, once theta is chosen: at most num_nugget
-  /// (1e-10), so the model interpolates the observations again
-  /// (min(kernel_chol_jitter, num_nugget), 0 when kernel_chol_jitter is 0).
+  /// Jitter of the committed model, once theta is chosen: 0, an exact
+  /// factorization, so the model interpolates the observations (num_nugget is
+  /// still added if the Cholesky fails, as for any noise-free model).
   LIBKRIGING_EXPORT static double model_chol_jitter(const std::string& kernel);
   /// Same, from the search jitter `kernel_jitter` a model was fitted with.
   LIBKRIGING_EXPORT static double model_chol_jitter(double kernel_jitter);

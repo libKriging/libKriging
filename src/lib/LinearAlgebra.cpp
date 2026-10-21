@@ -77,8 +77,12 @@ LIBKRIGING_EXPORT double LinearAlgebra::model_chol_jitter(const std::string& ker
   return LinearAlgebra::model_chol_jitter(LinearAlgebra::kernel_chol_jitter(kernel));
 }
 
-LIBKRIGING_EXPORT double LinearAlgebra::model_chol_jitter(double kernel_jitter) {
-  return kernel_jitter > 0.0 ? std::min(kernel_jitter, LinearAlgebra::num_nugget) : 0.0;
+LIBKRIGING_EXPORT double LinearAlgebra::model_chol_jitter(double /*kernel_jitter*/) {
+  // Exact factorization: the committed model interpolates the observations
+  // (with num_nugget = 1e-10 on the diagonal it misses them by
+  // 1e-10 * |R^-1 (y - F beta)|, 1e-5 for gauss n = 10 at theta ~ 1..10).
+  // safe_chol_lower still adds num_nugget when the Cholesky fails.
+  return 0.0;
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {

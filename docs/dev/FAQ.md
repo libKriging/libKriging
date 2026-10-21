@@ -67,7 +67,7 @@ This page collects questions about libKriging development
  Since the fixed Cholesky jitter (noise-free `gauss` and `matern5_2` fits), this mostly no longer
  changes the optimum: a small constant (1e-9 for `gauss`, 1e-10 for `matern5_2`) is added to the
  diagonal of the correlation matrix during the optimization, which keeps the objective smooth
- where `cond(R)` explodes; the model at the optimum is then factorized with 1e-10 and still
+ where `cond(R)` explodes; the model at the optimum is then factorized exactly and still
  interpolates. Across BLAS thread counts `theta` then differs only within the optimizer
  tolerance (~1e-8 relative, not bit-identical); on 240 noise-free test cases a different optimum
  was reached in 1.7 % of fits instead of 18 %. `LinearAlgebra::set_chol_jitter(0)` (or the

@@ -54,7 +54,7 @@ TEST_CASE("NestedKriging with one group reduces to plain Kriging", "[nested][kri
     auto [mk, sk, c1, d1, e1] = const_cast<Kriging&>(nk1.submodel(0)).predict(Xt, true, false, false);
     INFO("aggregation = " << NestedKriging::aggregationToString(agg));
     // the expert's and the aggregate's solves factorize R separately, and the
-    // committed R (jitter 1e-10, LinearAlgebra::model_chol_jitter) is
+    // committed R (exact, LinearAlgebra::model_chol_jitter) is
     // conditioned ~1e13 at the fitted theta: rounding-level gaps of ~1e-6
     // (1.8e-6 measured for rBCM)
     CHECK(arma::abs(m1 - mk).max() < 1e-5);

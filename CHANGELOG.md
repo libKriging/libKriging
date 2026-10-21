@@ -130,7 +130,7 @@ past release, see the corresponding entry on the
   single-start fit ended at a different optimum depending on the BLAS thread count, BLAS build
   or CPU (18 % of 240 `gauss` test cases across thread counts; 1.7 % with the jitter, `theta`
   otherwise equal within the optimizer tolerance). `Kriging` factorizes the model at the
-  optimum with 1e-10, so `predict` still interpolates, and `logLikelihood()` stays the
+  optimum exactly, so `predict` still interpolates the observations, and `logLikelihood()` stays the
   optimized objective. The jitter is saved with the model (`chol_jitter`,
   `model_chol_jitter`; older files load unchanged). Fitted `theta`, predictions and
   log-likelihoods of these fits change; accuracy is within a few % of the former fits, except

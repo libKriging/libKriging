@@ -264,6 +264,7 @@ All 4 pass with `LK_CHOL_JITTER=0`.
        theta as `on`; it would only recover the smoothing part, which `on>0`
        recovers already. A jitter growing with n (conditioning grows with n:
        gauss 1e-8 still left 2 % divergence at n = 200, d = 4) is still open.
+     - **Superseded (2026-10-21) by `on>0`, see 4g.**
      - **Decided (2026-10-20): `on>10`, implemented.** Two jitters in Kriging:
        - `m_chol_jitter` (`chol_jitter()`): the objective's,
          `kernel_chol_jitter` (gauss 1e-8, matern5_2 1e-10): optimization,
@@ -299,6 +300,36 @@ All 4 pass with `LK_CHOL_JITTER=0`.
          the case since option a). Fix: expose set_chol_jitter in the bindings
          (3.3) and run the reference-consistency tests with jitter 0 (they
          check the formula); the R reference tests probably need the same.
+   - [x] **4g. Committed model without jitter (`on>0`, 2026-10-21, decided by the user:
+     "ok pour B").** The CI `python-sdist` check (n = 10, d = 2, gauss, default fit,
+     `predict(X)` must give y to 1e-6) failed: 1.0e-5. At the fitted theta ~ (1, 9.3)
+     R is near singular, and the error of the committed model at the design points
+     is jitter x |R^-1 (y - F beta)|: 1e-10 → 1.0e-5, 1e-12 → 1.1e-7, 0 → 1.4e-11 (same
+     with OPENBLAS_CORETYPE=Prescott). Options: (A) keep 1e-10, loosen the check;
+     (B) commit the model exactly, `num_nugget` only if the Cholesky fails (as
+     before the jitter); (C) keep 1e-10 plus iterative refinement with the exact R.
+     B chosen: 4c measured the same theta divergence for `on>0` and `on>10` (0 %)
+     and equal or better RMSE (branin 0.037 vs 0.048, sin 10 0.032 vs 0.030).
+     - `LinearAlgebra::model_chol_jitter` returns 0 (kept as the single place of
+       the rule); `commit_model_chol_jitter` then rebuilds the model at theta
+       with an exact factorization; JSON: `model_chol_jitter` absent (= 0).
+     - NestedKriging non-warped groups: the submodel's committed factorization,
+       exact, with `safe_chol_lower` (was `arma::chol` + its own 1e-10 when the
+       submodel had none); the one-group test (NK = Kriging) needed it.
+     - `KrigingNystromTest` "k = n reproduces the exact model" (#410) runs with
+       `set_chol_jitter(0)`: Nystrom keeps the objective's diagonal (1e-10 for
+       matern5_2), the exact model none, gap 4.6e-8 sd.
+     - New check: CholJitterTest "the fitted model interpolates the
+       observations" (the sdist data, gauss and matern5_2, < 1e-8; 1.0e-5
+       before).
+     - WarpKriging still uses its one jitter for the final model too (kernel's,
+       else num_nugget, as before the jitter work): it does not interpolate
+       exactly either. Sdist data, warping "none": max error 5.6e-5 (gauss
+       1e-9), 1.0e-5 with `set_chol_jitter(0)` (num_nugget). Open, not changed
+       here.
+     - Local: C++ ctest 229 / 229 (warm restart re-run alone; also with
+       OPENBLAS_CORETYPE=Prescott), Python 237 / 237, R 941 tests 0 failed,
+       Octave 17 / 18 (Demo, display).
    - [x] **4d. Wider grid (2026-10-20)** (`jitter_scale_study.cpp`,
      `jitter-scale-*.csv`, `summarize_jitter_scale.py`; gauss / matern5_2;
      sin d 1–16, n 50–2000, Branin, Hartmann6, BFGS10, noisy data fitted

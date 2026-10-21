@@ -3473,7 +3473,7 @@ void Kriging::fit_impl(const arma::vec& y,
   clear_simulate_state();
   // Fixed Cholesky jitter (noise-free only): m_chol_jitter, the kernel's
   // value, for the objective (optimization, logLikelihood(Fun); reproducible
-  // theta); m_model_chol_jitter, at most num_nugget, for the committed exact
+  // theta); m_model_chol_jitter, 0, for the committed exact
   // factorization (commit_model_chol_jitter; predict / simulate / update).
   // Vecchia / Nystrom keep the objective value (their committed state comes
   // from the objective itself).

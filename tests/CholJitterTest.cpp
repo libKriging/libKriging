@@ -117,6 +117,36 @@ TEST_CASE("fixed Cholesky jitter: exact diagonal, set_chol_jitter(0) restores th
   CHECK(LinearAlgebra::kernel_chol_jitter("exp") == 0.0);
 }
 
+TEST_CASE("fixed Cholesky jitter: the fitted model interpolates the observations", "[jitter]") {
+  // The jitter is only in the objective: the committed model is factorized
+  // exactly. With 1e-10 on its diagonal this case (theta ~ (1, 9), R near
+  // singular, the python-sdist CI check) missed y by 1e-5.
+  const arma::mat X{{0.63696168732145431, 0.26978671376387031},
+                    {0.040973523936194689, 0.016527635528529094},
+                    {0.81327023920027242, 0.91275557727772172},
+                    {0.60663577576717986, 0.7294965609839984},
+                    {0.54362499146542287, 0.93507242378776823},
+                    {0.81585355412153215, 0.0027385001701480949},
+                    {0.85740427658756935, 0.033585575305464355},
+                    {0.72965544642994407, 0.17565562060255901},
+                    {0.86317892234988658, 0.54146122024909171},
+                    {0.29971189053738478, 0.42268722119765845}};
+  // numpy.random.default_rng(0).random((10, 2))
+  const arma::vec y = arma::sin(3 * X.col(0)) + X.col(1);
+  const double saved = LinearAlgebra::get_chol_jitter();
+  LinearAlgebra::set_chol_jitter(-1);
+  for (const std::string kernel : {"gauss", "matern5_2"}) {
+    Kriging m(kernel);
+    m.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+    INFO(kernel << " theta " << m.theta().t());
+    CHECK(m.chol_jitter() == LinearAlgebra::kernel_chol_jitter(kernel));
+    CHECK(m.model_chol_jitter() == 0.0);
+    const arma::vec yp = std::get<0>(m.predict(X, false, false, false));
+    CHECK(arma::abs(yp - y).max() < 1e-8);
+  }
+  LinearAlgebra::set_chol_jitter(saved);
+}
+
 // Hidden: run by the CholJitterTest/LK_CHOL_JITTER test with LK_CHOL_JITTER=0
 // in its environment (tests/CMakeLists.txt).
 TEST_CASE("fixed Cholesky jitter: LK_CHOL_JITTER is read", "[.env]") {

@@ -274,13 +274,13 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
      x > 0 that value for every kernel.
    - Kriging: the objective (optimization, `logLikelihoodFun`, LOO, LMP, Vecchia,
      Nystrom) uses that jitter; the committed model (`predict`, `simulate`,
-     `update`) is factorized at the optimum with min(jitter, `num_nugget`) =
-     1e-10, so it still interpolates. `logLikelihood()` stays the optimized
+     `update`) is factorized exactly at the optimum (`num_nugget` added only if
+     the Cholesky fails, as before), so it interpolates the observations. `logLikelihood()` stays the optimized
      objective. Both values are saved with the model (`chol_jitter`,
      `model_chol_jitter`; absent = 0, files saved before load as before) and a
      later `set_chol_jitter` does not change a fitted or reloaded model.
    - WarpKriging: one jitter, the kernel's or else `num_nugget` (its former
-     constant diagonal); NestedKriging: each submodel's own.
+     constant diagonal); NestedKriging: each submodel's own (exact for Kriging).
    - With it, the starting points matter more (the smooth long-range plateau of
      the LL traps starts that used to bounce off the erratic tail), hence:
      log-uniform starting points in the theta bounds (Kriging, per-variable

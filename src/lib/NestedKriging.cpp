@@ -361,15 +361,21 @@ void NestedKriging::precompute_nk() {
   m_alpha.assign(p, arma::vec());
   for (arma::uword g = 0; g < p; ++g) {
     const arma::uvec& idx = m_groups[g];
-    // Same diagonal as the submodel: the Cholesky jitter it was fitted (or
-    // loaded) with when it has one (Kriging: model_chol_jitter(); WarpKriging:
-    // its single jitter), else this class's own. Not the current
-    // LinearAlgebra setting, which may have changed since.
-    const double sub_jitter = warped() ? m_wsubmodels[g]->m_chol_jitter : m_submodels[g]->model_chol_jitter();
-    const double group_jitter = sub_jitter > 0.0 ? sub_jitter : jitter;
+    // Same factorization as the submodel, with the Cholesky jitter it was
+    // fitted (or loaded) with, not the current LinearAlgebra setting: Kriging's
+    // committed one (model_chol_jitter(), 0: exact, num_nugget added only if
+    // the Cholesky fails, as safe_chol_lower does for the submodel);
+    // WarpKriging's single jitter, else this class's own.
+    double group_jitter;
+    if (warped()) {
+      const double sub_jitter = m_wsubmodels[g]->m_chol_jitter;
+      group_jitter = sub_jitter > 0.0 ? sub_jitter : jitter;
+    } else {
+      group_jitter = m_submodels[g]->model_chol_jitter();
+    }
     arma::mat R = corrMat(m_X.rows(idx), m_X.rows(idx));
     R.diag() += group_jitter;
-    m_L[g] = arma::chol(R, "lower");
+    m_L[g] = LinearAlgebra::safe_chol_lower(R);
     const arma::vec r = m_y(idx) - m_beta0;
     m_alpha[g] = arma::solve(arma::trimatu(m_L[g].t()), arma::solve(arma::trimatl(m_L[g]), r));
   }

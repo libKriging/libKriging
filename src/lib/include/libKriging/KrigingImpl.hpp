@@ -131,7 +131,7 @@ class KrigingImpl {
   /// Fixed jitter on the correlation diagonal of the objective, chosen at fit
   /// time (LinearAlgebra::kernel_chol_jitter) and kept with the model
   /// (save/load). WarpKriging also factorizes its model with it; Kriging
-  /// commits its exact factorization with m_model_chol_jitter (<= num_nugget).
+  /// commits its exact factorization with m_model_chol_jitter (0: exact).
   double m_chol_jitter = 0.0;
 
   // Simulation stored data (members common to all three variants)
