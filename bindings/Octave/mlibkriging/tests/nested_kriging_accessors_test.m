@@ -17,17 +17,19 @@ assert(isequal(all_idx(:), (1:40)'));  % 1-based partition of the rows
 
 assert(isempty(nk.warping()));
 
+% off the design points: at a design point the stdev is sqrt(rounding), ~1e-8
+Xt = [linspace(0.05, 0.95, 10)', linspace(0.9, 0.1, 10)'];
 nk.set_predict_chunk(7);
-[m1, s1] = nk.predict(X(1:10, :));
+[m1, s1] = nk.predict(Xt);
 nk.set_predict_chunk(128);
-[m2, s2] = nk.predict(X(1:10, :));
+[m2, s2] = nk.predict(Xt);
 assert(max(abs(m1 - m2)) < 1e-8);  % chunking does not change the result (up to summation order)
 assert(max(abs(s1 - s2)) < 1e-8);
 
 % optional return_stdev flag, like Kriging.predict (#385)
-[m3, s3] = nk.predict(X(1:10, :), true);
+[m3, s3] = nk.predict(Xt, true);
 assert(max(abs(m3 - m2)) < 1e-12 && max(abs(s3 - s2)) < 1e-12);
-m4 = nk.predict(X(1:10, :), false);
+m4 = nk.predict(Xt, false);
 assert(max(abs(m4 - m2)) < 1e-12);
 
 nk.set_warp_subsample(500);  % accepted (used by warped fits)
