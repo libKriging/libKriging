@@ -50,7 +50,9 @@ diverges again (up to 93 %).
 - **WarpKriging / MLPKriging: committed model with min(J, `num_nugget`)** (1e-10 for gauss, its
   former diagonal). An exact model lost the predictive variance where warps bring training rows
   together (Kumaraswamy, saturated tanh MLP: stdev 0, NaN derivative / NLPD in
-  WarpKrigingPerWarpTest, WarpKrigingCollapseTest).
+  WarpKrigingPerWarpTest, WarpKrigingCollapseTest). Kept as a deliberate difference (decided
+  2026-10-23); aligning would first need a floor on the predicted variance in `predict` (a
+  separate change, which would also cover Kriging at the design points).
 - `logLikelihood()` returns the optimized objective; both jitters are saved in the JSON (absent →
   former behaviour), so a later `set_chol_jitter` does not change a fitted model.
 - `update_simulate` adds no jitter on the new observations, so that an update point on the
@@ -171,7 +173,7 @@ No `simulate` / `update`.
 ## Inconsistencies left
 
 1. **WarpKriging / MLPKriging** commit with `N` instead of exactly (see above; a deliberate
-   difference), and their `update_simulate` is exact while `update` keeps `N` (a 1e-10 relative
+   difference, decided 2026-10-23), and their `update_simulate` is exact while `update` keeps `N` (a 1e-10 relative
    difference).
 2. **`simulate` conditional covariance** (Kriging and WarpKriging, exact method) still relies on the
    stepwise retry: at points close to the design (or close to each other) the covariance is singular
