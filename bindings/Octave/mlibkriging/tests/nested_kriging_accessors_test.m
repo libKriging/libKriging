@@ -23,8 +23,10 @@ nk.set_predict_chunk(7);
 [m1, s1] = nk.predict(Xt);
 nk.set_predict_chunk(128);
 [m2, s2] = nk.predict(Xt);
-assert(max(abs(m1 - m2)) < 1e-8);  % chunking does not change the result (up to summation order)
-assert(max(abs(s1 - s2)) < 1e-8);
+% chunking does not change the result, up to summation order amplified by cond(R)
+% of the exactly factorized gauss groups (4.6e-8 seen with Accelerate)
+assert(max(abs(m1 - m2)) < 1e-6);
+assert(max(abs(s1 - s2)) < 1e-6);
 
 % optional return_stdev flag, like Kriging.predict (#385)
 [m3, s3] = nk.predict(Xt, true);

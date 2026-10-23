@@ -87,8 +87,13 @@ Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
   entries or sums per-row partial results in a fixed order (`BlasThreadsTest`).
 - They may depend on the BLAS thread count and build (FAQ), by rounding, and on
   the CPU: on an Intel Xeon Platinum 8573C CI runner, Ubuntu 22.04's OpenBLAS
-  0.3.20 `DYNAMIC_ARCH` falls back to its `Prescott` (SSE3) kernels (the #414
-  Octave failures; reproduce with `OPENBLAS_CORETYPE=Prescott`). On
+  0.3.20 `DYNAMIC_ARCH` falls back to its `Prescott` (SSE3) kernels (reproduce
+  with `OPENBLAS_CORETYPE=Prescott`). On an Intel Xeon 6973P-C runner the same
+  OpenBLAS picks its `Cooperlake` kernels and gives **wrong** results: ~100 tests
+  fail in the Octave Linux job, pure linear algebra included
+  (`LinearAlgebra::woodbury_solve` against `arma::solve`), on #414 (d7d5ffc9)
+  and #415 (26c68190); the Python job on the same CPU (reference BLAS) and the
+  same OpenBLAS on other CPUs pass. Not reproducible here (no AVX-512). On
   noise-free data with smooth kernels this rounding used to change the optimum
   itself; the fixed Cholesky jitter (8.6) keeps the optimum, theta then moving
   only within the optimizer tolerance (~1e-8 relative, not bit-identical:
@@ -327,4 +332,6 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
   (runners are too noisy for pass / fail on timings).
 - Other BLAS (MKL `mkl_set_num_threads_local`, FlexiBLAS, BLIS): sections 5 and 8.
 - macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then).
+- Octave Linux CI on Xeon 6973P (OpenBLAS 0.3.20 `Cooperlake`, section 4): pin
+  `OPENBLAS_CORETYPE` in that job, or use a newer OpenBLAS.
 - Julia exposes no thread setter (neither `set_thread_pool_size` nor the budget).

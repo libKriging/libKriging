@@ -101,8 +101,9 @@ test_that("fit refits an existing object; tuning setters", {
   p5 <- predict(k, Xt)
   k$set_predict_chunk(128)
   p128 <- predict(k, Xt)
-  # same result up to BLAS blocking / summation order (~1e-10 observed)
-  expect_equal(p5$mean, p128$mean, tolerance = 1e-8)
+  # same result up to BLAS blocking / summation order, amplified by cond(R) of
+  # the exactly factorized groups (~1e-10 here, 4.6e-8 with Accelerate)
+  expect_equal(p5$mean, p128$mean, tolerance = 1e-6)
   expect_error(k$set_predict_chunk(0))
   expect_error(k$set_warp_subsample(500), NA)
 })
