@@ -148,16 +148,19 @@ past release, see the corresponding entry on the
   them from the same generator as `Kriging` (`Random::reset_seed` applies), not Armadillo's.
   The restart of a start whose result is "not better" now ignores differences below the
   optimizer tolerance ([#418](https://github.com/libKriging/libKriging/issues/418)).
-- **Kriging** / **WarpKriging**: from n = 800 on, the covariance matrix of the exact
+- **Kriging** / **WarpKriging**: from n = 200 on Linux (n = 800 on macOS and Windows, not
+  measured there yet: #416, #417), the covariance matrix of the exact
   objectives (and its new rows in `update`) is built in an OpenMP loop instead of one thread,
   and the θ part of the log-likelihood gradient too, with per-row partial sums added in a
   fixed order. Neither depends on the OpenMP thread count. 4 cores, d = 4, OpenBLAS and
   OpenMP at 4 threads, log-likelihood + gradient: 75 → 54 ms at n = 800, 364 → 215 ms at
-  n = 1500. Below n = 800 the OpenMP team competes with the spinning OpenBLAS threads and
-  was slower than one thread (3.9 → 17 ms at n = 200), hence the threshold. Each worker of a
+  n = 1500. Without the thread budget the OpenMP team competed with the spinning OpenBLAS
+  threads below n = 800 and was slower than one thread (3.9 → 17 ms at n = 200); within the
+  budget (both at the physical cores) the loops pay off from n = 200 (x3 at n = 200-500 on
+  10 cores). Each worker of a
   parallel multistart gets its share of OpenMP threads, as of BLAS threads. The parallel
   gradient sum differs from the sequential one: on an ill-conditioned covariance matrix the
-  gradient, hence the optimum reached, may change from n = 800 on (see
+  gradient, hence the optimum reached, may change from that threshold on (see
   [docs/dev/FAQ.md](docs/dev/FAQ.md)).
 - **Python**: supported CPython versions are 3.10 to 3.14: the CI tests each of them
   (3.10 and 3.14 on Linux and Windows), the release builds wheels for all of them, and
