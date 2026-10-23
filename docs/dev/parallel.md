@@ -326,12 +326,14 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 
 ## 10. Open items
 
-- TSan job (OpenMP loops stay compiled out, `LK_OMP_LOOPS`) and a fork-safety
-  test in R.
+- TSan does not see the OpenMP loops (compiled out, `LK_OMP_LOOPS`); the R
+  fork-safety test does not check the children's budget (#420).
 - Optional CI job running `bench-threads.sh` on a small grid, no threshold
-  (runners are too noisy for pass / fail on timings).
-- Other BLAS (MKL `mkl_set_num_threads_local`, FlexiBLAS, BLIS): sections 5 and 8.
+  (runners are too noisy for pass / fail on timings) (#421).
+- Other BLAS (MKL `mkl_set_num_threads_local`, FlexiBLAS, BLIS): sections 5 and 8
+  (#422).
 - macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then).
 - Octave Linux CI on Xeon 6973P (OpenBLAS 0.3.20 `Cooperlake`, section 4): the
-  job now sets `OPENBLAS_CORETYPE=Haswell`; drop it with a newer OpenBLAS.
-- Julia exposes no thread setter (neither `set_thread_pool_size` nor the budget).
+  job now sets `OPENBLAS_CORETYPE=Haswell`; drop it with a newer OpenBLAS (#429).
+- Julia exposes no thread setter (neither `set_thread_pool_size` nor the budget)
+  (#423).

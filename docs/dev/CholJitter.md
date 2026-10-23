@@ -80,11 +80,13 @@ BFGS10 finds the maximum (theta 0.1506) and LL(BFGS10) >= LL(BFGS).
 ## Open items
 
 - Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;
-  matern5_2 ≈ 1.
-- A jitter growing with n (conditioning grows with n), not measured.
-- A fixed floor for the `simulate` conditional covariance instead of the retry (inconsistency 2).
-- Single-start robustness on the plateau (#418); bindings consistency checks (#419); Julia getters
-  `chol_jitter()` / `model_chol_jitter()` not exposed.
+  matern5_2 ≈ 1 (#425).
+- A jitter growing with n (conditioning grows with n), not measured (#426).
+- A fixed floor for the `simulate` conditional covariance instead of the retry (inconsistency 2,
+  #427).
+- A floor on the predicted variance, then an exact committed WarpKriging model (#428).
+- Single-start robustness on the plateau (#418); bindings consistency checks (#419); getters
+  `chol_jitter()` / `model_chol_jitter()` not exposed in the bindings (#424).
 
 # Jitter of each class and method
 
