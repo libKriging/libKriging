@@ -5,7 +5,7 @@
 // clang-format on
 
 // Thread-budget benchmark of the methods other than the objective
-// (docs/dev/ThreadBudget-TODO.md, step 1): times one predict / simulate /
+// (docs/dev/parallel.md, bench/thread-budget/RESULTS.md): times one predict / simulate /
 // update call of a Kriging model with fixed theta under the BLAS / OpenMP
 // thread counts of the environment, and prints one CSV row (median over the reps).
 //

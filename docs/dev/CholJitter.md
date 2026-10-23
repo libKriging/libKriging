@@ -1,7 +1,92 @@
-# Diagonal jitter: what each class and method adds to the correlation matrix
+# Fixed Cholesky jitter
 
-State of `perf/thread-budget` after 4h (2026-10-22). Background and decisions:
-[CholJitter-TODO.md](CholJitter-TODO.md) (4e, 4g, 4h), [parallel.md](parallel.md) 8.6.
+A fixed jitter on the diagonal of the correlation matrix of noise-free fits, on by default
+(PR #415). Summary in [parallel.md](parallel.md) 8.6; this page keeps the decisions, the key
+measurements and the jitter of every class and method. The study drivers are in
+`bench/thread-budget/` (their CSV output is not kept in the repository: rerun them).
+
+## Why
+
+A single-start fit of a smooth kernel (gauss, matern5_2) on noise-free data depended on the
+rounding (BLAS thread count, BLAS build, CPU): 7–75 % of the data sets ended at a different
+optimum with 1, 10 or 20 BLAS threads, up to hundreds of log-likelihood units apart (matern3_2 and
+exp: bit-identical). The optimizer enters the near-singular region of R, where `safe_chol_lower`
+adds a stepwise nugget (`num_nugget` x 10^k when the Cholesky fails or rcond < 1e-18): the
+objective is discontinuous there and the L-BFGS-B paths diverge. The thread budget only changed
+which outcome a user got (default BLAS count 20 → 10). A fixed jitter makes the objective
+continuous (`fit_repro_study.cpp`, table in parallel.md 8.6).
+
+## Values per kernel
+
+`LinearAlgebra::kernel_chol_jitter`: gauss 1e-9, matern5_2 1e-10, others 0 (they never reach the
+near-singular region). `set_chol_jitter(x)` / `LK_CHOL_JITTER`: x < 0 per kernel (default), 0 off,
+x > 0 that value. Noise-free fits only (nugget and noise models keep their own diagonal).
+
+gauss, 240 data sets (Branin 50, sin n 50–500 d 2–8, Hartmann6 60 / 300), with the starting points
+and restart tolerance below (`jitter_scale_study.cpp`):
+
+| J (gauss) | theta differs across budgets 10 / 100 / 200 % | median test RMSE, on / off |
+|---|---|---|
+| 0 | 18 % | 1 |
+| 1e-8 | 2.1 % | 1.0–1.24, Branin x246 |
+| **1e-9** (chosen) | 1.7 % | 1.0–1.06, Branin x3.8 |
+| 1e-10 | 6.2 % | 1.00, Branin x3.8 |
+
+The remaining divergences are iteration-limit paths on flat objectives (sin d 4); Branin (very
+smooth) needs a conditioning that any jitter forbids.
+
+## Search versus committed model
+
+The jitter `J` is in the objective only (optimization, `logLikelihoodFun`, LOO, LMP, and the
+approximate methods). Measured on 60 data sets per row (`jitter_split_study.cpp`), against a model
+rebuilt at the same theta with jitter 0 (`on>0`), 1e-10 (`on>10`), or a last BFGS without jitter
+(`on~0`): `on>0` keeps the reproducibility of the search (0 % divergence) and recovers about half
+of its accuracy cost (gauss Branin 30: RMSE 0.059 → 0.037); `on~0` is as accurate as no jitter but
+diverges again (up to 93 %).
+
+- **Kriging: committed model exact** (`model_chol_jitter()` = 0; `num_nugget` only if the Cholesky
+  fails). With 1e-10 the python-sdist check (n 10, gauss, R near singular) missed y by 1e-5; the
+  error at the design points is J x |R^-1 (y - F beta)|.
+- **WarpKriging / MLPKriging: committed model with min(J, `num_nugget`)** (1e-10 for gauss, its
+  former diagonal). An exact model lost the predictive variance where warps bring training rows
+  together (Kumaraswamy, saturated tanh MLP: stdev 0, NaN derivative / NLPD in
+  WarpKrigingPerWarpTest, WarpKrigingCollapseTest).
+- `logLikelihood()` returns the optimized objective; both jitters are saved in the JSON (absent →
+  former behaviour), so a later `set_chol_jitter` does not change a fitted model.
+- `update_simulate` adds no jitter on the new observations, so that an update point on the
+  simulation design is reproduced exactly.
+
+## Starting points and restarts
+
+With the jitter the long-range tail of the LL becomes a smooth plateau that traps random starts
+(gauss sin n 200 d 2: 6 / 20 BFGS10 fits at theta ≈ 7–10, RMSE 0.6–0.9 instead of ~1e-4); the
+erratic tail used to send them back through the restart criteria. Hence (#418):
+
+- Kriging draws its starts **log-uniform** in the theta bounds (uniform for a non-positive lower
+  bound): that case 0.63 → 2.0e-4.
+- The restart criterion "no improvement" uses the optimizer's tolerance (`factr * epsmch`) instead
+  of an exact comparison of two equal optima.
+- WarpKriging draws from `Random` as Kriging (reset to its seed at each fit); log-uniform for
+  per-variable warps (LL never worse on 20 sets x 4 configurations), uniform for the joint MLP
+  (log-uniform lost 124 LL units, median, on a projected Branin d 5: `warp_start_study.cpp`).
+
+A single start still misses the optimum often, with or without jitter (gauss 40 % vs 44 %,
+matern5_2 10 % vs 12 % of 800 data sets: `jitter_multistart_study.cpp`); the jitter changes which
+data sets miss. `unstableLLTest` checks the failover with the jitter off and, with it on, that
+BFGS10 finds the maximum (theta 0.1506) and LL(BFGS10) >= LL(BFGS).
+
+## Open items
+
+- Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;
+  matern5_2 ≈ 1.
+- A jitter growing with n (conditioning grows with n), not measured.
+- A fixed floor for the `simulate` conditional covariance instead of the retry (inconsistency 2).
+- Single-start robustness on the plateau (#418); bindings consistency checks (#419); Julia getters
+  `chol_jitter()` / `model_chol_jitter()` not exposed.
+
+# Jitter of each class and method
+
+State after the WarpKriging alignment (2026-10-22).
 
 Rule: the search adds `J`; the committed model is exact for Kriging, at most `N` for WarpKriging;
 an approximate method keeps the diagonal of its objective.

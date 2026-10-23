@@ -1,8 +1,8 @@
 # Parallelism in libKriging
 
-How the library uses threads, how to control it, and what was measured. Plan
-and history: [ThreadBudget-TODO.md](ThreadBudget-TODO.md); measurements:
-[bench/thread-budget/RESULTS.md](../../bench/thread-budget/RESULTS.md).
+How the library uses threads, how to control it, and what was measured. Measurements:
+[bench/thread-budget/RESULTS.md](../../bench/thread-budget/RESULTS.md); fixed Cholesky jitter:
+[CholJitter.md](CholJitter.md); open items: section 10.
 Status: branch `perf/thread-budget` (PR #415, which includes #414), Linux measurements only; macOS in
 #416, Windows in #417.
 
@@ -85,7 +85,10 @@ Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
 
 - Results do not depend on the OpenMP thread count: each loop writes disjoint
   entries or sums per-row partial results in a fixed order (`BlasThreadsTest`).
-- They may depend on the BLAS thread count and build (FAQ), by rounding. On
+- They may depend on the BLAS thread count and build (FAQ), by rounding, and on
+  the CPU: on an Intel Xeon Platinum 8573C CI runner, Ubuntu 22.04's OpenBLAS
+  0.3.20 `DYNAMIC_ARCH` falls back to its `Prescott` (SSE3) kernels (the #414
+  Octave failures; reproduce with `OPENBLAS_CORETYPE=Prescott`). On
   noise-free data with smooth kernels this rounding used to change the optimum
   itself; the fixed Cholesky jitter (8.6) keeps the optimum, theta then moving
   only within the optimizer tolerance (~1e-8 relative, not bit-identical:
@@ -264,7 +267,7 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
      matern5_2 is calibrated (≈ 1).
 
    **Decided (2026-10-20): fixed jitter on by default** (details and studies:
-   `docs/dev/CholJitter-TODO.md`):
+   [CholJitter.md](CholJitter.md)):
 
    - Noise-free fits only (Nugget / Heterogeneous noise already keep R away from
      singular). Value per kernel, `LinearAlgebra::kernel_chol_jitter`: gauss
@@ -279,8 +282,9 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
      objective. Both values are saved with the model (`chol_jitter`,
      `model_chol_jitter`; absent = 0, files saved before load as before) and a
      later `set_chol_jitter` does not change a fitted or reloaded model.
-   - WarpKriging: one jitter, the kernel's or else `num_nugget` (its former
-     constant diagonal); NestedKriging: each submodel's own (exact for Kriging).
+   - WarpKriging / MLPKriging: the same search jitter; the committed model keeps
+     min(jitter, `num_nugget`) (exact lost the predictive variance where warps bring
+     rows together). NestedKriging: each submodel's committed diagonal.
    - With it, the starting points matter more (the smooth long-range plateau of
      the LL traps starts that used to bounce off the erratic tail), hence:
      log-uniform starting points in the theta bounds (Kriging, per-variable
@@ -314,3 +318,13 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 | `OPENBLAS_THREAD_TIMEOUT` | OpenBLAS at load | spin time of its idle threads |
 | `MKL_NUM_THREADS`, `VECLIB_MAXIMUM_THREADS`, `BLIS_NUM_THREADS` | other BLAS | their own thread counts |
 | `GOMP_SPINCOUNT`, `KMP_BLOCKTIME` | libgomp / libomp | spin of idle OpenMP threads |
+
+## 10. Open items
+
+- TSan job (OpenMP loops stay compiled out, `LK_OMP_LOOPS`) and a fork-safety
+  test in R.
+- Optional CI job running `bench-threads.sh` on a small grid, no threshold
+  (runners are too noisy for pass / fail on timings).
+- Other BLAS (MKL `mkl_set_num_threads_local`, FlexiBLAS, BLIS): sections 5 and 8.
+- macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then).
+- Julia exposes no thread setter (neither `set_thread_pool_size` nor the budget).

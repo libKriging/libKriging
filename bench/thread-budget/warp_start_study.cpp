@@ -9,7 +9,7 @@
 //          none (WarpKriging with "none" warps, i.e. plain Kriging)
 //   family: sin, branin (d = 2), proj (Branin of a fixed 2 x 5 projection, d = 5)
 // Output CSV: set,ll,q2,nlpd,cov,ms
-// See docs/dev/CholJitter-TODO.md 4f.
+// See docs/dev/CholJitter.md, starting points.
 #define _USE_MATH_DEFINES
 #include <chrono>
 #include <cmath>

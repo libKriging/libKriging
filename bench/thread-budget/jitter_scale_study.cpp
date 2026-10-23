@@ -9,7 +9,7 @@
 //          still noise-free (interpolating slightly noisy data)
 //   jitter: set_chol_jitter value of the "on" fits (default -1: per kernel)
 // Output CSV: set,jitter,pct,theta0,ll,rmse,ms
-// See docs/dev/CholJitter-TODO.md 4d.
+// See docs/dev/CholJitter.md, values per kernel.
 #define _USE_MATH_DEFINES
 #include <chrono>
 #include <cmath>

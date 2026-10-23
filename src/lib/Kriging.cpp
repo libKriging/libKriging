@@ -3782,7 +3782,7 @@ void Kriging::fit_impl(const arma::vec& y,
       // puts 90 % of the starts above 1 x maxdX, where R is near singular and
       // the LL flat (fixed Cholesky jitter) or erratic, and a start reaches
       // the short-range region of every dimension with probability ~0.1^d
-      // (#418, docs/dev/CholJitter-TODO.md 4d). Uniform for a dimension whose
+      // (#418, docs/dev/CholJitter.md, starting points). Uniform for a dimension whose
       // lower bound is not positive.
       arma::mat theta0_rand = Random::randu_mat(multistart, d);
       for (arma::uword j = 0; j < d; ++j) {
@@ -4084,7 +4084,7 @@ void Kriging::fit_impl(const arma::vec& y,
             // "No improvement" below the optimizer's own relative tolerance
             // (factr * epsmch) is no change: an exact comparison of two equal
             // optima made the restart decision depend on the rounding (BLAS
-            // thread count, docs/dev/CholJitter-TODO.md 4d)
+            // thread count, docs/dev/CholJitter.md, starting points)
             const double f_tol
                 = optimizer.factr * arma::datum::eps * std::max(1.0, std::abs(std::min(best_f_opt, opt_result.f_opt)));
             const bool worse = (best_f_opt < arma::datum::inf) && (opt_result.f_opt > best_f_opt + f_tol);
@@ -4568,7 +4568,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
   // noise-free: the new observations are conditioned on exactly (no fixed
   // Cholesky jitter on R_uu), as update() does (committed model, exact): an
   // update point on the simulation design is reproduced exactly
-  // (docs/dev/CholJitter-usage.md)
+  // (docs/dev/CholJitter.md)
   return update_simulate_impl(y_u,
                               X_u,
                               allow_cache,

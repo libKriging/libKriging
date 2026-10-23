@@ -214,7 +214,7 @@ TEST_CASE("Fit: unstable LL (long range with 1D Gauss kernel)", "[fit][unstable]
     // (theta = 0.1506, LL = 2.288) but its long-range tail is a bumpy plateau
     // instead of an erratic fall: a single random start that lands there
     // stops on a bump (theta 1.37, LL -14.0). The multistart finds the
-    // maximum; a single start is not required to (docs/dev/CholJitter-TODO.md 4b).
+    // maximum; a single start is not required to (docs/dev/CholJitter.md, starting points).
     Kriging k_bfgs("gauss");
     k_bfgs.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", Kriging::Parameters{});
     Kriging k_bfgs10("gauss");

@@ -111,7 +111,7 @@ rlibkriging:::linalg_set_chol_jitter(default_chol_jitter)
 # With the fixed jitter (default, gauss 1e-9) the LL profile has the same
 # single maximum (theta = 0.1506) but its long-range tail is a bumpy plateau:
 # a single random start may stop there; the multistart finds the maximum
-# (docs/dev/CholJitter-TODO.md 4b)
+# (docs/dev/CholJitter.md, starting points)
 kj <- Kriging(y, X, kernel="gauss", optim="BFGS")
 kj10 <- Kriging(y, X, kernel="gauss", optim="BFGS10")
 test_that("LL / Fit: unstable LL with the fixed Cholesky jitter: the multistart finds the maximum", {

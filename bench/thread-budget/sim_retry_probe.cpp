@@ -1,5 +1,5 @@
-// Measure for docs/dev/CholJitter-usage.md (inconsistency 2), built like the other
-// thread-budget drivers (scratch build script, see CholJitter-TODO.md).
+// Measure for docs/dev/CholJitter.md (inconsistency 2), built like the other
+// thread-budget drivers (not built by CMake, see bench/thread-budget/README.md).
 // Conditional simulation: does the safe_chol_lower retry fire, and does it
 // depend on the thread budget?
 #include <cstdio>

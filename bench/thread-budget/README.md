@@ -1,7 +1,15 @@
-Results of the thread-budget measurements (docs/dev/ThreadBudget-TODO.md, step 1).
+Drivers of the thread-budget and fixed Cholesky jitter studies
+([docs/dev/parallel.md](../../docs/dev/parallel.md), [RESULTS.md](RESULTS.md),
+[docs/dev/CholJitter.md](../../docs/dev/CholJitter.md)). Their CSV output is not kept
+in the repository (`.gitignore`): rerun them, then the `summarize*.py` scripts in the
+output directory. Machine of the published numbers: `machine.txt`.
 
-- `reference-4cores-pthreads.csv`: the 4-core VM where the plan was written
-  (Xeon 2.1 GHz, OpenBLAS pthreads, `kOmpMinRows = 800`), for comparison only.
-  Note `t_dX_ms` ~ 8 ms with OpenBLAS at 4 threads and OpenMP at 2-4 threads
-  versus ~ 0.2 ms otherwise at n = 200: the OpenBLAS / OpenMP contention.
-- Files of the dedicated machine go next to it (see the TODO for their names).
+- Timing sweeps: `bench/bench-threads.sh` / `bench/bench-threads-ops.sh <build-dir> out.csv`
+  (built by CMake), `summarize.py out.csv`.
+- Study drivers (`*_study.cpp`, `*_probe.cpp`, `unstable_ll_profile.cpp`) are not built by
+  CMake: compile them with the flags of `bench-fit-profile` from
+  `<build-dir>/compile_commands.json`, then link with
+  `g++ -O2 x.o -o x -L<build-dir>/src/lib -lKriging -Wl,-rpath,<build-dir>/src/lib -fopenmp`.
+- Measure after a warm-up (`LK_BENCH_WARMUP_MS`, 300 ms: OpenBLAS pthreads threads spin
+  ~100 ms after loading) and compare fits by work done (iterations, restarts), not only by
+  time: a different BLAS thread count can change the optimizer path.

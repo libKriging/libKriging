@@ -4,7 +4,7 @@
 #include <cmath>
 // clang-format on
 
-// Thread-budget benchmark (docs/dev/ThreadBudget-TODO.md, step 1): times the
+// Thread-budget benchmark (docs/dev/parallel.md, bench/thread-budget/RESULTS.md): times the
 // phases of one exact log-likelihood evaluation under the BLAS / OpenMP thread
 // counts of the environment, and prints one CSV row (medians over the reps).
 //

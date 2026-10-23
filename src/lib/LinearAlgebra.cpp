@@ -65,7 +65,7 @@ LIBKRIGING_EXPORT double LinearAlgebra::kernel_chol_jitter(const std::string& ke
   // bench/thread-budget/fit_repro_study.cpp, jitter_scale_study.cpp);
   // matern3_2 and exp never reach the near-singular region there. gauss: 1e-9
   // is as reproducible as 1e-8 with the log-uniform starts and far less
-  // biased on very smooth functions (docs/dev/CholJitter-TODO.md 4e).
+  // biased on very smooth functions (docs/dev/CholJitter.md, values per kernel).
   if (kernel == "gauss")
     return 1e-9;
   if (kernel == "matern5_2")

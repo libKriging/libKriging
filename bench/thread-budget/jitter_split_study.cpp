@@ -10,7 +10,7 @@
 // Usage: jitter_split_study <family> <kernel> <n> <d> <sets> <optim>
 //   family: sin (random freq in [0.5, 3]), sin1 (freq 1), branin, unstable
 // Output CSV: set,pct,variant,theta0,ll,rmse,pred0 (prediction at the first test point)
-// See docs/dev/CholJitter-TODO.md 4c.
+// See docs/dev/CholJitter.md, search versus committed model.
 #define _USE_MATH_DEFINES
 #include <chrono>
 #include <cmath>

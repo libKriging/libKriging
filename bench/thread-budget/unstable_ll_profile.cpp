@@ -1,7 +1,7 @@
 // Study driver (not built by CMake, see fit_repro_study.cpp for the build):
 // the data of tests/unstableLLTest.cpp ("BFGS vs BFGS10" section). For each
 // (num_nugget/rcond settings) x (fixed jitter 0 / default), print the LL
-// profile over theta and the BFGS / BFGS10 fits. See docs/dev/CholJitter-TODO.md 3.4.
+// profile over theta and the BFGS / BFGS10 fits. See docs/dev/CholJitter.md, starting points.
 #include <cmath>
 #include <cstdio>
 #include "libKriging/Kriging.hpp"

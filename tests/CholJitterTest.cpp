@@ -16,7 +16,7 @@
 /**
  * @file CholJitterTest.cpp
  * @brief Fixed Cholesky jitter of noise-free fits (LinearAlgebra::kernel_chol_jitter,
- *        docs/dev/CholJitter-TODO.md): the fit no longer depends on the thread
+ *        docs/dev/CholJitter.md): the fit no longer depends on the thread
  *        budget, the objective has exactly the jitter on its diagonal, and
  *        set_chol_jitter(0) / LK_CHOL_JITTER=0 give the exact objective back.
  */

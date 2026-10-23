@@ -933,7 +933,7 @@ class WarpKriging : protected KrigingImpl {
 
   double m_logdet = 0.0;
 
-  // Diagonal jitter (docs/dev/CholJitter-usage.md): m_chol_jitter (base) is
+  // Diagonal jitter (docs/dev/CholJitter.md): m_chol_jitter (base) is
   // the search's; m_model_chol_jitter the committed model's,
   // min(m_chol_jitter, num_nugget) (committed_chol_jitter);
   // m_cache_jitter the one of the current cache (m_T, m_sigma2, m_logdet):

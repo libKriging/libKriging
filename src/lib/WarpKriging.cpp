@@ -2087,7 +2087,7 @@ double WarpKriging::committed_chol_jitter() const {
   // rows together in Phi (Kumaraswamy, saturated MLP, categorical levels), and
   // an exact factorization then leaves no predictive variance there (stdev 0,
   // NaN stdev derivative / NLPD: WarpKrigingPerWarpTest, WarpKrigingCollapseTest).
-  // docs/dev/CholJitter-usage.md.
+  // docs/dev/CholJitter.md.
   return std::min(m_chol_jitter, LinearAlgebra::num_nugget);
 }
 
@@ -2931,7 +2931,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
     // (θ is a scale parameter, theta_lower > 0). Joint MLP: uniform, θ lives on
     // the scale of the learnt features and long-range starts let the weights
     // adapt; the log-uniform draw lost 124 LL units (median) on a projected
-    // Branin (docs/dev/CholJitter-TODO.md 4f).
+    // Branin (docs/dev/CholJitter.md, starting points).
     Random::init();
     arma::mat theta0_rand = Random::randu_mat(multistart, d_theta);
     for (arma::uword j = 0; j < d_theta; ++j) {

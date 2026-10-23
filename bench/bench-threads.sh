@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Thread-budget benchmark sweep (docs/dev/ThreadBudget-TODO.md, step 1).
+# Thread-budget benchmark sweep (docs/dev/parallel.md, bench/thread-budget/RESULTS.md).
 #
 #   bench/bench-threads.sh <build-dir> [out.csv]
 #

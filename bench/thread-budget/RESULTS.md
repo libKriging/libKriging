@@ -5,10 +5,13 @@ no AVX-512, Ubuntu 24.04, GCC 13.3, OpenBLAS 0.3.26 (pthreads and OpenMP builds)
 reference BLAS/LAPACK 3.12 (`machine.txt`). Syncthing and other services stopped
 during the runs. `bench-threads`: one exact log-likelihood + gradient evaluation
 (`t_llgrad_ms`), median of 7 reps, Matérn 5/2. BLAS variant switched with
-`LD_LIBRARY_PATH` (see the TODO). Builds: `build-tb` (`kOmpMinRows = 800`, as on
+`LD_LIBRARY_PATH` (`.../openblas-openmp`, or `.../blas:.../lapack` for the reference). Builds: `build-tb` (`kOmpMinRows = 800`, as on
 master) and `build-tb200` (`-DLK_OMP_MIN_ROWS=200`). Tables: `summarize.py`.
 
 ## Files
+
+The CSV files below are not kept in the repository: `bench-threads.sh` /
+`bench-threads-ops.sh` / `bench-fit-profile` write them again (see README.md).
 
 | File | BLAS | `kOmpMinRows` | Grid |
 |---|---|---|---|

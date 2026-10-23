@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Thread-budget sweep of predict / simulate / update (docs/dev/ThreadBudget-TODO.md).
+# Thread-budget sweep of predict / simulate / update (docs/dev/parallel.md).
 #
 #   bench/bench-threads-ops.sh <build-dir> [out.csv]
 #

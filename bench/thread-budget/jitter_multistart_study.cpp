@@ -7,7 +7,7 @@
 //   family: unstable (f of tests/unstableLLTest.cpp, random design + 0, 1),
 //           sin (sum_j sin(2 pi f_j x_j), f_j ~ U[0.5, 3]), branin (d = 2)
 // Output CSV: set,jitter,optim,theta0,ll,rmse
-// See docs/dev/CholJitter-TODO.md 3.4.
+// See docs/dev/CholJitter.md, starting points.
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstdio>

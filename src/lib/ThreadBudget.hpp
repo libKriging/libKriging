@@ -2,7 +2,7 @@
 #define LIBKRIGING_SRC_LIB_THREADBUDGET_HPP
 
 // Private (not installed): single source of truth for the number of threads the
-// library uses (docs/dev/ThreadBudget-TODO.md, step 2). Three levels share it:
+// library uses (docs/dev/parallel.md). Three levels share it:
 // the multistart / task pool (TaskPool.hpp) first, then, inside each pool worker
 // or in the calling thread, the OpenMP loops and the BLAS, each at the remaining
 // share: BLAS calls and OpenMP loops run one after the other, so they do not

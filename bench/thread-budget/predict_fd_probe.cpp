@@ -1,7 +1,7 @@
 // Probe (not built by CMake): predict mean derivative vs central finite differences
 // for several steps h, on the data of tests/KrigingPredictTest.cpp. Usage:
 // predict_fd_probe [chol_jitter] (0 = off, -1 = automatic). Built like
-// fit_repro_study.cpp. See docs/dev/CholJitter-TODO.md, failing test 1.
+// fit_repro_study.cpp. See docs/dev/CholJitter.md.
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstdio>

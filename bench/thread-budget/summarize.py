@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize bench-threads CSVs (docs/dev/ThreadBudget-TODO.md, step 1).
+"""Summarize bench-threads CSVs (docs/dev/parallel.md, bench/thread-budget/RESULTS.md).
 
     python3 bench/thread-budget/summarize.py file.csv [baseline.csv]
 
