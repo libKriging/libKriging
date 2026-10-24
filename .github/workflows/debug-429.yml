@@ -8,7 +8,8 @@ name: Debug 429 (OpenBLAS on Xeon 6973P-C)
 # identification, then
 #   1. checks BLAS / LAPACK results (.github/debug-429/blas_check.c) against a
 #      long double reference, for each OpenBLAS kernel set and thread count;
-#   2. builds the C++ core and runs ctest with the kernels OpenBLAS picks by
+#   2. on a suspect CPU (Intel with avx512_bf16) or wrong BLAS results only,
+#      builds the C++ core and runs ctest with the kernels OpenBLAS picks by
 #      itself (no OPENBLAS_CORETYPE), then reruns the failures under other
 #      kernel sets / one thread.
 # The jobs do not fail on wrong results: the step summary and the annotations
@@ -19,6 +20,11 @@ on:
     branches:
       - 'ccr-143ce523-yoxpqv'
   workflow_dispatch:
+
+# a new push cancels the previous probe run (the API token cannot cancel runs)
+concurrency:
+  group: debug-429-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   DEBUG_CI: true
@@ -33,13 +39,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04]
-        replica: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        # cheap when the CPU is not suspect (no build): many replicas
+        replica: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
         include:
-          # OpenBLAS 0.3.26: expected to know the CPU (or at least not to fail)
+          # OpenBLAS 0.3.26: control (AMD EPYC 9V74 seen: Cooperlake kernels, correct)
           - os: ubuntu-24.04
             replica: 1
-          - os: ubuntu-24.04
-            replica: 2
     steps:
       - uses: actions/checkout@v4
         with:
@@ -99,8 +104,17 @@ jobs:
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
           echo "auto_core=${core}" >> "$GITHUB_OUTPUT"
+          vendor="$(sed -n 's/^vendor=\([^ ]*\).*/\1/p' "$RUNNER_TEMP/cpuid.txt")"
+          # suspect: Intel with avx512_bf16 (Xeon 6973P-C and the like), where
+          # OpenBLAS 0.3.20 takes its Cooperlake path
+          if [ "$vendor" == "GenuineIntel" ] && [ "$bf16" == "1" ]; then
+            echo "suspect=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "suspect=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: BLAS / LAPACK check per kernel set
+        id: blas
         shell: bash
         run: |
           gcc -O2 -o "$RUNNER_TEMP/blas_check" .github/debug-429/blas_check.c \
@@ -120,6 +134,7 @@ jobs:
               get() { echo "$s" | sed -n "s/.* $1=\([^ ]*\).*/\1/p"; }
               echo "| ${coretype} | ${threads} | $(get core) | $(get cases) | $(get fails) | $(get worst) | $(get ratio) |" >> "$GITHUB_STEP_SUMMARY"
               if [ "$(get fails)" != "0" ]; then
+                echo "fails=true" >> "$GITHUB_OUTPUT"
                 echo "::error title=wrong BLAS results::OPENBLAS_CORETYPE=${coretype} threads=${threads} core=$(get core): $(get fails) failing cases, worst $(get worst) ratio $(get ratio)"
               fi
             done
@@ -128,6 +143,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
       - name: build C++ core and tests
+        if: steps.arch.outputs.suspect == 'true' || steps.blas.outputs.fails == 'true' || matrix.os == 'ubuntu-24.04'
         shell: bash
         run: |
           export MODE=Release ENABLE_PYTHON_BINDING=off ENABLE_OCTAVE_BINDING=off ENABLE_MATLAB_BINDING=off \
@@ -137,6 +153,7 @@ jobs:
           tools/linux-macos/build.sh
 
       - name: ctest with the kernels OpenBLAS picks
+        if: steps.arch.outputs.suspect == 'true' || steps.blas.outputs.fails == 'true' || matrix.os == 'ubuntu-24.04'
         shell: bash
         run: |
           unset OPENBLAS_CORETYPE
