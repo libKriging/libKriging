@@ -17,6 +17,8 @@
 #include "libKriging/utils/utils.hpp"
 
 #include "BlasThreads.hpp"
+#include "TaskPool.hpp"
+#include "ThreadBudget.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -32,6 +34,10 @@
 #include <sstream>
 #include <stdexcept>
 #include <thread>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace libKriging {
 
@@ -52,6 +58,11 @@ constexpr arma::uword kJointMaxIterCap = 1000;
 // Early stop of the Adam phase: steps without a relative LL gain > tol.
 constexpr arma::uword kAdamPatience = 20;
 constexpr double kAdamRelTol = 1e-6;
+// At the first plateau, back to the best point with half the step, twice,
+// before stopping: the fixed step oscillated around a ridge (mlp warps: +167
+// LL median over 15 data sets, x2 fit time; docs/dev/CholJitter.md,
+// Adam phase).
+constexpr arma::uword kAdamLrDecays = 2;
 // Overflow-safe softplus log(1 + e^z): the naive form is +inf for z > 709.
 inline double softplus(double z) {
   return std::max(z, 0.0) + std::log1p(std::exp(-std::abs(z)));
@@ -63,77 +74,7 @@ inline double softplus(double z) {
 constexpr double kCollapseMinRatio = 0.1;
 constexpr double kCollapseWeight = 100.0;
 
-// Runs task(0), …, task(n_tasks − 1) in a pool of Optim::thread_pool_size
-// workers (all the cores by default), inline when n_tasks == 1. Each task must
-// work on its own WarpKriging and catch its own exceptions. This requires a
-// reentrant L-BFGS-B: lbfgsb_cpp >= b6eff96, whose f2c BLAS/LINPACK helpers
-// (Lbfgsb.3.0/blas.c, linpack.c) no longer keep `static` locals that
-// concurrent optimizers would race on. No task may draw from the global RNG
-// (the warp constructors reseed it): build the models before the pool.
-void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char* label) {
-  if (n_tasks <= 1) {
-    if (n_tasks == 1)
-      task(0);
-    return;
-  }
-  // Determine thread pool size
-  unsigned int n_cpu = std::thread::hardware_concurrency();
-  int pool_size = Optim::thread_pool_size;
-  if (pool_size <= 0)
-    pool_size = std::max(1u, n_cpu);
-  pool_size = std::min(pool_size, n_tasks);
-
-  // Give each worker its share of the BLAS/OMP threads: left at the
-  // default, every worker's BLAS calls spawn all-core thread teams that
-  // contend with the other workers (≈2x slower at n = 500, mostly in
-  // system time). Declared before the joiner below, so that it is reset
-  // only once all workers have joined.
-  detail::BlasThreadGuard blas_guard;
-  const unsigned int blas_threads = std::max(1u, n_cpu / static_cast<unsigned int>(pool_size));
-  blas_guard.set(blas_threads);
-
-  if (Optim::log_level > Optim::log_none) {
-    arma::cout << "WarpKriging thread pool: " << pool_size << " workers x " << blas_threads
-               << " BLAS threads (ncpu=" << n_cpu << ", " << label << "=" << n_tasks << ")" << arma::endl;
-  }
-
-  // Thread pool with atomic task counter
-  std::atomic<int> next_task(0);
-  std::vector<std::thread> threads;
-  threads.reserve(pool_size);
-
-  // RAII guard to ensure threads are always joined (also when spawning
-  // a later thread throws)
-  struct ThreadJoiner {
-    std::vector<std::thread>& threads_ref;
-    explicit ThreadJoiner(std::vector<std::thread>& t) : threads_ref(t) {}
-    ~ThreadJoiner() {
-      for (auto& t : threads_ref)
-        if (t.joinable())
-          t.join();
-    }
-  } joiner(threads);
-
-  for (int worker_id = 0; worker_id < pool_size; worker_id++) {
-    threads.emplace_back([&]() {
-      while (true) {
-        int task_id = next_task.fetch_add(1);
-        if (task_id >= n_tasks)
-          break;
-
-        // Staggered startup delay: only for each worker's first task
-        // (applied to every task, it added up to ~(n_tasks/pool)^2
-        // delays with no benefit once the pool is running).
-        if (task_id < pool_size) {
-          int delay_ms = task_id * Optim::thread_start_delay_ms;
-          std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-        }
-
-        task(task_id);
-      }
-    });
-  }
-}
+using detail::run_task_pool;
 }  // namespace
 
 // *************************************************************************
@@ -417,7 +358,10 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
       // Could be an integer K or a single float knot position
       bool is_int = true;
       for (char c : kparts[0]) {
-        if (!std::isdigit(c)) { is_int = false; break; }
+        if (!std::isdigit(c)) {
+          is_int = false;
+          break;
+        }
       }
       if (is_int) {
         arma::uword K = static_cast<arma::uword>(std::stoul(kparts[0]));
@@ -1579,8 +1523,9 @@ WarpKnots::WarpKnots(arma::uword n_knots, const std::vector<double>& knot_positi
 
   for (arma::uword k = 0; k < m_K + 1; ++k) {
     if (m_breaks[k] >= m_breaks[k + 1])
-      throw std::invalid_argument("WarpKnots: breakpoints must be strictly increasing; "
-                                  "knot positions must lie strictly in (0,1)");
+      throw std::invalid_argument(
+          "WarpKnots: breakpoints must be strictly increasing; "
+          "knot positions must lie strictly in (0,1)");
   }
 
   m_log_slopes = arma::zeros<arma::vec>(m_K + 1);
@@ -1815,7 +1760,9 @@ void WarpKriging::recalibrate_warps(const arma::mat& X_ref) {
   Xn.each_row() -= m_centerX;
   Xn.each_row() /= m_scaleX;
   calibrate_warps(Xn);
+  m_cache_jitter = m_chol_jitter;
   refresh_cache();
+  commit_model_chol_jitter();
 }
 
 void WarpKriging::ensure_joint_warp(arma::uword d_in) {
@@ -2022,15 +1969,16 @@ void WarpKriging::populate_Model(WKModel& m, const arma::vec& theta, double sigm
 
   // Preemptive nugget: Embedding/Ordinal warpings can collapse same-level
   // training rows in Phi, making R rank-deficient in a way Kriging never
-  // encounters. Add LinearAlgebra::num_nugget (default 1e-10, configurable
-  // via set_num_nugget()) on the diagonal to stabilize Cholesky and its
-  // derivative. Set num_nugget=0 to get exact Kriging equivalence at
-  // warping="none".
+  // encounters. m_cache_jitter on the diagonal stabilizes Cholesky and its
+  // derivative during the search: m_chol_jitter, the kernel's fixed jitter
+  // (LinearAlgebra::kernel_chol_jitter, same as Kriging) when it has one, else
+  // LinearAlgebra::num_nugget (default 1e-10, set_num_nugget()). The
+  // committed model keeps at most num_nugget (committed_chol_jitter).
   //
   // When m_noise is non-empty, the normalized covariance becomes
   //   C̃ = R_off-diag + diag(1 + nug + noise_i/σ²)
   // so the same cholCov(factor=1, diag) path carries observation-noise.
-  arma::vec diag(n, arma::fill::value(1.0 + LinearAlgebra::num_nugget));
+  arma::vec diag(n, arma::fill::value(1.0 + m_cache_jitter));
   if (!m_noise.is_empty()) {
     diag += m_noise / sigma2;
   }
@@ -2136,7 +2084,26 @@ double WarpKriging::concentrated_ll() const {
 double WarpKriging::logLikelihood() const {
   if (!m_fitted)
     throw std::runtime_error("WarpKriging: model not fitted");
-  return concentrated_ll();
+  return std::isnan(m_objective_ll) ? concentrated_ll() : m_objective_ll;
+}
+
+double WarpKriging::committed_chol_jitter() const {
+  // At most num_nugget (1e-10), not 0 as Kriging: warps can bring training
+  // rows together in Phi (Kumaraswamy, saturated MLP, categorical levels), and
+  // an exact factorization then leaves no predictive variance there (stdev 0,
+  // NaN stdev derivative / NLPD: WarpKrigingPerWarpTest, WarpKrigingCollapseTest).
+  // docs/dev/CholJitter.md.
+  return std::min(m_chol_jitter, LinearAlgebra::num_nugget);
+}
+
+void WarpKriging::commit_model_chol_jitter() {
+  m_cache_jitter = m_chol_jitter;
+  refresh_cache_theta_only();
+  m_objective_ll = concentrated_ll();
+  m_model_chol_jitter = committed_chol_jitter();
+  m_cache_jitter = m_model_chol_jitter;
+  if (m_model_chol_jitter != m_chol_jitter)
+    refresh_cache_theta_only();
 }
 
 std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arma::vec& theta,
@@ -2144,7 +2111,9 @@ std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arm
                                                                        bool /*return_hess*/) const {
   auto* self = const_cast<WarpKriging*>(this);
   arma::vec old_theta = m_theta;
+  const double old_cache_jitter = m_cache_jitter;
   self->m_theta = theta;
+  self->m_cache_jitter = m_chol_jitter;  // the objective: search jitter
   self->refresh_cache();
 
   double ll = concentrated_ll();
@@ -2156,6 +2125,7 @@ std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arm
   }
 
   self->m_theta = old_theta;
+  self->m_cache_jitter = old_cache_jitter;
   self->refresh_cache();
   return {ll, grad, arma::mat()};
 }
@@ -2614,6 +2584,10 @@ WarpKriging WarpKriging::clone_for_thread() const {
   c.m_adam_lr = m_adam_lr;
   c.m_calibration_folds = m_calibration_folds;
   c.m_var_scale = m_var_scale;
+  c.m_chol_jitter = m_chol_jitter;  // the clones search with the same diagonal
+  c.m_model_chol_jitter = m_model_chol_jitter;
+  c.m_cache_jitter = m_cache_jitter;
+  c.m_objective_ll = m_objective_ll;
   c.m_fitted = true;
 
   // Copy mutable GP state
@@ -2798,9 +2772,13 @@ void WarpKriging::optimise_joint(const std::string& method) {
       }
       arma::vec theta_cur = from_gamma(x.tail(dt));
       double sol_to_lb = arma::min(arma::abs(theta_cur - theta_lower));
+      // "No improvement" within the optimizer's own tolerance (as Kriging):
+      // a difference at the rounding level must not decide a restart.
+      const double f_tol = optimizer.factr * arma::datum::eps * std::max(1.0, std::abs(best_f));
+      const bool worse = res.f_opt > best_f + f_tol;
       if ((retry < Optim::max_restart)
           && ((res.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) || (res.num_iters <= 2)
-              || (sol_to_lb < arma::datum::eps) || (res.f_opt > best_f))) {
+              || (sol_to_lb < arma::datum::eps) || worse)) {
         // Contract theta starting point toward lower bound.
         arma::vec theta_restart = (theta0 + theta_lower) / std::pow(2.0, retry + 1);
         x.tail(dt) = to_gamma(theta_restart);
@@ -2828,12 +2806,23 @@ void WarpKriging::optimise_joint(const std::string& method) {
     opt.adam_lr = wk.m_adam_lr;
     opt.patience = kAdamPatience;
     opt.rel_tol = kAdamRelTol;
+    opt.lr_decays = kAdamLrDecays;
     opt.max_iter_bfgs = (wk.m_max_iter_bfgs > 0) ? wk.m_max_iter_bfgs : kDefaultInnerMaxIterBFGS;
     opt.bfgs_pgtol = Optim::gradient_tolerance;
     opt.bfgs_factr = Optim::objective_rel_tolerance / 1E-13;
     opt.maximize = true;
     opt.outer_lower = wp_lower;
     opt.outer_upper = wp_upper;
+    // Same restart as the joint BFGS (and Kriging): θ contracted toward its
+    // lower bound, kept inside the bounds (L-BFGS-B does not project its
+    // starting point)
+    opt.max_restart = Optim::max_restart;
+    opt.inner_restart = [&](const arma::vec& gamma0, int retry) -> arma::vec {
+      const arma::vec theta_restart
+          = arma::max(arma::min(arma::vec((from_gamma(gamma0) + theta_lower) / std::pow(2.0, retry + 1)), theta_upper),
+                      theta_lower);
+      return to_gamma(theta_restart);
+    };
 
     arma::vec current_wp = arma::min(arma::max(wk.pack_warp_params(), wp_lower), wp_upper);
     if (nw > 0 && arma::any(current_wp != wk.pack_warp_params())) {
@@ -2952,10 +2941,22 @@ void WarpKriging::optimise_joint(const std::string& method) {
 
   // Helper: run parallel multistart with a given optimizer function
   auto run_parallel_multistart = [&](auto& optimizer_fn) {
-    // Generate random starting points for θ in [theta_lower, theta_upper]
-    arma::mat theta0_rand(multistart, d_theta);
-    for (int i = 0; i < multistart; ++i)
-      theta0_rand.row(i) = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
+    // Random starting points for θ, from the same generator as Kriging
+    // (Random, reset to its seed at each fit: Random::reset_seed applies).
+    // Per-variable warps: log-uniform in [theta_lower, theta_upper] as Kriging
+    // (θ is a scale parameter, theta_lower > 0). Joint MLP: uniform, θ lives on
+    // the scale of the learnt features and long-range starts let the weights
+    // adapt; the log-uniform draw lost 124 LL units (median) on a projected
+    // Branin (docs/dev/CholJitter.md, starting points).
+    Random::init();
+    arma::mat theta0_rand = Random::randu_mat(multistart, d_theta);
+    for (arma::uword j = 0; j < d_theta; ++j) {
+      const double lo = theta_lower.at(j), up = theta_upper.at(j);
+      if (m_is_joint)
+        theta0_rand.col(j) = lo + theta0_rand.col(j) * (up - lo);
+      else
+        theta0_rand.col(j) = arma::exp(std::log(lo) + theta0_rand.col(j) * (std::log(up) - std::log(lo)));
+    }
     // First start uses the current theta
     theta0_rand.row(0) = m_theta.t();
 
@@ -3066,6 +3067,7 @@ void WarpKriging::fit(const arma::vec& y,
                       const std::string& objective,
                       const std::map<std::string, std::string>& parameters,
                       const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   fit(y, X, regmodel, normalize, optim, objective, Parameters{}, parameters, method);
 }
 
@@ -3082,6 +3084,7 @@ void WarpKriging::fit(const arma::vec& y,
                       const Parameters& parameters,
                       const std::map<std::string, std::string>& tuning,
                       const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (Kriging::fit_objective_method(objective, method).second != "exact")
     throw std::invalid_argument("WarpKriging::fit: method \"" + method + "\" is not implemented (only \"exact\" is)");
   for (const auto& [key, val] : tuning) {
@@ -3112,6 +3115,12 @@ void WarpKriging::fit(const arma::vec& y,
   m_X_raw = X;
   m_regmodel = regmodel;
   m_normalize = normalize;
+  {
+    const double kernel_jitter = LinearAlgebra::kernel_chol_jitter(m_covType);
+    m_chol_jitter = kernel_jitter > 0.0 ? kernel_jitter : LinearAlgebra::num_nugget;
+    m_cache_jitter = m_chol_jitter;  // search; committed after optimise_joint
+    m_objective_ll = arma::datum::nan;
+  }
 
   // Per-observation noise (optional). When set, populate_Model carries
   // noise_i/σ² on the diagonal and refresh_cache_theta_only runs an inner
@@ -3174,6 +3183,7 @@ void WarpKriging::fit(const arma::vec& y,
   // σ̂² is concentrated — computed in refresh_cache
   refresh_cache();
   optimise_joint(optim);
+  commit_model_chol_jitter();
   m_optim = optim;
   m_var_scale = 1.0;
   if (Optim::parse_method(optim, "BFGS").first != "none")
@@ -3189,6 +3199,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
                                                                                        bool return_stdev,
                                                                                        bool return_cov,
                                                                                        bool return_deriv) const {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (!m_fitted)
     throw std::runtime_error("predict: model not fitted");
   validate_discrete_columns(X_n, "predict");
@@ -3241,6 +3252,7 @@ arma::mat WarpKriging::simulate(int nsim,
                                 const arma::mat& X_n,
                                 const bool will_update,
                                 const arma::vec& with_noise) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (!m_fitted)
     throw std::runtime_error("simulate: model not fitted");
 
@@ -3290,6 +3302,7 @@ arma::mat WarpKriging::simulate(int nsim,
 LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u,
                                                          const arma::mat& X_u,
                                                          const arma::vec& noise_u) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
@@ -3357,6 +3370,7 @@ void WarpKriging::clear_simulate_state() {
 //  update()
 // -------------------------------------------------------------------------
 void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit, const arma::vec& noise_u) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (!m_fitted)
     throw std::runtime_error("update: model not fitted");
   if (y_u.n_elem != X_u.n_rows)
@@ -3409,6 +3423,7 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
     calibrate_warps();  // re-tie Knots to the enlarged input range before re-fit
     if (!m_noise.is_empty() && m_normalize)
       m_noise /= (m_scaleY * m_scaleY);
+    m_cache_jitter = m_chol_jitter;  // search; committed after optimise_joint
     refresh_cache();
 
     // The refit is warm-started from the current fit: keep the starting point
@@ -3423,6 +3438,7 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
       optimise_joint("BFGS+Adam");
       m_max_iter_adam = saved_adam;
     }
+    commit_model_chol_jitter();
     m_start_theta = start_theta;
     m_start_warp_params = start_warp_params;
     calibrate_variance();
@@ -3465,6 +3481,8 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
         [&]() { return make_Model(m_theta, m_sigma2); });
 
     m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
+    // no search here: logLikelihood() is the committed model's own
+    m_objective_ll = arma::datum::nan;
   }
 }
 
@@ -3533,6 +3551,10 @@ void WarpKriging::dump_to_json(nlohmann::json& j) const {
   // dX, maxdX, F, T, R, M, star, circ, z, Rinv,
   // beta/est_beta, theta/est_theta, sigma2/est_sigma2, noise
   dump_common_to_json(j);
+  j["chol_jitter"] = m_chol_jitter;
+  j["model_chol_jitter"] = m_model_chol_jitter;
+  if (!std::isnan(m_objective_ll))
+    j["objective_ll"] = m_objective_ll;
 }
 
 void WarpKriging::load_from_json(const nlohmann::json& j) {
@@ -3567,6 +3589,12 @@ void WarpKriging::load_from_json(const nlohmann::json& j) {
     m_maxdX = arma::max(arma::abs(m_dX), 1);
     m_is_empty = false;
   }
+  // Absent from files saved before the fixed jitter: they used num_nugget
+  m_chol_jitter = j.contains("chol_jitter") ? j["chol_jitter"].template get<double>() : LinearAlgebra::num_nugget;
+  // Absent from files saved before the exact committed model: one jitter for both
+  m_model_chol_jitter = j.contains("model_chol_jitter") ? j["model_chol_jitter"].template get<double>() : m_chol_jitter;
+  m_cache_jitter = m_model_chol_jitter;
+  m_objective_ll = j.contains("objective_ll") ? j["objective_ll"].template get<double>() : arma::datum::nan;
   // Warp-specific extras (present in both v2 and v3)
   m_logdet = j["logdet"].template get<double>();
   if (j.contains("is_continuous"))

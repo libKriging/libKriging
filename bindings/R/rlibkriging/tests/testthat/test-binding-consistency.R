@@ -34,6 +34,14 @@ find_dir = function() {
   }
 }
 
+# The references evaluate the exact LL / LOO formulas: no fixed Cholesky
+# jitter (gauss uses 1e-8 by default in the fit objective); restored at the end
+default_chol_jitter <- rlibkriging:::linalg_get_chol_jitter()
+rlibkriging:::linalg_set_chol_jitter(0)
+test_that("chol_jitter setting is applied", {
+  expect_equal(rlibkriging:::linalg_get_chol_jitter(), 0)
+})
+
 refpath = find_dir()
 print(paste0("Reference directory=", refpath))
 prefix = "data1-scal"
@@ -114,3 +122,5 @@ for (i in 1:length(logn)) {
       expect_lt(relative_error(loglik[[n]], testme), tolerance) })
   }
 }
+
+rlibkriging:::linalg_set_chol_jitter(default_chol_jitter)

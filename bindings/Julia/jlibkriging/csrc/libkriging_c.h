@@ -537,6 +537,15 @@ int lk_nested_kriging_set_warp_subsample(void* ptr, int m);
 int lk_nested_kriging_save(void* ptr, const char* filename);
 void* lk_nested_kriging_load(const char* filename);
 
+/* --- LinearAlgebra settings (global) ---
+   chol_jitter: fixed jitter on the correlation diagonal of noise-free fits
+   (< 0: automatic per kernel, the default; 0: disabled; > 0: this value)
+   num_nugget:  numerical nugget of the Cholesky fallback (default 1e-10) */
+double lk_linalg_get_chol_jitter(void);
+int lk_linalg_set_chol_jitter(double jitter);
+double lk_linalg_get_num_nugget(void);
+int lk_linalg_set_num_nugget(double nugget);
+
 #ifdef __cplusplus
 }
 #endif

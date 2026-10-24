@@ -40,6 +40,20 @@ designs), and scikit-learn compatible estimators in `pylibkriging.sklearn` (`pip
 [method reference](https://github.com/libKriging/libKriging/blob/master/bindings/README.md) for all bindings and the
 [main README](https://github.com/libKriging/libKriging#readme) for more examples.
 
+## Threads
+
+A fit uses all the physical cores by default (multistart starts, BLAS and OpenMP loops
+share one budget). To use part of them, e.g. half, or one share per process when running
+several fits at once (`multiprocessing`, a job array):
+
+```python
+lk.Optim.set_num_threads_percent(50)  # or 0.5; 0 = all
+lk.Optim.get_num_threads()            # resulting number of threads
+```
+
+`OMP_NUM_THREADS` and `OPENBLAS_NUM_THREADS` are never exceeded. See the
+[FAQ](https://github.com/libKriging/libKriging/blob/master/docs/dev/FAQ.md).
+
 ## Building from source
 
 Requires a C++17 compiler, CMake ≥ 3.13 and a BLAS/LAPACK implementation. From the repository root (cloned with

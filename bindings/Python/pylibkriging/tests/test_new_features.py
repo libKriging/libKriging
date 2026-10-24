@@ -238,6 +238,25 @@ class TestOptim:
         finally:
             lk.Optim.set_thread_start_delay_ms(orig_delay)
             lk.Optim.set_thread_pool_size(orig_pool)
+
+    def test_optim_thread_budget(self):
+        """Thread budget: share of the cores, resolved thread count"""
+        orig = lk.Optim.get_num_threads_percent()
+        try:
+            lk.Optim.set_num_threads_percent(100)
+            full = lk.Optim.get_num_threads()
+            assert full >= 1
+            lk.Optim.set_num_threads_percent(50)
+            assert lk.Optim.get_num_threads_percent() == 50
+            assert 1 <= lk.Optim.get_num_threads() <= full
+            lk.Optim.set_num_threads_percent(0.5)  # ratio: same as 50 %
+            assert 1 <= lk.Optim.get_num_threads() <= full
+            # a fit runs with a reduced budget
+            X = np.random.RandomState(1).uniform(size=(20, 1))
+            k = lk.Kriging(np.sin(6 * X[:, 0]), X, "matern3_2")
+            assert np.isfinite(k.logLikelihood())
+        finally:
+            lk.Optim.set_num_threads_percent(orig)
     
     def test_optim_affects_optimization(self):
         """Test that Optim settings actually affect model fitting"""

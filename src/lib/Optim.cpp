@@ -7,7 +7,9 @@
 #include "libKriging/Optim.hpp"
 
 #include <cstdlib>
+#include <stdexcept>
 #include <string>
+#include "ThreadBudget.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
 // Helper function to read environment variables and convert to appropriate type
@@ -217,7 +219,23 @@ LIBKRIGING_EXPORT std::pair<arma::vec, arma::vec> Optim::theta_bounds(const arma
   return {theta_lower, theta_upper};
 }
 
-int Optim::thread_pool_size = get_env_or_default("LK_THREAD_POOL_SIZE", 0);  // 0 means auto-detect (ncpu/4)
+double Optim::num_threads_percent = get_env_or_default("LK_NUM_THREADS_PERCENT", 0.0);  // 0: 100 %
+
+LIBKRIGING_EXPORT void Optim::set_num_threads_percent(double x) {
+  if (!(x >= 0.0))
+    throw std::invalid_argument("set_num_threads_percent: expected x >= 0 (x <= 1: ratio, x > 1: percentage)");
+  Optim::num_threads_percent = x;
+}
+
+LIBKRIGING_EXPORT double Optim::get_num_threads_percent() {
+  return Optim::num_threads_percent;
+}
+
+LIBKRIGING_EXPORT int Optim::get_num_threads() {
+  return libKriging::detail::budget_total();
+}
+
+int Optim::thread_pool_size = get_env_or_default("LK_THREAD_POOL_SIZE", 0);  // 0: the thread budget
 
 LIBKRIGING_EXPORT void Optim::set_thread_pool_size(int pool_size) {
   Optim::thread_pool_size = pool_size;

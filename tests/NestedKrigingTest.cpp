@@ -53,7 +53,11 @@ TEST_CASE("NestedKriging with one group reduces to plain Kriging", "[nested][kri
     auto [m1, s1] = nk1.predict(Xt, true);
     auto [mk, sk, c1, d1, e1] = const_cast<Kriging&>(nk1.submodel(0)).predict(Xt, true, false, false);
     INFO("aggregation = " << NestedKriging::aggregationToString(agg));
-    CHECK(arma::abs(m1 - mk).max() < 1e-8);
+    // the expert's and the aggregate's solves factorize R separately, and the
+    // committed R (exact, LinearAlgebra::model_chol_jitter) is
+    // conditioned ~1e13 at the fitted theta: rounding-level gaps of ~1e-6
+    // (1.8e-6 measured for rBCM)
+    CHECK(arma::abs(m1 - mk).max() < 1e-5);
     if (agg != NestedKriging::Aggregation::rBCM)
       CHECK(arma::abs(s1 - sk).max() < 1e-6);
   }
@@ -346,8 +350,10 @@ TEST_CASE("NestedKriging warped hyperparameters come from a subsample fit", "[ne
 
   // NK interpolation is a property of the aggregation, not of the
   // hyperparameters: it must hold even with subsampled hyperparameters
+  // (up to the gauss fixed Cholesky jitter 1e-9, which smooths the training
+  // values by about sqrt(jitter) of the process scale: 1.03e-3 measured)
   auto [mean, stdev] = nk.predict(X, true);
-  CHECK(arma::abs(mean - y).max() < 1e-3);
+  CHECK(arma::abs(mean - y).max() < 2e-3);
   CHECK(stdev.max() < 1e-2);
 
   // subsample larger than n must degrade gracefully to a full-data fit

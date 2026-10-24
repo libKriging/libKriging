@@ -12,6 +12,16 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- **Thread budget**: one setting bounds the threads of the multistart pool, the OpenMP loops
+  and the BLAS together: `Optim::set_num_threads_percent(x)` (x <= 1 a ratio, x > 1 a
+  percentage of the physical cores, 0 = 100 %) or `LK_NUM_THREADS_PERCENT`;
+  `Optim::get_num_threads()` returns the resolved number of threads. The starts of a multistart
+  get the budget first, each start's BLAS / OpenMP the rest; an explicit `OMP_NUM_THREADS` or
+  `OPENBLAS_NUM_THREADS` is never exceeded. Bindings: Python / Octave
+  `Optim.set_num_threads_percent`, `get_num_threads_percent`, `get_num_threads`; R
+  `rlibkriging:::optim_set_num_threads_percent` (and `_get_`), `optim_get_num_threads`
+  (Julia: not exposed, like `set_thread_pool_size`). See
+  [docs/dev/parallel.md](docs/dev/parallel.md).
 - **CI**: workflow `binding-api.yml` (Linux, one job per binding): the methods exposed by the
   Python, R, Octave and Julia bindings are extracted and compared across bindings, up to each
   language's naming convention; a method missing from some bindings fails the job
@@ -24,6 +34,21 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **Octave**: `Optim.set_log_level`, `set_max_iteration`, `set_thread_start_delay_ms` and
+  `set_thread_pool_size` failed with "is not an unsigned 64bits int" when given a plain
+  number (`Optim.set_log_level(2)`); they now convert it to `int32`. Their tests
+  (`test_new_features.m`) were not registered in CMake and never ran; they now do.
+- **Kriging** multistart `"BFGS<k>"`: the starts run one after the other in the calling
+  thread, but each was given only ncpu/k BLAS/OpenMP threads (1 thread from k ≥ ncpu on),
+  leaving the other cores idle. The starts now keep the full thread count.
+  With a fixed seed the fit stays bit-reproducible for a given BLAS thread count, but its
+  result may change with that count (as it already did with the number of cores): see
+  [docs/dev/FAQ.md](docs/dev/FAQ.md).
+- BLAS/OpenMP thread counts are restored after a fit instead of being left at 1 thread: a
+  `Kriging` multistart or a parallel `WarpKriging` / `MLPKriging` multistart made every later
+  `predict`, `simulate` or `update` run single-threaded. The parent process of a `fork()`
+  (R `parallel::mclapply`) also gets its thread counts back once the fork returns; the
+  children still start single-threaded (#325).
 - **MLPKriging** / `mlp_joint`: the K refits of the predictive-variance calibration (#407)
   run concurrently in the multistart thread pool (`Optim::set_thread_pool_size`) instead of
   one after the other. The calibration made the fit 5-10x slower (n = 200, d = 4,
@@ -101,6 +126,53 @@ past release, see the corresponding entry on the
   ([#388](https://github.com/libKriging/libKriging/issues/388)).
 
 ### Changed
+- **Kriging** / **WarpKriging** / **NestedKriging**, noise-free fits with `gauss` or
+  `matern5_2`: a fixed jitter is added to the diagonal of the correlation matrix during the
+  optimization (1e-9 for `gauss`, 1e-10 for `matern5_2`, none for `matern3_2` / `exp`). On
+  smooth noise-free data the optimizer reaches the near-singular region, where the stepwise
+  numerical nugget added when a Cholesky fails made the objective discontinuous: a
+  single-start fit ended at a different optimum depending on the BLAS thread count, BLAS build
+  or CPU (18 % of 240 `gauss` test cases across thread counts; 1.7 % with the jitter, `theta`
+  otherwise equal within the optimizer tolerance). `Kriging` factorizes the model at the
+  optimum exactly, so `predict` still interpolates the observations, and `logLikelihood()` stays the
+  optimized objective; `WarpKriging` / `MLPKriging` factorize it with at most 1e-10 (`num_nugget`,
+  their former diagonal: warps can bring training points together). The approximate methods
+  (`vecchia(m)`, `nystrom(k)`) use the same jitter for their `LOO` / `LMP` objectives as for `LL`. The jitter is saved with the model (`chol_jitter`,
+  `model_chol_jitter`; older files load unchanged). Fitted `theta`, predictions and
+  log-likelihoods of these fits change; accuracy is within a few % of the former fits, except
+  on very smooth functions (Branin, n = 50: median test RMSE 5e-4 → 0.058).
+  `LinearAlgebra::set_chol_jitter(0)` or `LK_CHOL_JITTER=0` restores the former behaviour
+  (Python / Octave `LinearAlgebra.set_chol_jitter`, Julia `set_chol_jitter`, R
+  `rlibkriging:::linalg_set_chol_jitter`). See [docs/dev/parallel.md](docs/dev/parallel.md) 8.6.
+- **Kriging** / **WarpKriging** multistart: the random starting points of `theta` are drawn
+  log-uniformly in their bounds instead of uniformly (`theta` is a scale parameter): with the
+  default bounds `[0.02, 10] × max |dX|` a uniform draw put 90 % of the starts in the
+  long-range region where the likelihood is flat. The joint MLP of `MLPKriging` / `mlp_joint`
+  keeps the uniform draw (long-range starts let its weights adapt). `WarpKriging` now draws
+  them from the same generator as `Kriging` (`Random::reset_seed` applies), not Armadillo's.
+  The restart of a start whose result is "not better" now ignores differences below the
+  optimizer tolerance ([#418](https://github.com/libKriging/libKriging/issues/418)).
+- **WarpKriging** / **MLPKriging**, optimisers `"Adam"` / `"BFGS+Adam"`: the first inner
+  `theta` L-BFGS-B is restarted as in `Kriging` when it stops abnormally, in <= 2 iterations or
+  at the lower bound (a start whose gradient points out of the bounds stopped at their corner,
+  LL −329 instead of 831 on a categorical case). The Adam loop no longer stops at its first
+  plateau: it goes back to the best point with half the step, twice. mlp warps: LL +167
+  (median of 15 data sets), fit time x2; every Adam-optimised warp is up to 1.4x slower. See
+  [docs/dev/CholJitter.md](docs/dev/CholJitter.md), Adam phase.
+- **Kriging** / **WarpKriging**: from n = 200 on Linux (n = 800 on macOS and Windows, not
+  measured there yet: #416, #417), the covariance matrix of the exact
+  objectives (and its new rows in `update`) is built in an OpenMP loop instead of one thread,
+  and the θ part of the log-likelihood gradient too, with per-row partial sums added in a
+  fixed order. Neither depends on the OpenMP thread count. 4 cores, d = 4, OpenBLAS and
+  OpenMP at 4 threads, log-likelihood + gradient: 75 → 54 ms at n = 800, 364 → 215 ms at
+  n = 1500. Without the thread budget the OpenMP team competed with the spinning OpenBLAS
+  threads below n = 800 and was slower than one thread (3.9 → 17 ms at n = 200); within the
+  budget (both at the physical cores) the loops pay off from n = 200 (x3 at n = 200-500 on
+  10 cores). Each worker of a
+  parallel multistart gets its share of OpenMP threads, as of BLAS threads. The parallel
+  gradient sum differs from the sequential one: on an ill-conditioned covariance matrix the
+  gradient, hence the optimum reached, may change from that threshold on (see
+  [docs/dev/FAQ.md](docs/dev/FAQ.md)).
 - **Python**: supported CPython versions are 3.10 to 3.14: the CI tests each of them
   (3.10 and 3.14 on Linux and Windows), the release builds wheels for all of them, and
   `python_requires` is now `>=3.10` (the end-of-life 3.7 and 3.9 jobs are dropped)

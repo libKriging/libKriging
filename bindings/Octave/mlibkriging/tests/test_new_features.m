@@ -16,6 +16,7 @@ function test_new_features()
     test_optim_max_iteration();
     test_optim_tolerances();
     test_optim_thread_settings();
+    test_optim_thread_budget();
     test_all_classes_have_covMat();
     test_all_classes_have_model();
     
@@ -337,6 +338,32 @@ function test_optim_thread_settings()
     
     Optim.set_thread_start_delay_ms(orig_delay);
     Optim.set_thread_pool_size(orig_pool);
+    
+    fprintf(' PASSED\n');
+end
+
+function test_optim_thread_budget()
+    fprintf('Test: Optim thread budget...');
+    
+    orig = Optim.get_num_threads_percent();
+    try
+        Optim.set_num_threads_percent(100);
+        full = Optim.get_num_threads();
+        assert(full >= 1);
+        Optim.set_num_threads_percent(50);
+        assert(Optim.get_num_threads_percent() == 50);
+        assert(Optim.get_num_threads() >= 1 && Optim.get_num_threads() <= full);
+        Optim.set_num_threads_percent(0.5);  % ratio: same as 50 %
+        assert(Optim.get_num_threads() <= full);
+        % a fit runs with a reduced budget
+        X = (1:20)' / 21;
+        k = Kriging(sin(6 * X), X, "matern3_2");
+        assert(isfinite(k.logLikelihood()));
+    catch err
+        Optim.set_num_threads_percent(orig);
+        rethrow(err);
+    end
+    Optim.set_num_threads_percent(orig);
     
     fprintf(' PASSED\n');
 end

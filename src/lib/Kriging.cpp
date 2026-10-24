@@ -23,29 +23,22 @@
 #include "libKriging/utils/utils.hpp"
 
 #include "BlasThreads.hpp"
+#include "TaskPool.hpp"
+#include "ThreadBudget.hpp"
 
 #include <cassert>
+#include <cstdlib>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
-#include <thread>
+#include <string>
 #include <tuple>
 #include <vector>
 
 #ifdef _OPENMP
 #include <omp.h>
-
-// Helper function to safely get optimal thread count
-// Windows MSVC OpenMP can sometimes return unexpected values
-inline int get_optimal_threads(int max_default = 2) {
-  int max_threads = omp_get_max_threads();
-  if (max_threads <= 0) {
-    return 1;
-  }
-  return (max_threads > max_default) ? max_default : max_threads;
-}
 #endif
 
-// Helper to get OpenBLAS thread control function (if available)
+// Helpers to get OpenBLAS thread control functions (if available)
 // Note: On macOS ARM64, use Accelerate framework instead of OpenBLAS
 #if !defined(__APPLE__) || !defined(__arm64__)
 #if defined(_MSC_VER)
@@ -56,19 +49,22 @@ inline int get_optimal_threads(int max_default = 2) {
 #include <windows.h>
 namespace {
 typedef void (*openblas_set_num_threads_t)(int);
+typedef int (*openblas_get_num_threads_t)();
+FARPROC get_openblas_proc(const char* name) {
+  // Try to load from OpenBLAS DLL (used by numpy/scipy)
+  HMODULE hModule = GetModuleHandleA("libopenblas.dll");
+  if (!hModule)
+    hModule = GetModuleHandleA("openblas.dll");
+  return hModule ? GetProcAddress(hModule, name) : nullptr;
+}
 openblas_set_num_threads_t get_openblas_set_num_threads() {
-  static openblas_set_num_threads_t func = nullptr;
-  static bool initialized = false;
-  if (!initialized) {
-    initialized = true;
-    // Try to load from OpenBLAS DLL (used by numpy/scipy)
-    HMODULE hModule = GetModuleHandleA("libopenblas.dll");
-    if (!hModule)
-      hModule = GetModuleHandleA("openblas.dll");
-    if (hModule) {
-      func = (openblas_set_num_threads_t)GetProcAddress(hModule, "openblas_set_num_threads");
-    }
-  }
+  static openblas_set_num_threads_t func
+      = reinterpret_cast<openblas_set_num_threads_t>(get_openblas_proc("openblas_set_num_threads"));
+  return func;
+}
+openblas_get_num_threads_t get_openblas_get_num_threads() {
+  static openblas_get_num_threads_t func
+      = reinterpret_cast<openblas_get_num_threads_t>(get_openblas_proc("openblas_get_num_threads"));
   return func;
 }
 }  // namespace
@@ -76,54 +72,36 @@ openblas_set_num_threads_t get_openblas_set_num_threads() {
 // GCC/Clang support weak symbols
 extern "C" {
 void openblas_set_num_threads(int num_threads) __attribute__((weak));
+int openblas_get_num_threads() __attribute__((weak));
 }
 namespace {
 typedef void (*openblas_set_num_threads_t)(int);
+typedef int (*openblas_get_num_threads_t)();
 openblas_set_num_threads_t get_openblas_set_num_threads() {
   return openblas_set_num_threads;
 }
-}  // namespace
-#endif
-#endif
-
-// Register pthread_atfork handlers so that forked child processes (e.g. R's
-// parallel::mclapply) inherit a clean, single-threaded BLAS/OMP state instead
-// of a locked idle thread pool that causes deadlocks.
-//
-// The prepare handler runs in the parent just before fork(): it sets BLAS and
-// OMP to 1 thread so no new parallel work can start during the fork window.
-// The child handler re-asserts single-threading in case the runtime inherited
-// stale state.  The parent handler is omitted (nullptr): the next fit() call
-// will reset threads_per_worker as needed.
-#if !defined(_WIN32) && defined(_POSIX_VERSION)
-#include <pthread.h>
-namespace {
-
-void libkriging_atfork_quiesce() {
-#if !defined(__APPLE__) || !defined(__arm64__)
-  auto fn = get_openblas_set_num_threads();
-  if (fn)
-    fn(1);
-#endif
-#ifdef _OPENMP
-  omp_set_num_threads(1);
-#endif
+openblas_get_num_threads_t get_openblas_get_num_threads() {
+  return openblas_get_num_threads;
 }
-
-struct ForkSafeRegistrar {
-  ForkSafeRegistrar() {
-    pthread_atfork(libkriging_atfork_quiesce,   // prepare: quiesce before fork
-                   nullptr,                     // parent:  restored by next fit()
-                   libkriging_atfork_quiesce);  // child:   ensure clean state
-  }
-};
-static ForkSafeRegistrar fork_safe_registrar;
-
 }  // namespace
-#endif  // !_WIN32 && _POSIX_VERSION
+#endif
+#endif
 
 namespace libKriging {
 namespace detail {
+BlasThreadState get_blas_threads() {
+  BlasThreadState s;
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_get_num_threads();
+  if (fn)
+    s.blas = fn();
+#endif
+#ifdef _OPENMP
+  s.omp = omp_get_max_threads();
+#endif
+  return s;
+}
+
 void set_blas_threads(unsigned int n) {
 #if !defined(__APPLE__) || !defined(__arm64__)
   auto fn = get_openblas_set_num_threads();
@@ -134,8 +112,78 @@ void set_blas_threads(unsigned int n) {
   omp_set_num_threads(static_cast<int>(n));
 #endif
 }
+
+int get_openblas_threads() {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_get_num_threads();
+  if (fn)
+    return fn();
+#endif
+  return 0;
+}
+
+void set_openblas_threads(int n) {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_set_num_threads();
+  if (fn && n > 0)
+    fn(n);
+#endif
+}
+
+void restore_blas_threads(const BlasThreadState& s) {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_set_num_threads();
+  if (fn && s.blas > 0)
+    fn(s.blas);
+#endif
+#ifdef _OPENMP
+  if (s.omp > 0)
+    omp_set_num_threads(s.omp);
+#endif
+}
 }  // namespace detail
 }  // namespace libKriging
+
+// Register pthread_atfork handlers so that forked child processes (e.g. R's
+// parallel::mclapply) inherit a clean, single-threaded BLAS/OMP state instead
+// of a locked idle thread pool that causes deadlocks.
+//
+// The prepare handler runs in the parent just before fork(): it records the
+// current thread counts, then sets BLAS and OMP to 1 thread so no new parallel
+// work can start during the fork window. The parent handler restores the
+// recorded counts once fork() has returned, so the parent does not stay
+// single-threaded after e.g. mclapply. The child handler re-asserts
+// single-threading in case the runtime inherited stale state.
+#if !defined(_WIN32) && defined(_POSIX_VERSION)
+#include <pthread.h>
+namespace {
+
+libKriging::detail::BlasThreadState atfork_saved;
+
+void libkriging_atfork_prepare() {
+  atfork_saved = libKriging::detail::get_blas_threads();
+  libKriging::detail::set_blas_threads(1);
+}
+
+void libkriging_atfork_parent() {
+  libKriging::detail::restore_blas_threads(atfork_saved);
+}
+
+void libkriging_atfork_child() {
+  libKriging::detail::set_blas_threads(1);
+}
+
+struct ForkSafeRegistrar {
+  ForkSafeRegistrar() {
+    pthread_atfork(libkriging_atfork_prepare,  // prepare: quiesce before fork
+                   libkriging_atfork_parent,   // parent:  restore thread counts
+                   libkriging_atfork_child);   // child:   ensure clean state
+  }
+};
+static ForkSafeRegistrar fork_safe_registrar;
+
+}  // namespace
+#endif  // !_WIN32 && _POSIX_VERSION
 
 // =============================================================================
 // Subset-of-data pre-fit reduction (see Kriging.hpp for the full doc) -- a
@@ -304,6 +352,14 @@ void Kriging::populate_Model(KModel& m,
                              const arma::vec& theta,
                              double extra_param,
                              std::map<std::string, double>* bench) const {
+  populate_Model_jitter(m, theta, extra_param, m_chol_jitter, bench);
+}
+
+void Kriging::populate_Model_jitter(KModel& m,
+                                    const arma::vec& theta,
+                                    double extra_param,
+                                    double chol_jitter,
+                                    std::map<std::string, double>* bench) const {
   double alpha = 1.0;
   arma::vec diag = KrigingImpl::ones;
   bool update_eligible = false;
@@ -317,8 +373,14 @@ void Kriging::populate_Model(KModel& m,
     update_eligible = !m_is_empty && (extra_param == m_sigma2) && (m_theta.size() == theta.size())
                       && (theta - m_theta).is_zero() && (m_T.memptr() != nullptr) && (m_X.n_rows > m_T.n_rows);
   } else {
+    // (m_T was factorized with m_model_chol_jitter)
     update_eligible = !m_is_empty && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
-                      && (m_T.memptr() != nullptr) && (m_X.n_rows > m_T.n_rows);
+                      && (m_T.memptr() != nullptr) && (m_X.n_rows > m_T.n_rows) && (chol_jitter == m_model_chol_jitter);
+    // Noise-free: fixed jitter on the diagonal (objective: m_chol_jitter;
+    // committed model: m_model_chol_jitter, see make_committed_Model); the
+    // Nugget / Heterogeneous modes are regularized by their own diagonal.
+    if (chol_jitter > 0.0)
+      diag = arma::vec(m_X.n_rows, arma::fill::value(1.0 + chol_jitter));
   }
 
   KrigingImpl::populate_Model(m, theta, alpha, diag, update_eligible, bench);
@@ -342,6 +404,13 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta,
 Kriging::KModel Kriging::make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const {
   KModel m = allocate_KModel();
   populate_Model(m, theta, bench);
+  return m;
+}
+
+Kriging::KModel Kriging::make_committed_Model(const arma::vec& theta, double extra_param) const {
+  KModel m = allocate_KModel();
+  populate_Model_jitter(
+      m, theta, extra_param, (m_noise_model == NoiseModel::None) ? m_model_chol_jitter : 0.0, nullptr);
   return m;
 }
 
@@ -1025,8 +1094,10 @@ double Kriging::_logLikelihoodVecchia(const arma::vec& _gamma,
   // gradient directions: theta (d), plus the extra parameter if asked for
   const bool grad_extra = with_grad && (grad_out->n_elem > d) && (is_nugget || is_hetero);
   const arma::uword nd = grad_extra ? d + 1 : d;
-  // diagonal of the noisy correlation (and its d/dsigma2 for Heterogeneous)
-  auto diag_of = [&](arma::uword j) { return is_hetero ? 1.0 + m_noise(j) / extra : 1.0; };
+  // diagonal of the noisy correlation (and its d/dsigma2 for Heterogeneous);
+  // noise-free: 1 + the fixed Cholesky jitter of the exact path (populate_Model)
+  const double jitter = m_chol_jitter;  // 0 unless noise-free (fit_impl)
+  auto diag_of = [&](arma::uword j) { return is_hetero ? 1.0 + m_noise(j) / extra : 1.0 + jitter; };
   auto ddiag_of = [&](arma::uword j) { return is_hetero ? -m_noise(j) / (extra * extra) : 0.0; };
 
   arma::vec u(n);     // y_i - a' y_N  (trend-free residual numerator)
@@ -1391,6 +1462,7 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodVecchiaFun
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const arma::mat& X_n,
                                                                            bool return_stdev,
                                                                            arma::uword m) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const arma::uword n = m_X.n_rows;
   const arma::uword d = m_X.n_cols;
   const arma::uword q = X_n.n_rows;
@@ -1407,6 +1479,8 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
   const bool is_nugget = (m_noise_model == NoiseModel::Nugget);
   const bool is_hetero = (m_noise_model == NoiseModel::Heterogeneous);
   const double f = is_nugget ? m_alpha : 1.0;
+  // noise-free observations: the fixed Cholesky jitter of the exact path
+  const double jitter = m_chol_jitter;  // 0 unless noise-free (fit_impl)
   const double lmp_scale = (m_objective == "LMP") ? (n - m_F.n_cols) / (n - m_F.n_cols - 2.0) : 1.0;
   const double var_scale = m_sigma2 * lmp_scale / f;
 
@@ -1424,7 +1498,8 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
   const double* xp = Xt.memptr();
 
 #if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
-#pragma omp parallel for schedule(dynamic, 16) if (q > 32 && n * m >= 40000)
+#pragma omp parallel for schedule(dynamic, 16) \
+    num_threads(libKriging::detail::omp_threads()) if (q > 32 && n * m >= 40000)
 #endif
   for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
     // m nearest observations (normalized space), partial selection
@@ -1453,7 +1528,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
         const arma::vec dx = (m_X.row(Ni(a)) - m_X.row(Ni(b))).t();
         RN(a, b) = RN(b, a) = f * _Cov(dx, m_theta);
       }
-      RN(a, a) = (is_hetero ? 1.0 + m_noise(Ni(a)) / m_sigma2 : 1.0) + LinearAlgebra::num_nugget;
+      RN(a, a) = (is_hetero ? 1.0 + m_noise(Ni(a)) / m_sigma2 : 1.0 + jitter) + LinearAlgebra::num_nugget;
       const arma::vec dx = (m_X.row(Ni(a)) - x_t).t();
       // as predict(): a prediction point equal to an observation gets the
       // observation's (noisy) covariance 1 in Nugget mode
@@ -1499,6 +1574,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
                                                      arma::uword m,
                                                      bool with_nugget,
                                                      const arma::vec& with_noise) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const arma::uword n = m_X.n_rows;
   const arma::uword d = m_X.n_cols;
   const arma::uword q = X_n.n_rows;
@@ -1532,7 +1608,8 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
   const arma::mat Xt = m_X.t();
   const double* xp = Xt.memptr();
 #if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
-#pragma omp parallel for schedule(dynamic, 16) if (q > 32 && n * m_obs >= 40000)
+#pragma omp parallel for schedule(dynamic, 16) \
+    num_threads(libKriging::detail::omp_threads()) if (q > 32 && n * m_obs >= 40000)
 #endif
   for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
     std::vector<std::pair<double, arma::uword>> cand(n);
@@ -1570,11 +1647,13 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
       return 1.0;  // noisy simulated response at an observed location
     return f * _Cov(dx, m_theta);
   };
-  // variance (units sigma2 / f) of a candidate
+  // variance (units sigma2 / f) of a candidate; observations: noise-free with
+  // the fixed Cholesky jitter of the exact path (populate_Model)
+  const double jitter = m_chol_jitter;  // 0 unless noise-free (fit_impl)
   auto var_of = [&](arma::uword c) {
     if (c >= n)
       return sim_var;
-    return is_hetero ? 1.0 + m_noise(c) / m_sigma2 : 1.0;
+    return is_hetero ? 1.0 + m_noise(c) / m_sigma2 : 1.0 + jitter;
   };
 
   std::vector<std::pair<double, arma::uword>> cand;
@@ -1873,8 +1952,10 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
     U = U0;
     D = D0 + m_noise / extra;
   } else {
+    // noise-free: the fixed Cholesky jitter of the exact path (populate_Model),
+    // so that k = n reproduces the exact model
     U = U0;
-    D = D0;
+    D = D0 + m_chol_jitter;
   }
 
   const NystromChol Rf(U, D, m_nystrom_landmarks, /*with_inverse=*/grad_out != nullptr);
@@ -1959,9 +2040,9 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
 
     const arma::vec& x = Rinve;
 
-    const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);           // R_ss^-1
-    const arma::mat W = Kinv * R_ns.t();                             // k x n = R_ss^-1 * R_ns.t()
-    const arma::mat RM = Rf.solve(R_ns);                             // n x k = Rinv * R_ns
+    const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);  // R_ss^-1
+    const arma::mat W = Kinv * R_ns.t();                    // k x n = R_ss^-1 * R_ns.t()
+    const arma::mat RM = Rf.solve(R_ns);                    // n x k = Rinv * R_ns
     const arma::vec& diagRinv = Rf.diag_inv;
 
     const arma::vec Mtx = R_ns.t() * x;    // k
@@ -2088,6 +2169,7 @@ void Kriging::check_not_nystrom_light(const char* what) const {
  * universal-kriging-style with the committed beta; variance is the
  * simple-kriging one (beta treated as known, like predictVecchia). */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const arma::mat& X_n, bool return_stdev) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (m_nystrom_U.is_empty())
     throw std::runtime_error("predictNystrom: model was not fitted with method=\"nystrom(k)\"");
   const arma::uword d = m_X.n_cols;
@@ -2137,6 +2219,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::simulateNystrom(int nsim, int seed, const arma::mat& X_n) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (m_nystrom_U.is_empty())
     throw std::runtime_error("simulateNystrom: model was not fitted with method=\"nystrom(k)\"");
   const arma::uword d = m_X.n_cols;
@@ -2511,7 +2594,10 @@ VecchiaPrecision build_vecchia_precision(const arma::mat& X,
                                          const arma::vec& theta,
                                          const std::function<double(const arma::vec&, const arma::vec&)>& Cov,
                                          const std::function<arma::vec(const arma::vec&, const arma::vec&)>& DlnCov,
-                                         bool with_grad) {
+                                         bool with_grad,
+                                         double jitter) {
+  // jitter: the fixed Cholesky jitter of the noise-free objective
+  // (m_chol_jitter), on the diagonal as in _logLikelihoodVecchia
   constexpr double v_floor = 1e-15;  // as in _logLikelihoodVecchia
   VecchiaPrecision vp;
   vp.n = X.n_rows;
@@ -2561,11 +2647,11 @@ VecchiaPrecision build_vecchia_precision(const arma::mat& X,
           dr(i, k) = c * dln(k);
       }
     }
-    RN.diag() += LinearAlgebra::num_nugget;
+    RN.diag() += jitter + LinearAlgebra::num_nugget;
     const arma::mat LN = LinearAlgebra::safe_chol_lower(RN);
     const arma::vec a_vec = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), r));
     vp.a[t] = a_vec;
-    vp.v(t) = std::max(1.0 - arma::dot(r, a_vec), v_floor);
+    vp.v(t) = std::max(1.0 + jitter - arma::dot(r, a_vec), v_floor);
     if (with_grad) {
       arma::mat dA(mi, d);
       for (arma::uword k = 0; k < d; ++k) {
@@ -2649,7 +2735,10 @@ NystromPrecision build_nystrom_precision(const arma::mat& X,
                                          const arma::vec& theta,
                                          const std::function<double(const arma::vec&, const arma::vec&)>& Cov,
                                          const std::function<arma::vec(const arma::vec&, const arma::vec&)>& DlnCov,
-                                         bool with_grad) {
+                                         bool with_grad,
+                                         double jitter) {
+  // jitter: as in build_vecchia_precision (residual diagonal D0 + jitter, as
+  // _logLikelihoodNystrom)
   NystromPrecision np;
   const arma::uword n = X.n_rows;
   const arma::uword d = X.n_cols;
@@ -2665,14 +2754,15 @@ NystromPrecision build_nystrom_precision(const arma::mat& X,
   R_ss.diag() += LinearAlgebra::num_nugget;
   const arma::mat L_ss = arma::chol(R_ss, "lower");
   const arma::mat U = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));
-  const arma::vec D = nystrom_residual_diag(U, landmarks);
+  const arma::vec D0 = nystrom_residual_diag(U, landmarks);
+  const arma::vec D = D0 + jitter;
   np.F = NystromChol(U, D, landmarks, /*with_inverse=*/true);
 
   if (with_grad) {
     const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);
     np.Wt = R_ns * Kinv;
     np.PW = np.P(np.Wt);
-    const arma::uvec clamped = arma::find(D <= LinearAlgebra::num_nugget);
+    const arma::uvec clamped = arma::find(D0 <= LinearAlgebra::num_nugget);
     np.dM.resize(d);
     np.dK.resize(d);
     np.dlow.resize(d);
@@ -2816,11 +2906,11 @@ double Kriging::_leaveOneOutApprox(bool vecchia,
     grad_out->set_size(_theta.n_elem);
   if (vecchia) {
     const VecchiaPrecision P = build_vecchia_precision(
-        m_X, m_vecchia_order, m_vecchia_neighbors, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+        m_X, m_vecchia_order, m_vecchia_neighbors, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr, m_chol_jitter);
     return approx_loo(P, m_y, m_F, est_beta, m_beta, grad_out, yhat_out);
   }
-  const NystromPrecision P
-      = build_nystrom_precision(m_X, m_nystrom_landmarks, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+  const NystromPrecision P = build_nystrom_precision(
+      m_X, m_nystrom_landmarks, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr, m_chol_jitter);
   return approx_loo(P, m_y, m_F, est_beta, m_beta, grad_out, yhat_out);
 }
 
@@ -2829,11 +2919,11 @@ double Kriging::_logMargPostApprox(bool vecchia, const arma::vec& _theta, arma::
     grad_out->set_size(_theta.n_elem);
   if (vecchia) {
     const VecchiaPrecision P = build_vecchia_precision(
-        m_X, m_vecchia_order, m_vecchia_neighbors, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+        m_X, m_vecchia_order, m_vecchia_neighbors, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr, m_chol_jitter);
     return approx_lmp(P, m_y, m_F, m_X, _theta, m_est_sigma2, m_sigma2, grad_out);
   }
-  const NystromPrecision P
-      = build_nystrom_precision(m_X, m_nystrom_landmarks, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr);
+  const NystromPrecision P = build_nystrom_precision(
+      m_X, m_nystrom_landmarks, _theta, _Cov, _DlnCovDtheta, grad_out != nullptr, m_chol_jitter);
   return approx_lmp(P, m_y, m_F, m_X, _theta, m_est_sigma2, m_sigma2, grad_out);
 }
 
@@ -3336,6 +3426,33 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   fit_impl(y, nullptr, X, regmodel, normalize, optim, objective, parameters, method);
 }
 
+void Kriging::commit_model_chol_jitter() {
+  if (m_noise_model != NoiseModel::None || m_is_empty)
+    return;
+  // from the search jitter kept with the model (not the current setting), so
+  // a warm-restart update of a loaded model commits the same factorization
+  m_model_chol_jitter = LinearAlgebra::model_chol_jitter(m_chol_jitter);
+  if (m_model_chol_jitter == m_chol_jitter)
+    return;  // the optimizer's last model is already the committed one
+  KModel m = make_committed_Model(m_theta, m_sigma2);
+  m_T = std::move(m.L);
+  m_R = std::move(m.R);
+  m_M = std::move(m.Fstar);
+  m_circ = std::move(m.Rstar);
+  m_star = std::move(m.Qstar);
+  m_Rinv = std::move(m.Rinv);
+  if (m_est_beta) {
+    m_beta = std::move(m.betahat);
+    m_z = std::move(m.Estar);
+  } else {
+    m_z = std::move(m.ystar) - m_M * m_beta;
+  }
+  if (m_est_sigma2) {
+    const arma::uword n = m_X.n_rows;
+    m_sigma2 = (m_objective == "LMP") ? m.SSEstar / (n - m_F.n_cols) : m.SSEstar / n;
+  }
+}
+
 void Kriging::fit_impl(const arma::vec& y,
                        const arma::vec* noise,
                        const arma::mat& X,
@@ -3345,6 +3462,7 @@ void Kriging::fit_impl(const arma::vec& y,
                        const std::string& objective_in,
                        const Parameters& parameters,
                        const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const arma::uword n = X.n_rows;
   // Heterogeneous noise in the ORIGINAL scale of y: the given one, or (refit
   // without new noise) the current one, read before the normalization
@@ -3360,6 +3478,14 @@ void Kriging::fit_impl(const arma::vec& y,
   const std::string objective = internal_fit_objective(objective_method.first, objective_method.second);
   // the last simulate(..., will_update=true) was built for the previous model
   clear_simulate_state();
+  // Fixed Cholesky jitter (noise-free only): m_chol_jitter, the kernel's
+  // value, for the objective (optimization, logLikelihood(Fun); reproducible
+  // theta); m_model_chol_jitter, 0, for the committed exact
+  // factorization (commit_model_chol_jitter; predict / simulate / update).
+  // Vecchia / Nystrom keep the objective value (their committed state comes
+  // from the objective itself).
+  m_chol_jitter = (m_noise_model == NoiseModel::None) ? LinearAlgebra::kernel_chol_jitter(m_covType) : 0.0;
+  m_model_chol_jitter = m_chol_jitter;
   m_optim = optim;
   m_objective = objective_method.first;
   m_method = objective_method.second;
@@ -3581,11 +3707,11 @@ void Kriging::fit_impl(const arma::vec& y,
     } else if (m_noise_model == NoiseModel::Heterogeneous) {
       extra_param = (sigma2 > 0) ? sigma2 : m_sigma2;
     } else {
-      extra_param = m_sigma2;  // ignored by 2-param populate_Model for None
+      extra_param = m_sigma2;  // ignored for None
+      m_model_chol_jitter = LinearAlgebra::model_chol_jitter(m_chol_jitter);
     }
 
-    Kriging::KModel m = (m_noise_model != NoiseModel::None) ? make_Model(m_theta, extra_param, nullptr)
-                                                            : make_Model(m_theta, nullptr);
+    Kriging::KModel m = make_committed_Model(m_theta, extra_param);
     m_is_empty = false;
     m_T = std::move(m.L);
     m_R = std::move(m.R);
@@ -3648,25 +3774,24 @@ void Kriging::fit_impl(const arma::vec& y,
       auto parsed_bfgs = Optim::parse_method(optim, "BFGS");
       int multistart = parsed_bfgs.second;
 
-      // Configure threads for Armadillo/BLAS to balance nested parallelism.
-      // Each of the 'multistart' workers uses internal BLAS/OMP parallelism.
-      unsigned int n_cpu = std::thread::hardware_concurrency();
-      libKriging::detail::BlasThreadGuard thread_guard;
+      // The starts run in a thread pool (see run_task_pool below): the cores
+      // go to the starts first, the remaining share to their BLAS / OpenMP.
 
-      if (n_cpu > 0 && multistart > 1) {
-        unsigned int threads_per_worker = std::max(1u, n_cpu / multistart);
-        thread_guard.set(threads_per_worker);
-        if (Optim::log_level > Optim::log_none) {
-          arma::cout << "Threads per worker: " << threads_per_worker << " (total CPUs: " << n_cpu
-                     << ", multistart: " << multistart << ")" << arma::endl;
-        }
+      // Log-uniform draw in [theta_lower, theta_upper] (theta is a scale
+      // parameter): with the default bounds [0.02, 10] x maxdX a uniform draw
+      // puts 90 % of the starts above 1 x maxdX, where R is near singular and
+      // the LL flat (fixed Cholesky jitter) or erratic, and a start reaches
+      // the short-range region of every dimension with probability ~0.1^d
+      // (#418, docs/dev/CholJitter.md, starting points). Uniform for a dimension whose
+      // lower bound is not positive.
+      arma::mat theta0_rand = Random::randu_mat(multistart, d);
+      for (arma::uword j = 0; j < d; ++j) {
+        const double lo = theta_lower.at(j), up = theta_upper.at(j);
+        if (lo > 0.0)
+          theta0_rand.col(j) = arma::exp(std::log(lo) + theta0_rand.col(j) * (std::log(up) - std::log(lo)));
+        else
+          theta0_rand.col(j) = lo + theta0_rand.col(j) * (up - lo);
       }
-
-      arma::mat theta0_rand
-          = arma::repmat(trans(theta_lower), multistart, 1)
-            + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
-      // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
-      //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
 
       // Nystrom warm start: with no given theta, every multistart worker
       // otherwise begins from a fully random point in theta_bounds, so how
@@ -3956,6 +4081,13 @@ void Kriging::fit_impl(const arma::vec& y,
                          << ", num_iters=" << opt_result.num_iters << ", task=" << opt_result.task << arma::endl;
             }
 
+            // "No improvement" below the optimizer's own relative tolerance
+            // (factr * epsmch) is no change: an exact comparison of two equal
+            // optima made the restart decision depend on the rounding (BLAS
+            // thread count, docs/dev/CholJitter.md, starting points)
+            const double f_tol
+                = optimizer.factr * arma::datum::eps * std::max(1.0, std::abs(std::min(best_f_opt, opt_result.f_opt)));
+            const bool worse = (best_f_opt < arma::datum::inf) && (opt_result.f_opt > best_f_opt + f_tol);
             if (opt_result.f_opt < best_f_opt) {
               best_f_opt = opt_result.f_opt;
               best_gamma = gamma_tmp;
@@ -3980,9 +4112,9 @@ void Kriging::fit_impl(const arma::vec& y,
             // Check abnormal termination or convergence at bounds to decide on restart
             if ((retry < Optim::max_restart)
                 && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)  // Check for abnormal termination
-                    || (opt_result.num_iters <= 2)          // Start point is strangely quite optimal...
-                    || (sol_to_lb < arma::datum::eps)       // Stuck at lower bound
-                    || (opt_result.f_opt > best_f_opt))) {  // No improvement
+                    || (opt_result.num_iters <= 2)     // Start point is strangely quite optimal...
+                    || (sol_to_lb < arma::datum::eps)  // Stuck at lower bound
+                    || worse)) {                       // No improvement
 
               if (Optim::log_level > Optim::log_none) {
                 arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << (retry + 1)
@@ -4059,16 +4191,20 @@ void Kriging::fit_impl(const arma::vec& y,
         return result;
       };
 
-      // Execute optimizations (sequential multistart in the calling thread)
-      // Running multistart workers in std::threads even when serialized by a mutex causes MKL to
-      // produce slightly different floating-point results compared to running on the main thread,
-      // because MKL uses different code paths for secondary vs. primary threads. This breaks the
-      // BFGS20 == best-of-20×BFGS1 invariant. Running sequentially in the calling thread ensures
-      // every start uses the same BLAS/LAPACK context as a single-start BFGS1 run.
+      // Execute optimizations: the starts run concurrently in a thread pool
+      // (TaskPool.hpp), which gives the cores to the starts first and the
+      // remaining share to each start's BLAS / OpenMP calls; a single start
+      // runs inline with all of them. Each start works on its own
+      // preallocated KModel and the objectives are const. With MKL, BLAS calls
+      // from secondary threads may round differently from the calling
+      // thread's: BFGS20 matches the best of 20 BFGS1 up to that rounding
+      // (KrigingTest checks it to 1e-3 relative).
       std::vector<OptimizationResult> results(multistart);
-      for (int task_id = 0; task_id < multistart; task_id++) {
-        results[task_id] = optimize_worker(task_id);
-      }
+      libKriging::detail::run_task_pool(
+          multistart,
+          [&](int task_id) { results[task_id] = optimize_worker(task_id); },
+          "multistart",
+          /*stagger=*/false);
 
       // Find best result
       int best_idx = -1;
@@ -4162,6 +4298,7 @@ void Kriging::fit_impl(const arma::vec& y,
           arma::cout << "\nBest solution from start point " << (best_idx + 1) << " with objective: " << min_ofn
                      << arma::endl;
         }
+        commit_model_chol_jitter();
       }
 
     } else
@@ -4198,6 +4335,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
 Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   // exact prediction only: no implicit switch to an approximate predictor
   check_exact_available("predict", "predict");
   const arma::uword n_o = m_X.n_rows;
@@ -4231,6 +4369,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::m
     bool return_cov,
     bool return_deriv,
     const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "predict");
   check_nystrom_rank(am, m_nystrom_k, "predict");
   if (am.kind == ApproxMethod::Exact)
@@ -4247,6 +4386,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const arma::mat& X_n,
                                               const std::string& method,
                                               const bool will_update) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "simulate");
   check_nystrom_rank(am, m_nystrom_k, "simulate");
   if (am.kind == ApproxMethod::Exact)
@@ -4263,6 +4403,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const bool with_nugget,
                                               const bool will_update,
                                               const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "simulate");
   check_nystrom_rank(am, m_nystrom_k, "simulate");
   if (am.kind == ApproxMethod::Exact)
@@ -4287,6 +4428,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const arma::vec& with_noise,
                                               const bool will_update,
                                               const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "simulate");
   check_nystrom_rank(am, m_nystrom_k, "simulate");
   if (am.kind == ApproxMethod::Exact)
@@ -4318,6 +4460,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
                                               const int seed,
                                               const arma::mat& X_n,
                                               const bool will_update) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   check_exact_available("simulate", "simulate");
   if (m_noise_model == NoiseModel::Nugget)
     return simulate(nsim, seed, X_n, /*with_nugget=*/false, will_update);
@@ -4343,6 +4486,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const arma::mat& X_n,
                                               const bool with_nugget,
                                               const bool will_update) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   check_exact_available("simulate", "simulate");
   const double alpha = m_alpha;
   const arma::vec diag_nn = with_nugget ? arma::vec(X_n.n_rows, arma::fill::ones) : arma::vec();
@@ -4368,6 +4512,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const arma::mat& X_n,
                                               const arma::vec& with_noise,
                                               const bool will_update) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   const arma::uword n_n = X_n.n_rows;
   if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
     throw std::runtime_error("Noise vector should have same length as X_n");
@@ -4399,6 +4544,7 @@ void Kriging::clear_simulate_state() {
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   // the noise of the new observations is needed (checked before any state change)
   if (m_noise_model == NoiseModel::Heterogeneous)
     throw std::invalid_argument("heterogeneous noise model: use update_simulate(y_u, noise_u, X_u)");
@@ -4419,6 +4565,10 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
                                 /*R_un_coincident_to_one=*/false,
                                 /*Sigma_divisor=*/alpha);
   }
+  // noise-free: the new observations are conditioned on exactly (no fixed
+  // Cholesky jitter on R_uu), as update() does (committed model, exact): an
+  // update point on the simulation design is reproduced exactly
+  // (docs/dev/CholJitter.md)
   return update_simulate_impl(y_u,
                               X_u,
                               allow_cache,
@@ -4433,6 +4583,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
                                                      const arma::vec& noise_u,
                                                      const arma::mat& X_u) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension mismatch: y_u and X_u");
   if (X_u.n_cols != m_X.n_cols)
@@ -4467,6 +4618,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
  * @param refit is true if we want to re-fit the model
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   // the noise of the new observations is needed (checked before any state change)
   if (m_noise_model == NoiseModel::Heterogeneous)
     throw std::invalid_argument("heterogeneous noise model: use update(y_u, noise_u, X_u)");
@@ -4665,12 +4817,14 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
       if (m_objective == "LMP")
         m_sigma2 = km.SSEstar / (n - m_F.n_cols);
     }
+    commit_model_chol_jitter();
   } else {  // incremental update without parameter re-optimization
     update_no_refit_impl(
         y_u,
         X_u,
         /*extend_class_data=*/[] {},
-        /*build_model=*/[this] { return make_Model(m_theta, nullptr); });
+        /*build_model=*/
+        [this] { return make_committed_Model(m_theta, (m_noise_model == NoiseModel::Nugget) ? m_alpha : m_sigma2); });
   }
 }
 
@@ -4678,6 +4832,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u,
                                        const arma::vec& noise_u,
                                        const arma::mat& X_u,
                                        const bool refit) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (m_noise_model != NoiseModel::Heterogeneous)
     throw std::runtime_error("update(y, noise, X) requires NoiseModel::Heterogeneous");
   if (y_u.n_elem != X_u.n_rows)
@@ -4751,6 +4906,11 @@ void Kriging::dump_to_json(nlohmann::json& j) const {
     j["est_nugget"] = m_est_nugget;
     j["alpha"] = m_alpha;
   }
+  // Only when non-zero, so files without a fixed jitter stay byte-identical
+  if (m_chol_jitter > 0.0)
+    j["chol_jitter"] = m_chol_jitter;
+  if (m_model_chol_jitter > 0.0)
+    j["model_chol_jitter"] = m_model_chol_jitter;
   // Nystrom fits carry no m_T/m_R/... (dump_common_to_json serializes those
   // as empty, harmlessly): the committed low-rank factors/landmarks are the
   // extra state that reconstructs the model, stored only when present so
@@ -4792,6 +4952,9 @@ Kriging Kriging::load_from_json(const nlohmann::json& j, const std::string& file
     kr.m_est_nugget = j["est_nugget"].template get<bool>();
     kr.m_alpha = j["alpha"].template get<double>();
   }
+  // Absent on files without a fixed jitter (all files before it existed)
+  kr.m_chol_jitter = j.contains("chol_jitter") ? j["chol_jitter"].template get<double>() : 0.0;
+  kr.m_model_chol_jitter = j.contains("model_chol_jitter") ? j["model_chol_jitter"].template get<double>() : 0.0;
   // Absent on pre-Nystrom save files: defaults to a normal (non-Nystrom) load.
   if (j.contains("nystrom_light") && j["nystrom_light"].template get<bool>()) {
     kr.m_nystrom_light = true;

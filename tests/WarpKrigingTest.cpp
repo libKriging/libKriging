@@ -1,3 +1,5 @@
+// assert() is the check of this test: keep it in Release builds
+#undef NDEBUG
 #define _USE_MATH_DEFINES  // required for Visual Studio
 /**
  * @file test_WarpKriging.cpp
@@ -1181,6 +1183,21 @@ void test_parallel_multistart() {
     double ll = model.logLikelihood();
     std::cout << "  2D BFGS3 LL: " << ll << std::endl;
     assert(std::isfinite(ll));
+  }
+
+  // Starting points come from Random (as Kriging), reset to its seed at each
+  // fit: same result whatever the Armadillo RNG state.
+  {
+    arma::arma_rng::set_seed(1);
+    WarpKriging a({"kumaraswamy"}, "gauss");
+    a.fit(y, X, Trend::RegressionModel::Constant, true, "BFGS3", "LL");
+    arma::arma_rng::set_seed(2);
+    arma::vec u = arma::randu<arma::vec>(10);  // move the Armadillo RNG further
+    WarpKriging b({"kumaraswamy"}, "gauss");
+    b.fit(y, X, Trend::RegressionModel::Constant, true, "BFGS3", "LL");
+    std::cout << "  BFGS3 same Random seed: " << a.logLikelihood() << " / " << b.logLikelihood() << std::endl;
+    assert(arma::approx_equal(a.theta(), b.theta(), "absdiff", 1e-12));
+    assert(a.logLikelihood() == b.logLikelihood());
   }
 
   std::cout << "  PASSED\n" << std::endl;

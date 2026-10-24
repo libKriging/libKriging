@@ -1,6 +1,7 @@
 #include "libkriging_c.h"
 
 #include <libKriging/Kriging.hpp>
+#include <libKriging/LinearAlgebra.hpp>
 #include <libKriging/MLPKriging.hpp>
 #include <libKriging/NestedKriging.hpp>
 
@@ -2224,4 +2225,32 @@ void* lk_nested_kriging_load(const char* filename) {
     return new NestedKriging(NestedKriging::load(filename));
   }
   CATCH_RETURN_NULL
+}
+
+/* ========================================================================== */
+/*  LinearAlgebra settings                                                    */
+/* ========================================================================== */
+
+double lk_linalg_get_chol_jitter(void) {
+  return LinearAlgebra::get_chol_jitter();
+}
+
+int lk_linalg_set_chol_jitter(double jitter) {
+  try {
+    LinearAlgebra::set_chol_jitter(jitter);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_linalg_get_num_nugget(void) {
+  return LinearAlgebra::get_num_nugget();
+}
+
+int lk_linalg_set_num_nugget(double nugget) {
+  try {
+    LinearAlgebra::set_num_nugget(nugget);
+    return 0;
+  }
+  CATCH_RETURN
 }

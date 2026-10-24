@@ -21,6 +21,18 @@ void linalg_set_num_nugget(double nugget) {
   impl_ptr->set_num_nugget(nugget);
 }
 
+// Fixed Cholesky jitter of noise-free fits: < 0 automatic per kernel (default),
+// 0 disabled (former behaviour), > 0 this value for every kernel
+// [[Rcpp::export]]
+double linalg_get_chol_jitter() {
+  return LinearAlgebra::get_chol_jitter();
+}
+
+// [[Rcpp::export]]
+void linalg_set_chol_jitter(double jitter) {
+  LinearAlgebra::set_chol_jitter(jitter);
+}
+
 // [[Rcpp::export]]
 void linalg_check_chol_rcond(bool cr) {
   LinearAlgebra* la = new LinearAlgebra();
