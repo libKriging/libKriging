@@ -154,6 +154,8 @@ jobs:
             sudo apt update
           fi
           sudo apt install liblapack-dev python3-pip
+          # OpenBLAS 0.3.20 Cooperlake kernels are wrong on Xeon 6973P-C (main.yml, #429)
+          echo "OPENBLAS_CORETYPE=Haswell" >> $GITHUB_ENV
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
             sudo apt install -qy octave liboctave-dev
           fi

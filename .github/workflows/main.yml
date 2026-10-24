@@ -242,12 +242,13 @@ jobs:
             sudo apt-get remove -y libomp-dev libomp5-dev || true
           fi
           sudo apt install liblapack-dev python3-pip
+          # Ubuntu 22.04's OpenBLAS 0.3.20 (pulled by octave, and present in the
+          # R jobs) gives wrong results with its Cooperlake kernels on Xeon
+          # 6973P-C runners (docs/dev/parallel.md 4, #429): use its AVX2 kernels,
+          # available on every x86 runner. No effect where OpenBLAS is absent.
+          echo "OPENBLAS_CORETYPE=Haswell" >> $GITHUB_ENV
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
             sudo apt install -qy octave liboctave-dev
-            # octave pulls Ubuntu 22.04's OpenBLAS 0.3.20, whose Cooperlake kernels
-            # give wrong results on Xeon 6973P-C runners (docs/dev/parallel.md 4):
-            # use its AVX2 kernels, available on every x86 runner
-            echo "OPENBLAS_CORETYPE=Haswell" >> $GITHUB_ENV
           fi
           if [ "${ENABLE_MATLAB_BINDING}" == "on" ]; then
             sudo apt install -qy intel-mkl

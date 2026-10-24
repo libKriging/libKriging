@@ -333,7 +333,9 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 - Other BLAS (MKL `mkl_set_num_threads_local`, FlexiBLAS, BLIS): sections 5 and 8
   (#422).
 - macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then).
-- Octave Linux CI on Xeon 6973P (OpenBLAS 0.3.20 `Cooperlake`, section 4): the
-  job now sets `OPENBLAS_CORETYPE=Haswell`; drop it with a newer OpenBLAS (#429).
+- Linux CI on Xeon 6973P (OpenBLAS 0.3.20 `Cooperlake`, section 4): the Octave,
+  R (`main.yml`) and coverage (`analysis.yml`) jobs failed the same way; every
+  Linux job of these workflows now sets `OPENBLAS_CORETYPE=Haswell`; drop it with
+  a newer OpenBLAS (#429).
 - Julia exposes no thread setter (neither `set_thread_pool_size` nor the budget)
   (#423).
