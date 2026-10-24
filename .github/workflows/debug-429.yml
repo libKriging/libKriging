@@ -1,0 +1,181 @@
+name: Debug 429 (OpenBLAS on Xeon 6973P-C)
+
+# TEMPORARY workflow for #429, to be removed with .github/debug-429/ and the
+# '!ccr-143ce523-yoxpqv' exclusions of the other workflows.
+#
+# Each replica lands on whatever CPU GitHub gives it; several replicas raise
+# the odds of an Intel Xeon 6973P-C. Every replica logs the runner / CPU
+# identification, then
+#   1. checks BLAS / LAPACK results (.github/debug-429/blas_check.c) against a
+#      long double reference, for each OpenBLAS kernel set and thread count;
+#   2. builds the C++ core and runs ctest with the kernels OpenBLAS picks by
+#      itself (no OPENBLAS_CORETYPE), then reruns the failures under other
+#      kernel sets / one thread.
+# The jobs do not fail on wrong results: the step summary and the annotations
+# carry the outcome.
+
+on:
+  push:
+    branches:
+      - 'ccr-143ce523-yoxpqv'
+  workflow_dispatch:
+
+env:
+  DEBUG_CI: true
+  CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+
+jobs:
+  probe:
+    name: probe (${{ matrix.os }} #${{ matrix.replica }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04]
+        replica: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        include:
+          # OpenBLAS 0.3.26: expected to know the CPU (or at least not to fail)
+          - os: ubuntu-24.04
+            replica: 1
+          - os: ubuntu-24.04
+            replica: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: install BLAS (as the Octave Linux job)
+        shell: bash
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -qy liblapack-dev
+          # libopenblas0-pthread is what `apt install octave` pulls on 22.04;
+          # its alternatives take libblas.so.3 / liblapack.so.3 over.
+          sudo apt-get install -qy libopenblas0-pthread
+          update-alternatives --display libblas.so.3-x86_64-linux-gnu || true
+          update-alternatives --display liblapack.so.3-x86_64-linux-gnu || true
+          dpkg -l | grep -E "openblas|liblapack|libblas" || true
+
+      - name: runner architecture
+        id: arch
+        shell: bash
+        run: |
+          echo "runner.os=${{ runner.os }} runner.arch=${{ runner.arch }} runner.name=${{ runner.name }}"
+          echo "ImageOS=${ImageOS:-?} ImageVersion=${ImageVersion:-?}"
+          uname -a
+          cat /etc/os-release | grep -E "^(PRETTY_NAME|VERSION_ID)="
+          ldd --version | head -1
+          gcc --version | head -1
+          echo "nproc=$(nproc)"
+          echo "---- lscpu"
+          LC_ALL=C lscpu
+          echo "---- /proc/cpuinfo (first CPU)"
+          awk '/^$/{exit} {print}' /proc/cpuinfo
+          echo "---- cpuid / xcr0"
+          gcc -O1 -o "$RUNNER_TEMP/cpuid" .github/debug-429/cpuid.c
+          "$RUNNER_TEMP/cpuid" | tee "$RUNNER_TEMP/cpuid.txt"
+          echo "---- OpenBLAS kernel choice"
+          python3 - <<'PYEOF' | tee "$RUNNER_TEMP/openblas.txt"
+          import ctypes
+          lib = ctypes.CDLL("libopenblas.so.0")
+          lib.openblas_get_config.restype = ctypes.c_char_p
+          lib.openblas_get_corename.restype = ctypes.c_char_p
+          print(f"{lib.openblas_get_config().decode()} | core: {lib.openblas_get_corename().decode()} | threads: {lib.openblas_get_num_threads()}")
+          PYEOF
+          model="$(LC_ALL=C lscpu | sed -n 's/^Model name: *//p')"
+          core="$(sed -n 's/.*| core: \([^ |]*\).*/\1/p' "$RUNNER_TEMP/openblas.txt")"
+          bf16="$(sed -n 's/.*avx512_bf16=\([01]\).*/\1/p' "$RUNNER_TEMP/cpuid.txt")"
+          fp16="$(sed -n 's/.*avx512_fp16=\([01]\).*/\1/p' "$RUNNER_TEMP/cpuid.txt")"
+          xcr0="$(sed -n 's/.*xcr0=\(0x[0-9a-f]*\).*/\1/p' "$RUNNER_TEMP/cpuid.txt")"
+          fms="$(sed -n 's/.*(display family=\([^ ]*\) model=\([^)]*\)).*/\1\/\2/p' "$RUNNER_TEMP/cpuid.txt")"
+          echo "::notice title=runner ${{ matrix.os }} #${{ matrix.replica }}::${{ runner.arch }} | ${model} | family/model ${fms} | avx512_bf16=${bf16} avx512_fp16=${fp16} xcr0=${xcr0} | OpenBLAS core ${core} | image ${ImageVersion:-?}"
+          {
+            echo "### ${{ matrix.os }} #${{ matrix.replica }}"
+            echo ""
+            echo "| arch | CPU | family/model | avx512_bf16 | avx512_fp16 | xcr0 | OpenBLAS auto core | image |"
+            echo "|---|---|---|---|---|---|---|---|"
+            echo "| ${{ runner.arch }} | ${model} | ${fms} | ${bf16} | ${fp16} | ${xcr0} | ${core} | ${ImageVersion:-?} |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "auto_core=${core}" >> "$GITHUB_OUTPUT"
+
+      - name: BLAS / LAPACK check per kernel set
+        shell: bash
+        run: |
+          gcc -O2 -o "$RUNNER_TEMP/blas_check" .github/debug-429/blas_check.c \
+            /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/libblas.so.3 -ldl -lm
+          ldd "$RUNNER_TEMP/blas_check" | grep -E "blas|lapack"
+          {
+            echo "| OPENBLAS_CORETYPE | threads | core used | cases | fails | worst case | ratio |"
+            echo "|---|---|---|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for coretype in auto Cooperlake SkylakeX Haswell Sandybridge Prescott; do
+            for threads in 4 1; do
+              echo "==== OPENBLAS_CORETYPE=${coretype} OPENBLAS_NUM_THREADS=${threads}"
+              if [ "$coretype" == "auto" ]; then unset OPENBLAS_CORETYPE; else export OPENBLAS_CORETYPE=$coretype; fi
+              out="$(OPENBLAS_NUM_THREADS=$threads "$RUNNER_TEMP/blas_check" 2>&1)" || echo "exit code $?"
+              echo "$out" | head -60
+              s="$(echo "$out" | grep '^SUMMARY' || echo 'SUMMARY core=crash threads=? cases=? fails=? worst=? ratio=?')"
+              get() { echo "$s" | sed -n "s/.* $1=\([^ ]*\).*/\1/p"; }
+              echo "| ${coretype} | ${threads} | $(get core) | $(get cases) | $(get fails) | $(get worst) | $(get ratio) |" >> "$GITHUB_STEP_SUMMARY"
+              if [ "$(get fails)" != "0" ]; then
+                echo "::error title=wrong BLAS results::OPENBLAS_CORETYPE=${coretype} threads=${threads} core=$(get core): $(get fails) failing cases, worst $(get worst) ratio $(get ratio)"
+              fi
+            done
+          done
+          unset OPENBLAS_CORETYPE
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: build C++ core and tests
+        shell: bash
+        run: |
+          export MODE=Release ENABLE_PYTHON_BINDING=off ENABLE_OCTAVE_BINDING=off ENABLE_MATLAB_BINDING=off \
+                 ENABLE_R_BINDING=off ENABLE_JULIA_BINDING=off BUILD_NAME=linux-macos
+          tools/linux-macos/install.sh
+          tools/common/before_script.sh
+          tools/linux-macos/build.sh
+
+      - name: ctest with the kernels OpenBLAS picks
+        shell: bash
+        run: |
+          unset OPENBLAS_CORETYPE
+          cd build
+          ldd "$(find . -type f -name 'LinearAlgebraTest' | head -1)" | grep -E "blas|lapack" || true
+          set +e
+          ctest -C Release -j "$(nproc)" --output-on-failure --timeout 900 > ctest-auto.log 2>&1
+          rc=$?
+          set -e
+          tail -150 ctest-auto.log
+          failed="$(grep -cE '^\s+[0-9]+ - .*\((Failed|SEGFAULT|Subprocess aborted|Timeout|Exception)' ctest-auto.log || true)"
+          summary="$(grep -E 'tests passed|tests failed' ctest-auto.log | tail -1)"
+          echo "ctest (core ${{ steps.arch.outputs.auto_core }}): ${summary:-rc=$rc}"
+          {
+            echo "**ctest, core ${{ steps.arch.outputs.auto_core }} (auto):** ${summary:-rc=$rc}"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$rc" != "0" ]; then
+            echo "::error title=ctest auto core::core ${{ steps.arch.outputs.auto_core }}: ${summary}"
+            cp Testing/Temporary/LastTestsFailed.log failed-auto.log
+            for cfg in "OPENBLAS_CORETYPE=Haswell" "OPENBLAS_CORETYPE=SkylakeX" "OPENBLAS_CORETYPE=Cooperlake" "OPENBLAS_NUM_THREADS=1" "OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1"; do
+              echo "==== rerun failed with ${cfg}"
+              cp failed-auto.log Testing/Temporary/LastTestsFailed.log
+              set +e
+              env $cfg ctest -C Release -j "$(nproc)" --rerun-failed --output-on-failure --timeout 900 > "ctest-rerun.log" 2>&1
+              set -e
+              s="$(grep -E 'tests passed|tests failed' ctest-rerun.log | tail -1)"
+              echo "${cfg}: ${s}"
+              grep -E '^\s+[0-9]+ - ' ctest-rerun.log | head -30 || true
+              echo "- rerun of the failures with \`${cfg}\`: ${s}" >> "$GITHUB_STEP_SUMMARY"
+            done
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-429-${{ matrix.os }}-${{ matrix.replica }}
+          path: |
+            build/ctest-*.log
+            build/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
