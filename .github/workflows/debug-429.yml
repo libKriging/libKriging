@@ -26,7 +26,7 @@ env:
 
 jobs:
   probe:
-    name: probe (${{ matrix.os }} #${{ matrix.replica }})
+    name: "probe (${{ matrix.os }} #${{ matrix.replica }})"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 75
     strategy:
@@ -141,7 +141,7 @@ jobs:
         run: |
           unset OPENBLAS_CORETYPE
           cd build
-          ldd "$(find . -type f -name 'LinearAlgebraTest' | head -1)" | grep -E "blas|lapack" || true
+          for f in $(find . -type f \( -name KrigingTest -o -name "libKriging.so*" \) | head -2); do echo "$f:"; ldd "$f" | grep -E "blas|lapack|gomp"; done || true
           set +e
           ctest -C Release -j "$(nproc)" --output-on-failure --timeout 900 > ctest-auto.log 2>&1
           rc=$?
