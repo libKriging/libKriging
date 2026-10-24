@@ -683,5 +683,10 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def_static("get_chol_jitter", &LinearAlgebra::get_chol_jitter)
       .def_static("set_chol_jitter", &LinearAlgebra::set_chol_jitter, py::arg("jitter"))
       .def_static("get_num_nugget", &LinearAlgebra::get_num_nugget)
-      .def_static("set_num_nugget", &LinearAlgebra::set_num_nugget, py::arg("nugget"));
+      .def_static("set_num_nugget", &LinearAlgebra::set_num_nugget, py::arg("nugget"))
+      // warning when the fallback adds a numerical nugget; check of the
+      // reciprocal condition number of the factorizations
+      .def_static("set_chol_warning", &LinearAlgebra::set_chol_warning, py::arg("warn"))
+      .def_static("check_chol_rcond", &LinearAlgebra::check_chol_rcond, py::arg("check"))
+      .def_static("chol_rcond_checked", &LinearAlgebra::chol_rcond_checked);
 }

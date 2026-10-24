@@ -25,6 +25,7 @@ void is_fitted(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void feature_dim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void hidden_dims(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void activation(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void centerX(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void scaleX(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void centerY(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

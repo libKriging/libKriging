@@ -436,6 +436,32 @@ function summary(k::Kriging)
     return unsafe_string(s)
 end
 
+"""
+    model(k::Kriging) -> Dict{String,Any}
+
+All the fields of the model (settings, data, normalization, trend, fitted
+parameters), as `model()` in Python / Octave and `as.list()` in R.
+"""
+function model(k::Kriging)
+    d = Dict{String,Any}(
+        "kernel" => kernel(k), "optim" => optim(k), "objective" => objective(k), "method" => method(k),
+        "noise_model" => noise_model(k),
+        "theta" => theta(k), "is_theta_estim" => is_theta_estim(k),
+        "sigma2" => sigma2(k), "is_sigma2_estim" => is_sigma2_estim(k),
+        "X" => X(k), "centerX" => centerX(k), "scaleX" => scaleX(k),
+        "y" => y(k), "centerY" => centerY(k), "scaleY" => scaleY(k),
+        "normalize" => normalize(k), "regmodel" => regmodel(k),
+        "beta" => beta(k), "is_beta_estim" => is_beta_estim(k),
+        "F" => F(k), "T" => T(k), "M" => M(k), "z" => z(k))
+    if d["noise_model"] == "nugget"
+        d["nugget"] = nugget(k)
+        d["is_nugget_estim"] = is_nugget_estim(k)
+    elseif d["noise_model"] == "heterogeneous"
+        d["noise"] = noise(k)
+    end
+    return d
+end
+
 function log_likelihood_fun(k::Kriging, theta::Vector{Float64};
                              return_grad::Bool=false,
                              return_hess::Bool=false)
@@ -1377,6 +1403,7 @@ end
 kernel(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_kernel), Cstring, (Ptr{Nothing},), mk.ptr))
 method(::MLPKriging) = "exact"  # only the exact covariance is implemented
 activation(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_activation), Cstring, (Ptr{Nothing},), mk.ptr))
+objective(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_get_objective), Cstring, (Ptr{Nothing},), mk.ptr))
 normalize(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_get_normalize), Cint, (Ptr{Nothing},), mk.ptr) != 0
 regmodel(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_get_regmodel), Cstring, (Ptr{Nothing},), mk.ptr))
 is_fitted(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_is_fitted), Cint, (Ptr{Nothing},), mk.ptr) != 0
@@ -1653,7 +1680,7 @@ end
     get_chol_jitter() / set_chol_jitter(x)
 
 Fixed jitter on the correlation diagonal of noise-free fits: `x < 0` automatic
-per kernel (default: gauss 1e-8, matern5_2 1e-10, 0 otherwise), `x = 0`
+per kernel (default: gauss 1e-9, matern5_2 1e-10, 0 otherwise), `x = 0`
 disabled (former behaviour), `x > 0` this value for every kernel.
 """
 get_chol_jitter() = ccall(dlsym(_lk(), :lk_linalg_get_chol_jitter), Cdouble, ())
@@ -1667,15 +1694,71 @@ Numerical nugget of the Cholesky fallback (default 1e-10).
 get_num_nugget() = ccall(dlsym(_lk(), :lk_linalg_get_num_nugget), Cdouble, ())
 set_num_nugget(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_linalg_set_num_nugget), Cint, (Cdouble,), x))
 
+"""
+    set_chol_warning(warn::Bool)
+
+Warn when the Cholesky fallback adds a numerical nugget.
+"""
+set_chol_warning(warn::Bool) = _check_error(ccall(dlsym(_lk(), :lk_linalg_set_chol_warning), Cint, (Cint,), warn))
+
+"""
+    check_chol_rcond(check::Bool) / chol_rcond_checked()
+
+Check the reciprocal condition number of the Cholesky factorizations.
+"""
+check_chol_rcond(check::Bool) = _check_error(ccall(dlsym(_lk(), :lk_linalg_check_chol_rcond), Cint, (Cint,), check))
+chol_rcond_checked() = ccall(dlsym(_lk(), :lk_linalg_chol_rcond_checked), Cint, ()) != 0
+
+"""
+    jlibkriging.Optim
+
+Global optimizer settings, as `Optim` in C++ / Python / Octave (R:
+`rlibkriging:::optim_<name>`): `jlibkriging.Optim.set_max_iteration(50)`.
+Not exported, not to clash with the Optim.jl package.
+"""
+module Optim
+
+import ..jlibkriging: _lk, _check_error
+using Libdl: dlsym
+
+use_reparametrize(x::Bool) = _check_error(ccall(dlsym(_lk(), :lk_optim_use_reparametrize), Cint, (Cint,), x))
+is_reparametrized() = ccall(dlsym(_lk(), :lk_optim_is_reparametrized), Cint, ()) != 0
+set_theta_lower_factor(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_theta_lower_factor), Cint, (Cdouble,), x))
+get_theta_lower_factor() = ccall(dlsym(_lk(), :lk_optim_get_theta_lower_factor), Cdouble, ())
+set_theta_upper_factor(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_theta_upper_factor), Cint, (Cdouble,), x))
+get_theta_upper_factor() = ccall(dlsym(_lk(), :lk_optim_get_theta_upper_factor), Cdouble, ())
+use_variogram_bounds_heuristic(x::Bool) = _check_error(ccall(dlsym(_lk(), :lk_optim_use_variogram_bounds_heuristic), Cint, (Cint,), x))
+variogram_bounds_heuristic_used() = ccall(dlsym(_lk(), :lk_optim_variogram_bounds_heuristic_used), Cint, ()) != 0
+set_log_level(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_log_level), Cint, (Cint,), x))
+get_log_level() = Int(ccall(dlsym(_lk(), :lk_optim_get_log_level), Cint, ()))
+set_max_iteration(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_max_iteration), Cint, (Cint,), x))
+get_max_iteration() = Int(ccall(dlsym(_lk(), :lk_optim_get_max_iteration), Cint, ()))
+set_gradient_tolerance(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_gradient_tolerance), Cint, (Cdouble,), x))
+get_gradient_tolerance() = ccall(dlsym(_lk(), :lk_optim_get_gradient_tolerance), Cdouble, ())
+set_objective_rel_tolerance(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_objective_rel_tolerance), Cint, (Cdouble,), x))
+get_objective_rel_tolerance() = ccall(dlsym(_lk(), :lk_optim_get_objective_rel_tolerance), Cdouble, ())
+set_thread_start_delay_ms(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_thread_start_delay_ms), Cint, (Cint,), x))
+get_thread_start_delay_ms() = Int(ccall(dlsym(_lk(), :lk_optim_get_thread_start_delay_ms), Cint, ()))
+# Julia's own threads and OpenBLAS are not driven by these (docs/dev/parallel.md 5)
+set_thread_pool_size(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_thread_pool_size), Cint, (Cint,), x))
+get_thread_pool_size() = Int(ccall(dlsym(_lk(), :lk_optim_get_thread_pool_size), Cint, ()))
+# thread budget: x <= 1 ratio, x > 1 percentage of the cores, 0 automatic (100 %)
+set_num_threads_percent(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_num_threads_percent), Cint, (Cdouble,), x))
+get_num_threads_percent() = ccall(dlsym(_lk(), :lk_optim_get_num_threads_percent), Cdouble, ())
+get_num_threads() = Int(ccall(dlsym(_lk(), :lk_optim_get_num_threads), Cint, ()))
+
+end # module Optim
+
 export Kriging, WarpKriging, MLPKriging, NestedKriging
 export get_chol_jitter, set_chol_jitter, get_num_nugget, set_num_nugget
+export set_chol_warning, check_chol_rcond, chol_rcond_checked
 export nb_groups, aggregation, beta0, groups, set_predict_chunk!, set_warp_subsample!
 export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
 export load, load_kriging, load_warp_kriging, load_mlp_kriging, load_nested_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
-export kernel, optim, objective, normalize, regmodel, noise_model
+export kernel, optim, objective, normalize, regmodel, noise_model, model
 export nystrom_rank, vecchia_neighbors
 export method
 export X, centerX, scaleX, y, centerY, scaleY

@@ -4,6 +4,7 @@
 #include <libKriging/LinearAlgebra.hpp>
 #include <libKriging/MLPKriging.hpp>
 #include <libKriging/NestedKriging.hpp>
+#include <libKriging/Optim.hpp>
 
 #include <libKriging/Trend.hpp>
 #include <libKriging/WarpKriging.hpp>
@@ -1687,6 +1688,14 @@ const char* lk_mlp_kriging_activation(void* ptr) {
     return "";
   }
 }
+const char* lk_mlp_kriging_get_objective(void* ptr) {
+  try {
+    static thread_local std::string buf;
+    buf = static_cast<MLPKriging*>(ptr)->objective();
+    return buf.c_str();
+  }
+  CATCH_RETURN_NULL
+}
 
 int lk_mlp_kriging_get_normalize(void* ptr) {
   try {
@@ -2253,4 +2262,164 @@ int lk_linalg_set_num_nugget(double nugget) {
     return 0;
   }
   CATCH_RETURN
+}
+
+int lk_linalg_set_chol_warning(int warn) {
+  try {
+    LinearAlgebra::set_chol_warning(warn != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_linalg_check_chol_rcond(int check) {
+  try {
+    LinearAlgebra::check_chol_rcond(check != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_linalg_chol_rcond_checked(void) {
+  return LinearAlgebra::chol_rcond_checked() ? 1 : 0;
+}
+
+/* ========================================================================== */
+/*  Optim settings                                                            */
+/* ========================================================================== */
+
+int lk_optim_use_reparametrize(int reparametrize) {
+  try {
+    Optim::use_reparametrize(reparametrize != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_is_reparametrized(void) {
+  return Optim::is_reparametrized() ? 1 : 0;
+}
+
+int lk_optim_set_theta_lower_factor(double factor) {
+  try {
+    Optim::set_theta_lower_factor(factor);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_optim_get_theta_lower_factor(void) {
+  return Optim::get_theta_lower_factor();
+}
+
+int lk_optim_set_theta_upper_factor(double factor) {
+  try {
+    Optim::set_theta_upper_factor(factor);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_optim_get_theta_upper_factor(void) {
+  return Optim::get_theta_upper_factor();
+}
+
+int lk_optim_use_variogram_bounds_heuristic(int use) {
+  try {
+    Optim::use_variogram_bounds_heuristic(use != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_variogram_bounds_heuristic_used(void) {
+  return Optim::variogram_bounds_heuristic_used() ? 1 : 0;
+}
+
+int lk_optim_set_log_level(int level) {
+  try {
+    Optim::set_log_level(level);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_get_log_level(void) {
+  return Optim::get_log_level();
+}
+
+int lk_optim_set_max_iteration(int max_iteration) {
+  try {
+    Optim::set_max_iteration(max_iteration);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_get_max_iteration(void) {
+  return Optim::get_max_iteration();
+}
+
+int lk_optim_set_gradient_tolerance(double tolerance) {
+  try {
+    Optim::set_gradient_tolerance(tolerance);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_optim_get_gradient_tolerance(void) {
+  return Optim::get_gradient_tolerance();
+}
+
+int lk_optim_set_objective_rel_tolerance(double tolerance) {
+  try {
+    Optim::set_objective_rel_tolerance(tolerance);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_optim_get_objective_rel_tolerance(void) {
+  return Optim::get_objective_rel_tolerance();
+}
+
+int lk_optim_set_thread_start_delay_ms(int delay_ms) {
+  try {
+    Optim::set_thread_start_delay_ms(delay_ms);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_get_thread_start_delay_ms(void) {
+  return Optim::get_thread_start_delay_ms();
+}
+
+int lk_optim_set_thread_pool_size(int pool_size) {
+  try {
+    Optim::set_thread_pool_size(pool_size);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_get_thread_pool_size(void) {
+  return Optim::get_thread_pool_size();
+}
+
+int lk_optim_set_num_threads_percent(double percent) {
+  try {
+    Optim::set_num_threads_percent(percent);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_optim_get_num_threads_percent(void) {
+  return Optim::get_num_threads_percent();
+}
+
+int lk_optim_get_num_threads(void) {
+  return Optim::get_num_threads();
 }

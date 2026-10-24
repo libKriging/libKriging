@@ -450,6 +450,16 @@ void activation(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, mk->activation(), "activation name");
 }
 
+void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->objective(), "objective");
+}
+
 void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,

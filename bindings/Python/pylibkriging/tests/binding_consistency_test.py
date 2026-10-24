@@ -62,6 +62,16 @@ def test_chol_jitter_setting():
     assert lk.LinearAlgebra.get_chol_jitter() == saved
 
 
+def test_linalg_settings():
+    saved = lk.LinearAlgebra.chol_rcond_checked()
+    lk.LinearAlgebra.check_chol_rcond(False)
+    assert not lk.LinearAlgebra.chol_rcond_checked()
+    lk.LinearAlgebra.check_chol_rcond(True)
+    assert lk.LinearAlgebra.chol_rcond_checked()
+    lk.LinearAlgebra.check_chol_rcond(saved)
+    lk.LinearAlgebra.set_chol_warning(False)
+
+
 def test_data1():
     refpath = find_dir()
     prefix = "data1-scal"

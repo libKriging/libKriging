@@ -17,6 +17,7 @@ function test_new_features()
     test_optim_tolerances();
     test_optim_thread_settings();
     test_optim_thread_budget();
+    test_linalg_settings();
     test_all_classes_have_covMat();
     test_all_classes_have_model();
     
@@ -431,3 +432,19 @@ end
 
 % Run all tests
 test_new_features();
+
+
+%% Test LinearAlgebra settings
+function test_linalg_settings()
+    fprintf('Test: LinearAlgebra settings...');
+
+    orig = LinearAlgebra.chol_rcond_checked();
+    LinearAlgebra.check_chol_rcond(false);
+    assert(~LinearAlgebra.chol_rcond_checked());
+    LinearAlgebra.check_chol_rcond(true);
+    assert(LinearAlgebra.chol_rcond_checked());
+    LinearAlgebra.check_chol_rcond(orig);
+    LinearAlgebra.set_chol_warning(false);
+
+    fprintf(' PASSED\n');
+end

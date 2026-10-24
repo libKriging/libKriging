@@ -378,6 +378,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return MLPKrigingBinding::hidden_dims(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::activation"_hash:
       return MLPKrigingBinding::activation(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::objective"_hash:
+      return MLPKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::copy"_hash:
       return MLPKrigingBinding::copy(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::save"_hash:
@@ -429,6 +431,12 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return LinearAlgebraBinding::get_num_nugget(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearAlgebra::set_num_nugget"_hash:
       return LinearAlgebraBinding::set_num_nugget(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::set_chol_warning"_hash:
+      return LinearAlgebraBinding::set_chol_warning(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::check_chol_rcond"_hash:
+      return LinearAlgebraBinding::check_chol_rcond(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::chol_rcond_checked"_hash:
+      return LinearAlgebraBinding::chol_rcond_checked(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::get_thread_pool_size"_hash:
       return OptimBinding::get_thread_pool_size(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::set_thread_pool_size"_hash:

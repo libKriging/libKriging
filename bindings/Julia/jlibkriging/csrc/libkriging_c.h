@@ -442,6 +442,7 @@ int lk_mlp_kriging_log_likelihood_fun(void* ptr,
 
 const char* lk_mlp_kriging_kernel(void* ptr);
 const char* lk_mlp_kriging_activation(void* ptr);
+const char* lk_mlp_kriging_get_objective(void* ptr);
 int lk_mlp_kriging_get_normalize(void* ptr);
 const char* lk_mlp_kriging_get_regmodel(void* ptr);
 int lk_mlp_kriging_is_fitted(void* ptr);
@@ -545,6 +546,36 @@ double lk_linalg_get_chol_jitter(void);
 int lk_linalg_set_chol_jitter(double jitter);
 double lk_linalg_get_num_nugget(void);
 int lk_linalg_set_num_nugget(double nugget);
+/* warning when the Cholesky fallback adds a numerical nugget; check of the
+   reciprocal condition number of the factorizations */
+int lk_linalg_set_chol_warning(int warn);
+int lk_linalg_check_chol_rcond(int check);
+int lk_linalg_chol_rcond_checked(void);
+
+/* --- Optim settings (global), as Optim:: in C++ --- */
+int lk_optim_use_reparametrize(int reparametrize);
+int lk_optim_is_reparametrized(void);
+int lk_optim_set_theta_lower_factor(double factor);
+double lk_optim_get_theta_lower_factor(void);
+int lk_optim_set_theta_upper_factor(double factor);
+double lk_optim_get_theta_upper_factor(void);
+int lk_optim_use_variogram_bounds_heuristic(int use);
+int lk_optim_variogram_bounds_heuristic_used(void);
+int lk_optim_set_log_level(int level);
+int lk_optim_get_log_level(void);
+int lk_optim_set_max_iteration(int max_iteration);
+int lk_optim_get_max_iteration(void);
+int lk_optim_set_gradient_tolerance(double tolerance);
+double lk_optim_get_gradient_tolerance(void);
+int lk_optim_set_objective_rel_tolerance(double tolerance);
+double lk_optim_get_objective_rel_tolerance(void);
+int lk_optim_set_thread_start_delay_ms(int delay_ms);
+int lk_optim_get_thread_start_delay_ms(void);
+int lk_optim_set_thread_pool_size(int pool_size);
+int lk_optim_get_thread_pool_size(void);
+int lk_optim_set_num_threads_percent(double percent);
+double lk_optim_get_num_threads_percent(void);
+int lk_optim_get_num_threads(void);
 
 #ifdef __cplusplus
 }

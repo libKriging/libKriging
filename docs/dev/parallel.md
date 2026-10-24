@@ -39,7 +39,8 @@ share  = Optim::set_num_threads_percent(x) / LK_NUM_THREADS_PERCENT=x
   still get the whole budget.
 - `Optim::get_num_threads()` returns the resolved budget.
 
-API (C++; Python / Octave `Optim.<same name>`, R `rlibkriging:::optim_<same name>`; not in Julia):
+API (C++; Python / Octave `Optim.<same name>`, R `rlibkriging:::optim_<same name>`, Julia
+`jlibkriging.Optim.<same name>`):
 
 ```cpp
 Optim::set_num_threads_percent(50);   // or 0.5: half of the physical cores
@@ -337,5 +338,3 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
   R (`main.yml`) and coverage (`analysis.yml`) jobs failed the same way; every
   Linux job of these workflows now sets `OPENBLAS_CORETYPE=Haswell`; drop it with
   a newer OpenBLAS (#429).
-- Julia exposes no thread setter (neither `set_thread_pool_size` nor the budget)
-  (#423).

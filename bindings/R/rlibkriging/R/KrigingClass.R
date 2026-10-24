@@ -270,6 +270,19 @@ print.Kriging <- function(x, ...) {
     invisible(p)
 }
 
+#' Summary of a \code{Kriging} model, as printed by \code{print}.
+#'
+#' @param object S3 Kriging object.
+#' @param ... Ignored.
+#'
+#' @return The description of the model, a character string.
+#'
+#' @method summary Kriging
+#' @export
+summary.Kriging <- function(object, ...) {
+    kriging_summary(object)
+}
+
 
 #' Fit \code{Kriging} object on given data.
 #'

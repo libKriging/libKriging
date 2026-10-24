@@ -35,6 +35,7 @@ end
 
         @test kernel(k) == "gauss"
         @test activation(k) == "selu"
+        @test objective(k) == "LL"
         @test hidden_dims(k) == [16, 8]
         @test feature_dim(k) == 2
         @test sigma2(k) > 0

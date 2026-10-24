@@ -149,6 +149,10 @@ classdef MLPKriging < handle
             [varargout{1:nargout}] = mLibKriging("MLPKriging::activation", obj.ref, varargin{:});
         end
 
+        function varargout = objective(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::objective", obj.ref, varargin{:});
+        end
+
         function k2 = copy(obj)
             ref_copy = mLibKriging("MLPKriging::copy", obj.ref);
             k2 = MLPKriging('__ref__', ref_copy);

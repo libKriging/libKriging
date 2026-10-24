@@ -292,3 +292,16 @@ test_that("All classes have as.list/model", {
   expect_true('nugget' %in% names(m3))
   expect_true('is_nugget_estim' %in% names(m3))
 })
+
+test_that("summary() of Kriging and NestedKriging is their description", {
+  set.seed(123)
+  X <- matrix(runif(20), ncol = 1)
+  y <- sin(6 * X[, 1])
+  k <- Kriging(y, X, kernel = "matern3_2")
+  expect_true(is.character(summary(k)) && nchar(summary(k)) > 0)
+  invisible(capture.output(p <- print(k)))  # print() returns the description
+  expect_equal(summary(k), p)
+  nk <- NestedKriging(y, X, "matern3_2", nb_groups = 2)
+  expect_true(is.character(summary(nk)) && nchar(summary(nk)) > 0)
+})
+

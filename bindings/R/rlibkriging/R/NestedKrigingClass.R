@@ -121,6 +121,19 @@ print.NestedKriging <- function(x, ...) {
     invisible(x)
 }
 
+#' Summary of a \code{NestedKriging} model, as printed by \code{print}.
+#'
+#' @param object S3 NestedKriging object.
+#' @param ... Ignored.
+#'
+#' @return The description of the model, a character string.
+#'
+#' @method summary NestedKriging
+#' @export
+summary.NestedKriging <- function(object, ...) {
+    nestedkriging_summary(object)
+}
+
 #' Save a \code{NestedKriging} model to a file.
 #'
 #' @param object S3 NestedKriging object.

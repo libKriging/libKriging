@@ -31,6 +31,7 @@ try
 
     assert(strcmp(k.kernel(), "gauss"));
     assert(strcmp(k.activation(), "selu"));
+    assert(strcmp(k.objective(), "LL"));
     hd = k.hidden_dims();
     assert(length(hd) == 2 && hd(1) == 16 && hd(2) == 8);
     assert(k.feature_dim() == 2);
