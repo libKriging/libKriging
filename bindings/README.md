@@ -2,6 +2,21 @@
 
 This document lists all methods exposed by each language binding for accessing the underlying C++ library.
 
+The workflow `.github/workflows/binding-api.yml` (Linux, one job per binding)
+lists the methods each built binding exposes and compares them across
+bindings, names being matched up to each language's convention
+(`leaveOneOut` / `leave_one_out`, `fit` / `fit!`): a method missing from
+some bindings fails the job (table in the job summary). To compare locally after
+building, e.g. Python against Julia:
+
+```
+PYTHONPATH=build/bindings/Python/pylibkriging:bindings/Python/pylibkriging/src \
+  python3 tools/checks/binding_api/dump_python.py python.txt
+JLIBKRIGING_LIB_PATH=build/bindings/Julia/jlibkriging/libkriging_c.so \
+  julia --project=bindings/Julia/jlibkriging tools/checks/binding_api/dump_julia.jl julia.txt
+python3 tools/checks/binding_api/compare.py python.txt julia.txt
+```
+
 ## Classes
 
 | Class | Description | R | Python | Octave/Matlab | Julia |
