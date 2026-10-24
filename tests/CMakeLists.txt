@@ -56,6 +56,14 @@ endif()
 catch_discover_tests(KrigingTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
+add_executable(CholJitterTest CholJitterTest.cpp)
+target_link_libraries(CholJitterTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries CholJitterTest)
+catch_discover_tests(CholJitterTest)
+# the hidden [.env] case checks that LK_CHOL_JITTER is read at load time
+add_test(NAME CholJitterTest/LK_CHOL_JITTER COMMAND CholJitterTest "[.env]")
+set_tests_properties(CholJitterTest/LK_CHOL_JITTER PROPERTIES ENVIRONMENT "LK_CHOL_JITTER=0")
+
 add_executable(KrigingFitTest KrigingFitTest.cpp)
 target_link_libraries(KrigingFitTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingFitTest)
@@ -352,6 +360,14 @@ endif()
 catch_discover_tests(WarpKrigingUpdateSimulateTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
+add_executable(BlasThreadsTest BlasThreadsTest.cpp)
+target_link_libraries(BlasThreadsTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries BlasThreadsTest)
+catch_discover_tests(BlasThreadsTest)
+# the hidden [.openblas_env] case needs OPENBLAS_NUM_THREADS at load time
+add_test(NAME BlasThreadsTest/OPENBLAS_NUM_THREADS COMMAND BlasThreadsTest "[.openblas_env]")
+set_tests_properties(BlasThreadsTest/OPENBLAS_NUM_THREADS PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
+
 add_executable(SimulateStateResetTest SimulateStateResetTest.cpp)
 target_link_libraries(SimulateStateResetTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries SimulateStateResetTest)
@@ -370,6 +386,11 @@ if(DEFINED ENV{GITHUB_ACTIONS})
 endif()
 catch_discover_tests(WarpKrigingPerWarpTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
+
+add_executable(AdamBFGSTest AdamBFGSTest.cpp)
+target_link_libraries(AdamBFGSTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries AdamBFGSTest)
+catch_discover_tests(AdamBFGSTest)
 
 add_executable(WarpKrigingCollapseTest WarpKrigingCollapseTest.cpp)
 target_link_libraries(WarpKrigingCollapseTest LINK_PUBLIC Kriging Catch2)

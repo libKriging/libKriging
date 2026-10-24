@@ -134,3 +134,20 @@ int optim_get_thread_pool_size() {
 void optim_set_thread_pool_size(int pool_size) {
   Optim::set_thread_pool_size(pool_size);
 }
+
+// Thread budget: x <= 1 ratio, x > 1 percentage of the cores, 0 automatic (100 %)
+// [[Rcpp::export]]
+double optim_get_num_threads_percent() {
+  return Optim::get_num_threads_percent();
+}
+
+// [[Rcpp::export]]
+void optim_set_num_threads_percent(double percent) {
+  Optim::set_num_threads_percent(percent);
+}
+
+// Resolved thread budget (number of threads), read only
+// [[Rcpp::export]]
+int optim_get_num_threads() {
+  return Optim::get_num_threads();
+}

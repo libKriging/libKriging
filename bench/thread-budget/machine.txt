@@ -1,0 +1,71 @@
+# 2026-10-18 alien
+Ubuntu 24.04.4 LTS
+7.0.0-38-generic
+
+Architecture :                            x86_64
+Mode(s) opératoire(s) des processeurs :   32-bit, 64-bit
+Tailles des adresses:                     39 bits physical, 48 bits virtual
+Boutisme :                                Little Endian
+Processeur(s) :                           20
+Liste de processeur(s) en ligne :         0-19
+Identifiant constructeur :                GenuineIntel
+Nom de modèle :                           Intel(R) Core(TM) i9-10900K CPU @ 3.70GHz
+Famille de processeur :                   6
+Modèle :                                  165
+Thread(s) par cœur :                      2
+Cœur(s) par socket :                      10
+Socket(s) :                               1
+Révision :                                5
+multiplication des MHz du/des CPU(s) :    70%
+Vitesse maximale du processeur en MHz :   5300,0000
+Vitesse minimale du processeur en MHz :   800,0000
+BogoMIPS :                                7399,70
+Drapeaux :                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid mpx rdseed adx smap clflushopt intel_pt xsaveopt xsavec xgetbv1 xsaves dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp vnmi pku ospke md_clear flush_l1d arch_capabilities
+Virtualisation :                          VT-x
+Cache L1d :                               320 KiB (10 instances)
+Cache L1i :                               320 KiB (10 instances)
+Cache L2 :                                2,5 MiB (10 instances)
+Cache L3 :                                20 MiB (1 instance)
+Nœud(s) NUMA :                            1
+Nœud NUMA 0 de processeur(s) :            0-19
+Vulnérabilité Gather data sampling :      Vulnerable
+Vulnérabilité Ghostwrite :                Not affected
+Vulnérabilité Indirect target selection : Mitigation; Aligned branch/return thunks
+Vulnérabilité Itlb multihit :             KVM: Mitigation: Split huge pages
+Vulnérabilité L1tf :                      Not affected
+Vulnérabilité Mds :                       Not affected
+Vulnérabilité Meltdown :                  Not affected
+Vulnérabilité Mmio stale data :           Mitigation; Clear CPU buffers; SMT vulnerable
+Vulnérabilité Old microcode :             Not affected
+Vulnérabilité Reg file data sampling :    Not affected
+Vulnérabilité Retbleed :                  Mitigation; Enhanced IBRS
+Vulnérabilité Spec rstack overflow :      Not affected
+Vulnérabilité Spec store bypass :         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnérabilité Spectre v1 :                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnérabilité Spectre v2 :                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI SW loop, KVM SW loop
+Vulnérabilité Srbds :                     Mitigation; Microcode
+Vulnérabilité Tsa :                       Not affected
+Vulnérabilité Tsx async abort :           Not affected
+Vulnérabilité Vmscape :                   Mitigation; IBPB before exit to userspace
+
+nproc: 20
+               total       utilisé      libre     partagé tamp/cache   disponible
+Mem:              62           7          23           0          32          54
+Échange:           7           0           7
+
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+cmake version 3.28.3
+
+lrwxrwxrwx 1 root root   51 févr. 12  2024 /usr/lib/x86_64-linux-gnu/libopenblas.so.0 -> /etc/alternatives/libopenblas.so.0-x86_64-linux-gnu
+
+/usr/lib/x86_64-linux-gnu/openblas-pthread/:
+total 43760
+-rw-r--r-- 1 root root   444968 nov.  10  2025 libblas.so.3
+-rw-r--r-- 1 root root  6802256 nov.  10  2025 liblapack.so.3
+-rw-r--r-- 1 root root 37555760 nov.  10  2025 libopenblasp-r0.3.26.so
+lrwxrwxrwx 1 root root       23 nov.  10  2025 libopenblas.so.0 -> libopenblasp-r0.3.26.so
+libblas-dev:amd64 3.12.0-3build1.1
+libblas3:amd64 3.12.0-3build1.1
+liblapack-dev:amd64 3.12.0-3build1.1
+liblapack3:amd64 3.12.0-3build1.1
+libopenblas0-pthread:amd64 0.3.26+ds-1ubuntu0.1

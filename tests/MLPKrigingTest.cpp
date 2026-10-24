@@ -1,3 +1,5 @@
+// assert() is the check of this test: keep it in Release builds
+#undef NDEBUG
 #define _USE_MATH_DEFINES  // required for Visual Studio
 /**
  * @file MLPKrigingTest.cpp

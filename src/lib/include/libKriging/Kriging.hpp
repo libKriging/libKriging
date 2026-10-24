@@ -77,6 +77,15 @@ class Kriging : public KrigingImpl {
   Kriging::KModel make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const;
   void populate_Model(Kriging::KModel& m, const arma::vec& theta, std::map<std::string, double>* bench) const;
 
+  // populate_Model with an explicit Cholesky jitter (noise-free diagonal)
+  void populate_Model_jitter(Kriging::KModel& m,
+                             const arma::vec& theta,
+                             double extra_param,
+                             double chol_jitter,
+                             std::map<std::string, double>* bench) const;
+  // the committed factorization (m_model_chol_jitter), not the objective's
+  Kriging::KModel make_committed_Model(const arma::vec& theta, double extra_param) const;
+
   // populate_Model with explicit extra_param (used during optimization)
   Kriging::KModel make_Model(const arma::vec& theta, double extra_param, std::map<std::string, double>* bench) const;
   void populate_Model(Kriging::KModel& m,
@@ -144,6 +153,9 @@ class Kriging : public KrigingImpl {
   /// Nugget mode: alpha = sigma2 / (sigma2 + nugget) used by the noisy
   /// correlation (scale-free: identical with normalize=true or false)
   [[nodiscard]] double alpha() const { return m_alpha; }
+  /// Fixed jitter of the committed factorization (predict / simulate / update);
+  /// chol_jitter() is the one of the objective (fit, logLikelihood).
+  [[nodiscard]] double model_chol_jitter() const { return m_model_chol_jitter; }
 
   /** Parameter accessors, always in the ORIGINAL scale of X and y, so that
    * they round-trip with `Parameters` (which are read in the original scale
@@ -545,7 +557,10 @@ class Kriging : public KrigingImpl {
   NoiseModel m_noise_model = NoiseModel::None;
   double m_nugget = 0.0;
   bool m_est_nugget = false;
-  double m_alpha = 1.0;  // sigma2/(sigma2+nugget) — only meaningful in Nugget mode
+  double m_alpha = 1.0;
+  /// Jitter of the committed exact factorization (m_T); m_chol_jitter is the
+  /// objective's. Noise-free only. See commit_model_chol_jitter.
+  double m_model_chol_jitter = 0.0;  // sigma2/(sigma2+nugget) — only meaningful in Nugget mode
   // Simulate state for Nugget/Heterogeneous modes (mirrors NuggetKriging/NoiseKriging)
   bool m_lastsim_with_nugget = false;
   arma::vec m_lastsim_with_noise;
@@ -554,6 +569,10 @@ class Kriging : public KrigingImpl {
   arma::vec m_lastsimup_noise_u;
   /// KrigingImpl::clear_simulate_state plus the members above
   void clear_simulate_state();
+  /// After an exact noise-free optimization (run with the search jitter
+  /// LinearAlgebra::kernel_chol_jitter): rebuild the committed model at
+  /// m_theta with LinearAlgebra::model_chol_jitter.
+  void commit_model_chol_jitter();
 
   using FitOfn = std::function<double(const arma::vec&, arma::vec*, KModel*)>;
   FitOfn make_fit_objective(const std::string& objective) const;

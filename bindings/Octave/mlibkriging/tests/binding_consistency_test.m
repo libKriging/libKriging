@@ -1,6 +1,11 @@
 % clear all
 
 tolerance = 1e-12
+% The references evaluate the exact LL / LOO formulas: no fixed Cholesky
+% jitter (gauss uses 1e-8 by default in the fit objective)
+default_chol_jitter = LinearAlgebra.get_chol_jitter();
+LinearAlgebra.set_chol_jitter(0);
+assert(LinearAlgebra.get_chol_jitter() == 0)
 refpath=find_dir();
 fprintf("Reference directory=%s\n", refpath);
 
@@ -102,3 +107,5 @@ for i = 1:10
         rethrow(exception);
     end
 end
+
+LinearAlgebra.set_chol_jitter(default_chol_jitter);

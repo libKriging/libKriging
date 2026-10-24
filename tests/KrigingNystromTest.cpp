@@ -6,6 +6,7 @@
 
 #include <catch2/catch.hpp>
 #include "libKriging/Kriging.hpp"
+#include "libKriging/LinearAlgebra.hpp"
 #include <cmath>
 #include <utility>
 // clang-format on
@@ -931,6 +932,10 @@ TEST_CASE("Nystrom is not sensitive to rounding at the landmark rows (#410)", "[
   arma::arma_rng::set_seed(410);
 
   SECTION("k = n reproduces the exact model") {
+    // Without the fixed jitter: Nystrom keeps the objective's diagonal (1e-10
+    // for matern5_2), the exact model commits an exact factorization.
+    const double saved_jitter = LinearAlgebra::get_chol_jitter();
+    LinearAlgebra::set_chol_jitter(0);
     const arma::mat X = arma::randu<arma::mat>(150, 3);
     const arma::vec y = hartmann3(X);
     const arma::mat Xt = arma::randu<arma::mat>(50, 3);
@@ -945,6 +950,7 @@ TEST_CASE("Nystrom is not sensitive to rounding at the landmark rows (#410)", "[
     CHECK(arma::abs(m_n - m_e).max() < 1e-8 * sd);         // was 3e-4..6e-4
     CHECK(std::abs(ll_n - ll_u) < 1e-9 * std::abs(ll_e));
     CHECK(arma::abs(m_n - m_u).max() < 1e-8 * sd);
+    LinearAlgebra::set_chol_jitter(saved_jitter);
   }
 
   SECTION("small k with an ill-conditioned landmark block") {

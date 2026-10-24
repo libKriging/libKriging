@@ -1,8 +1,12 @@
 #include "libKriging/NestedKriging.hpp"
 
+#include "libKriging/LinearAlgebra.hpp"
+
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
+
+#include "ThreadBudget.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -184,6 +188,7 @@ void NestedKriging::fit(const arma::vec& y,
                         const Kriging::Parameters& parameters,
                         const std::vector<std::string>& warping,
                         const std::string& method_in) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("y and X should have the same number of rows");
   if (nb_groups < 1 || nb_groups > X.n_rows / (X.n_cols + 2))
@@ -356,9 +361,15 @@ void NestedKriging::precompute_nk() {
   m_alpha.assign(p, arma::vec());
   for (arma::uword g = 0; g < p; ++g) {
     const arma::uvec& idx = m_groups[g];
+    // Same factorization as the submodel, with the Cholesky jitter it was
+    // fitted (or loaded) with, not the current LinearAlgebra setting: its
+    // committed one (Kriging::model_chol_jitter(), WarpKriging's
+    // m_model_chol_jitter; 0: exact, num_nugget added only if the Cholesky
+    // fails, as safe_chol_lower does for the submodel).
+    const double group_jitter = warped() ? m_wsubmodels[g]->m_model_chol_jitter : m_submodels[g]->model_chol_jitter();
     arma::mat R = corrMat(m_X.rows(idx), m_X.rows(idx));
-    R.diag() += jitter;
-    m_L[g] = arma::chol(R, "lower");
+    R.diag() += group_jitter;
+    m_L[g] = LinearAlgebra::safe_chol_lower(R);
     const arma::vec r = m_y(idx) - m_beta0;
     m_alpha[g] = arma::solve(arma::trimatu(m_L[g].t()), arma::solve(arma::trimatl(m_L[g]), r));
   }
@@ -369,6 +380,7 @@ void NestedKriging::precompute_nk() {
 // =============================================================================
 
 std::tuple<arma::vec, arma::vec> NestedKriging::predict(const arma::mat& X_n, bool return_stdev) {
+  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
   if (!m_is_fitted)
     throw std::runtime_error("NestedKriging is not fitted");
   if (X_n.n_cols != m_X.n_cols)
@@ -474,7 +486,8 @@ std::tuple<arma::vec, arma::vec> NestedKriging::predict_nk(const arma::mat& X_n,
     const arma::sword npairs = static_cast<arma::sword>(p * (p - 1) / 2);
 #if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
     const arma::uword pair_work = (p > 1) ? (m_X.n_rows * m_X.n_rows) / p * qc : 0;
-#pragma omp parallel for schedule(dynamic) if (npairs > 1 && pair_work >= 40000)
+#pragma omp parallel for schedule(dynamic) \
+    num_threads(libKriging::detail::omp_threads()) if (npairs > 1 && pair_work >= 40000)
 #endif
     for (arma::sword k = 0; k < npairs; ++k) {
       // unrank pair index k -> (i, j), i < j

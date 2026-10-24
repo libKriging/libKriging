@@ -42,7 +42,7 @@ classdef Optim
         end
         
         function set_log_level(val)
-            mLibKriging("Optim::set_log_level", val);
+            mLibKriging("Optim::set_log_level", int32(val));
         end
         
         function val = get_max_iteration()
@@ -50,7 +50,7 @@ classdef Optim
         end
         
         function set_max_iteration(val)
-            mLibKriging("Optim::set_max_iteration", val);
+            mLibKriging("Optim::set_max_iteration", int32(val));
         end
         
         function val = get_gradient_tolerance()
@@ -74,7 +74,7 @@ classdef Optim
         end
         
         function set_thread_start_delay_ms(val)
-            mLibKriging("Optim::set_thread_start_delay_ms", val);
+            mLibKriging("Optim::set_thread_start_delay_ms", int32(val));
         end
         
         function val = get_thread_pool_size()
@@ -82,7 +82,22 @@ classdef Optim
         end
         
         function set_thread_pool_size(val)
-            mLibKriging("Optim::set_thread_pool_size", val);
+            mLibKriging("Optim::set_thread_pool_size", int32(val));
+        end
+        
+        % Thread budget: x <= 1 ratio, x > 1 percentage of the cores,
+        % 0 automatic (100 %)
+        function val = get_num_threads_percent()
+            val = mLibKriging("Optim::get_num_threads_percent");
+        end
+        
+        function set_num_threads_percent(val)
+            mLibKriging("Optim::set_num_threads_percent", val);
+        end
+        
+        % Resolved thread budget (number of threads), read only
+        function val = get_num_threads()
+            val = mLibKriging("Optim::get_num_threads");
         end
     end
 end

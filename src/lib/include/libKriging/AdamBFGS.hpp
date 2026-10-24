@@ -69,6 +69,12 @@ class AdamBFGS {
   /// 0 disables it (run all max_iter_adam steps).
   arma::uword patience = 0;
   double rel_tol = 0.0;
+  /// Step decay on plateau: when `patience` is reached, up to `lr_decays`
+  /// times go back to the best point, reset the Adam moments and multiply the
+  /// step by `lr_decay` instead of stopping. A fixed step oscillates around a
+  /// ridge it cannot climb; 0 (default) stops at the first plateau.
+  arma::uword lr_decays = 0;
+  double lr_decay = 0.5;
   // Optional box constraints on x_outer (empty = unbounded; ±inf entries
   // allowed): each Adam step is projected back onto [outer_lower, outer_upper].
   arma::vec outer_lower;
@@ -78,6 +84,12 @@ class AdamBFGS {
   arma::uword max_iter_bfgs = 100;
   double bfgs_pgtol = 1e-6;
   double bfgs_factr = 1e7;
+
+  /// Restart of the first inner L-BFGS-B (bounded case only): returns the
+  /// x_inner to restart from, given the start point and the retry number;
+  /// at most max_restart restarts. Empty: no restart.
+  std::function<arma::vec(const arma::vec& x_inner0, int retry)> inner_restart;
+  int max_restart = 0;
 
   /// If true, maximize the objective (Adam does gradient ascent, BFGS minimizes -f).
   bool maximize = false;
@@ -112,6 +124,9 @@ class AdamBFGS {
     arma::uword total_bfgs_evals = 0;
     arma::uword n_iters = 0;
     arma::uword stall = 0;
+    double lr = adam_lr;
+    arma::uword decays = 0;
+    arma::uword k = 0;  // Adam steps since the last moment reset (bias correction)
 
     // Set up bounds for BFGS
     bool has_bounds = (inner_lower.n_elem == n_inner && inner_upper.n_elem == n_inner);
@@ -140,9 +155,33 @@ class AdamBFGS {
         };
 
         if (has_bounds) {
+          const arma::vec x_inner_start = x_inner;
           auto res
               = optimizer.minimize(bfgs_fn, x_inner, inner_lower.memptr(), inner_upper.memptr(), bounds_type.memptr());
           total_bfgs_evals += res.num_fun_calls;
+          // First inner run (from the start point): restart as Kriging does
+          // when it ended abnormally, in <= 2 iterations or at the lower
+          // bound. A start where the gradient points out of the box in every
+          // direction otherwise stops at that corner of the bounds (KKT
+          // point), and the later warm-started runs never leave it.
+          if (t == 1 && inner_restart) {
+            double best_res_f = res.f_opt;
+            arma::vec best_res_x = x_inner;
+            for (int retry = 0; retry < max_restart; ++retry) {
+              const bool at_lower = arma::min(arma::abs(x_inner - inner_lower)) < arma::datum::eps;
+              if (!(res.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0 || res.num_iters <= 2 || at_lower))
+                break;
+              x_inner = inner_restart(x_inner_start, retry);
+              res = optimizer.minimize(
+                  bfgs_fn, x_inner, inner_lower.memptr(), inner_upper.memptr(), bounds_type.memptr());
+              total_bfgs_evals += res.num_fun_calls;
+              if (res.f_opt < best_res_f) {
+                best_res_f = res.f_opt;
+                best_res_x = x_inner;
+              }
+            }
+            x_inner = best_res_x;
+          }
         } else {
           // Unbounded: use bound_type = 0 (no bounds)
           arma::ivec no_bounds(n_inner, arma::fill::zeros);
@@ -168,8 +207,19 @@ class AdamBFGS {
         best_inner = x_inner;
       }
       stall = significant ? 0 : stall + 1;
-      if (patience > 0 && stall >= patience)
-        break;
+      if (patience > 0 && stall >= patience) {
+        if (decays >= lr_decays)
+          break;
+        ++decays;
+        lr *= lr_decay;
+        x_outer = best_outer;
+        x_inner = best_inner;
+        mm.zeros();
+        vm.zeros();
+        k = 0;
+        stall = 0;
+        continue;
+      }
 
       // ---- Adam update on x_outer ----
       if (n_outer > 0) {
@@ -177,11 +227,12 @@ class AdamBFGS {
         // For minimization, Adam descends (negative gradient direction)
         const arma::vec& g = maximize ? grad_outer : -grad_outer;
 
+        ++k;
         mm = adam_beta1 * mm + (1.0 - adam_beta1) * g;
         vm = adam_beta2 * vm + (1.0 - adam_beta2) * (g % g);
-        arma::vec mh = mm / (1.0 - std::pow(adam_beta1, static_cast<double>(t)));
-        arma::vec vh = vm / (1.0 - std::pow(adam_beta2, static_cast<double>(t)));
-        x_outer += adam_lr * mh / (arma::sqrt(vh) + adam_eps);
+        arma::vec mh = mm / (1.0 - std::pow(adam_beta1, static_cast<double>(k)));
+        arma::vec vh = vm / (1.0 - std::pow(adam_beta2, static_cast<double>(k)));
+        x_outer += lr * mh / (arma::sqrt(vh) + adam_eps);
         if (outer_lower.n_elem == n_outer && outer_upper.n_elem == n_outer)
           x_outer = arma::min(arma::max(x_outer, outer_lower), outer_upper);
       }

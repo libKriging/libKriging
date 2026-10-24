@@ -85,10 +85,10 @@ Full demo: [rlibkriging/tests/testthat/test-rlibkriging-demo.R](rlibkriging/test
 
 ## Parallel R code (`mclapply`, forked workers)
 
-libKriging uses OpenMP (multistart `"BFGS<k>"`) and the system BLAS, which may be
-multithreaded. A process forked while such a thread pool is alive
-(`parallel::mclapply`, `parallel::mcparallel`, `future::multicore`) can deadlock in
-the child. libKriging quiesces its own OpenMP and OpenBLAS threads before every
+libKriging uses OpenMP (covariance loops), threads (parallel `WarpKriging` /
+`MLPKriging` multistart) and the system BLAS, which may be multithreaded. A process
+forked while such a thread pool is alive (`parallel::mclapply`, `parallel::mcparallel`,
+`future::multicore`) can deadlock in the child. libKriging quiesces its own OpenMP and OpenBLAS threads before every
 `fork()` (`pthread_atfork`), which covers the usual OpenBLAS builds. If forked workers
 still hang (e.g. with an OpenMP build of OpenBLAS, `libopenblaso`, selected as the
 system BLAS, or another threaded BLAS), make the parent single-threaded before
@@ -102,6 +102,17 @@ or use socket workers (`parallel::makeCluster(type = "PSOCK")`, `future::multise
 which do not fork. Models are shipped to them by R serialization (rlibkriging versions
 including [#327](https://github.com/libKriging/libKriging/issues/327)) or with `$save()` /
 `load.Kriging()`.
+
+Forked children start with one thread. Socket workers do not: each one uses all the
+physical cores by default, so k workers oversubscribe the machine k times. Give each
+worker its share of the thread budget, e.g. for k workers:
+
+```r
+parallel::clusterCall(cl, function(k) rlibkriging:::optim_set_num_threads_percent(1 / k), length(cl))
+```
+
+(`rlibkriging:::optim_get_num_threads()` returns the resulting number of threads;
+see [docs/dev/FAQ.md](../../docs/dev/FAQ.md), "How many threads does libKriging use?").
 
 ## CI
 

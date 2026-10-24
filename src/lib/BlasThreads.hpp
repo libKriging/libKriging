@@ -1,30 +1,34 @@
 #ifndef LIBKRIGING_SRC_LIB_BLASTHREADS_HPP
 #define LIBKRIGING_SRC_LIB_BLASTHREADS_HPP
 
-// Private (not installed) helper shared by Kriging.cpp and WarpKriging.cpp.
+// Private (not installed): OpenBLAS / OpenMP thread-count access, defined in
+// Kriging.cpp (fork handlers, ThreadBudget.cpp).
 
 namespace libKriging {
 namespace detail {
+
+/// OpenBLAS and OpenMP thread counts; 0 for a backend whose count cannot be
+/// read (no openblas_get_num_threads, no OpenMP).
+struct BlasThreadState {
+  int blas = 0;
+  int omp = 0;
+};
+
+/// Current OpenBLAS and OpenMP thread counts. Defined in Kriging.cpp.
+BlasThreadState get_blas_threads();
 
 /// Set the OpenBLAS and OpenMP thread counts (no-op for a backend without
 /// openblas_set_num_threads). Defined in Kriging.cpp.
 void set_blas_threads(unsigned int n);
 
-/// Balances nested parallelism during a parallel multistart: each worker gets
-/// `n` BLAS/OMP threads instead of all of them. Resets to 1 thread on scope
-/// exit, which also collapses the idle BLAS pool so that a later fork() (e.g.
-/// R's mclapply) does not inherit locked mutexes and deadlock.
-struct BlasThreadGuard {
-  bool active = false;
-  void set(unsigned int n) {
-    active = true;
-    set_blas_threads(n);
-  }
-  ~BlasThreadGuard() {
-    if (active)
-      set_blas_threads(1);
-  }
-};
+/// Restore counts read by get_blas_threads() (0 entries are left untouched).
+/// Defined in Kriging.cpp.
+void restore_blas_threads(const BlasThreadState& s);
+
+/// OpenBLAS thread count only (0 / no-op without openblas_*_num_threads); the
+/// OpenMP ICV is left untouched. Defined in Kriging.cpp.
+int get_openblas_threads();
+void set_openblas_threads(int n);
 
 }  // namespace detail
 }  // namespace libKriging

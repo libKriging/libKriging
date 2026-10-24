@@ -1647,8 +1647,28 @@ function load_nested_kriging(filename::String)
     return NestedKriging(_check_ptr(ptr))
 end
 
+# --- LinearAlgebra settings (global) ---
+
+"""
+    get_chol_jitter() / set_chol_jitter(x)
+
+Fixed jitter on the correlation diagonal of noise-free fits: `x < 0` automatic
+per kernel (default: gauss 1e-8, matern5_2 1e-10, 0 otherwise), `x = 0`
+disabled (former behaviour), `x > 0` this value for every kernel.
+"""
+get_chol_jitter() = ccall(dlsym(_lk(), :lk_linalg_get_chol_jitter), Cdouble, ())
+set_chol_jitter(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_linalg_set_chol_jitter), Cint, (Cdouble,), x))
+
+"""
+    get_num_nugget() / set_num_nugget(x)
+
+Numerical nugget of the Cholesky fallback (default 1e-10).
+"""
+get_num_nugget() = ccall(dlsym(_lk(), :lk_linalg_get_num_nugget), Cdouble, ())
+set_num_nugget(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_linalg_set_num_nugget), Cint, (Cdouble,), x))
 
 export Kriging, WarpKriging, MLPKriging, NestedKriging
+export get_chol_jitter, set_chol_jitter, get_num_nugget, set_num_nugget
 export nb_groups, aggregation, beta0, groups, set_predict_chunk!, set_warp_subsample!
 export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
 export load, load_kriging, load_warp_kriging, load_mlp_kriging, load_nested_kriging

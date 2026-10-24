@@ -14,6 +14,8 @@ add_library(Kriging
         Kriging.cpp include/libKriging/Kriging.hpp
         NestedKriging.cpp include/libKriging/NestedKriging.hpp
         WarpKriging.cpp include/libKriging/WarpKriging.hpp
+        TaskPool.cpp TaskPool.hpp
+        ThreadBudget.cpp ThreadBudget.hpp
         MLPKriging.cpp include/libKriging/MLPKriging.hpp
         KrigingLoader.cpp include/libKriging/KrigingLoader.hpp
         include/libKriging/KrigingException.hpp
@@ -35,7 +37,7 @@ endif ()
 
 target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp) # maybe PRIVATE
 
-# Link OpenMP if found (required for omp_set_num_threads calls in Kriging.cpp, etc.)
+# Link OpenMP if found (OpenMP loops, fork handlers in Kriging.cpp)
 if(OpenMP_CXX_FOUND)
     target_link_libraries(Kriging PUBLIC OpenMP::OpenMP_CXX)
 endif()

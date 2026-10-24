@@ -158,6 +158,11 @@ TEST_CASE("Fit: unstable LL (long range with 1D Gauss kernel)", "[fit][unstable]
   }
 
   SECTION("LL / Fit: unstable LL fixed using rcond failover - BFGS vs BFGS10") {
+    // This section checks the rcond / num_nugget failover of the Cholesky,
+    // which the fixed jitter bypasses (the factorization no longer fails):
+    // run it without the jitter (see the next section for the default).
+    const double default_chol_jitter = LinearAlgebra::get_chol_jitter();
+    LinearAlgebra::set_chol_jitter(0);
     LinearAlgebra::check_chol_rcond(true);
     LinearAlgebra::set_num_nugget(1e-15);
     LinearAlgebra::set_chol_warning(true);
@@ -201,6 +206,26 @@ TEST_CASE("Fit: unstable LL (long range with 1D Gauss kernel)", "[fit][unstable]
     // Restore defaults
     LinearAlgebra::check_chol_rcond(default_rcond_checked);
     LinearAlgebra::set_num_nugget(default_num_nugget);
+    LinearAlgebra::set_chol_jitter(default_chol_jitter);
+  }
+
+  SECTION("LL / Fit: unstable LL with the fixed Cholesky jitter (default) - BFGS vs BFGS10") {
+    // With the jitter (gauss 1e-9) the LL profile has the same single maximum
+    // (theta = 0.1506, LL = 2.288) but its long-range tail is a bumpy plateau
+    // instead of an erratic fall: a single random start that lands there
+    // stops on a bump (theta 1.37, LL -14.0). The multistart finds the
+    // maximum; a single start is not required to (docs/dev/CholJitter.md, starting points).
+    Kriging k_bfgs("gauss");
+    k_bfgs.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", Kriging::Parameters{});
+    Kriging k_bfgs10("gauss");
+    k_bfgs10.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS10", "LL", Kriging::Parameters{});
+
+    INFO("BFGS theta: " << k_bfgs.theta().t() << ", LL: " << k_bfgs.logLikelihood());
+    INFO("BFGS10 theta: " << k_bfgs10.theta().t() << ", LL: " << k_bfgs10.logLikelihood());
+
+    CHECK(std::abs(k_bfgs10.theta()(0) - 0.1506) < 1e-3);
+    CHECK(std::isfinite(k_bfgs.logLikelihood()));
+    CHECK(k_bfgs10.logLikelihood() >= k_bfgs.logLikelihood() - 1e-8);
   }
 
   // Ensure defaults are restored at the end

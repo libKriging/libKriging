@@ -8,6 +8,10 @@
 library(rlibkriging)
 library(testthat)
 
+# v0.9.3 had no fixed Cholesky jitter: compare the exact objective and model
+# (noise-free gauss fits now add 1e-9 / 1e-10 to the diagonal, see docs/dev/FAQ.md)
+rlibkriging:::linalg_set_chol_jitter(0)
+
 reffile <- commandArgs(trailingOnly = TRUE)
 if (length(reffile) == 0) reffile <- "/tmp/rlibkriging_v093_ref.rds"
 stopifnot(file.exists(reffile))
