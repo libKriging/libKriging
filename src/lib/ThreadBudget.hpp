@@ -21,8 +21,19 @@ int physical_cores();
 /// Thread budget: round(share × physical_cores()), share = Optim::num_threads_percent
 /// (x <= 1: ratio, x > 1: percentage, 0 = 100 %), at least 1, never more than the
 /// calling thread's OpenMP limit (omp_get_max_threads(): OMP_NUM_THREADS,
-/// omp_set_num_threads). The OpenBLAS count bounds the BLAS only.
+/// omp_set_num_threads). The OpenBLAS count bounds the BLAS only. 1 in a
+/// forked child (set_forked_child()).
 int budget_total();
+
+/// Called by the pthread_atfork child handler (Kriging.cpp): caps the budget
+/// of the forked child at 1 thread until Optim::set_num_threads_percent() is
+/// called in it. The OpenMP ICV set to 1 by that handler is not enough: LLVM
+/// libomp registers its own child handler after it (at its first use) and
+/// resets the ICV to OMP_NUM_THREADS / the CPU count (#420).
+void set_forked_child();
+
+/// Clears the cap of set_forked_child() (Optim::set_num_threads_percent).
+void clear_forked_child();
 
 /// OpenBLAS count for a call with `share` threads, 0 = leave it as it is: no
 /// OpenBLAS, or OpenBLAS loaded with at most `share` threads (an explicit

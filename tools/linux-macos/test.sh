@@ -25,11 +25,22 @@ fi
 # still instruments the code and would report any genuine non-OpenMP race.
 # The .tsan-suppressions file is kept as a documented fallback and is loaded
 # too. Real multi-threaded OpenMP race detection would require building this
-# job with Clang + the TSan-aware OpenMP runtime (libarcher).
+# job with Clang + the TSan-aware OpenMP runtime (libarcher): when CMake found
+# it (LIBKRIGING_ARCHER_LIBRARY, LLVM libomp), the OpenMP loops are compiled in
+# (LK_TSAN_OPENMP) and run on 2 threads with Archer loaded, so TSan checks them
+# (#420); .tsan-suppressions-archer only silences the uninstrumented runtimes
+# (libomp internals, OpenBLAS threads), not code run in an OpenMP region.
 if [[ "$(printf %s "${SANITIZE:-}" | tr "[:upper:]" "[:lower:]")" == "thread" ]]; then
-  export OMP_NUM_THREADS=1
-  export TSAN_OPTIONS="suppressions=${ROOT_DIR}/.tsan-suppressions${TSAN_OPTIONS:+ ${TSAN_OPTIONS}}"
-  echo "TSan job: OMP_NUM_THREADS=${OMP_NUM_THREADS}, TSAN_OPTIONS=${TSAN_OPTIONS}"
+  ARCHER_LIBRARY=$(sed -n 's/^LIBKRIGING_ARCHER_LIBRARY:FILEPATH=//p' "${BUILD_DIR:-build}"/CMakeCache.txt 2>/dev/null || true)
+  if [[ -n "${ARCHER_LIBRARY}" && "${ARCHER_LIBRARY}" != *NOTFOUND ]]; then
+    export OMP_NUM_THREADS=2
+    export OMP_TOOL_LIBRARIES="${ARCHER_LIBRARY}"
+    export TSAN_OPTIONS="suppressions=${ROOT_DIR}/.tsan-suppressions-archer${TSAN_OPTIONS:+ ${TSAN_OPTIONS}}"
+  else
+    export OMP_NUM_THREADS=1
+    export TSAN_OPTIONS="suppressions=${ROOT_DIR}/.tsan-suppressions${TSAN_OPTIONS:+ ${TSAN_OPTIONS}}"
+  fi
+  echo "TSan job: OMP_NUM_THREADS=${OMP_NUM_THREADS}, OMP_TOOL_LIBRARIES=${OMP_TOOL_LIBRARIES:-}, TSAN_OPTIONS=${TSAN_OPTIONS}"
 fi
 
 cd "${BUILD_DIR:-build}"

@@ -186,6 +186,28 @@ as fast as setting `OPENBLAS_NUM_THREADS` before loading (RESULTS.md, section 9)
 build deadlocks in forked workers). With `mclapply`, give each worker one thread
 (`Optim::set_num_threads_percent` small, or `OPENBLAS_NUM_THREADS=1`).
 
+In the child, the thread budget is capped at 1 (`set_forked_child()`,
+`ThreadBudget.cpp`) until `Optim::set_num_threads_percent` is called there: the
+OpenMP ICV set to 1 by the child handler does not hold with LLVM libomp (macOS,
+Clang builds), whose own child handler, registered at its first use and so
+after libKriging's, resets it to `OMP_NUM_THREADS` / the CPU count (#420). On
+Linux libomp also pins the child's main thread to one CPU on re-initialisation,
+which hid this (`physical_cores()` = 1) unless `OMP_PROC_BIND=false`.
+`Optim::get_blas_num_threads()` / `get_omp_num_threads()` (R
+`rlibkriging:::optim_get_blas_num_threads()` / `optim_get_omp_num_threads()`)
+read the counts in effect. Tests: `BlasThreadsTest` (fork, then a fit in the
+child), `test-ForkSafety.R` (budget and OpenBLAS count 1 in `mcparallel`
+children before and after a fit, parent's counts unchanged).
+
+Under ThreadSanitizer the OpenMP loops are compiled out (`LK_OMP_LOOPS`,
+`OmpLoops.hpp`) with GCC / libgomp, which TSan cannot see through. With Clang
+and LLVM libomp, CMake finds Archer (`libarcher`, shipped with `libomp-dev`) and
+defines `LK_TSAN_OPENMP`: the loops stay in, `tools/linux-macos/test.sh` loads
+Archer (`OMP_TOOL_LIBRARIES`) and runs them on 2 threads, with
+`.tsan-suppressions-archer` (libomp internals, OpenBLAS threads only; a race
+planted in an `omp parallel for` is still reported). CI job "Thread Sanitizer
+(Clang + Archer)".
+
 ## 8. Decisions
 
 1. ~~OpenBLAS loaded with more threads than the budget: leave it, run OpenMP
@@ -326,8 +348,6 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 
 ## 10. Open items
 
-- TSan does not see the OpenMP loops (compiled out, `LK_OMP_LOOPS`); the R
-  fork-safety test does not check the children's budget (#420).
 - Optional CI job running `bench-threads.sh` on a small grid, no threshold
   (runners are too noisy for pass / fail on timings) (#421).
 - Other BLAS (MKL `mkl_set_num_threads_local`, FlexiBLAS, BLIS): sections 5 and 8

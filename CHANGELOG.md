@@ -22,6 +22,12 @@ past release, see the corresponding entry on the
   `rlibkriging:::optim_set_num_threads_percent` (and `_get_`), `optim_get_num_threads`
   (Julia: not exposed, like `set_thread_pool_size`). See
   [docs/dev/parallel.md](docs/dev/parallel.md).
+- `Optim::get_blas_num_threads()` / `Optim::get_omp_num_threads()` (R
+  `rlibkriging:::optim_get_blas_num_threads()` / `optim_get_omp_num_threads()`): the OpenBLAS
+  count and OpenMP limit in effect, read only (#420).
+- **CI**: "Thread Sanitizer (Clang + Archer)" job: with LLVM libomp and its Archer tool the
+  OpenMP loops are kept under TSan and checked on 2 threads (the GCC job compiles them out)
+  (#420).
 - **R**: `Kriging`, `NestedKriging`, `WarpKriging` and `MLPKriging` objects survive R
   serialization: `saveRDS()` / `readRDS()`, `save()` / `load()` of a workspace,
   `serialize()`, and shipping to PSOCK / `future` workers. The current model is stored as its
@@ -45,6 +51,11 @@ past release, see the corresponding entry on the
   `predict`, `simulate` or `update` run single-threaded. The parent process of a `fork()`
   (R `parallel::mclapply`) also gets its thread counts back once the fork returns; the
   children still start single-threaded (#325).
+- Forked children (R `parallel::mclapply`) with LLVM libomp (macOS, Clang builds) could run
+  with the full thread budget: libomp's own `fork()` child handler, registered after
+  libKriging's, resets the OpenMP limit set to 1 (seen on Linux, Clang 18 / libomp, with
+  `OMP_PROC_BIND=false`; macOS not verified). The budget is now capped at 1 in a forked child whatever
+  the OpenMP runtime, until `Optim::set_num_threads_percent` is called in it (#420).
 - **MLPKriging** / `mlp_joint`: the K refits of the predictive-variance calibration (#407)
   run concurrently in the multistart thread pool (`Optim::set_thread_pool_size`) instead of
   one after the other. The calibration made the fit 5-10x slower (n = 200, d = 4,

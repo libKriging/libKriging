@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <csignal>
 #include <thread>
 
 #ifdef _OPENMP
@@ -158,7 +159,20 @@ int physical_cores() {
   return n;
 }
 
+// Set in a forked child only (async-signal-safe store from the atfork handler)
+static volatile std::sig_atomic_t forked_child = 0;
+
+void set_forked_child() {
+  forked_child = 1;
+}
+
+void clear_forked_child() {
+  forked_child = 0;
+}
+
 int budget_total() {
+  if (forked_child)
+    return 1;
   double share = Optim::num_threads_percent;
   if (!(share > 0.0))
     share = 1.0;

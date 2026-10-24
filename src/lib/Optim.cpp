@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <string>
+#include "BlasThreads.hpp"
 #include "ThreadBudget.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
@@ -225,6 +226,7 @@ LIBKRIGING_EXPORT void Optim::set_num_threads_percent(double x) {
   if (!(x >= 0.0))
     throw std::invalid_argument("set_num_threads_percent: expected x >= 0 (x <= 1: ratio, x > 1: percentage)");
   Optim::num_threads_percent = x;
+  libKriging::detail::clear_forked_child();  // a forked child may opt back in
 }
 
 LIBKRIGING_EXPORT double Optim::get_num_threads_percent() {
@@ -233,6 +235,14 @@ LIBKRIGING_EXPORT double Optim::get_num_threads_percent() {
 
 LIBKRIGING_EXPORT int Optim::get_num_threads() {
   return libKriging::detail::budget_total();
+}
+
+LIBKRIGING_EXPORT int Optim::get_blas_num_threads() {
+  return libKriging::detail::get_blas_threads().blas;
+}
+
+LIBKRIGING_EXPORT int Optim::get_omp_num_threads() {
+  return libKriging::detail::get_blas_threads().omp;
 }
 
 int Optim::thread_pool_size = get_env_or_default("LK_THREAD_POOL_SIZE", 0);  // 0: the thread budget

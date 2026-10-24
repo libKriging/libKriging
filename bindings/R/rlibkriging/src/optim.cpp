@@ -151,3 +151,15 @@ void optim_set_num_threads_percent(double percent) {
 int optim_get_num_threads() {
   return Optim::get_num_threads();
 }
+
+// Diagnostics, read only: OpenBLAS count (0: not OpenBLAS / unreadable) and
+// OpenMP limit of the calling thread (0: no OpenMP)
+// [[Rcpp::export]]
+int optim_get_blas_num_threads() {
+  return Optim::get_blas_num_threads();
+}
+
+// [[Rcpp::export]]
+int optim_get_omp_num_threads() {
+  return Optim::get_omp_num_threads();
+}

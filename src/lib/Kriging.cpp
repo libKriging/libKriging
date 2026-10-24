@@ -153,7 +153,9 @@ void restore_blas_threads(const BlasThreadState& s) {
 // work can start during the fork window. The parent handler restores the
 // recorded counts once fork() has returned, so the parent does not stay
 // single-threaded after e.g. mclapply. The child handler re-asserts
-// single-threading in case the runtime inherited stale state.
+// single-threading in case the runtime inherited stale state, and caps the
+// thread budget at 1: LLVM libomp's own child handler, registered after this
+// one, resets the OpenMP ICV (#420).
 #if !defined(_WIN32) && defined(_POSIX_VERSION)
 #include <pthread.h>
 namespace {
@@ -171,6 +173,7 @@ void libkriging_atfork_parent() {
 
 void libkriging_atfork_child() {
   libKriging::detail::set_blas_threads(1);
+  libKriging::detail::set_forked_child();
 }
 
 struct ForkSafeRegistrar {

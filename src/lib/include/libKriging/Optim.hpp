@@ -112,6 +112,14 @@ class Optim {
   LIBKRIGING_EXPORT static double get_num_threads_percent();
   /// Resolved thread budget (number of threads), read only.
   LIBKRIGING_EXPORT static int get_num_threads();
+  /// Diagnostics, read only: the OpenBLAS thread count currently set (0: not
+  /// OpenBLAS, or its count cannot be read) and the OpenMP limit of the calling
+  /// thread (omp_get_max_threads(); 0 without OpenMP). In a child forked by a
+  /// process that loaded the library, the OpenBLAS count and get_num_threads()
+  /// are 1 (pthread_atfork handlers); the OpenMP limit may not be (LLVM libomp
+  /// resets it), it does not bound the library's loops there.
+  LIBKRIGING_EXPORT static int get_blas_num_threads();
+  LIBKRIGING_EXPORT static int get_omp_num_threads();
 
   // Number of multistart workers (Kriging, WarpKriging, MLPKriging), at most
   // the number of starts; 0 = automatic = the thread budget (one thread per

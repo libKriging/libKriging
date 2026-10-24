@@ -164,8 +164,17 @@ TEST_CASE("fork() quiesces the child only and restores the parent's thread count
   }
   const pid_t pid = fork();
   if (pid == 0) {
+    // The OpenMP ICV is not checked: LLVM libomp's own child handler resets it
+    // to OMP_NUM_THREADS / the CPU count; the budget, which bounds every pool
+    // and OpenMP loop of the library, is 1 whatever the runtime (#420).
     const Threads c = get_threads();
-    _exit((c.blas <= 1 && c.omp <= 1) ? 0 : 1);
+    const bool before = c.blas <= 1 && Optim::get_num_threads() == 1;
+    arma::vec y;
+    arma::mat X;
+    data(y, X);
+    Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS4");  // a fit keeps it
+    const bool after = get_threads().blas <= 1 && Optim::get_num_threads() == 1;
+    _exit((before && after && std::isfinite(k.logLikelihood())) ? 0 : 1);
   }
   REQUIRE(pid > 0);
   int status = 0;
