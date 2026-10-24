@@ -17,3 +17,6 @@ add_mex_test(NAME KrigingNormalizeScale FILENAME kriging_normalize_scale_test.m)
 add_mex_test(NAME KrigingNoiseApi FILENAME kriging_noise_api_test.m)
 add_mex_test(NAME NestedKrigingAccessors FILENAME nested_kriging_accessors_test.m)
 add_mex_test(NAME WarpMLPSimulateNoise FILENAME warp_mlp_simulate_noise_test.m)
+# Exposed names, compared to bindings/api.yaml by tools/checks/binding_api.py
+add_mex_test(NAME ApiDump FILENAME api_dump_test.m)
+set_property(TEST ${OCTAVE_BINDING_MODE}/ApiDump APPEND PROPERTY ENVIRONMENT "LK_API_DUMP_DIR=${CMAKE_BINARY_DIR}/binding-api")

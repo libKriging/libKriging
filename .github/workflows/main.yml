@@ -63,6 +63,35 @@ jobs:
         shell: bash
         run: python3 tools/release/check_versions.py
 
+  binding-api:
+    # API exposed by the Python, R, Octave and Julia bindings (#419): the
+    # manifest bindings/api.yaml is valid and every binding test file is run.
+    # The names each binding exposes are compared to the manifest in the
+    # Linux build jobs ("check binding API" step).
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Install PyYAML
+        shell: bash
+        run: python3 -m pip install pyyaml
+
+      - name: Check the manifest
+        shell: bash
+        run: python3 tools/checks/binding_api.py manifest
+
+      - name: Check that every binding test file is run
+        shell: bash
+        run: python3 tools/checks/binding_api.py tests
+
+      - name: Manifest summary
+        shell: bash
+        run: |
+          echo "## Binding API (bindings/api.yaml)" >> "$GITHUB_STEP_SUMMARY"
+          python3 tools/checks/binding_api.py table >> "$GITHUB_STEP_SUMMARY"
+
   build:
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ matrix.timeout_minutes || 60 }}
@@ -201,6 +230,8 @@ jobs:
           echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
           echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
           echo "DISABLE_OPENMP=${{matrix.disable_openmp}}"       >> $GITHUB_ENV
+          # names exposed by each binding, written by its api_dump test (#419)
+          echo "LK_API_DUMP_DIR=${GITHUB_WORKSPACE}/${BUILD_DIR:-build}/binding-api" >> $GITHUB_ENV
           # GCC ships its own OpenMP runtime (libgomp, omp.h): removing packages
           # cannot hide it, so tell CMake not to look for OpenMP at all.
           if [ "${{matrix.disable_openmp}}" == "on" ]; then
@@ -350,6 +381,20 @@ jobs:
       
       - if: steps.test.outcome != 'success'
         run: exit 1
+
+      - name: check binding API
+        # compare the names exposed by the bindings built here (dumped by
+        # their api_dump tests) to bindings/api.yaml (#419)
+        shell: bash
+        run: |
+          dumps=()
+          [[ "${ENABLE_PYTHON_BINDING}" == "on" ]] && dumps+=("${LK_API_DUMP_DIR}/python.txt")
+          [[ "${ENABLE_R_BINDING}" == "on" ]] && dumps+=("${LK_API_DUMP_DIR}/r.txt")
+          [[ "${ENABLE_OCTAVE_BINDING}" == "on" ]] && dumps+=("${LK_API_DUMP_DIR}/octave.txt")
+          [[ "${ENABLE_JULIA_BINDING}" == "on" ]] && dumps+=("${LK_API_DUMP_DIR}/julia.txt")
+          python3 -m pip install pyyaml
+          python3 tools/checks/binding_api.py dump "${dumps[@]}"
+        if: runner.os == 'Linux' && (matrix.enable_python == 'on' || matrix.enable_R == 'on' || matrix.enable_octave == 'on' || matrix.enable_julia == 'on')
 
       - name: publish_report
         shell: bash

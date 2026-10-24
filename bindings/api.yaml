@@ -1,0 +1,432 @@
+# Public API of the Python, R, Octave and Julia bindings (#419).
+#
+# Checked by tools/checks/binding_api.py:
+#   - in the Linux build jobs, against the names each binding exposes
+#     (written by its api_dump test: Python/api_dump, Julia/api_dump,
+#     Octave/ApiDump, testthat test-ApiDump.R): a name missing from a binding
+#     or exposed but not listed here fails the job;
+#   - in the binding-api job, that every binding test file is run.
+#
+# What a binding "exposes" for each scope:
+#   module         Python: public non-module names of pylibkriging;
+#                  R: exported names, except the class members below (S3
+#                  generics); Octave: the .m files next to Kriging.m;
+#                  Julia: exported names, except the class methods below.
+#   <class>        Python: public attributes of the class; R: functions
+#                  `k$name()` of a fitted object; Octave: methods(<class>)
+#                  minus the handle ones; Julia: methods of jlibkriging
+#                  taking a <class> argument.
+#   Optim, LinearAlgebra, Random
+#                  R: namespace functions optim_* / linalg_* / random_*.
+#
+# Entries: `scopes.<scope>.members.<name>`, where <name> is the C++ name.
+#   <name>:                             same name in every binding
+#   <name>: {julia: fit!}               another name in that binding
+#   <name>: {r: "not exposed: <why>"}   a gap, decided and explained
+#   <name>: {only: [r], reason: <why>}  specific to some bindings
+#   <name>: {optional: <why>}           may be absent (e.g. Debug builds only)
+# A scope missing from a binding: `bindings: {julia: "not exposed: <why>"}`.
+#
+# Each "not exposed" that is not a language idiom is a known gap to fix.
+
+scopes:
+  module:
+    members:
+      Kriging:
+      WarpKriging:
+      MLPKriging:
+      NestedKriging:
+      Optim:
+        r: "not exposed: internal rlibkriging:::optim_* functions (gap)"
+        julia: "not exposed: no Optim settings in Julia (gap, #423)"
+      load:
+        octave: "not exposed: load_kriging(), as `load` would shadow Octave's built-in load"
+      load_kriging:
+        python: "not exposed: load()"
+        r: "not exposed: load()"
+      load.Kriging:
+        only: [r]
+        reason: "S3 method exported by the R package"
+      load_warp_kriging:
+        only: [julia]
+        reason: "Julia per-class loaders (no static methods in Julia)"
+      load_mlp_kriging:
+        only: [julia]
+        reason: "Julia per-class loaders (no static methods in Julia)"
+      load_nested_kriging:
+        only: [julia]
+        reason: "Julia per-class loaders (no static methods in Julia)"
+      subsetOfData:
+        python: "not exposed: Kriging.subsetOfData (static method)"
+        octave: "not exposed: Kriging.subsetOfData (static method)"
+      class_saved:
+        only: [octave]
+        reason: "Octave helper of load_kriging, reading the saved class name"
+      Params:
+        only: [octave]
+        reason: "Octave helper class for named parameters"
+      KrigingParameters:
+        only: [python]
+        reason: "Python type of the `parameters` argument"
+      RegressionModel:
+        only: [python]
+        reason: "Python enum of the regression models"
+      Constant:
+        only: [python]
+        reason: "RegressionModel value exported at module level by pybind11"
+      Linear:
+        only: [python]
+        reason: "RegressionModel value exported at module level by pybind11"
+      Interactive:
+        only: [python]
+        reason: "RegressionModel value exported at module level by pybind11"
+      Quadratic:
+        only: [python]
+        reason: "RegressionModel value exported at module level by pybind11"
+      None:
+        only: [python]
+        reason: "RegressionModel value exported at module level by pybind11"
+      RandomGenerator:
+        only: [python]
+        reason: "Python test helper (std::mt19937), unrelated to libKriging's Random"
+      WrappedPyKriging:
+        only: [python]
+        reason: "pybind11 class behind Kriging (Kriging is an alias)"
+      WrappedPyWarpKriging:
+        only: [python]
+        reason: "pybind11 class wrapped by the Python WarpKriging class"
+      WrappedPyMLPKriging:
+        only: [python]
+        reason: "pybind11 class behind MLPKriging (MLPKriging is an alias)"
+      WrappedPyNestedKriging:
+        only: [python]
+        reason: "pybind11 class behind NestedKriging (NestedKriging is an alias)"
+      direct_binding:
+        only: [python]
+        reason: "binding test helper"
+        optional: "Debug builds only"
+      one_side_carma_binding:
+        only: [python]
+        reason: "binding test helper"
+        optional: "Debug builds only"
+      two_side_carma_binding:
+        only: [python]
+        reason: "binding test helper"
+        optional: "Debug builds only"
+      check_dict_entry:
+        only: [python]
+        reason: "binding test helper"
+        optional: "Debug builds only"
+      warp_none:
+        only: [r]
+        reason: "R helpers building warping spec strings"
+      warp_affine:
+        only: [r]
+        reason: "R helpers building warping spec strings"
+      warp_boxcox:
+        only: [r]
+        reason: "R helpers building warping spec strings"
+      warp_kumaraswamy:
+        only: [r]
+        reason: "R helpers building warping spec strings"
+      warp_neural_mono:
+        only: [r]
+        reason: "R helpers building warping spec strings"
+      warp_mlp:
+        only: [r]
+        reason: "R helpers building warping spec strings"
+      warp_categorical:
+        only: [r]
+        reason: "R helpers building warping spec strings"
+      warp_ordinal:
+        only: [r]
+        reason: "R helpers building warping spec strings"
+      warp_knots:
+        only: [r]
+        reason: "R helpers building warping spec strings"
+
+  Kriging:
+    members:
+      fit: {julia: fit!}
+      predict:
+      simulate:
+      update: {julia: update!}
+      update_simulate:
+      copy:
+      save:
+      load:
+        r: "not exposed: module-level load() / load.Kriging()"
+        julia: "not exposed: module-level load() / load_kriging()"
+      summary:
+        r: "not exposed: print() / show()"
+      subsetOfData:
+        r: "not exposed: module-level subsetOfData()"
+        julia: "not exposed: module-level subsetOfData()"
+      covMat: {julia: cov_mat}
+      logLikelihood: {julia: log_likelihood}
+      logLikelihoodFun: {julia: log_likelihood_fun}
+      leaveOneOut: {julia: leave_one_out}
+      leaveOneOutFun: {julia: leave_one_out_fun}
+      leaveOneOutVec: {julia: leave_one_out_vec}
+      logMargPost: {julia: log_marg_post}
+      logMargPostFun: {julia: log_marg_post_fun}
+      model:
+        r: "not exposed: as.list() gives the same content (gap)"
+        julia: "not exposed: not bound yet (gap)"
+      kernel:
+      optim:
+      objective:
+      method:
+      nystrom_rank:
+      vecchia_neighbors:
+      X:
+      centerX:
+      scaleX:
+      y:
+      centerY:
+      scaleY:
+      normalize:
+      regmodel:
+      F:
+      T:
+      M:
+      z:
+      beta:
+      is_beta_estim:
+      theta:
+      is_theta_estim:
+      sigma2:
+      is_sigma2_estim:
+      noise_model:
+      nugget:
+      is_nugget_estim:
+      noise:
+      print: &r_print
+        only: [r]
+        reason: "R display methods"
+      show: *r_print
+      as.list:
+        only: [r]
+        reason: "R conversion to a list of the model content"
+      get_X: &julia_deprecated
+        only: [julia]
+        reason: "deprecated Julia alias of the accessor without get_ / is_"
+      get_centerX: *julia_deprecated
+      get_scaleX: *julia_deprecated
+      get_y: *julia_deprecated
+      get_centerY: *julia_deprecated
+      get_scaleY: *julia_deprecated
+      get_F: *julia_deprecated
+      get_T: *julia_deprecated
+      get_M: *julia_deprecated
+      get_z: *julia_deprecated
+      get_beta: *julia_deprecated
+      get_theta: *julia_deprecated
+      get_sigma2: *julia_deprecated
+      get_nugget: *julia_deprecated
+      get_noise: *julia_deprecated
+      is_normalize: *julia_deprecated
+
+  WarpKriging:
+    members:
+      fit: {julia: fit!}
+      predict:
+      simulate:
+      update: {julia: update!}
+      update_simulate:
+      copy:
+      save:
+      load:
+        r: "not exposed: module-level load()"
+        julia: "not exposed: module-level load() / load_warp_kriging()"
+      summary:
+        r: "not exposed: print() / show() (summary() is an S3 method)"
+      covMat: {julia: cov_mat}
+      logLikelihood: {julia: log_likelihood}
+      logLikelihoodFun: {julia: log_likelihood_fun}
+      kernel:
+      optim:
+      objective:
+      method:
+      warping:
+      warp_params:
+      feature_dim:
+      is_fitted:
+      X:
+      centerX:
+      scaleX:
+      y:
+      centerY:
+      scaleY:
+      normalize:
+      regmodel:
+      F:
+      T:
+      M:
+      z:
+      beta:
+      theta:
+      sigma2:
+      noise:
+      F_: &r_FT
+        only: [r]
+        reason: "S3 generic names, as F / T would mask base::F / base::T (k$F() / k$T() exist too)"
+      T_: *r_FT
+      print: *r_print
+      show: *r_print
+      as.list:
+        only: [r]
+        reason: "R conversion to a list of the model content"
+      encode_string_columns: &octave_encode
+        only: [octave]
+        reason: "Octave static helpers encoding string columns of X"
+      encode_X_from_warping: *octave_encode
+      get_X: *julia_deprecated
+      get_y: *julia_deprecated
+      get_theta: *julia_deprecated
+      get_sigma2: *julia_deprecated
+      get_warping: *julia_deprecated
+
+  MLPKriging:
+    members:
+      fit: {julia: fit!}
+      predict:
+      simulate:
+      update: {julia: update!}
+      update_simulate:
+      copy:
+      save:
+      load:
+        r: "not exposed: module-level load()"
+        julia: "not exposed: module-level load() / load_mlp_kriging()"
+      summary:
+        r: "not exposed: print() / show() (summary() is an S3 method)"
+      logLikelihood: {julia: log_likelihood}
+      logLikelihoodFun: {julia: log_likelihood_fun}
+      kernel:
+      objective:
+        octave: "not exposed: not bound yet (gap)"
+        julia: "not exposed: not bound yet (gap)"
+      method:
+      hidden_dims:
+      activation:
+      feature_dim:
+      is_fitted:
+      X:
+      centerX:
+      scaleX:
+      y:
+      centerY:
+      scaleY:
+      normalize:
+      regmodel:
+      F:
+      T:
+      M:
+      z:
+      beta:
+      theta:
+      sigma2:
+      F_: *r_FT
+      T_: *r_FT
+      print: *r_print
+      show: *r_print
+      as.list:
+        only: [r]
+        reason: "R conversion to a list of the model content"
+      get_X: *julia_deprecated
+      get_y: *julia_deprecated
+      get_theta: *julia_deprecated
+      get_sigma2: *julia_deprecated
+      get_hidden_dims: *julia_deprecated
+
+  NestedKriging:
+    members:
+      fit: {julia: fit!}
+      predict:
+      save:
+      load:
+        r: "not exposed: module-level load()"
+        julia: "not exposed: module-level load() / load_nested_kriging()"
+      summary:
+        r: "not exposed: print() / show()"
+      kernel:
+      objective:
+      method:
+      warping:
+      aggregation:
+      nb_groups:
+      groups:
+      theta:
+      sigma2:
+      beta0:
+      X:
+      y:
+      set_predict_chunk: {julia: set_predict_chunk!}
+      set_warp_subsample: {julia: set_warp_subsample!}
+      print: *r_print
+      show:
+        only: [r, julia]
+        reason: "R display method / Julia Base.show"
+      disp:
+        only: [octave]
+        reason: "Octave display method"
+
+  Optim:
+    bindings:
+      julia: "not exposed: no Optim settings in Julia (gap, #423)"
+    members:
+      is_reparametrized:
+      use_reparametrize:
+      get_theta_lower_factor:
+      set_theta_lower_factor:
+      get_theta_upper_factor:
+      set_theta_upper_factor:
+      variogram_bounds_heuristic_used:
+      use_variogram_bounds_heuristic:
+      get_log_level:
+      set_log_level:
+      get_max_iteration:
+      set_max_iteration:
+      get_gradient_tolerance:
+      set_gradient_tolerance:
+      get_objective_rel_tolerance:
+      set_objective_rel_tolerance:
+      get_thread_start_delay_ms:
+      set_thread_start_delay_ms:
+      get_thread_pool_size:
+      set_thread_pool_size:
+
+  LinearAlgebra:
+    bindings:
+      python: "not exposed: not bound yet (gap)"
+      octave: "not exposed: not bound yet (gap)"
+      julia: "not exposed: not bound yet (gap)"
+    members:
+      get_num_nugget:
+      set_num_nugget:
+      set_chol_warning:
+      check_chol_rcond:
+      chol_rcond_checked:
+      safe_chol_lower: {r: chol_safe}
+      rcond_chol:
+      rcond_approx_chol:
+      chol_block:
+
+  Random:
+    bindings:
+      python: "not exposed: not bound yet (gap)"
+      octave: "not exposed: not bound yet (gap)"
+      julia: "not exposed: not bound yet (gap)"
+    members:
+      reset_seed:
+      randu:
+      randu_vec:
+      randu_mat:
+      randn_mat:
+
+tests:
+  # binding test files deliberately not run, with the reason
+  not_run:
+    bindings/R/rlibkriging/tests/testthat/notest-Armadillo.R: "Armadillo demo, disabled (the demo_binding functions it called are commented out)"
+    bindings/Octave/mlibkriging/tests/test_new_features.m: "fails: the Optim integer setters reject a plain double (\"is not an unsigned 64bits int\"); fixed and registered by #415"
