@@ -58,6 +58,11 @@ constexpr arma::uword kJointMaxIterCap = 1000;
 // Early stop of the Adam phase: steps without a relative LL gain > tol.
 constexpr arma::uword kAdamPatience = 20;
 constexpr double kAdamRelTol = 1e-6;
+// At the first plateau, back to the best point with half the step, twice,
+// before stopping: the fixed step oscillated around a ridge (mlp warps: +167
+// LL median over 15 data sets, x2 fit time; docs/dev/CholJitter.md,
+// Adam phase).
+constexpr arma::uword kAdamLrDecays = 2;
 // Overflow-safe softplus log(1 + e^z): the naive form is +inf for z > 709.
 inline double softplus(double z) {
   return std::max(z, 0.0) + std::log1p(std::exp(-std::abs(z)));
@@ -2801,12 +2806,23 @@ void WarpKriging::optimise_joint(const std::string& method) {
     opt.adam_lr = wk.m_adam_lr;
     opt.patience = kAdamPatience;
     opt.rel_tol = kAdamRelTol;
+    opt.lr_decays = kAdamLrDecays;
     opt.max_iter_bfgs = (wk.m_max_iter_bfgs > 0) ? wk.m_max_iter_bfgs : kDefaultInnerMaxIterBFGS;
     opt.bfgs_pgtol = Optim::gradient_tolerance;
     opt.bfgs_factr = Optim::objective_rel_tolerance / 1E-13;
     opt.maximize = true;
     opt.outer_lower = wp_lower;
     opt.outer_upper = wp_upper;
+    // Same restart as the joint BFGS (and Kriging): θ contracted toward its
+    // lower bound, kept inside the bounds (L-BFGS-B does not project its
+    // starting point)
+    opt.max_restart = Optim::max_restart;
+    opt.inner_restart = [&](const arma::vec& gamma0, int retry) -> arma::vec {
+      const arma::vec theta_restart = arma::max(
+          arma::min(arma::vec((from_gamma(gamma0) + theta_lower) / std::pow(2.0, retry + 1)), theta_upper),
+          theta_lower);
+      return to_gamma(theta_restart);
+    };
 
     arma::vec current_wp = arma::min(arma::max(wk.pack_warp_params(), wp_lower), wp_upper);
     if (nw > 0 && arma::any(current_wp != wk.pack_warp_params())) {

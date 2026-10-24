@@ -387,6 +387,11 @@ endif()
 catch_discover_tests(WarpKrigingPerWarpTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
+add_executable(AdamBFGSTest AdamBFGSTest.cpp)
+target_link_libraries(AdamBFGSTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries AdamBFGSTest)
+catch_discover_tests(AdamBFGSTest)
+
 add_executable(WarpKrigingCollapseTest WarpKrigingCollapseTest.cpp)
 target_link_libraries(WarpKrigingCollapseTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries WarpKrigingCollapseTest)

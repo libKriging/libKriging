@@ -77,6 +77,44 @@ matern5_2 10 % vs 12 % of 800 data sets: `jitter_multistart_study.cpp`); the jit
 data sets miss. `unstableLLTest` checks the failover with the jitter off and, with it on, that
 BFGS10 finds the maximum (theta 0.1506) and LL(BFGS10) >= LL(BFGS).
 
+## Adam phase
+
+Multi-seed study of the WarpKriging warps (gauss, n 400, d 4, reference BLAS; 3 functions — the
+bench's sum sin(2 pi x), sum sin(2 pi x^2), a Gaussian bump plus a trend — x 5 data seeds, master
+fcabe4c5 against this branch). The CI bench (one data set) showed the branch losing LL on mlp,
+neural_mono and categorical; the study separates three causes:
+
+- **Objective, not optimum.** `logLikelihood()` is the objective at the search jitter (1e-9),
+  master's at num_nugget: above LL ≈ 1000 that alone costs 30–130 units. Both versions' models
+  re-evaluated at 1e-9 (save, load, `logLikelihoodFun`): neural_mono f1 +22 to +44 for the
+  branch (5 / 5), ordinal f1 +2 to +6, categorical f1 even.
+- **First inner BFGS at a corner.** With the search jitter forced to 1e-10 the branch reproduces
+  master exactly: the paths differ by the jitter only. On categorical / ordinal f2, seed 2, the
+  gradient at the start theta = 1 points out of the box in every direction; L-BFGS-B steps to the
+  upper corner (a KKT point, 1 iteration) and the warm-started runs of the later Adam steps never
+  leave it (LL −329, sigma2 1e9). `AdamBFGS` now restarts that first run with the Kriging
+  criteria (abnormal stop, <= 2 iterations, at the lower bound), theta contracted toward its
+  lower bound as the joint BFGS does: −329 → 831, −287 → 588; the 73 other cases bit-identical.
+- **Plateau of the Adam loop.** With a fixed step Adam oscillates around a ridge and the patience
+  (20 steps) stops it there: mlp f1 1094 at 60 steps against 1365 at 138 at 1e-10. At the first
+  plateau `AdamBFGS` now goes back to the best point with half the step, twice (`lr_decays`,
+  `kAdamLrDecays = 2`), before stopping.
+
+Against master (LL as returned, so the branch pays the jitter of the first point):
+
+| warp | branch before | + restart | + restart + 2 decays | patience 60 instead | time, decays / restart |
+|---|---|---|---|---|---|
+| mlp | median −22, 7 better / 8 worse | same | **median +167, 13 / 2** | +73, 10 / 5 | x2.1 |
+| categorical | −16, 1 / 10, one at −1117 | −12, 2 / 9 | 0, 4 / 7 | 0, 6 / 5 | x1.25 |
+| ordinal | 0, 4 / 7, one at −863 | 0, 6 / 5 | 0, 6 / 5 | same | x1.3 |
+| kumaraswamy | +0.4, 7 / 0 | same | same | same | x1.37 |
+| neural_mono | −29, 3 / 8 | same | same (no plateau stop) | same | x1.0 |
+
+Total fit time of the 75 fits: master 64 min, branch with restart 58 min, with the decays 81 min.
+Decided 2026-10-24: decays for every warp optimised by Adam (the cost is bounded by
+`max_iter_adam`); kumaraswamy and ordinal pay +30 % for no gain. Left: mlp f1, seed 3 (1136
+against master's 1365), a local optimum of that path.
+
 ## Open items
 
 - Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;

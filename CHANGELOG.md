@@ -148,6 +148,13 @@ past release, see the corresponding entry on the
   them from the same generator as `Kriging` (`Random::reset_seed` applies), not Armadillo's.
   The restart of a start whose result is "not better" now ignores differences below the
   optimizer tolerance ([#418](https://github.com/libKriging/libKriging/issues/418)).
+- **WarpKriging** / **MLPKriging**, optimisers `"Adam"` / `"BFGS+Adam"`: the first inner
+  `theta` L-BFGS-B is restarted as in `Kriging` when it stops abnormally, in <= 2 iterations or
+  at the lower bound (a start whose gradient points out of the bounds stopped at their corner,
+  LL −329 instead of 831 on a categorical case). The Adam loop no longer stops at its first
+  plateau: it goes back to the best point with half the step, twice. mlp warps: LL +167
+  (median of 15 data sets), fit time x2; every Adam-optimised warp is up to 1.4x slower. See
+  [docs/dev/CholJitter.md](docs/dev/CholJitter.md), Adam phase.
 - **Kriging** / **WarpKriging**: from n = 200 on Linux (n = 800 on macOS and Windows, not
   measured there yet: #416, #417), the covariance matrix of the exact
   objectives (and its new rows in `update`) is built in an OpenMP loop instead of one thread,
