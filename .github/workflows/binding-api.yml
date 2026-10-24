@@ -5,8 +5,8 @@ name: Binding API
 # builds it and lists its methods (tools/checks/binding_api/dump_<binding>);
 # the compare job matches the names across bindings, up to the naming
 # conventions of each language (tools/checks/binding_api/compare.py), and
-# reports the methods missing from some bindings (warnings and a table in
-# the job summary; add --strict to compare.py to make them errors).
+# fails on any method missing from some bindings (errors, and a table in the
+# job summary; --report-only on compare.py makes them warnings).
 
 on:
   push:

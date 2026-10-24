@@ -5,8 +5,8 @@ This document lists all methods exposed by each language binding for accessing t
 The workflow `.github/workflows/binding-api.yml` (Linux, one job per binding)
 lists the methods each built binding exposes and compares them across
 bindings, names being matched up to each language's convention
-(`leaveOneOut` / `leave_one_out`, `fit` / `fit!`); the methods missing from
-some bindings are listed in the job summary. To compare locally after
+(`leaveOneOut` / `leave_one_out`, `fit` / `fit!`): a method missing from
+some bindings fails the job (table in the job summary). To compare locally after
 building, e.g. Python against Julia:
 
 ```

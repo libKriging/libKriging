@@ -2,7 +2,7 @@
 """Compares the methods exposed by the Python, R, Octave and Julia bindings
 with each other (issue #419).
 
-  compare.py [--strict] [--markdown FILE] DUMP...
+  compare.py [--report-only] [--markdown FILE] DUMP...
 
 A dump is a text file of "<scope>\\t<name>" lines written by the dump_*
 script of this directory, the binding being given by its file name
@@ -11,9 +11,10 @@ bindings after normalization of the naming conventions: case and "_" are
 ignored, as are Julia's trailing "!", the deprecated Julia "get_" prefix and
 R's trailing "_" (F_, T_): leaveOneOut, leave_one_out and fit / fit! match.
 
-Every method missing from some bindings is reported (a GitHub warning when
-run in Actions); --strict makes them errors (exit status 1). --markdown writes
-the correspondence table, e.g. to $GITHUB_STEP_SUMMARY.
+Every method missing from some bindings, and every binding without a dump,
+is an error (exit status 1, a GitHub error annotation when run in Actions);
+--report-only makes them warnings (exit status 0). --markdown writes the
+correspondence table, e.g. to $GITHUB_STEP_SUMMARY.
 """
 
 import argparse
@@ -100,7 +101,8 @@ def markdown(langs, table, dumps):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--strict", action="store_true", help="fail on any missing method")
+    parser.add_argument("--report-only", action="store_true",
+                        help="report the missing methods as warnings, exit status 0")
     parser.add_argument("--markdown", help="write the correspondence table to this file (appended)")
     parser.add_argument("dumps", nargs="+")
     args = parser.parse_args(argv)
@@ -112,18 +114,16 @@ def main(argv=None):
             sys.exit("%s: file name must be one of %s" % (path, ", ".join(b + ".txt" for b in BINDINGS)))
         dumps[lang] = read_dump(path)
     langs, table, gaps = compare(dumps)
-    missing = [lang for lang in BINDINGS if lang not in dumps]
-    if missing:
-        print("not compared (no dump): " + ", ".join(missing))
+    gaps += ["%s: no dump, binding not compared" % lang for lang in BINDINGS if lang not in dumps]
 
     if args.markdown:
         with open(args.markdown, "a") as f:
             f.write(markdown(langs, table, dumps))
     in_actions = os.environ.get("GITHUB_ACTIONS") == "true"
     for gap in gaps:
-        print(("::%s::" % ("error" if args.strict else "warning") if in_actions else "") + gap)
-    print("%d method(s) not exposed by every binding (%s)" % (len(gaps), ", ".join(langs)))
-    return 1 if gaps and args.strict else 0
+        print(("::%s::" % ("warning" if args.report_only else "error") if in_actions else "") + gap)
+    print("%d difference(s) between the bindings (%s)" % (len(gaps), ", ".join(langs)))
+    return 1 if gaps and not args.report_only else 0
 
 
 if __name__ == "__main__":
