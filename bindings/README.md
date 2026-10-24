@@ -2,17 +2,19 @@
 
 This document lists all methods exposed by each language binding for accessing the underlying C++ library.
 
-The names exposed by each binding are also listed, machine-readably, in
-[`api.yaml`](api.yaml), a binding gap being recorded as
-`not exposed: <reason>`. The workflow `.github/workflows/binding-api.yml`
-(Linux, one job per binding) fails on a name missing from a binding or
-exposed but not listed there. To check locally after a build, e.g. for Python:
+The workflow `.github/workflows/binding-api.yml` (Linux, one job per binding)
+lists the methods each built binding exposes and compares them across
+bindings, names being matched up to each language's convention
+(`leaveOneOut` / `leave_one_out`, `fit` / `fit!`); the methods missing from
+some bindings are listed in the job summary. To compare locally after
+building, e.g. Python against Julia:
 
 ```
-pip install pyyaml
 PYTHONPATH=build/bindings/Python/pylibkriging:bindings/Python/pylibkriging/src \
   python3 tools/checks/binding_api/dump_python.py python.txt
-python3 tools/checks/binding_api/check.py python.txt
+JLIBKRIGING_LIB_PATH=build/bindings/Julia/jlibkriging/libkriging_c.so \
+  julia --project=bindings/Julia/jlibkriging tools/checks/binding_api/dump_julia.jl julia.txt
+python3 tools/checks/binding_api/compare.py python.txt julia.txt
 ```
 
 ## Classes

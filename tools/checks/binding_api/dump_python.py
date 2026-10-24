@@ -1,12 +1,11 @@
 # Lists the names exposed by pylibkriging, one "<scope>\t<name>" line each,
-# for check.py, which compares them to bindings/api.yaml.
+# for compare.py, which compares the bindings with each other.
 # Usage: python3 dump_python.py <output file>
-import inspect
 import sys
 
 import pylibkriging as lk
 
-# scope in bindings/api.yaml -> object exposing it
+# scope -> object exposing it
 SCOPES = {
     "Kriging": lk.Kriging,
     "WarpKriging": lk.WarpKriging,
@@ -20,7 +19,7 @@ def public(names):
     return sorted(n for n in names if not n.startswith("_"))
 
 
-lines = [("module", n) for n in public(dir(lk)) if not inspect.ismodule(getattr(lk, n))]
+lines = []
 for scope, obj in SCOPES.items():
     lines.extend((scope, n) for n in public(dir(obj)))
 

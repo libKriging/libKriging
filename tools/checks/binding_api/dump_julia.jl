@@ -1,5 +1,5 @@
 # Lists the names exposed by jlibkriging, one "<scope>\t<name>" line each,
-# for check.py, which compares them to bindings/api.yaml.
+# for compare.py, which compares the bindings with each other.
 # Usage: julia --project=bindings/Julia/jlibkriging dump_julia.jl <output file>
 using InteractiveUtils: methodswith
 using jlibkriging
@@ -22,13 +22,6 @@ for (scope, T) in SCOPES
         push!(members, String(m.name))
     end
     append!(lines, [(scope, n) for n in sort!(collect(members))])
-end
-# module: the exported names that are not methods of a class above
-members = Set(n for (_, n) in lines)
-for name in names(jlibkriging)
-    name === :jlibkriging && continue
-    String(name) in members && continue
-    push!(lines, ("module", String(name)))
 end
 
 open(ARGS[1], "w") do io

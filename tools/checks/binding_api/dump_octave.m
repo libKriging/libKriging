@@ -1,5 +1,5 @@
 % Lists the names exposed by mLibKriging, one "<scope>\t<name>" line each,
-% for check.py, which compares them to bindings/api.yaml.
+% for compare.py, which compares the bindings with each other.
 % Usage: octave --path <mLibKriging dirs> --eval "dump_octave('<output file>')"
 function dump_octave(out_file)
     scopes = {'Kriging', 'WarpKriging', 'MLPKriging', 'NestedKriging', 'Optim'};
@@ -7,12 +7,6 @@ function dump_octave(out_file)
     inherited = methods('handle');
 
     lines = {};
-    % module: the functions and classes installed next to Kriging.m
-    files = dir(fullfile(fileparts(which('Kriging')), '*.m'));
-    for i = 1:numel(files)
-        [~, name] = fileparts(files(i).name);
-        lines{end+1} = sprintf('module\t%s', name);
-    end
     for i = 1:numel(scopes)
         names = methods(scopes{i});
         for j = 1:numel(names)

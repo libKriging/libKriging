@@ -1,9 +1,7 @@
 # Lists the names exposed by rlibkriging, one "<scope>\t<name>" line each,
-# for check.py, which compares them to bindings/api.yaml.
+# for compare.py, which compares the bindings with each other.
 # Usage: Rscript dump_r.R <output file>
 #  - model classes: the `k$name()` members of a fitted object;
-#  - module: the exported names, except the class members (S3 generics such
-#    as fit or predict) and the S4 method tables (.__T__*);
 #  - Optim / LinearAlgebra / Random: the namespace functions optim_* /
 #    linalg_* / random_* (exported or not), prefix removed.
 suppressPackageStartupMessages(library(rlibkriging))
@@ -27,10 +25,6 @@ for (scope in names(models)) {
   obj <- models[[scope]]
   add(scope, Filter(function(n) is.function(obj[[n]]), names(obj)))
 }
-
-members <- sub("^[^\t]*\t", "", lines)
-exports <- grep("^\\.", getNamespaceExports("rlibkriging"), value = TRUE, invert = TRUE)
-add("module", setdiff(exports, members))
 
 internals <- ls(ns, all.names = TRUE)
 prefixes <- c(Optim = "optim_", LinearAlgebra = "linalg_", Random = "random_")

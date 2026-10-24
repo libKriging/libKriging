@@ -13,8 +13,8 @@ past release, see the corresponding entry on the
 
 ### Added
 - **CI**: workflow `binding-api.yml` (Linux, one job per binding): the methods exposed by the
-  Python, R, Octave and Julia bindings are compared to the manifest `bindings/api.yaml`, where
-  each gap is listed as `not exposed: <reason>`
+  Python, R, Octave and Julia bindings are extracted and compared across bindings, up to each
+  language's naming convention; the missing ones are reported
   ([#419](https://github.com/libKriging/libKriging/issues/419)).
 - **R**: `Kriging`, `NestedKriging`, `WarpKriging` and `MLPKriging` objects survive R
   serialization: `saveRDS()` / `readRDS()`, `save()` / `load()` of a workspace,
