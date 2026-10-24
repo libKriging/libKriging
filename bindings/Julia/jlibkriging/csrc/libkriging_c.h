@@ -165,6 +165,8 @@ int lk_kriging_cov_mat(void* ptr, const double* X1, int n1, int d1, const double
 const char* lk_kriging_kernel(void* ptr);
 const char* lk_kriging_optim(void* ptr);
 const char* lk_kriging_objective(void* ptr);
+double lk_kriging_chol_jitter(void* ptr);
+double lk_kriging_model_chol_jitter(void* ptr);
 int lk_kriging_nystrom_rank(void* ptr);
 int lk_kriging_vecchia_neighbors(void* ptr);
 const char* lk_kriging_method(void* ptr);
@@ -344,6 +346,8 @@ int lk_warp_kriging_get_noise(void* ptr, double* out, int* n);
 int lk_warp_kriging_get_warp_params(void* ptr, double* out, int* n);
 const char* lk_warp_kriging_get_optim(void* ptr);
 const char* lk_warp_kriging_get_objective(void* ptr);
+double lk_warp_kriging_chol_jitter(void* ptr);
+double lk_warp_kriging_model_chol_jitter(void* ptr);
 int lk_warp_kriging_get_warping(void* ptr, char** out, int* n_warping);
 
 /* Covariance matrix (n1 x n2) between two designs, using the warped kernel.
@@ -443,6 +447,8 @@ int lk_mlp_kriging_log_likelihood_fun(void* ptr,
 const char* lk_mlp_kriging_kernel(void* ptr);
 const char* lk_mlp_kriging_activation(void* ptr);
 const char* lk_mlp_kriging_get_objective(void* ptr);
+double lk_mlp_kriging_chol_jitter(void* ptr);
+double lk_mlp_kriging_model_chol_jitter(void* ptr);
 int lk_mlp_kriging_get_normalize(void* ptr);
 const char* lk_mlp_kriging_get_regmodel(void* ptr);
 int lk_mlp_kriging_is_fitted(void* ptr);

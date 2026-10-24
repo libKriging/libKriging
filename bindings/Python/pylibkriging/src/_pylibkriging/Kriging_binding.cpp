@@ -317,6 +317,14 @@ std::string PyKriging::objective() {
   return m_internal->objective();
 }
 
+double PyKriging::chol_jitter() {
+  return m_internal->chol_jitter();
+}
+
+double PyKriging::model_chol_jitter() {
+  return m_internal->model_chol_jitter();
+}
+
 int PyKriging::nystrom_rank() {
   return static_cast<int>(m_internal->nystrom_rank());
 }

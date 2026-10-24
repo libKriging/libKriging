@@ -533,6 +533,20 @@ const char* lk_kriging_objective(void* ptr) {
   CATCH_RETURN_NULL
 }
 
+double lk_kriging_chol_jitter(void* ptr) {
+  try {
+    return static_cast<Kriging*>(ptr)->chol_jitter();
+  }
+  CATCH_RETURN_NAN
+}
+
+double lk_kriging_model_chol_jitter(void* ptr) {
+  try {
+    return static_cast<Kriging*>(ptr)->model_chol_jitter();
+  }
+  CATCH_RETURN_NAN
+}
+
 int lk_kriging_nystrom_rank(void* ptr) {
   try {
     return static_cast<int>(static_cast<Kriging*>(ptr)->nystrom_rank());
@@ -1397,6 +1411,20 @@ const char* lk_warp_kriging_get_objective(void* ptr) {
   }
   CATCH_RETURN_NULL
 }
+
+double lk_warp_kriging_chol_jitter(void* ptr) {
+  try {
+    return static_cast<WarpKriging*>(ptr)->chol_jitter();
+  }
+  CATCH_RETURN_NAN
+}
+
+double lk_warp_kriging_model_chol_jitter(void* ptr) {
+  try {
+    return static_cast<WarpKriging*>(ptr)->model_chol_jitter();
+  }
+  CATCH_RETURN_NAN
+}
 int lk_warp_kriging_cov_mat(void* ptr,
                             const double* X1,
                             int n1,
@@ -1695,6 +1723,20 @@ const char* lk_mlp_kriging_get_objective(void* ptr) {
     return buf.c_str();
   }
   CATCH_RETURN_NULL
+}
+
+double lk_mlp_kriging_chol_jitter(void* ptr) {
+  try {
+    return static_cast<MLPKriging*>(ptr)->chol_jitter();
+  }
+  CATCH_RETURN_NAN
+}
+
+double lk_mlp_kriging_model_chol_jitter(void* ptr) {
+  try {
+    return static_cast<MLPKriging*>(ptr)->model_chol_jitter();
+  }
+  CATCH_RETURN_NAN
 }
 
 int lk_mlp_kriging_get_normalize(void* ptr) {

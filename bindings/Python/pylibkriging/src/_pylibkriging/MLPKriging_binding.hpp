@@ -69,6 +69,8 @@ class PyMLPKriging {
 
   std::string kernel();
   std::string objective();
+  double chol_jitter();
+  double model_chol_jitter();
   std::string method();
   py::array_t<double> X();
   py::array_t<double> centerX();

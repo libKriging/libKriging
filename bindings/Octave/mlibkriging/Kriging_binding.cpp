@@ -521,6 +521,26 @@ void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, km->objective(), "objective");
 }
 
+void chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, km->chol_jitter(), "chol_jitter");
+}
+
+void model_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, km->model_chol_jitter(), "model_chol_jitter");
+}
+
 void nystrom_rank(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,

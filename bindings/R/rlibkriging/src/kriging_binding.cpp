@@ -674,6 +674,26 @@ std::string kriging_method(Rcpp::List k) {
   return impl_ptr->method();
 }
 
+// Diagonal jitter of the fit (logLikelihood) and of the committed model
+// (predict / simulate / update), docs/dev/CholJitter.md
+// [[Rcpp::export]]
+double kriging_chol_jitter(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = lk_xptr(k.attr("object"));
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->chol_jitter();
+}
+
+// [[Rcpp::export]]
+double kriging_model_chol_jitter(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = lk_xptr(k.attr("object"));
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->model_chol_jitter();
+}
+
 // [[Rcpp::export]]
 arma::mat kriging_X(Rcpp::List k) {
   if (!k.inherits("Kriging"))

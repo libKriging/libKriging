@@ -145,6 +145,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::objective"_hash:
       return KrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::chol_jitter"_hash:
+      return KrigingBinding::chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::model_chol_jitter"_hash:
+      return KrigingBinding::model_chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::nystrom_rank"_hash:
       return KrigingBinding::nystrom_rank(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::vecchia_neighbors"_hash:
@@ -297,6 +301,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return WarpKrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::objective"_hash:
       return WarpKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::chol_jitter"_hash:
+      return WarpKrigingBinding::chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::model_chol_jitter"_hash:
+      return WarpKrigingBinding::model_chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::method"_hash:
       return WarpKrigingBinding::method(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::covMat"_hash:
@@ -380,6 +388,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return MLPKrigingBinding::activation(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::objective"_hash:
       return MLPKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::chol_jitter"_hash:
+      return MLPKrigingBinding::chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::model_chol_jitter"_hash:
+      return MLPKrigingBinding::model_chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::copy"_hash:
       return MLPKrigingBinding::copy(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::save"_hash:

@@ -36,6 +36,9 @@ past release, see the corresponding entry on the
   - **R**: `summary()` of a `Kriging` / `NestedKriging` (their description, as printed).
   - **Python, Octave, Julia**: `LinearAlgebra` `set_chol_warning`, `check_chol_rcond`,
     `chol_rcond_checked`, as in R.
+  - **All four**: `chol_jitter()` / `model_chol_jitter()` of a fitted `Kriging`, `WarpKriging`,
+    `MLPKriging` (jitter of the fit / of the committed model, saved with it; C++ `WarpKriging` /
+    `MLPKriging` getters made public) ([#424](https://github.com/libKriging/libKriging/issues/424)).
 - **R**: `Kriging`, `NestedKriging`, `WarpKriging` and `MLPKriging` objects survive R
   serialization: `saveRDS()` / `readRDS()`, `save()` / `load()` of a workspace,
   `serialize()`, and shipping to PSOCK / `future` workers. The current model is stored as its

@@ -57,6 +57,7 @@ python3 tools/checks/binding_api/compare.py python.txt julia.txt
 | `kernel` | `kriging_kernel(obj)` | `obj$kernel()` | `obj.kernel()` | `kernel(obj)` | `kernel(obj)` |
 | `optim` | `kriging_optim(obj)` | `obj$optim()` | `obj.optim()` | `optim(obj)` | `optim(obj)` |
 | `objective` | `kriging_objective(obj)` | `obj$objective()` | `obj.objective()` | `objective(obj)` | `objective(obj)` |
+| `chol_jitter` / `model_chol_jitter` (fit / committed model) | `kriging_chol_jitter(obj)` / `kriging_model_chol_jitter(obj)` | `obj$chol_jitter()` / `obj$model_chol_jitter()` | `obj.chol_jitter()` / `obj.model_chol_jitter()` | `chol_jitter(obj)` / `model_chol_jitter(obj)` | `chol_jitter(obj)` / `model_chol_jitter(obj)` |
 | `X` | `kriging_X(obj)` | `obj$X()` | `obj.X()` | `X(obj)` | `X(obj)` |
 | `centerX` / `scaleX` | `kriging_centerX(obj)` / `kriging_scaleX(obj)` | `obj$centerX()` / `obj$scaleX()` | `obj.centerX()` / `obj.scaleX()` | `centerX(obj)` / `scaleX(obj)` | `centerX(obj)` / `scaleX(obj)` |
 | `y` | `kriging_y(obj)` | `obj$y()` | `obj.y()` | `y(obj)` | `y(obj)` |
@@ -172,6 +173,7 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 | `feature_dim` | `warpKriging_featureDim(obj)` | `obj$feature_dim()` | `obj.feature_dim()` | `feature_dim(obj)` | `feature_dim(obj)` |
 | `is_fitted` | `warpKriging_isFitted(obj)` | `obj$is_fitted()` | `obj.is_fitted()` | `is_fitted(obj)` | `is_fitted(obj)` |
 | `optim` / `objective` | `warpKriging_optim(obj)` / `warpKriging_objective(obj)` | `obj$optim()` / `obj$objective()` | `obj.optim()` / `obj.objective()` | `optim(obj)` / `objective(obj)` | `optim(obj)` / `objective(obj)` |
+| `chol_jitter` / `model_chol_jitter` (fit / committed model) | `warpKriging_chol_jitter(obj)` / `warpKriging_model_chol_jitter(obj)` | `obj$chol_jitter()` / `obj$model_chol_jitter()` | `obj.chol_jitter()` / `obj.model_chol_jitter()` | `chol_jitter(obj)` / `model_chol_jitter(obj)` | `chol_jitter(obj)` / `model_chol_jitter(obj)` |
 | `noise` | `warpKriging_noise(obj)` | `obj$noise()` | `obj.noise()` | `noise(obj)` | `noise(obj)` |
 | `warp_params` | `warpKriging_warpParams(obj)` | `obj$warp_params()` | `obj.warp_params()` | `warp_params(obj)` | `warp_params(obj)` |
 | Covariance matrix | `warpKriging_covMat(obj,X1,X2)` | `obj$covMat(X1,X2)` | `obj.covMat(X1,X2)` | `covMat(obj,X1,X2)` | `cov_mat(obj,X1,X2)` |
@@ -217,6 +219,7 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 | `hidden_dims` | `mlpKriging_hiddenDims(obj)` | `obj$hidden_dims()` | `obj.hidden_dims()` | `hidden_dims(obj)` | `hidden_dims(obj)` |
 | `activation` | `mlpKriging_activation(obj)` | `obj$activation()` | `obj.activation()` | `activation(obj)` | `activation(obj)` |
 | `objective` | `mlpKriging_objective(obj)` | `obj$objective()` | `obj.objective()` | `objective(obj)` | `objective(obj)` |
+| `chol_jitter` / `model_chol_jitter` (fit / committed model) | `mlpKriging_chol_jitter(obj)` / `mlpKriging_model_chol_jitter(obj)` | `obj$chol_jitter()` / `obj$model_chol_jitter()` | `obj.chol_jitter()` / `obj.model_chol_jitter()` | `chol_jitter(obj)` / `model_chol_jitter(obj)` | `chol_jitter(obj)` / `model_chol_jitter(obj)` |
 | `is_fitted` | `mlpKriging_isFitted(obj)` | `obj$is_fitted()` | `obj.is_fitted()` | `is_fitted(obj)` | `is_fitted(obj)` |
 | `X` / `y` | `mlpKriging_X(obj)` / `mlpKriging_y(obj)` | `obj$X()` / `obj$y()` | `obj.X()` / `obj.y()` | `X(obj)` / `y(obj)` | `X(obj)` / `y(obj)` |
 | `centerX` / `scaleX` | `mlpKriging_centerX(obj)` / `mlpKriging_scaleX(obj)` | `obj$centerX()` / `obj$scaleX()` | `obj.centerX()` / `obj.scaleX()` | `centerX(obj)` / `scaleX(obj)` | `centerX(obj)` / `scaleX(obj)` |

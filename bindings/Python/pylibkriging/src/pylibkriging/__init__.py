@@ -370,5 +370,7 @@ class WarpKriging:
     def optim(self): return self._impl.optim()
     def objective(self): return self._impl.objective()
     def method(self): return self._impl.method()
+    def chol_jitter(self): return self._impl.chol_jitter()
+    def model_chol_jitter(self): return self._impl.model_chol_jitter()
     def noise(self): return self._impl.noise()
     def warp_params(self): return self._impl.warp_params()

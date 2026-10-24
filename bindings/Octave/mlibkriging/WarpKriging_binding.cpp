@@ -462,6 +462,26 @@ void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
   output.set(0, wk->objective(), "objective name");
 }
+
+void chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  output.set(0, wk->chol_jitter(), "chol_jitter");
+}
+
+void model_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  output.set(0, wk->model_chol_jitter(), "model_chol_jitter");
+}
 void method(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,

@@ -34,6 +34,8 @@ classWarpKriging <- function(obj) {
     obj$optim <- function() warpKriging_optim(obj$ptr)
     obj$objective <- function() warpKriging_objective(obj$ptr)
     obj$method <- function() warpKriging_method(obj$ptr)
+    obj$chol_jitter <- function() warpKriging_chol_jitter(obj$ptr)
+    obj$model_chol_jitter <- function() warpKriging_model_chol_jitter(obj$ptr)
     # `k$F()` / `k$T()` as for Kriging (the S3 generics are named F_ / T_ so
     # as not to mask base::F / base::T)
     obj$F <- function() F_(obj)

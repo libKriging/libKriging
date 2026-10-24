@@ -106,6 +106,8 @@ class PyKriging {
   std::string kernel();
   std::string optim();
   std::string objective();
+  double chol_jitter();
+  double model_chol_jitter();
   int nystrom_rank();
   int vecchia_neighbors();
   std::string method();

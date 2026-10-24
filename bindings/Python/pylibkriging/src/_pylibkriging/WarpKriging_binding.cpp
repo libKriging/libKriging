@@ -196,6 +196,14 @@ std::string PyWarpKriging::objective() {
   return m_internal->objective();
 }
 
+double PyWarpKriging::chol_jitter() {
+  return m_internal->chol_jitter();
+}
+
+double PyWarpKriging::model_chol_jitter() {
+  return m_internal->model_chol_jitter();
+}
+
 std::string PyWarpKriging::method() {
   return m_internal->method();
 }

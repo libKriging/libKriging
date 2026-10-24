@@ -588,6 +588,16 @@ function objective(k::Kriging)
     return unsafe_string(ccall(dlsym(_lk(), :lk_kriging_objective), Cstring, (Ptr{Nothing},), k.ptr))
 end
 
+"""
+    chol_jitter(k) / model_chol_jitter(k)
+
+Diagonal jitter of the fit (`log_likelihood`) and of the committed model
+(`predict`, `simulate`, `update!`), saved with the model; the global setting
+for the next fits is `get_chol_jitter()` (docs/dev/CholJitter.md).
+"""
+chol_jitter(k::Kriging) = ccall(dlsym(_lk(), :lk_kriging_chol_jitter), Cdouble, (Ptr{Nothing},), k.ptr)
+model_chol_jitter(k::Kriging) = ccall(dlsym(_lk(), :lk_kriging_model_chol_jitter), Cdouble, (Ptr{Nothing},), k.ptr)
+
 function nystrom_rank(k::Kriging)
     return Int(ccall(dlsym(_lk(), :lk_kriging_nystrom_rank), Cint, (Ptr{Nothing},), k.ptr))
 end
@@ -1049,6 +1059,8 @@ noise(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_noise, wk.ptr)
 warp_params(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_warp_params, wk.ptr)
 optim(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_get_optim), Cstring, (Ptr{Nothing},), wk.ptr))
 objective(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_get_objective), Cstring, (Ptr{Nothing},), wk.ptr))
+chol_jitter(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_chol_jitter), Cdouble, (Ptr{Nothing},), wk.ptr)
+model_chol_jitter(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_model_chol_jitter), Cdouble, (Ptr{Nothing},), wk.ptr)
 method(::WarpKriging) = "exact"  # only the exact covariance is implemented
 
 function cov_mat(wk::WarpKriging, X1::Matrix{Float64}, X2::Matrix{Float64})
@@ -1404,6 +1416,8 @@ kernel(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_kernel
 method(::MLPKriging) = "exact"  # only the exact covariance is implemented
 activation(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_activation), Cstring, (Ptr{Nothing},), mk.ptr))
 objective(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_get_objective), Cstring, (Ptr{Nothing},), mk.ptr))
+chol_jitter(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_chol_jitter), Cdouble, (Ptr{Nothing},), mk.ptr)
+model_chol_jitter(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_model_chol_jitter), Cdouble, (Ptr{Nothing},), mk.ptr)
 normalize(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_get_normalize), Cint, (Ptr{Nothing},), mk.ptr) != 0
 regmodel(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_get_regmodel), Cstring, (Ptr{Nothing},), mk.ptr))
 is_fitted(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_is_fitted), Cint, (Ptr{Nothing},), mk.ptr) != 0
@@ -1759,6 +1773,7 @@ export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
 export kernel, optim, objective, normalize, regmodel, noise_model, model
+export chol_jitter, model_chol_jitter
 export nystrom_rank, vecchia_neighbors
 export method
 export X, centerX, scaleX, y, centerY, scaleY

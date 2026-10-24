@@ -207,6 +207,18 @@ std::string mlpKriging_objective(SEXP model_ptr) {
 }
 
 // [[Rcpp::export]]
+double mlpKriging_chol_jitter(SEXP model_ptr) {
+  MLPKrigingPtr model(lk_xptr(model_ptr));
+  return model->chol_jitter();
+}
+
+// [[Rcpp::export]]
+double mlpKriging_model_chol_jitter(SEXP model_ptr) {
+  MLPKrigingPtr model(lk_xptr(model_ptr));
+  return model->model_chol_jitter();
+}
+
+// [[Rcpp::export]]
 std::string mlpKriging_method(SEXP model_ptr) {
   MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->method();

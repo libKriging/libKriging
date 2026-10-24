@@ -144,6 +144,14 @@ std::string PyMLPKriging::objective() {
   return m_internal->objective();
 }
 
+double PyMLPKriging::chol_jitter() {
+  return m_internal->chol_jitter();
+}
+
+double PyMLPKriging::model_chol_jitter() {
+  return m_internal->model_chol_jitter();
+}
+
 std::string PyMLPKriging::method() {
   return m_internal->method();
 }

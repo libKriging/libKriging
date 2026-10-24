@@ -83,6 +83,8 @@ class PyWarpKriging {
   std::string kernel();
   std::string optim();
   std::string objective();
+  double chol_jitter();
+  double model_chol_jitter();
   std::string method();
   py::array_t<double> noise();
   py::array_t<double> warp_params();

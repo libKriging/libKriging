@@ -18,6 +18,7 @@ function test_new_features()
     test_optim_thread_settings();
     test_optim_thread_budget();
     test_linalg_settings();
+    test_model_chol_jitter_save_load();
     test_all_classes_have_covMat();
     test_all_classes_have_model();
     
@@ -448,3 +449,30 @@ function test_linalg_settings()
 
     fprintf(' PASSED\n');
 end
+
+
+%% Jitters of a fitted model (fit / committed), kept by save / load
+function test_model_chol_jitter_save_load()
+    fprintf('Test: model jitters and save / load...');
+
+    X = linspace(0, 1, 10)';
+    y = sin(6 * X);
+    models = {Kriging(y, X, "gauss"), WarpKriging(y, X, {"kumaraswamy"}, "gauss"), ...
+              MLPKriging(y, X, [4], 1, "selu", "gauss")};
+    loaders = {@Kriging.load, @WarpKriging.load, @MLPKriging.load};
+    for i = 1:numel(models)
+        k = models{i};
+        assert(k.chol_jitter() > 0);  % gauss, noise-free
+        assert(k.model_chol_jitter() >= 0 && k.model_chol_jitter() <= k.chol_jitter());
+        f = [tempname() '.json'];
+        k.save(f);
+        k2 = loaders{i}(f);
+        assert(k2.chol_jitter() == k.chol_jitter());
+        assert(k2.model_chol_jitter() == k.model_chol_jitter());
+        delete(f);
+    end
+    assert(models{1}.model_chol_jitter() == 0);  % Kriging: exact committed model
+
+    fprintf(' PASSED\n');
+end
+

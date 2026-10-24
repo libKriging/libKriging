@@ -373,6 +373,18 @@ std::string warpKriging_objective(SEXP model_ptr) {
 }
 
 // [[Rcpp::export]]
+double warpKriging_chol_jitter(SEXP model_ptr) {
+  WarpKrigingPtr model(lk_xptr(model_ptr));
+  return model->chol_jitter();
+}
+
+// [[Rcpp::export]]
+double warpKriging_model_chol_jitter(SEXP model_ptr) {
+  WarpKrigingPtr model(lk_xptr(model_ptr));
+  return model->model_chol_jitter();
+}
+
+// [[Rcpp::export]]
 arma::mat warpKriging_covMat(SEXP model_ptr, const arma::mat& X1, const arma::mat& X2) {
   WarpKrigingPtr model(lk_xptr(model_ptr));
   return model->covMat(X1, X2);

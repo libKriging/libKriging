@@ -305,3 +305,25 @@ test_that("summary() of Kriging and NestedKriging is their description", {
   expect_true(is.character(summary(nk)) && nchar(summary(nk)) > 0)
 })
 
+test_that("jitters of a fitted model are kept by save / load", {
+  X <- matrix(seq(0, 1, length.out = 10), ncol = 1)
+  y <- sin(6 * X[, 1])
+  models <- list(
+    Kriging(y, X, kernel = "gauss"),
+    WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss"),
+    MLPKriging(y, X, hidden_dims = 4, d_out = 1, kernel = "gauss",
+               parameters = list(max_iter_adam = "20"))
+  )
+  for (k in models) {
+    expect_gt(k$chol_jitter(), 0)  # gauss, noise-free
+    expect_true(k$model_chol_jitter() >= 0 && k$model_chol_jitter() <= k$chol_jitter())
+    f <- tempfile(fileext = ".json")
+    save(k, f)
+    k2 <- load(f)
+    expect_equal(k2$chol_jitter(), k$chol_jitter())
+    expect_equal(k2$model_chol_jitter(), k$model_chol_jitter())
+    unlink(f)
+  }
+  expect_equal(models[[1]]$model_chol_jitter(), 0)  # Kriging: exact committed model
+})
+

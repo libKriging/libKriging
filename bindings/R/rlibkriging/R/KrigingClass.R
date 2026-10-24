@@ -43,7 +43,7 @@ classKriging <- function(nk) {
             )))
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank','vecchia_neighbors','method')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank','vecchia_neighbors','method','chol_jitter','model_chol_jitter')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() kriging_", d, "(nk)"
             )))

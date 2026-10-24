@@ -62,6 +62,32 @@ def test_chol_jitter_setting():
     assert lk.LinearAlgebra.get_chol_jitter() == saved
 
 
+def test_model_chol_jitter_save_load(tmp_path):
+    """Jitters of a fitted model (fit / committed), kept by save / load"""
+    saved = lk.LinearAlgebra.get_chol_jitter()
+    lk.LinearAlgebra.set_chol_jitter(-1)  # automatic per kernel (this module sets 0)
+    try:
+        X = np.linspace(0, 1, 10).reshape(-1, 1)
+        y = np.sin(6 * X[:, 0])
+        models = [
+            (lk.Kriging(y, X, "gauss"), lk.Kriging.load),
+            (lk.WarpKriging(y, X, ["kumaraswamy"], "gauss"), lk.WarpKriging.load),
+            (lk.MLPKriging(y, X, hidden_dims=[4], d_out=1, kernel="gauss", parameters={"max_iter_adam": "20"}),
+             lk.MLPKriging.load),
+        ]
+        for k, load in models:
+            assert k.chol_jitter() > 0  # gauss, noise-free
+            assert 0 <= k.model_chol_jitter() <= k.chol_jitter()
+            f = str(tmp_path / "model.json")
+            k.save(f)
+            k2 = load(f)
+            assert k2.chol_jitter() == k.chol_jitter()
+            assert k2.model_chol_jitter() == k.model_chol_jitter()
+        assert models[0][0].model_chol_jitter() == 0  # Kriging: exact committed model
+    finally:
+        lk.LinearAlgebra.set_chol_jitter(saved)
+
+
 def test_linalg_settings():
     saved = lk.LinearAlgebra.chol_rcond_checked()
     lk.LinearAlgebra.check_chol_rcond(False)

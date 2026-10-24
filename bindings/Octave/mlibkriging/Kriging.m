@@ -128,6 +128,16 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::objective", obj.ref, varargin{:});
         end
 
+        % diagonal jitter of the fit (logLikelihood) / of the committed model
+        % (predict, simulate, update), docs/dev/CholJitter.md
+        function varargout = chol_jitter(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::chol_jitter", obj.ref, varargin{:});
+        end
+
+        function varargout = model_chol_jitter(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::model_chol_jitter", obj.ref, varargin{:});
+        end
+
         function varargout = nystrom_rank(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::nystrom_rank", obj.ref, varargin{:});
         end
