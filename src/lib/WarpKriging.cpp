@@ -2818,9 +2818,9 @@ void WarpKriging::optimise_joint(const std::string& method) {
     // starting point)
     opt.max_restart = Optim::max_restart;
     opt.inner_restart = [&](const arma::vec& gamma0, int retry) -> arma::vec {
-      const arma::vec theta_restart = arma::max(
-          arma::min(arma::vec((from_gamma(gamma0) + theta_lower) / std::pow(2.0, retry + 1)), theta_upper),
-          theta_lower);
+      const arma::vec theta_restart
+          = arma::max(arma::min(arma::vec((from_gamma(gamma0) + theta_lower) / std::pow(2.0, retry + 1)), theta_upper),
+                      theta_lower);
       return to_gamma(theta_restart);
     };
 
