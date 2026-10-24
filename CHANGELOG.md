@@ -22,6 +22,10 @@ past release, see the corresponding entry on the
   `rlibkriging:::optim_set_num_threads_percent` (and `_get_`), `optim_get_num_threads`
   (Julia: not exposed, like `set_thread_pool_size`). See
   [docs/dev/parallel.md](docs/dev/parallel.md).
+- **CI**: workflow `binding-api.yml` (Linux, one job per binding): the methods exposed by the
+  Python, R, Octave and Julia bindings are extracted and compared across bindings, up to each
+  language's naming convention; a method missing from some bindings fails the job
+  ([#419](https://github.com/libKriging/libKriging/issues/419)).
 - **R**: `Kriging`, `NestedKriging`, `WarpKriging` and `MLPKriging` objects survive R
   serialization: `saveRDS()` / `readRDS()`, `save()` / `load()` of a workspace,
   `serialize()`, and shipping to PSOCK / `future` workers. The current model is stored as its
