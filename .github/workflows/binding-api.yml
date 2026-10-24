@@ -1,0 +1,116 @@
+name: Binding API
+
+# Checks that each binding exposes the methods listed in bindings/api.yaml
+# (#419): one Linux job per binding, one version of the target language.
+# The built binding lists the names it exposes (tools/checks/binding_api/
+# dump_<binding>), tools/checks/binding_api/check.py compares them to the
+# manifest: a missing name, or a name exposed but not in the manifest, fails.
+
+on:
+  push:
+    branches:
+      - '*'
+    tags-ignore:
+      - 'v*'
+  pull_request:
+    branches:
+      - '*'
+
+env:
+  # see main.yml: needed by the pinned pybind11 submodule with cmake >= 4
+  CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+  MODE: Release
+  BUILD_TEST: false # bindings only (install.lib target)
+
+jobs:
+  methods:
+    name: ${{ matrix.binding }} methods
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        binding: [python, r, octave, julia]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+        if: matrix.binding == 'r'
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+        if: matrix.binding == 'julia'
+
+      - name: Setup cmake
+        uses: lukka/get-cmake@v4.3.2
+        with:
+          cmakeVersion: '~4.2.0'
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -qy liblapack-dev
+          case "${{ matrix.binding }}" in
+            octave) sudo apt-get install -qy octave liboctave-dev ;;
+            r)      sudo apt-get install -qy gfortran ;;
+          esac
+          python3 -m pip install pyyaml
+          if [ "${{ matrix.binding }}" == "python" ]; then
+            python3 -m pip install -r bindings/Python/pylibkriging/requirements.txt \
+                                   -r bindings/Python/pylibkriging/dev-requirements.txt
+          fi
+
+      - name: Build
+        shell: bash
+        run: |
+          export ENABLE_PYTHON_BINDING=off ENABLE_OCTAVE_BINDING=off ENABLE_MATLAB_BINDING=off ENABLE_JULIA_BINDING=off
+          case "${{ matrix.binding }}" in
+            python) ENABLE_PYTHON_BINDING=on tools/linux-macos/build.sh ;;
+            octave) ENABLE_OCTAVE_BINDING=on tools/linux-macos/build.sh ;;
+            julia)  ENABLE_JULIA_BINDING=on tools/linux-macos/build.sh ;;
+            r)
+              # as tools/r-linux-macos/build.sh, without the C++ tests
+              CC=$(R CMD config CC) CXX=$(R CMD config CXX) \
+                EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=off -DSTATIC_LIB=on" \
+                tools/linux-macos/build.sh
+              export LIBKRIGING_PATH=${PWD}/build/installed
+              cd bindings/R
+              MAKEFLAGS=-j$(nproc) MAKE_SHARED_LIBS=off STATIC_LIB=on make
+              ;;
+          esac
+
+      - name: List the methods of the binding
+        shell: bash
+        run: |
+          DUMP=${PWD}/build/${{ matrix.binding }}.txt
+          case "${{ matrix.binding }}" in
+            python)
+              PYTHONPATH=build/bindings/Python/pylibkriging:bindings/Python/pylibkriging/src \
+                python3 tools/checks/binding_api/dump_python.py "${DUMP}" ;;
+            r)
+              R_LIBS=bindings/R/Rlibs Rscript tools/checks/binding_api/dump_r.R "${DUMP}" ;;
+            octave)
+              octave-cli --path build/bindings/Octave/mlibkriging --path bindings/Octave/mlibkriging \
+                --path tools/checks/binding_api --eval "dump_octave('${DUMP}')" ;;
+            julia)
+              JLIBKRIGING_LIB_PATH=${PWD}/build/bindings/Julia/jlibkriging/libkriging_c.so \
+                julia --project=bindings/Julia/jlibkriging tools/checks/binding_api/dump_julia.jl "${DUMP}" ;;
+          esac
+          cat "${DUMP}"
+
+      - name: Compare to bindings/api.yaml
+        shell: bash
+        run: python3 tools/checks/binding_api/check.py build/${{ matrix.binding }}.txt

@@ -3,16 +3,16 @@
 This document lists all methods exposed by each language binding for accessing the underlying C++ library.
 
 The names exposed by each binding are also listed, machine-readably, in
-[`api.yaml`](api.yaml): CI compares it to what each built binding exposes and
-fails on a missing or unlisted name. A binding gap is recorded there as
-`not exposed: <reason>`. To check locally after a build (`ctest -R "api_dump|ApiDump"`
-writes `<build>/binding-api/<binding>.txt`; for R, run the testthat suite with
-`LK_API_DUMP_DIR` set):
+[`api.yaml`](api.yaml), a binding gap being recorded as
+`not exposed: <reason>`. The workflow `.github/workflows/binding-api.yml`
+(Linux, one job per binding) fails on a name missing from a binding or
+exposed but not listed there. To check locally after a build, e.g. for Python:
 
 ```
 pip install pyyaml
-python3 tools/checks/binding_api.py dump build/binding-api/*.txt
-python3 tools/checks/binding_api.py tests   # every binding test file is run
+PYTHONPATH=build/bindings/Python/pylibkriging:bindings/Python/pylibkriging/src \
+  python3 tools/checks/binding_api/dump_python.py python.txt
+python3 tools/checks/binding_api/check.py python.txt
 ```
 
 ## Classes

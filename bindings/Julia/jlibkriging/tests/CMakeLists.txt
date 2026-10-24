@@ -43,6 +43,3 @@ add_julia_test(NAME demo FILENAME jlibkriging_demo.jl)
 add_julia_test(NAME warp_kriging FILENAME warp_kriging_test.jl)
 add_julia_test(NAME mlp_kriging FILENAME mlp_kriging_test.jl)
 add_julia_test(NAME nested_kriging FILENAME nested_kriging_test.jl)
-# Exposed names, compared to bindings/api.yaml by tools/checks/binding_api.py
-add_julia_test(NAME api_dump FILENAME api_dump_test.jl)
-set_property(TEST Julia/api_dump APPEND PROPERTY ENVIRONMENT "LK_API_DUMP_DIR=${CMAKE_BINARY_DIR}/binding-api")

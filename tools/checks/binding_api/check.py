@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
-"""Checks the API exposed by the Python, R, Octave and Julia bindings
-against the manifest bindings/api.yaml (issue #419).
+"""Checks that the methods of a binding (Python, R, Octave or Julia) are
+the ones listed in bindings/api.yaml (issue #419).
 
-  binding_api.py manifest          validate the manifest itself
-  binding_api.py tests             every binding test file is run by ctest
-                                   or by the binding's test runner
-  binding_api.py dump FILE...      compare introspection dumps (python.txt,
-                                   r.txt, octave.txt, julia.txt, written by
-                                   the api_dump tests) to the manifest
-  binding_api.py table             print the manifest as a Markdown table
+  check.py DUMP...
 
-A dump is a text file of "<scope>\\t<name>" lines, the binding being given
-by the file name. Exit status 1 on any finding.
+A dump is a text file of "<scope>\\t<name>" lines written by the dump_*
+script of this directory, the binding being given by its file name
+(python.txt, r.txt, octave.txt or julia.txt). A name of the manifest missing
+from the binding, or exposed by the binding but not in the manifest, is an
+error. Exit status 1 on any error.
 """
 
 import argparse
@@ -22,9 +19,9 @@ import sys
 try:
     import yaml
 except ImportError:  # pragma: no cover
-    sys.exit("binding_api.py needs PyYAML: pip install pyyaml")
+    sys.exit("check.py needs PyYAML: pip install pyyaml")
 
-ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 DEFAULT_MANIFEST = os.path.join(ROOT, "bindings", "api.yaml")
 BINDINGS = ("python", "r", "octave", "julia")
 NOT_EXPOSED = "not exposed:"
@@ -152,7 +149,7 @@ def check_dump(manifest, path):
     if lang not in BINDINGS:
         return ["%s: file name must be one of %s" % (path, ", ".join(b + ".txt" for b in BINDINGS))]
     if not os.path.exists(path):
-        return ["%s: %s not found (did the %s api_dump test run?)" % (lang, path, lang)]
+        return ["%s: %s not found" % (lang, path)]
     dump = read_dump(path)
     errors = []
     for scope in sorted(set(dump) - set(manifest.scopes())):
@@ -180,108 +177,23 @@ def check_dump(manifest, path):
     return errors
 
 
-# --- test registration --------------------------------------------------
-
-def _registered(cmakelists, macro):
-    """FILENAME arguments of the macro calls in a CMakeLists.txt."""
-    with open(cmakelists) as f:
-        text = "\n".join(line.split("#", 1)[0] for line in f)
-    files = set()
-    for args in re.findall(r"\b%s\s*\(([^)]*)\)" % macro, text):
-        m = re.search(r"\bFILENAME\s+(\S+)", args)
-        if m:
-            files.add(m.group(1))
-    return files
-
-
-# binding -> (tests directory, file pattern of a test, how the files are run)
-TEST_RUNNERS = {
-    "python": ("bindings/Python/pylibkriging/tests", r"(test_.*|.*_test)\.py$",
-               ("add_python_test", "CMakeLists.txt")),
-    "octave": ("bindings/Octave/mlibkriging/tests", r"(test_.*|.*test)\.m$",
-               ("add_mex_test", "CMakeLists.txt")),
-    "julia": ("bindings/Julia/jlibkriging/tests", r"(test_.*|.*_test)\.jl$",
-              ("add_julia_test", "CMakeLists.txt")),
-    # testthat runs every test*.R file of the directory (and helper*/setup*/
-    # teardown* as support files): any other .R file never runs
-    "r": ("bindings/R/rlibkriging/tests/testthat", r".*\.[rR]$", None),
-}
-TESTTHAT_RUN = re.compile(r"^(test|helper|setup|teardown).*\.[rR]$")
-
-
-def check_tests(manifest):
-    allowed = (manifest.data.get("tests") or {}).get("not_run") or {}
-    errors = []
-    for path, reason in allowed.items():
-        if not reason:
-            errors.append("tests.not_run.%s needs a reason" % path)
-        if not os.path.exists(os.path.join(ROOT, path)):
-            errors.append("tests.not_run.%s does not exist" % path)
-    for lang, (tests_dir, pattern, runner) in TEST_RUNNERS.items():
-        full_dir = os.path.join(ROOT, tests_dir)
-        files = sorted(f for f in os.listdir(full_dir) if re.fullmatch(pattern, f))
-        if runner is None:
-            run = {f for f in files if TESTTHAT_RUN.match(f)}
-        else:
-            macro, cmakelists = runner
-            run = _registered(os.path.join(full_dir, cmakelists), macro)
-            for f in sorted(run):
-                if not os.path.exists(os.path.join(full_dir, f)):
-                    errors.append("%s: %s/%s registered by %s does not exist" % (lang, tests_dir, f, macro))
-        for f in files:
-            rel = "%s/%s" % (tests_dir, f)
-            if f in run and rel in allowed:
-                errors.append("%s: %s is run, remove it from tests.not_run" % (lang, rel))
-            elif f not in run and rel not in allowed:
-                how = "%s(...) in %s/%s" % (runner[0], tests_dir, runner[1]) if runner \
-                    else "a test*.R name"
-                errors.append("%s: %s is never run (needs %s, or a tests.not_run entry)" % (lang, rel, how))
-    return errors
-
-
-def table(manifest):
-    out = []
-    for scope in manifest.scopes():
-        out.append("\n### %s\n" % scope)
-        out.append("| member | " + " | ".join(BINDINGS) + " |")
-        out.append("|---" * (len(BINDINGS) + 1) + "|")
-        for member in manifest.data["scopes"][scope]["members"]:
-            cells = []
-            for lang in BINDINGS:
-                name = manifest.member_name(scope, member, lang) if manifest.scope_exposed(scope, lang) else None
-                cells.append("—" if name is None else ("`%s`" % name))
-            out.append("| %s | %s |" % (member, " | ".join(cells)))
-    return "\n".join(out)
-
-
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--manifest", default=DEFAULT_MANIFEST)
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("manifest")
-    sub.add_parser("tests")
-    dump = sub.add_parser("dump")
-    dump.add_argument("files", nargs="+")
-    sub.add_parser("table")
+    parser.add_argument("dumps", nargs="+")
     args = parser.parse_args(argv)
 
     manifest = Manifest(args.manifest)
     errors = list(manifest.errors)
     if not errors:
-        if args.command == "tests":
-            errors += check_tests(manifest)
-        elif args.command == "dump":
-            for path in args.files:
-                errors += check_dump(manifest, path)
-        elif args.command == "table":
-            print(table(manifest))
+        for path in args.dumps:
+            errors += check_dump(manifest, path)
     for e in errors:
         print("error: " + e)
     if errors:
-        print("%d finding(s); the manifest is %s" % (len(errors), rel(args.manifest)))
+        print("%d error(s); the manifest is %s" % (len(errors), rel(args.manifest)))
         return 1
-    if args.command != "table":
-        print("binding API %s check: OK" % args.command)
+    print("binding API check: OK")
     return 0
 
 

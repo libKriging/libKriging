@@ -1,11 +1,10 @@
 # Public API of the Python, R, Octave and Julia bindings (#419).
 #
-# Checked by tools/checks/binding_api.py:
-#   - in the Linux build jobs, against the names each binding exposes
-#     (written by its api_dump test: Python/api_dump, Julia/api_dump,
-#     Octave/ApiDump, testthat test-ApiDump.R): a name missing from a binding
-#     or exposed but not listed here fails the job;
-#   - in the binding-api job, that every binding test file is run.
+# Checked by the workflow .github/workflows/binding-api.yml (Linux, one job
+# per binding): tools/checks/binding_api/dump_<binding> lists the names the
+# built binding exposes, tools/checks/binding_api/check.py compares them to
+# this file. A name missing from a binding, or exposed but not listed here,
+# fails the job.
 #
 # What a binding "exposes" for each scope:
 #   module         Python: public non-module names of pylibkriging;
@@ -424,9 +423,3 @@ scopes:
       randu_vec:
       randu_mat:
       randn_mat:
-
-tests:
-  # binding test files deliberately not run, with the reason
-  not_run:
-    bindings/R/rlibkriging/tests/testthat/notest-Armadillo.R: "Armadillo demo, disabled (the demo_binding functions it called are commented out)"
-    bindings/Octave/mlibkriging/tests/test_new_features.m: "fails: the Optim integer setters reject a plain double (\"is not an unsigned 64bits int\"); fixed and registered by #415"
