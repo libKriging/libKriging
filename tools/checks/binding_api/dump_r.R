@@ -1,9 +1,12 @@
 # Lists the names exposed by rlibkriging, one "<scope>\t<name>" line each,
 # for compare.py, which compares the bindings with each other.
 # Usage: Rscript dump_r.R <output file>
-#  - model classes: the `k$name()` members of a fitted object;
-#  - Optim / LinearAlgebra / Random: the namespace functions optim_* /
-#    linalg_* / random_* (exported or not), prefix removed.
+#  - model classes: the `k$name()` members of a fitted object, the S3 methods
+#    `generic.Class` (load(), summary(), as.list()...) and the free functions
+#    standing for a static method (subsetOfData);
+#  - Optim / LinearAlgebra: the namespace functions optim_* / linalg_*
+#    (exported or not), prefix removed, except the wrappers of C++ internals
+#    kept for the R tests (TEST_HELPERS).
 suppressPackageStartupMessages(library(rlibkriging))
 
 ns <- asNamespace("rlibkriging")
@@ -27,9 +30,24 @@ for (scope in names(models)) {
 }
 
 internals <- ls(ns, all.names = TRUE)
-prefixes <- c(Optim = "optim_", LinearAlgebra = "linalg_", Random = "random_")
+for (scope in names(models)) {
+  s3 <- grep(paste0("^.+\\.", scope, "$"), internals, value = TRUE)
+  s3 <- Filter(function(n) is.function(get(n, envir = ns)), s3)
+  add(scope, sub(paste0("\\.", scope, "$"), "", s3))
+}
+# free functions of the namespace standing for a static method of a class
+statics <- list(Kriging = "subsetOfData")
+for (scope in names(statics)) {
+  add(scope, Filter(function(n) exists(n, envir = ns, inherits = FALSE), statics[[scope]]))
+}
+
+# R test wrappers of C++ internals, not settings of the library: the
+# Cholesky numerics below and the random generator (random_*, not listed)
+TEST_HELPERS <- c("linalg_chol_safe", "linalg_chol_block", "linalg_rcond_chol", "linalg_rcond_approx_chol")
+
+prefixes <- c(Optim = "optim_", LinearAlgebra = "linalg_")
 for (scope in names(prefixes)) {
-  fns <- grep(paste0("^", prefixes[[scope]]), internals, value = TRUE)
+  fns <- setdiff(grep(paste0("^", prefixes[[scope]]), internals, value = TRUE), TEST_HELPERS)
   fns <- Filter(function(n) is.function(get(n, envir = ns)), fns)
   add(scope, sub(paste0("^", prefixes[[scope]]), "", fns))
 }
