@@ -8,15 +8,20 @@ X = [mod(0.3819660 * (1:n)', 1), mod(0.7548777 * (1:n)', 1)];
 y = sin(3 * X(:, 1)) + cos(5 * X(:, 2));
 Xn = [0.2 0.3; 0.5 0.5; 0.8 0.1];
 
-% logLikelihoodFun(theta, return_grad, return_hess, bench): Kriging has no
-% hessian (empty, as in Python / R), bench only prints timings
+% logLikelihoodFun(theta, return_grad, return_hess, bench): hessian by central
+% differences of the analytic gradient, bench only prints timings
 k = Kriging(y, X, "matern5_2");
 th = [0.4; 0.6];
 [ll, g] = k.logLikelihoodFun(th, true);
 [ll2, g2, h] = k.logLikelihoodFun(th, true, true);
 assert(ll2, ll, -1e-14);
 assert(g2, g, -1e-14);
-assert(isempty(h));
+assert(size(h), [2 2]);
+assert(h, h');
+e = 1e-4 * th(1);
+[~, gp] = k.logLikelihoodFun(th + [e; 0], true);
+[~, gm] = k.logLikelihoodFun(th - [e; 0], true);
+assert(h(:, 1), (gp - gm) / (2 * e), -1e-3);
 [ll3, g3] = k.logLikelihoodFun(th, true, false, true);  % bench=true
 assert(ll3, ll, -1e-14);
 assert(g3, g, -1e-14);

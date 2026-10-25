@@ -523,14 +523,13 @@ function log_likelihood_fun(k::Kriging, theta::Vector{Float64};
     n = length(theta)
     ll = Ref{Float64}(0.0)
     grad = return_grad ? Vector{Float64}(undef, n) : Float64[]
-    # Kriging computes no hessian: an empty matrix (as in Python / R), never
-    # an uninitialized n x n one
-    hess = Matrix{Float64}(undef, 0, 0)
+    # hessian: central differences of the analytic gradient (C++)
+    hess = return_hess ? Matrix{Float64}(undef, n, n) : Matrix{Float64}(undef, 0, 0)
     ret = ccall(dlsym(_lk(), :lk_kriging_log_likelihood_fun), Cint,
                 (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint, Cint,
                  Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-                k.ptr, theta, n, return_grad ? 1 : 0, 0, bench ? 1 : 0,
-                ll, return_grad ? grad : C_NULL, C_NULL)
+                k.ptr, theta, n, return_grad ? 1 : 0, return_hess ? 1 : 0, bench ? 1 : 0,
+                ll, return_grad ? grad : C_NULL, return_hess ? hess : C_NULL)
     _check_error(ret)
     return (ll=ll[],
             grad=return_grad ? grad : nothing,

@@ -410,11 +410,13 @@ int lk_kriging_log_likelihood_fun(void* ptr,
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
-    auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, bench != 0);
+    auto [ll, grad, hess] = k->logLikelihoodFun(theta_v, return_grad != 0, return_hess != 0, bench != 0);
     if (ll_out)
       *ll_out = ll;
     if (grad_out && return_grad)
       std::memcpy(grad_out, grad.memptr(), grad.n_elem * sizeof(double));
+    if (hess_out && return_hess)  // theta_n x theta_n, column-major
+      std::memcpy(hess_out, hess.memptr(), hess.n_elem * sizeof(double));
     return 0;
   }
   CATCH_RETURN

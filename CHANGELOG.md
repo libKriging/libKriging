@@ -44,6 +44,16 @@ past release, see the corresponding entry on the
     `WarpKriging.simulate` without `X` raises `TypeError` (passed `None` down).
   - **R**: `update()` / `update_simulate()` of a `Kriging`: `X_u` has no default in the
     signature (it was `NULL`, then an error); calls unchanged.
+- **Log-likelihood Hessian** (`logLikelihoodFun(theta, return_grad, return_hess)`): computed for
+  `Kriging` (every noise model, `normalize`) and `WarpKriging` / `MLPKriging`, by central differences
+  of the analytic gradient (`KrigingImpl::hessian_from_gradient`, step `1e-4 |theta_i|`, symmetrized;
+  2 dim(theta) gradients, only when asked). Before, `return_hess` returned an empty matrix in every
+  binding. C++: `Kriging::logLikelihoodFun(theta, return_grad, return_hess, bench)` overload (the
+  3-argument one unchanged); Python / R / Octave / Julia return it. Checked against second
+  differences of the values (`tests/LogLikelihoodHessianTest.cpp`, each binding).
+- **Python `Kriging.simulate` on a nugget model**: without `with_noise`, the draws include the nugget
+  (as in R / Julia; Octave takes `with_nugget` explicitly), except with `method="nystrom"` (latent
+  process only). Before, Python simulated the latent process: pass `with_noise=False` for it.
 - **Bindings**, gaps found by that comparison:
   - **Julia**: the `Optim` settings, as `jlibkriging.Optim.<name>` (not exported, not to clash
     with Optim.jl): iterations, tolerances, log level, reparametrization, theta bounds,

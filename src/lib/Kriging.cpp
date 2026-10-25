@@ -568,6 +568,18 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodFun(const 
   return res;
 }
 
+LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoodFun(const arma::vec& _theta,
+                                                                                     const bool _grad,
+                                                                                     const bool _hess,
+                                                                                     const bool _bench) {
+  auto [ll, grad] = logLikelihoodFun(_theta, _grad, _bench);
+  arma::mat hess;
+  if (_hess)
+    hess = hessian_from_gradient(_theta,
+                                 [&](const arma::vec& t) { return std::get<1>(logLikelihoodFun(t, true, false)); });
+  return {ll, std::move(grad), std::move(hess)};
+}
+
 // Objective function for fit : -LOO
 
 double Kriging::_leaveOneOut(const arma::vec& _theta,

@@ -2108,7 +2108,14 @@ void WarpKriging::commit_model_chol_jitter() {
 
 std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arma::vec& theta,
                                                                        bool return_grad,
-                                                                       bool /*return_hess*/) const {
+                                                                       bool return_hess) const {
+  if (return_hess) {
+    // central differences of the analytic gradient (KrigingImpl::hessian_from_gradient)
+    auto res = logLikelihoodFun(theta, return_grad, false);
+    std::get<2>(res) = hessian_from_gradient(
+        theta, [&](const arma::vec& t) { return std::get<1>(logLikelihoodFun(t, true, false)); });
+    return res;
+  }
   auto* self = const_cast<WarpKriging*>(this);
   arma::vec old_theta = m_theta;
   const double old_cache_jitter = m_cache_jitter;

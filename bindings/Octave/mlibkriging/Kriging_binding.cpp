@@ -358,17 +358,15 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   // [ll, llgrad, llhess] = logLikelihoodFun(theta, return_grad, return_hess, bench),
-  // as in the Python / R bindings. The C++ signature is
-  // logLikelihoodFun(theta, return_grad, bench): Kriging computes no hessian,
-  // so llhess is an empty matrix (as in Python / R); bench only prints timings
+  // as in the Python / R bindings; llhess: central differences of the
+  // analytic gradient (C++); bench only prints timings
   const bool return_grad = flag_output_compliance(input, 2, "return_grad", output, 1);
   const bool return_hess = flag_output_compliance(input, 3, "return_hess", output, 2);
   const bool bench = input.getOptional<bool>(4, "bench").value_or(false);
-  auto [ll, llgrad] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, bench);
+  auto [ll, llgrad, llhess] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, return_hess, bench);
   output.set(0, ll, "ll");                  // FIXME better name
   output.setOptional(1, llgrad, "llgrad");  // FIXME better name
-  if (return_hess)
-    output.setOptional(2, arma::mat(), "llhess");
+  output.setOptional(2, llhess, "llhess");
 }
 
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

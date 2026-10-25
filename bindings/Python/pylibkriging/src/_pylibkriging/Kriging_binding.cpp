@@ -176,8 +176,14 @@ py::array_t<double> PyKriging::simulate(const int nsim,
                                         const std::string& method) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
 
+  // nugget model: with_noise=None includes the nugget, as in R / Julia,
+  // except with "nystrom" (latent process only)
+  if (with_noise.is_none() && m_internal->noise_model() == Kriging::NoiseModel::Nugget
+      && method.rfind("nystrom", 0) != 0)
+    return simulate(nsim, seed, X_n, will_update, py::bool_(true), method);
+
   if (with_noise.is_none()) {
-    // Plain simulate (latent process for noise models); method: "exact",
+    // Plain simulate (latent process: heterogeneous model, or "nystrom"); method: "exact",
     // "vecchia", "vecchia(m)" or "nystrom" (the noise-model overloads below
     // raise with "nystrom" for with_nugget=True / a non-zero with_noise:
     // Nystrom simulates the latent process only)
@@ -285,11 +291,11 @@ double PyKriging::leaveOneOut(const std::string& method) {
 std::tuple<double, py::array_t<double>, py::array_t<double>> PyKriging::logLikelihoodFun(
     const py::array_t<double>& theta,
     const bool return_grad,
-    const bool /*return_hess: Kriging computes no Hessian*/,
+    const bool return_hess,
     const bool bench) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta, return_grad, bench);
-  return {llo, vec_to_arr(grad), {}};
+  auto [llo, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, return_hess, bench);
+  return {llo, vec_to_arr(grad), carma::mat_to_arr(hess)};
 }
 
 double PyKriging::logLikelihood(const std::string& method) {

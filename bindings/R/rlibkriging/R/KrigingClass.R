@@ -863,7 +863,8 @@ covMat.Kriging <- function(object, x1, x2, ...) {
 #' @param theta A numeric vector of (positive) range parameters at
 #'     which the log-likelihood will be evaluated.
 #' @param return_grad Logical. Should the function return the gradient?
-#' @param return_hess Logical. Should the function return Hessian?
+#' @param return_hess Logical. Should the function return the Hessian
+#'     (central differences of the analytic gradient)?
 #' @param bench Logical. Should the function display benchmarking output?
 #' @param ... Not used.
 #'
@@ -908,6 +909,7 @@ logLikelihoodFun.Kriging <- function(object, theta,
                                     bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
         if (isTRUE(return_grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
+        if (isTRUE(return_hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
     }
     if (!isTRUE(return_grad)) out$logLikelihoodGrad <- NULL
     if (!isTRUE(return_hess)) out$logLikelihoodHess <- NULL

@@ -421,6 +421,11 @@ target_link_libraries(KrigingWarmRestartTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingWarmRestartTest)
 add_test(NAME KrigingWarmRestartTest COMMAND KrigingWarmRestartTest)
 
+add_executable(LogLikelihoodHessianTest LogLikelihoodHessianTest.cpp)
+target_link_libraries(LogLikelihoodHessianTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries LogLikelihoodHessianTest)
+add_test(NAME LogLikelihoodHessianTest COMMAND LogLikelihoodHessianTest)
+
 
 add_executable(NestedKrigingTest NestedKrigingTest.cpp)
 target_link_libraries(NestedKrigingTest LINK_PUBLIC Kriging Catch2)

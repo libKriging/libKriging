@@ -517,14 +517,15 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
     Rcpp::stop("Length of arg data should be " + std::to_string(d)
                + (is_noise_model ? " or " + std::to_string(d + 1) : "") + ")");
 
-  std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta, return_grad, bench);
+  // Hessian: central differences of the analytic gradient (C++)
+  auto [ll, grad, hess] = impl_ptr->logLikelihoodFun(theta, return_grad, return_hess, bench);
 
-  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = ll);
   if (return_grad) {
-    ret.push_back(std::get<1>(ll), "logLikelihoodGrad");
+    ret.push_back(grad, "logLikelihoodGrad");
   }
   if (return_hess) {
-    ret.push_back(arma::mat(), "logLikelihoodHess");
+    ret.push_back(hess, "logLikelihoodHess");
   }
 
   return ret;

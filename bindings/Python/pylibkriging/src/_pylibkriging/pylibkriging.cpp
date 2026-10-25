@@ -300,7 +300,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("method") = "exact",
            R"pbdoc(Conditional simulations at X. method: "exact" (default), "vecchia" /
 "vecchia(m)" or "nystrom" (see predict); will_update needs "exact", with_noise
-(True: nugget; array or scalar: observation-noise VARIANCES, like fit's noise)
+(True / False: with / without the nugget, default True for a nugget model as in
+R / Julia; array or scalar: observation-noise VARIANCES, like fit's noise)
 needs "exact" or "vecchia"
 ("nystrom" simulates the latent process only and raises for it).)pbdoc")
       .def("update",
@@ -339,8 +340,8 @@ needs "exact" or "vecchia"
            py::arg("return_grad") = false,
            py::arg("return_hess") = false,
            py::arg("bench") = false,
-           "Log-likelihood at theta: (value, gradient if return_grad, empty Hessian: Kriging computes none); "
-           "bench prints the timings of the steps.")
+           "Log-likelihood at theta: (value, gradient if return_grad, Hessian if return_hess: central "
+           "differences of the analytic gradient); bench prints the timings of the steps.")
       .def("logMargPostFun",
            &PyKriging::logMargPostFun,
            py::arg("theta"),

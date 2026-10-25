@@ -42,11 +42,14 @@ model.update(y_u, X_u, refit=True)
 # sims_u = model.update_simulate(y_u, X_u, noise_u=noise_var_u)
 # model.update(y_u, X_u, refit=True, noise_u=noise_var_u)
 # fit / update drop the last simulate: simulate(..., will_update=True) again
+# nugget model (noise="nugget"): simulate includes the nugget by default
+# (with_noise=False: latent process), as in R / Julia
 
 model.logLikelihood()
 model.leaveOneOut()
 model.logMargPost()
-ll, grad, _hess = model.logLikelihoodFun(theta, return_grad=True)  # (ll, grad, hess: always empty)
+ll, grad, hess = model.logLikelihoodFun(theta, return_grad=True, return_hess=True)
+# hess: central differences of the analytic gradient (empty unless return_hess)
 ```
 
 Do **not** instantiate `NuggetKriging`/`NoiseKriging` — pass `noise=` to
