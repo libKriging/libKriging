@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - '*'
-      - '!ccr-143ce523-yoxpqv' # TEMPORARY (#429): only debug-429.yml runs on this branch
     tags-ignore:
       - 'v*' # done in release
   pull_request:

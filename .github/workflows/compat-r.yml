@@ -8,7 +8,6 @@ on:
   push:
     branches:
       - '*'
-      - '!ccr-143ce523-yoxpqv' # TEMPORARY (#429): only debug-429.yml runs on this branch
   pull_request:
     branches:
       - '*'

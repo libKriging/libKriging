@@ -314,6 +314,7 @@ jobs:
   # is the same). 0.3.18: before the 0.3.19 SkylakeX DYNAMIC_ARCH workaround;
   # 0.3.21: workaround removed; 0.3.26: ubuntu-24.04; 0.3.34: latest tag.
   ob-build:
+    if: false # diagnosis done (#429)
     name: "openblas ${{ matrix.version }}"
     runs-on: ubuntu-22.04
     timeout-minutes: 60
@@ -352,6 +353,7 @@ jobs:
   # avx512_bf16 exercises the Cooperlake path; other replicas stop after the
   # identification.
   blas-alt:
+    if: false # diagnosis done (#429)
     name: "blas-alt (ubuntu-22.04 #${{ matrix.replica }})"
     needs: ob-build
     runs-on: ubuntu-22.04
