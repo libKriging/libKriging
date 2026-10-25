@@ -60,6 +60,18 @@ class Optim {
 
   static int max_restart;  // eg. for wrong convergence to bounds
 
+  // Single-start BFGS of a noise-free LL fit: restart when the solution has a
+  // long-range component, max_j theta_j / maxdX_j > long_range_restart (0: off),
+  // at most max_long_range_restart times per start (docs/dev/CholJitter.md,
+  // long-range restart).
+  static double long_range_restart;
+  LIBKRIGING_EXPORT static void set_long_range_restart(double c);
+  LIBKRIGING_EXPORT static double get_long_range_restart();
+
+  static int max_long_range_restart;
+  LIBKRIGING_EXPORT static void set_max_long_range_restart(int m);
+  LIBKRIGING_EXPORT static int get_max_long_range_restart();
+
   static int max_iteration;
   LIBKRIGING_EXPORT static void set_max_iteration(int max_iteration_val);
   LIBKRIGING_EXPORT static int get_max_iteration();
