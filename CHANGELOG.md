@@ -17,7 +17,7 @@ past release, see the corresponding entry on the
   inverse, rcond, QR, Woodbury solve, symmetric eigen) and compares each result with a long
   double oracle computed without the BLAS, whatever the BLAS (OpenBLAS, MKL, Accelerate, BLIS,
   FlexiBLAS, reference), from one thread then from `n_threads` concurrent threads, and returns
-  `ok`, the BLAS identification (file providing `dgemm_` and vendor details) and a report with
+  `ok`, the BLAS identification (library libKriging's `dgemm` is bound to, and vendor details) and a report with
   the workaround of a known faulty BLAS (OpenBLAS 0.3.19 / 0.3.20 `Cooperlake` kernels, MKL 2020 with its Intel
   threading layer); the backend is detected, not chosen. Bindings: `linearalgebra_check()`
   (Python `pylibkriging.linearalgebra_check` dict, R exported `linearalgebra_check` list,

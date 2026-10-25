@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <functional>
 #include <limits>
@@ -21,9 +22,9 @@
 #include <thread>
 #include <vector>
 
-// Backend identification (#429): the module providing dgemm_ (whatever the BLAS:
-// OpenBLAS, MKL, BLIS, FlexiBLAS, Accelerate, reference), then the vendor's
-// own version entry points when it has some.
+// Backend identification (#429): the module libKriging's dgemm is bound to
+// (whatever the BLAS: OpenBLAS, MKL, BLIS, FlexiBLAS, Accelerate, reference),
+// then the vendor's own version entry points in that module when it has some.
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -35,51 +36,109 @@
 
 namespace {
 
+// The module libKriging's dgemm is bound to: Armadillo's dgemm entry, not the
+// first dgemm_ of the process (on macOS, two-level namespace, Octave may load
+// OpenBLAS next to the Accelerate the library is linked to).
+struct BlasModule {
+  std::string path;  // "" if unknown
 #if defined(_WIN32)
-// candidate BLAS DLLs, vendor libraries first (conda's libblas.dll forwards to one of them)
-const char* const kWinBlasDlls[] = {"libopenblas.dll",
-                                    "openblas.dll",
-                                    "mkl_rt.2.dll",
-                                    "mkl_rt.dll",
-                                    "libblis.dll",
-                                    "libflexiblas.dll",
-                                    "Rblas.dll",
-                                    "libblas.dll",
-                                    "blas.dll"};
-#endif
-
-// address of an exported symbol of the process (nullptr if absent), and the
-// file of the module exporting it ("" if unknown)
-template <typename F>
-F blas_symbol(const char* name, std::string* module = nullptr) {
-#if defined(_WIN32)
-  for (const char* dll : kWinBlasDlls) {
-    HMODULE h = GetModuleHandleA(dll);
-    if (!h)
-      continue;
-    FARPROC p = GetProcAddress(h, name);
-    if (!p)
-      continue;
-    if (module) {
-      char path[MAX_PATH] = {0};
-      GetModuleFileNameA(h, path, MAX_PATH);
-      *module = path;
-    }
-    return reinterpret_cast<F>(reinterpret_cast<void (*)()>(p));
-  }
-  return nullptr;
+  HMODULE handle = nullptr;
 #else
-  void* p = dlsym(RTLD_DEFAULT, name);
-  if (p && module) {
-    Dl_info info;
-    if (dladdr(p, &info) && info.dli_fname) {
-      // the file behind the symlinks (e.g. libblas.so.3 -> openblas-pthread/...)
-      char* real = realpath(info.dli_fname, nullptr);
-      *module = real ? real : info.dli_fname;
-      std::free(real);
+  void* handle = nullptr;
+#endif
+  BlasModule() = default;
+  BlasModule(const BlasModule&) = delete;
+  BlasModule& operator=(const BlasModule&) = delete;
+  ~BlasModule() {
+#if !defined(_WIN32)
+    if (handle)
+      dlclose(handle);
+#endif
+  }
+};
+
+void bound_module(BlasModule& m) {
+#if defined(ARMA_USE_BLAS)
+  const void* p = reinterpret_cast<const void*>(&arma::arma_fortran(arma_dgemm));
+#if defined(_WIN32)
+#if defined(_WIN64)
+  // without dllimport, &f is a stub of the calling module: follow the
+  // incremental-link "jmp rel32" and the import "jmp [rip + disp32]"
+  for (int hops = 0; hops < 4 && p; ++hops) {
+    const auto* b = static_cast<const unsigned char*>(p);
+    std::int32_t disp;
+    if (b[0] == 0xE9) {
+      std::memcpy(&disp, b + 1, 4);
+      p = b + 5 + disp;
+    } else if (b[0] == 0xFF && b[1] == 0x25) {
+      std::memcpy(&disp, b + 2, 4);
+      p = *reinterpret_cast<void* const*>(b + 6 + disp);
+    } else {
+      break;
     }
   }
-  return reinterpret_cast<F>(p);
+#endif
+  HMODULE h = nullptr;
+  if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          static_cast<LPCSTR>(p),
+                          &h)
+      || !GetProcAddress(h, "dgemm_")) {
+    // not the BLAS itself (Armadillo's wrapper DLL, a static link): the
+    // vendor DLL loaded in the process (conda's libblas.dll forwards to one)
+    h = nullptr;
+    for (const char* dll : {"libopenblas.dll",
+                            "openblas.dll",
+                            "mkl_rt.2.dll",
+                            "mkl_rt.dll",
+                            "libblis.dll",
+                            "libflexiblas.dll",
+                            "Rblas.dll",
+                            "libblas.dll",
+                            "blas.dll"})
+      if ((h = GetModuleHandleA(dll)) && GetProcAddress(h, "dgemm_"))
+        break;
+      else
+        h = nullptr;
+  }
+  if (h) {
+    char path[MAX_PATH] = {0};
+    GetModuleFileNameA(h, path, MAX_PATH);
+    m.path = path;
+    m.handle = h;
+  }
+#else
+  for (int hops = 0; hops < 2; ++hops) {
+    Dl_info info;
+    if (!dladdr(p, &info) || !info.dli_fname)
+      break;
+    if (m.handle)
+      dlclose(m.handle);
+    // the file behind the symlinks (e.g. libblas.so.3 -> openblas-pthread/...)
+    char* real = realpath(info.dli_fname, nullptr);
+    m.path = real ? real : info.dli_fname;
+    std::free(real);
+    m.handle = dlopen(info.dli_fname, RTLD_LAZY | RTLD_NOLOAD);
+    // not the BLAS itself (Armadillo's wrapper library): the dgemm_ of its dependencies
+    const void* q = m.handle ? dlsym(m.handle, "dgemm_") : nullptr;
+    if (!q || q == p)
+      break;
+    p = q;
+  }
+#endif
+#else
+  (void)m;
+#endif
+}
+
+// address of a vendor entry point in that module (nullptr if absent)
+template <typename F>
+F blas_symbol(const BlasModule& m, const char* name) {
+  if (!m.handle)
+    return nullptr;
+#if defined(_WIN32)
+  return reinterpret_cast<F>(reinterpret_cast<void (*)()>(GetProcAddress(m.handle, name)));
+#else
+  return reinterpret_cast<F>(dlsym(m.handle, name));
 #endif
 }
 
@@ -88,25 +147,26 @@ using mkl_version_fn = void (*)(char*, int);
 using flexiblas_backend_fn = int (*)(char*, size_t);
 
 std::string detect_backend() {
-  std::string module;
-  (void)blas_symbol<void (*)()>("dgemm_", &module);
+  BlasModule m;
+  bound_module(m);
+  const std::string& module = m.path;
   std::string vendor;
-  if (auto backend = blas_symbol<flexiblas_backend_fn>("flexiblas_current_backend")) {
+  if (auto backend = blas_symbol<flexiblas_backend_fn>(m, "flexiblas_current_backend")) {
     char buf[256] = {0};
     backend(buf, sizeof(buf) - 1);
     vendor = "FlexiBLAS, backend " + std::string(buf);
-  } else if (auto config = blas_symbol<config_fn>("openblas_get_config")) {
+  } else if (auto config = blas_symbol<config_fn>(m, "openblas_get_config")) {
     vendor = config();
-    if (auto core = blas_symbol<config_fn>("openblas_get_corename"))
+    if (auto core = blas_symbol<config_fn>(m, "openblas_get_corename"))
       vendor += " | core " + std::string(core());
-  } else if (auto version = blas_symbol<mkl_version_fn>("mkl_get_version_string")) {
+  } else if (auto version = blas_symbol<mkl_version_fn>(m, "mkl_get_version_string")) {
     char buf[256] = {0};
     version(buf, sizeof(buf) - 1);
     vendor = buf;
     vendor.erase(vendor.find_last_not_of(' ') + 1);
     const char* layer = std::getenv("MKL_THREADING_LAYER");
     vendor += " | threading layer " + std::string(layer ? layer : "INTEL (default)");
-  } else if (auto version = blas_symbol<config_fn>("bli_info_get_version_str")) {
+  } else if (auto version = blas_symbol<config_fn>(m, "bli_info_get_version_str")) {
     vendor = "BLIS " + std::string(version());
   } else {
     // no version entry point: guess from the file name
@@ -126,9 +186,9 @@ std::string detect_backend() {
     else if (has("rblas"))
       vendor = "R reference BLAS";
     else if (has("/blas/") || has("libblas") || has("\\blas"))
-      vendor = "reference BLAS (Netlib) or unknown";
+      vendor = "unidentified BLAS, reference (Netlib) by its name";
     else
-      vendor = "unknown vendor";
+      vendor = "unidentified BLAS";
   }
   return module.empty() ? vendor : vendor + " (" + module + ")";
 }

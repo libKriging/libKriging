@@ -91,7 +91,7 @@ This page collects questions about libKriging development
  the same with any BLAS: OpenBLAS, MKL, Apple Accelerate, BLIS, FlexiBLAS, the reference BLAS.
  The backend is detected, not chosen. It runs once from the calling thread, then from
  concurrent threads as the multistart fits do (`eig_sym`, used by `simulate` only, from one
- thread). It returns `ok`, the backend identification (the file providing `dgemm_`, plus OpenBLAS configuration and kernels, MKL
+ thread). It returns `ok`, the backend identification (the library libKriging's `dgemm` is bound to, plus OpenBLAS configuration and kernels, MKL
  version and threading layer, FlexiBLAS backend when available) and a report, with the
  workaround of a known faulty BLAS.
 

@@ -166,7 +166,7 @@ class LinearAlgebra {
   struct CheckResult {
     bool ok = false;      ///< every result within its rounding bound
     std::string backend;  ///< BLAS / LAPACK vendor (OpenBLAS config and core, MKL version and threading layer, BLIS,
-                          ///< FlexiBLAS backend, Accelerate) and the file providing dgemm_
+                          ///< FlexiBLAS backend, Accelerate) and the library libKriging's dgemm is bound to
     std::string report;   ///< one line per check, then advice for a BLAS known to be faulty
   };
   /// Quick self-test of the BLAS / LAPACK backend (detected, not chosen) behind the LinearAlgebra routines

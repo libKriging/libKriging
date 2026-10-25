@@ -54,7 +54,7 @@ as_numeric_matrix = function(x) {
 #' @param n_threads Number of concurrent threads (0: hardware concurrency, at
 #'   least 2).
 #' @return A list: \code{ok} (logical), \code{backend} (detected backend and
-#'   file providing dgemm), \code{report} (one line per check, then the
+#'   library libKriging's dgemm is bound to), \code{report} (one line per check, then the
 #'   workaround of a backend known to be faulty).
 #' @examples
 #' c <- linearalgebra_check()

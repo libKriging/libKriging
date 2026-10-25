@@ -10,7 +10,7 @@ function [ok, backend, report] = linearalgebra_check(n_threads)
     % from n_threads concurrent threads (default 0: hardware concurrency). The
     % BLAS / LAPACK backend is detected, not chosen.
     %   ok: true when every result is within its rounding bound
-    %   backend: detected backend and file providing dgemm
+    %   backend: detected backend and library libKriging's dgemm is bound to
     %   report: one line per check, then the workaround of a backend known
     %     to be faulty
     if nargin < 1
