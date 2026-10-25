@@ -6,7 +6,10 @@ The workflow `.github/workflows/binding-api.yml` (Linux, one job per binding)
 lists the methods each built binding exposes and compares them across
 bindings, names being matched up to each language's convention
 (`leaveOneOut` / `leave_one_out`, `fit` / `fit!`): a method missing from
-some bindings fails the job (table in the job summary). To compare locally after
+some bindings fails the job. The arguments of the methods (Python, R, Julia; the
+Octave methods take `varargin`) are compared as warnings only: argument missing
+from some bindings, required in some and optional in others. The log and the
+job summary end with a synthesis table of all the compared methods. To compare locally after
 building, e.g. Python against Julia:
 
 ```

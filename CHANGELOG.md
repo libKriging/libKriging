@@ -26,7 +26,10 @@ past release, see the corresponding entry on the
   language's naming convention; a method missing from some bindings fails the job
   ([#419](https://github.com/libKriging/libKriging/issues/419)). The lists include the
   `LinearAlgebra` settings, Julia's free functions and R's S3 methods; R's test wrappers of
-  C++ internals (`random_*`, Cholesky numerics) are left out.
+  C++ internals (`random_*`, Cholesky numerics) are left out. The arguments of the methods
+  (Python, R, Julia; Octave's methods take `varargin`) are compared too, as warnings only:
+  argument missing from some bindings, required in some and optional in others. The log and
+  the job summary end with a synthesis table of all the compared methods.
 - **Bindings**, gaps found by that comparison:
   - **Julia**: the `Optim` settings, as `jlibkriging.Optim.<name>` (not exported, not to clash
     with Optim.jl): iterations, tolerances, log level, reparametrization, theta bounds,

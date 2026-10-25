@@ -56,8 +56,37 @@ if isdefined(jlibkriging, :Optim)
     end
 end
 
+# the arguments of the fullest method of name in scope, the object excluded:
+# positional ones (with a default when a shorter method exists), then the
+# keyword ones (all with a default), "kwargs..." as "*"
+function signature(scope, name)
+    mod = scope == "Optim" ? jlibkriging.Optim : jlibkriging
+    isdefined(mod, Symbol(name)) || return nothing
+    f = getfield(mod, Symbol(name))
+    T = get(SCOPES, scope, nothing)
+    ms = Method[]
+    for m in methods(f)
+        m.module in (jlibkriging, jlibkriging.Optim) || continue
+        params = Base.unwrap_unionall(m.sig).parameters
+        member = T !== nothing && length(params) >= 2 && params[2] <: T
+        # members of a model class take the object first; statics do not
+        (T !== nothing && !(name in get(STATICS, scope, String[]))) == member || continue
+        push!(ms, m)
+    end
+    isempty(ms) && return nothing
+    drop = T !== nothing && !(name in get(STATICS, scope, String[]))
+    positional(m) = String.(Base.method_argnames(m)[(drop ? 3 : 2):end])
+    keywords(m) = [k == Symbol("kwargs...") ? "*" : String(k) * "=" for k in Base.kwarg_decl(m)]
+    named(m) = count(!=("*"), vcat(positional(m), keywords(m)))
+    full = ms[argmax(named.(ms))]
+    required = minimum(length(positional(m)) for m in ms)
+    args = [i > required ? a * "=" : a for (i, a) in enumerate(positional(full))]
+    join(vcat(args, keywords(full)), ",")
+end
+
 open(ARGS[1], "w") do io
     for (scope, name) in sort!(lines)
-        println(io, scope, '\t', name)
+        sig = signature(scope, name)
+        println(io, scope, '\t', name, sig === nothing ? "" : "\t" * sig)
     end
 end

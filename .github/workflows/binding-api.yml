@@ -5,8 +5,10 @@ name: Binding API
 # builds it and lists its methods (tools/checks/binding_api/dump_<binding>);
 # the compare job matches the names across bindings, up to the naming
 # conventions of each language (tools/checks/binding_api/compare.py), and
-# fails on any method missing from some bindings (errors, and a table in the
-# job summary; --report-only on compare.py makes them warnings).
+# fails on any method missing from some bindings (errors; --report-only on
+# compare.py makes them warnings). The arguments of the methods (Python, R,
+# Julia) are compared too, as warnings only. The log and the job summary end
+# with a synthesis table of all the compared methods.
 
 on:
   push:
