@@ -464,7 +464,13 @@ jobs:
         shell: bash
         run: |
           cd build
-          f="$(find . -type f -name KrigingTest | head -1)"; ldd "$f" | grep -E "blas|lapack|mkl|openblas" || true
+          # the bundled armadillo picks FlexiBLAS > MKL > OpenBLAS > libblas at
+          # configure time: MKL is installed above, so it needs libmkl_rt.so;
+          # every directory provides that name too, pointing at its own BLAS
+          a="$(find . -name 'libarmadillo.so*' -type f | head -1)"; readelf -d "$a" | grep NEEDED
+          for dir in "$RUNNER_TEMP"/blas/*; do
+            [ -e "$dir/libmkl_rt.so" ] || ln -sf "$(readlink -f "$dir/libblas.so.3")" "$dir/libmkl_rt.so"
+          done
           echo "| BLAS (ctest, default settings) | result |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
           for dir in "$RUNNER_TEMP"/blas/*; do
