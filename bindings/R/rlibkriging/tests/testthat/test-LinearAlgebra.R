@@ -92,3 +92,13 @@ test_that(desc="Full chol equals incremented chol by block",
 
 rlibkriging:::linalg_check_chol_rcond(default_rcond_checked)
 rlibkriging:::linalg_set_num_nugget(default_num_nugget)
+
+test_that("linalg_check_blas: BLAS / LAPACK self-test passes (#429)", {
+  c <- rlibkriging:::linalg_check_blas(2)
+  expect_setequal(names(c), c("ok", "library", "report"))
+  expect_true(nchar(c$library) > 0)
+  expect_true(grepl("single thread:", c$report, fixed = TRUE))
+  expect_true(grepl("2 concurrent threads:", c$report, fixed = TRUE))
+  if (!c$ok) cat(c$report)
+  expect_true(c$ok)
+})

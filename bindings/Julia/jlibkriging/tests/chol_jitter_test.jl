@@ -23,6 +23,15 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test get_num_nugget() == saved_nugget
     end
 
+    @testset "check_blas (#429)" begin
+        c = check_blas(2)
+        @test !isempty(c.library)
+        @test occursin("single thread:", c.report)
+        @test occursin("2 concurrent threads:", c.report)
+        c.ok || println(c.report)
+        @test c.ok
+    end
+
     @testset "gauss fit with and without the jitter" begin
         X = reshape(collect(range(0.0, 1.0; length=10)), :, 1)
         y = f_test.(vec(X))

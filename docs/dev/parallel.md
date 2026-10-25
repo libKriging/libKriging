@@ -93,7 +93,10 @@ Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
   fail in the Octave Linux job, pure linear algebra included
   (`LinearAlgebra::woodbury_solve` against `arma::solve`), on #414 (d7d5ffc9)
   and #415 (26c68190); the Python job on the same CPU (reference BLAS) and the
-  same OpenBLAS on other CPUs pass. Not reproducible here (no AVX-512). On
+  same OpenBLAS on other CPUs pass. Cause (#429): in 0.3.19 / 0.3.20
+  `DYNAMIC_ARCH` builds the Cooperlake DGEMM kernel and packing come from
+  SkylakeX (4x8) while `param.h` keeps the 16x2 unrolls for Cooperlake; fixed in
+  0.3.21. `LinearAlgebra::check_blas()` detects it (FAQ). On
   noise-free data with smooth kernels this rounding used to change the optimum
   itself; the fixed Cholesky jitter (8.6) keeps the optimum, theta then moving
   only within the optimizer tolerance (~1e-8 relative, not bit-identical:
@@ -336,6 +339,6 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 - Linux CI on Xeon 6973P (OpenBLAS 0.3.20 `Cooperlake`, section 4): the Octave,
   R (`main.yml`) and coverage (`analysis.yml`) jobs failed the same way; every
   Linux job of these workflows now sets `OPENBLAS_CORETYPE=Haswell`; drop it with
-  a newer OpenBLAS (#429).
+  a newer OpenBLAS (#429). Faulty BLAS configurations and `check_blas`: FAQ.
 - Julia exposes no thread setter (neither `set_thread_pool_size` nor the budget)
   (#423).

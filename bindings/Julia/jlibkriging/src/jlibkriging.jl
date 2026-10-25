@@ -1667,8 +1667,26 @@ Numerical nugget of the Cholesky fallback (default 1e-10).
 get_num_nugget() = ccall(dlsym(_lk(), :lk_linalg_get_num_nugget), Cdouble, ())
 set_num_nugget(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_linalg_set_num_nugget), Cint, (Cdouble,), x))
 
+"""
+    check_blas(n_threads::Integer=0) -> (ok, library, report)
+
+Self-test of the BLAS / LAPACK routines libKriging relies on (matrix product,
+Cholesky, solves, inverse, QR, symmetric eigen decomposition) against long
+double references, from one thread then `n_threads` concurrent threads
+(0: hardware concurrency). `report` holds one line per check and the advice
+for a BLAS known to be faulty (#429).
+"""
+function check_blas(n_threads::Integer=0)
+    lib = Ref{Cstring}()
+    rep = Ref{Cstring}()
+    ret = ccall(dlsym(_lk(), :lk_linalg_check_blas), Cint, (Cint, Ref{Cstring}, Ref{Cstring}),
+                n_threads, lib, rep)
+    ret < 0 && _check_error(ret)
+    return (ok=ret == 1, library=unsafe_string(lib[]), report=unsafe_string(rep[]))
+end
+
 export Kriging, WarpKriging, MLPKriging, NestedKriging
-export get_chol_jitter, set_chol_jitter, get_num_nugget, set_num_nugget
+export get_chol_jitter, set_chol_jitter, get_num_nugget, set_num_nugget, check_blas
 export nb_groups, aggregation, beta0, groups, set_predict_chunk!, set_warp_subsample!
 export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
 export load, load_kriging, load_warp_kriging, load_mlp_kriging, load_nested_kriging

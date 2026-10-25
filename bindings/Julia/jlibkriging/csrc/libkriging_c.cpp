@@ -2254,3 +2254,16 @@ int lk_linalg_set_num_nugget(double nugget) {
   }
   CATCH_RETURN
 }
+
+int lk_linalg_check_blas(int n_threads, const char** library, const char** report) {
+  try {
+    static thread_local std::string lib, rep;
+    const LinearAlgebra::BlasCheck c = LinearAlgebra::check_blas(n_threads);
+    lib = c.library;
+    rep = c.report;
+    *library = lib.c_str();
+    *report = rep.c_str();
+    return c.ok ? 1 : 0;
+  }
+  CATCH_RETURN
+}

@@ -683,5 +683,22 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def_static("get_chol_jitter", &LinearAlgebra::get_chol_jitter)
       .def_static("set_chol_jitter", &LinearAlgebra::set_chol_jitter, py::arg("jitter"))
       .def_static("get_num_nugget", &LinearAlgebra::get_num_nugget)
-      .def_static("set_num_nugget", &LinearAlgebra::set_num_nugget, py::arg("nugget"));
+      .def_static("set_num_nugget", &LinearAlgebra::set_num_nugget, py::arg("nugget"))
+      // BLAS / LAPACK self-test: single thread, then n_threads concurrent
+      // threads (0: hardware concurrency); dict ok / library / report (#429)
+      .def_static(
+          "check_blas",
+          [](int n_threads) {
+            LinearAlgebra::BlasCheck c;
+            {
+              py::gil_scoped_release release;
+              c = LinearAlgebra::check_blas(n_threads);
+            }
+            py::dict d;
+            d["ok"] = c.ok;
+            d["library"] = c.library;
+            d["report"] = c.report;
+            return d;
+          },
+          py::arg("n_threads") = 0);
 }

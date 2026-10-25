@@ -9,6 +9,7 @@ add_library(Kriging
         Optim.cpp include/libKriging/Optim.hpp
         Random.cpp include/libKriging/Random.hpp
         LinearAlgebra.cpp include/libKriging/LinearAlgebra.hpp
+        BlasCheck.cpp
         Covariance.cpp include/libKriging/Covariance.hpp
         KrigingImpl.cpp include/libKriging/KrigingImpl.hpp
         Kriging.cpp include/libKriging/Kriging.hpp

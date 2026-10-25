@@ -12,6 +12,15 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- **BLAS self-test**: `LinearAlgebra::check_blas(n_threads = 0)` checks the BLAS / LAPACK
+  routines libKriging relies on (product, Cholesky, solves, inverse, rcond, QR, symmetric
+  eigen) against long double references, from one thread then from `n_threads` concurrent
+  threads, and returns `ok`, the BLAS identification and a report with the workaround of a
+  known faulty BLAS (OpenBLAS 0.3.19 / 0.3.20 `Cooperlake` kernels, MKL 2020 with its Intel
+  threading layer). Bindings: Python `LinearAlgebra.check_blas` (dict), R
+  `rlibkriging:::linalg_check_blas` (list), Octave `[ok, library, report] =
+  LinearAlgebra.check_blas()`, Julia `check_blas()` (named tuple). See
+  [docs/dev/FAQ.md](docs/dev/FAQ.md) ([#429](https://github.com/libKriging/libKriging/issues/429)).
 - **Thread budget**: one setting bounds the threads of the multistart pool, the OpenMP loops
   and the BLAS together: `Optim::set_num_threads_percent(x)` (x <= 1 a ratio, x > 1 a
   percentage of the physical cores, 0 = 100 %) or `LK_NUM_THREADS_PERCENT`;

@@ -159,6 +159,21 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static arma::mat inv_sympd(const arma::mat& L);
   LIBKRIGING_EXPORT static arma::mat chol_upper(const arma::mat& A);
   LIBKRIGING_EXPORT static void qr_econ(arma::mat& Q, arma::mat& R, const arma::mat& A);
+
+  /// Outcome of check_blas().
+  struct BlasCheck {
+    bool ok = false;      ///< every result within its rounding bound
+    std::string library;  ///< OpenBLAS config and core, MKL or BLIS version, or "unknown"
+    std::string report;   ///< one line per check, then advice for a BLAS known to be faulty
+  };
+  /// Quick self-test of the BLAS / LAPACK routines libKriging relies on
+  /// (matrix product, Cholesky, triangular and general solves, inverse, QR,
+  /// symmetric eigen decomposition), compared with long double references:
+  /// once from the calling thread, then from n_threads concurrent threads
+  /// (0: hardware concurrency, at least 2). Takes a fraction of a second.
+  /// Detects e.g. OpenBLAS 0.3.19 / 0.3.20 DYNAMIC_ARCH on CPUs with
+  /// avx512_bf16 and MKL 2020 with concurrent callers (#429).
+  LIBKRIGING_EXPORT static BlasCheck check_blas(int n_threads = 0);
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP

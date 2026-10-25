@@ -77,3 +77,30 @@ This page collects questions about libKriging development
  To get the same result on several machines, set the same BLAS thread count everywhere (e.g.
  `OPENBLAS_NUM_THREADS=1`, at the cost of speed) and use the same BLAS build; a nugget or noise
  model, or tighter `theta` bounds, also reduce the sensitivity.
+
+# Are my BLAS / LAPACK results correct? (`check_blas`)
+
+ Some BLAS builds give wrong results on some CPUs, without any error message: fits then fail
+ with "Exceed max numerical nugget", or return NaN or nonsense. `LinearAlgebra::check_blas()`
+ (C++), `lk.LinearAlgebra.check_blas()` (Python), `rlibkriging:::linalg_check_blas()` (R),
+ `LinearAlgebra.check_blas()` (Octave / MATLAB, `[ok, library, report]`), `check_blas()`
+ (Julia) checks, in a fraction of a second, the routines libKriging relies on (matrix product,
+ Cholesky, triangular and general solves, inverse, rcond, QR, symmetric eigen decomposition)
+ against long double references, from one thread then from concurrent threads as the
+ multistart fits do. It returns `ok`, the BLAS identification (OpenBLAS configuration and
+ kernels, MKL or BLIS version) and a report, with the workaround of a known faulty BLAS.
+
+ Known faulty configurations ([#429](https://github.com/libKriging/libKriging/issues/429)),
+ all fixed by an environment variable set **before** the process starts (it is read when the
+ BLAS is loaded) or by another BLAS:
+
+ | BLAS | Faulty | Workaround |
+ |---|---|---|
+ | OpenBLAS 0.3.20 `DYNAMIC_ARCH` (Ubuntu 22.04) | `Cooperlake` kernels: Intel Sapphire Rapids, Granite Rapids (Xeon 6), Cooper Lake; any CPU with avx512_bf16 when `OPENBLAS_CORETYPE` holds a value 0.3.20 does not know | `OPENBLAS_CORETYPE=SkylakeX`, or OpenBLAS >= 0.3.21 |
+ | OpenBLAS 0.3.19 `DYNAMIC_ARCH` | `Cooperlake` and `SkylakeX` kernels | `OPENBLAS_CORETYPE=Haswell`, or OpenBLAS >= 0.3.21 |
+ | MKL 2020 (Ubuntu 22.04 `intel-mkl`) | default Intel threading layer next to the GNU OpenMP runtime of libKriging: NaN or crashes | `MKL_THREADING_LAYER=GNU` (or `SEQUENTIAL`), or a recent MKL |
+
+ Correct in the same tests: OpenBLAS 0.3.18, 0.3.21, 0.3.26, 0.3.34, the reference BLAS,
+ BLIS 0.8 / 0.9, MKL 2026. Note that the bundled Armadillo picks its BLAS when libKriging is
+ configured (FlexiBLAS, then MKL, then OpenBLAS, then `libblas`): installing MKL before building
+ libKriging makes it use MKL.

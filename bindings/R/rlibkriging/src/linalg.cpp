@@ -81,3 +81,12 @@ arma::mat linalg_chol_block(arma::mat C, arma::mat Loo) {
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
   return impl_ptr->chol_block(C, Loo);
 }
+
+// BLAS / LAPACK self-test (single thread, then n_threads concurrent threads;
+// 0: hardware concurrency), see LinearAlgebra::check_blas and #429
+// [[Rcpp::export]]
+Rcpp::List linalg_check_blas(int n_threads = 0) {
+  const LinearAlgebra::BlasCheck c = LinearAlgebra::check_blas(n_threads);
+  return Rcpp::List::create(
+      Rcpp::Named("ok") = c.ok, Rcpp::Named("library") = c.library, Rcpp::Named("report") = c.report);
+}
