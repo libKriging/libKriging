@@ -178,7 +178,13 @@ Results run_checks(std::uint64_t seed) {
   Results res;
   std::mt19937_64 g(seed);
   const arma::uword n = 150;
-  auto guarded = [&res](const std::string& name, const std::function<double()>& f) {
+  // LK_CHECK_BLAS_TRACE: one stderr line per check, to locate a BLAS crash
+  static const bool trace = std::getenv("LK_CHECK_BLAS_TRACE") != nullptr;
+  auto guarded = [&res, seed](const std::string& name, const std::function<double()>& f) {
+    if (trace) {
+      std::fprintf(stderr, "check_blas[%llu] %s\n", static_cast<unsigned long long>(seed), name.c_str());
+      std::fflush(stderr);
+    }
     double r;
     try {
       r = f();
@@ -191,6 +197,10 @@ Results run_checks(std::uint64_t seed) {
   const arma::mat B = random_mat(g, n, 7);
   arma::mat L;
   try {
+    if (trace) {
+      std::fprintf(stderr, "check_blas[%llu] safe_chol_lower\n", static_cast<unsigned long long>(seed));
+      std::fflush(stderr);
+    }
     L = LinearAlgebra::safe_chol_lower(R);
   } catch (const std::exception&) {
   }

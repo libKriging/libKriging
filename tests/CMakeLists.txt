@@ -287,7 +287,9 @@ add_dependencies(all_test_binaries LinearAlgebraTest)
 if(DEFINED ENV{GITHUB_ACTIONS})
     set(AdditionalCatchParameters "~[intensive]")
 endif()
-catch_discover_tests(LinearAlgebraTest EXTRA_ARGS ${AdditionalCatchParameters})
+# LK_CHECK_BLAS_TRACE: check_blas prints each check it starts (locates a BLAS crash)
+catch_discover_tests(LinearAlgebraTest EXTRA_ARGS ${AdditionalCatchParameters}
+                     PROPERTIES ENVIRONMENT "LK_CHECK_BLAS_TRACE=1")
 unset(AdditionalCatchParameters)
 
 
