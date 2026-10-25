@@ -385,7 +385,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy liblapack-dev libopenblas0-pthread libblis3-pthread
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy --no-install-recommends intel-mkl || echo "::warning::intel-mkl not installed"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy intel-mkl || echo "::warning::intel-mkl not installed"
           python3 -m pip install -q mkl || echo "::warning::pip mkl not installed"
           A=/usr/lib/x86_64-linux-gnu
           B="$RUNNER_TEMP/blas"; mkdir -p "$B"
