@@ -31,6 +31,7 @@ try
 
     assert(strcmp(k.kernel(), "gauss"));
     assert(strcmp(k.activation(), "selu"));
+    assert(strcmp(k.objective(), "LL"));
     hd = k.hidden_dims();
     assert(length(hd) == 2 && hd(1) == 16 && hd(2) == 8);
     assert(k.feature_dim() == 2);
@@ -113,11 +114,11 @@ try
     ll_val = k.logLikelihood();
     assert(isfinite(ll_val));
 
-    [ll, grad] = k.logLikelihoodFun(th, true, false);
+    [ll, grad] = k.logLikelihoodFun(th, true);
     assert(isfinite(ll));
     assert(all(isfinite(grad)));
 
-    [ll2, ~] = k.logLikelihoodFun(th, false, false);
+    [ll2, ~] = k.logLikelihoodFun(th, false);
     assert(isfinite(ll2));
     fprintf("  Test 4 MLP logLikelihoodFun OK\n");
 catch err

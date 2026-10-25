@@ -29,6 +29,8 @@ void model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void optim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void model_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void nystrom_rank(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void vecchia_neighbors(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void method(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

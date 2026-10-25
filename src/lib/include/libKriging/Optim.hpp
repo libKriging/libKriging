@@ -16,7 +16,6 @@ class Optim {
   static std::function<arma::vec(const arma::vec&)> reparam_from;
   static std::function<double(const double&, const double&)> reparam_from_deriv_;
   static std::function<arma::vec(const arma::vec&, const arma::vec&)> reparam_from_deriv;
-  static std::function<arma::mat(const arma::vec&, const arma::vec&, const arma::mat&)> reparam_from_deriv2;
 
   // Parse an optimizer method string of the form "<prefix><N>[<suffix>]".
   // Returns {base_method_without_N, multistart_count}.

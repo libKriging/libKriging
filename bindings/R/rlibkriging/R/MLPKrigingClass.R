@@ -28,6 +28,8 @@ classMLPKriging <- function(obj) {
     }
     obj$objective <- function() mlpKriging_objective(obj$ptr)
     obj$method <- function() mlpKriging_method(obj$ptr)
+    obj$chol_jitter <- function() mlpKriging_chol_jitter(obj$ptr)
+    obj$model_chol_jitter <- function() mlpKriging_model_chol_jitter(obj$ptr)
     # `k$F()` / `k$T()` as for Kriging (the S3 generics are named F_ / T_ so
     # as not to mask base::F / base::T)
     obj$F <- function() F_(obj)
@@ -222,12 +224,11 @@ logLikelihood.MLPKriging <- function(object, ...) {
 #' @param object MLPKriging object
 #' @param theta range parameter vector
 #' @param return_grad return gradient?
-#' @param return_hess return hessian?
 #' @param ... ignored
 #' @method logLikelihoodFun MLPKriging
 #' @export
-logLikelihoodFun.MLPKriging <- function(object, theta, return_grad = FALSE, return_hess = FALSE, ...) {
-  mlpKriging_logLikelihoodFun(object$ptr, theta, return_grad, return_hess)
+logLikelihoodFun.MLPKriging <- function(object, theta, return_grad = FALSE, ...) {
+  mlpKriging_logLikelihoodFun(object$ptr, theta, return_grad)
 }
 
 #' @method theta MLPKriging

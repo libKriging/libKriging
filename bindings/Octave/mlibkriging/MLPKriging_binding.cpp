@@ -215,17 +215,15 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 4}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
+                 RequiresArg::Range{2, 3}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
 
   const bool return_grad = flag_output_compliance(input, 2, "return_grad", output, 1);
-  const bool return_hess = flag_output_compliance(input, 3, "return_hess", output, 2);
 
-  auto [ll, grad, hess] = mk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), return_grad, return_hess);
+  auto [ll, grad] = mk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), return_grad);
   output.set(0, ll, "log-likelihood value");
   output.setOptional(1, grad, "log-likelihood gradient");
-  output.setOptional(2, hess, "log-likelihood hessian");
 }
 
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -448,6 +446,36 @@ void activation(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
   output.set(0, mk->activation(), "activation name");
+}
+
+void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->objective(), "objective");
+}
+
+void chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->chol_jitter(), "chol_jitter");
+}
+
+void model_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->model_chol_jitter(), "model_chol_jitter");
 }
 
 void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

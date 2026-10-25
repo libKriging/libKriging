@@ -300,7 +300,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("method") = "exact",
            R"pbdoc(Conditional simulations at X. method: "exact" (default), "vecchia" /
 "vecchia(m)" or "nystrom" (see predict); will_update needs "exact", with_noise
-(True: nugget; array or scalar: observation-noise VARIANCES, like fit's noise)
+(True / False: with / without the nugget, default True for a nugget model as in
+R / Julia; array or scalar: observation-noise VARIANCES, like fit's noise)
 needs "exact" or "vecchia"
 ("nystrom" simulates the latent process only and raises for it).)pbdoc")
       .def("update",
@@ -322,7 +323,11 @@ needs "exact" or "vecchia"
       .def("summary", &PyKriging::summary)
       .def("save", &PyKriging::save)
       .def_static("load", &PyKriging::load)
-      .def("leaveOneOutFun", &PyKriging::leaveOneOutFun)
+      .def("leaveOneOutFun",
+           &PyKriging::leaveOneOutFun,
+           py::arg("theta"),
+           py::arg("return_grad") = false,
+           py::arg("bench") = false)
       .def("leaveOneOutVec",
            &PyKriging::leaveOneOutVec,
            py::arg("theta"),
@@ -333,8 +338,13 @@ needs "exact" or "vecchia"
            &PyKriging::logLikelihoodFun,
            py::arg("theta"),
            py::arg("return_grad") = false,
-           py::arg("want_hess") = false)
-      .def("logMargPostFun", &PyKriging::logMargPostFun)
+           py::arg("bench") = false,
+           "Log-likelihood at theta: (value, gradient if return_grad); bench prints the timings of the steps.")
+      .def("logMargPostFun",
+           &PyKriging::logMargPostFun,
+           py::arg("theta"),
+           py::arg("return_grad") = false,
+           py::arg("bench") = false)
       .def("logLikelihood",
            &PyKriging::logLikelihood,
            py::arg("method") = "exact",
@@ -356,6 +366,10 @@ needs "exact" or "vecchia"
       .def("kernel", &PyKriging::kernel)
       .def("optim", &PyKriging::optim)
       .def("objective", &PyKriging::objective)
+      .def("chol_jitter", &PyKriging::chol_jitter, "Diagonal jitter of the fit (logLikelihood).")
+      .def("model_chol_jitter",
+           &PyKriging::model_chol_jitter,
+           "Diagonal jitter of the committed model (predict / simulate / update).")
       .def("method", &PyKriging::method, "Fit method: \"exact\", \"vecchia(m)\" or \"nystrom(k)\".")
       .def("nystrom_rank", &PyKriging::nystrom_rank)
       .def("vecchia_neighbors", &PyKriging::vecchia_neighbors)
@@ -526,14 +540,14 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def("covMat", &PyWarpKriging::covMat, py::arg("X1"), py::arg("X2"))
       .def("summary", &PyWarpKriging::summary)
       .def("logLikelihood", &PyWarpKriging::logLikelihood)
-      .def("logLikelihoodFun",
-           &PyWarpKriging::logLikelihoodFun,
-           py::arg("theta"),
-           py::arg("return_grad") = false,
-           py::arg("return_hess") = false)
+      .def("logLikelihoodFun", &PyWarpKriging::logLikelihoodFun, py::arg("theta"), py::arg("return_grad") = false)
       .def("kernel", &PyWarpKriging::kernel)
       .def("optim", &PyWarpKriging::optim)
       .def("objective", &PyWarpKriging::objective)
+      .def("chol_jitter", &PyWarpKriging::chol_jitter, "Diagonal jitter of the fit (logLikelihood).")
+      .def("model_chol_jitter",
+           &PyWarpKriging::model_chol_jitter,
+           "Diagonal jitter of the committed model (predict / simulate / update).")
       .def("method", &PyWarpKriging::method)
       .def("noise", &PyWarpKriging::noise)
       .def("warp_params", &PyWarpKriging::warp_params)
@@ -617,13 +631,13 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def("update", &PyMLPKriging::update, py::arg("y_u"), py::arg("X_u"), py::arg("refit") = true)
       .def("summary", &PyMLPKriging::summary)
       .def("logLikelihood", &PyMLPKriging::logLikelihood)
-      .def("logLikelihoodFun",
-           &PyMLPKriging::logLikelihoodFun,
-           py::arg("theta"),
-           py::arg("return_grad") = false,
-           py::arg("return_hess") = false)
+      .def("logLikelihoodFun", &PyMLPKriging::logLikelihoodFun, py::arg("theta"), py::arg("return_grad") = false)
       .def("kernel", &PyMLPKriging::kernel)
       .def("objective", &PyMLPKriging::objective)
+      .def("chol_jitter", &PyMLPKriging::chol_jitter, "Diagonal jitter of the fit (logLikelihood).")
+      .def("model_chol_jitter",
+           &PyMLPKriging::model_chol_jitter,
+           "Diagonal jitter of the committed model (predict / simulate / update).")
       .def("method", &PyMLPKriging::method)
       .def("X", &PyMLPKriging::X)
       .def("centerX", &PyMLPKriging::centerX)
@@ -683,5 +697,10 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def_static("get_chol_jitter", &LinearAlgebra::get_chol_jitter)
       .def_static("set_chol_jitter", &LinearAlgebra::set_chol_jitter, py::arg("jitter"))
       .def_static("get_num_nugget", &LinearAlgebra::get_num_nugget)
-      .def_static("set_num_nugget", &LinearAlgebra::set_num_nugget, py::arg("nugget"));
+      .def_static("set_num_nugget", &LinearAlgebra::set_num_nugget, py::arg("nugget"))
+      // warning when the fallback adds a numerical nugget; check of the
+      // reciprocal condition number of the factorizations
+      .def_static("set_chol_warning", &LinearAlgebra::set_chol_warning, py::arg("warn"))
+      .def_static("check_chol_rcond", &LinearAlgebra::check_chol_rcond, py::arg("check"))
+      .def_static("chol_rcond_checked", &LinearAlgebra::chol_rcond_checked);
 }

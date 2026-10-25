@@ -286,6 +286,16 @@ classdef WarpKriging < handle
             [varargout{1:nargout}] = mLibKriging("WarpKriging::objective", obj.ref, varargin{:});
         end
 
+        % diagonal jitter of the fit (logLikelihood) / of the committed model
+        % (predict, simulate, update), docs/dev/CholJitter.md
+        function varargout = chol_jitter(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::chol_jitter", obj.ref, varargin{:});
+        end
+
+        function varargout = model_chol_jitter(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::model_chol_jitter", obj.ref, varargin{:});
+        end
+
         function varargout = method(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("WarpKriging::method", obj.ref, varargin{:});
         end

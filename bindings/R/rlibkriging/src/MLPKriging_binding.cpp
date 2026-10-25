@@ -162,19 +162,14 @@ double mlpKriging_logLikelihood(SEXP model_ptr) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List mlpKriging_logLikelihoodFun(SEXP model_ptr,
-                                       const arma::vec& theta_gp,
-                                       bool withGrad = true,
-                                       bool withHess = false) {
+Rcpp::List mlpKriging_logLikelihoodFun(SEXP model_ptr, const arma::vec& theta_gp, bool withGrad = true) {
   MLPKrigingPtr model(lk_xptr(model_ptr));
-  auto [ll, grad, hess] = model->logLikelihoodFun(theta_gp, withGrad, withHess);
+  auto [ll, grad] = model->logLikelihoodFun(theta_gp, withGrad);
 
   Rcpp::List result;
   result["logLikelihood"] = ll;
   if (withGrad)
     result["gradient"] = grad;
-  if (withHess)
-    result["hessian"] = hess;
   return result;
 }
 
@@ -204,6 +199,18 @@ double mlpKriging_sigma2(SEXP model_ptr) {
 std::string mlpKriging_objective(SEXP model_ptr) {
   MLPKrigingPtr model(lk_xptr(model_ptr));
   return model->objective();
+}
+
+// [[Rcpp::export]]
+double mlpKriging_chol_jitter(SEXP model_ptr) {
+  MLPKrigingPtr model(lk_xptr(model_ptr));
+  return model->chol_jitter();
+}
+
+// [[Rcpp::export]]
+double mlpKriging_model_chol_jitter(SEXP model_ptr) {
+  MLPKrigingPtr model(lk_xptr(model_ptr));
+  return model->model_chol_jitter();
 }
 
 // [[Rcpp::export]]

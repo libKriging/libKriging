@@ -787,9 +787,8 @@ class WarpKriging : protected KrigingImpl {
 
   LIBKRIGING_EXPORT double logLikelihood() const;
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta,
-                                                                              bool return_grad = true,
-                                                                              bool return_hess = false) const;
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta,
+                                                                   bool return_grad = true) const;
 
   // -----------------------------------------------------------------------
   //  Accessors
@@ -827,6 +826,10 @@ class WarpKriging : protected KrigingImpl {
   using KrigingImpl::method;
   using KrigingImpl::objective;
   using KrigingImpl::optim;
+  /// Diagonal jitter of the search (fit, logLikelihood) and of the committed
+  /// model (predict / simulate / update), as Kriging (docs/dev/CholJitter.md)
+  using KrigingImpl::chol_jitter;
+  double model_chol_jitter() const { return m_model_chol_jitter; }
 
   /// Get warping specs as a vector of strings
   std::vector<std::string> warping_strings() const {

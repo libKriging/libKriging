@@ -123,8 +123,9 @@ against master's 1365), a local optimum of that path.
 - A fixed floor for the `simulate` conditional covariance instead of the retry (inconsistency 2,
   #427).
 - A floor on the predicted variance, then an exact committed WarpKriging model (#428).
-- Single-start robustness on the plateau (#418); bindings consistency checks (#419); getters
-  `chol_jitter()` / `model_chol_jitter()` not exposed in the bindings (#424).
+- Single-start robustness on the plateau (#418); bindings consistency checks (#419).
+- Done: getters `chol_jitter()` / `model_chol_jitter()` of `Kriging`, `WarpKriging`,
+  `MLPKriging` in the four bindings, kept by `save` / `load` (#424).
 
 # Jitter of each class and method
 

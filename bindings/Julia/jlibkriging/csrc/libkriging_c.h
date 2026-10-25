@@ -56,6 +56,17 @@ int lk_kriging_fit(void* ptr,
                    int normalize,
                    const char* optim,
                    const char* objective,
+                   /* optional parameters (NULL to skip), as lk_kriging_new_fit */
+                   const double* sigma2,
+                   int is_sigma2_estim,
+                   const double* theta,
+                   int theta_n,
+                   int is_theta_estim,
+                   const double* beta,
+                   int beta_n,
+                   int is_beta_estim,
+                   const double* nugget,
+                   int is_nugget_estim,
                    const char* method);
 
 int lk_kriging_predict(void* ptr,
@@ -123,15 +134,15 @@ int lk_kriging_log_likelihood_fun(void* ptr,
                                   const double* theta,
                                   int theta_n,
                                   int return_grad,
-                                  int return_hess,
+                                  int bench, /* print the timings of the steps */
                                   double* ll_out,
-                                  double* grad_out,
-                                  double* hess_out);
+                                  double* grad_out);
 
 int lk_kriging_leave_one_out_fun(void* ptr,
                                  const double* theta,
                                  int theta_n,
                                  int return_grad,
+                                 int bench,
                                  double* loo_out,
                                  double* grad_out);
 
@@ -139,6 +150,7 @@ int lk_kriging_log_marg_post_fun(void* ptr,
                                  const double* theta,
                                  int theta_n,
                                  int return_grad,
+                                 int bench,
                                  double* lmp_out,
                                  double* grad_out);
 
@@ -165,6 +177,8 @@ int lk_kriging_cov_mat(void* ptr, const double* X1, int n1, int d1, const double
 const char* lk_kriging_kernel(void* ptr);
 const char* lk_kriging_optim(void* ptr);
 const char* lk_kriging_objective(void* ptr);
+double lk_kriging_chol_jitter(void* ptr);
+double lk_kriging_model_chol_jitter(void* ptr);
 int lk_kriging_nystrom_rank(void* ptr);
 int lk_kriging_vecchia_neighbors(void* ptr);
 const char* lk_kriging_method(void* ptr);
@@ -317,10 +331,8 @@ int lk_warp_kriging_log_likelihood_fun(void* ptr,
                                        const double* theta,
                                        int theta_n,
                                        int return_grad,
-                                       int return_hess,
                                        double* ll_out,
-                                       double* grad_out,
-                                       double* hess_out);
+                                       double* grad_out);
 
 const char* lk_warp_kriging_kernel(void* ptr);
 int lk_warp_kriging_get_normalize(void* ptr);
@@ -344,6 +356,8 @@ int lk_warp_kriging_get_noise(void* ptr, double* out, int* n);
 int lk_warp_kriging_get_warp_params(void* ptr, double* out, int* n);
 const char* lk_warp_kriging_get_optim(void* ptr);
 const char* lk_warp_kriging_get_objective(void* ptr);
+double lk_warp_kriging_chol_jitter(void* ptr);
+double lk_warp_kriging_model_chol_jitter(void* ptr);
 int lk_warp_kriging_get_warping(void* ptr, char** out, int* n_warping);
 
 /* Covariance matrix (n1 x n2) between two designs, using the warped kernel.
@@ -435,13 +449,14 @@ int lk_mlp_kriging_log_likelihood_fun(void* ptr,
                                       const double* theta,
                                       int theta_n,
                                       int return_grad,
-                                      int return_hess,
                                       double* ll_out,
-                                      double* grad_out,
-                                      double* hess_out);
+                                      double* grad_out);
 
 const char* lk_mlp_kriging_kernel(void* ptr);
 const char* lk_mlp_kriging_activation(void* ptr);
+const char* lk_mlp_kriging_get_objective(void* ptr);
+double lk_mlp_kriging_chol_jitter(void* ptr);
+double lk_mlp_kriging_model_chol_jitter(void* ptr);
 int lk_mlp_kriging_get_normalize(void* ptr);
 const char* lk_mlp_kriging_get_regmodel(void* ptr);
 int lk_mlp_kriging_is_fitted(void* ptr);
@@ -545,6 +560,36 @@ double lk_linalg_get_chol_jitter(void);
 int lk_linalg_set_chol_jitter(double jitter);
 double lk_linalg_get_num_nugget(void);
 int lk_linalg_set_num_nugget(double nugget);
+/* warning when the Cholesky fallback adds a numerical nugget; check of the
+   reciprocal condition number of the factorizations */
+int lk_linalg_set_chol_warning(int warn);
+int lk_linalg_check_chol_rcond(int check);
+int lk_linalg_chol_rcond_checked(void);
+
+/* --- Optim settings (global), as Optim:: in C++ --- */
+int lk_optim_use_reparametrize(int reparametrize);
+int lk_optim_is_reparametrized(void);
+int lk_optim_set_theta_lower_factor(double factor);
+double lk_optim_get_theta_lower_factor(void);
+int lk_optim_set_theta_upper_factor(double factor);
+double lk_optim_get_theta_upper_factor(void);
+int lk_optim_use_variogram_bounds_heuristic(int use);
+int lk_optim_variogram_bounds_heuristic_used(void);
+int lk_optim_set_log_level(int level);
+int lk_optim_get_log_level(void);
+int lk_optim_set_max_iteration(int max_iteration);
+int lk_optim_get_max_iteration(void);
+int lk_optim_set_gradient_tolerance(double tolerance);
+double lk_optim_get_gradient_tolerance(void);
+int lk_optim_set_objective_rel_tolerance(double tolerance);
+double lk_optim_get_objective_rel_tolerance(void);
+int lk_optim_set_thread_start_delay_ms(int delay_ms);
+int lk_optim_get_thread_start_delay_ms(void);
+int lk_optim_set_thread_pool_size(int pool_size);
+int lk_optim_get_thread_pool_size(void);
+int lk_optim_set_num_threads_percent(double percent);
+double lk_optim_get_num_threads_percent(void);
+int lk_optim_get_num_threads(void);
 
 #ifdef __cplusplus
 }

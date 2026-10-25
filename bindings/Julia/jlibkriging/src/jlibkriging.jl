@@ -228,26 +228,70 @@ function Base.copy(k::Kriging)
     return Kriging(_check_ptr(ptr))
 end
 
+# initial or fixed hyper-parameters of a `parameters` dict (keys sigma2,
+# theta, beta, nugget and is_<name>_estim, as in Python / R): a NamedTuple of
+# them, nothing for the absent values (estimated), true for the absent flags
+const _KRIGING_PARAMETERS = ("sigma2", "is_sigma2_estim", "theta", "is_theta_estim",
+                             "beta", "is_beta_estim", "nugget", "is_nugget_estim")
+function _kriging_params(parameters)
+    p = Dict{String,Any}()
+    if parameters !== nothing
+        for (key, v) in parameters
+            String(key) in _KRIGING_PARAMETERS ||
+                throw(ArgumentError("parameters: unknown key \"$key\" (expected $(join(_KRIGING_PARAMETERS, ", ")))"))
+            p[String(key)] = v
+        end
+    end
+    num(key) = haskey(p, key) ? Float64(p[key]) : nothing
+    vector(key) = haskey(p, key) ? Float64.(collect(Iterators.flatten(p[key]))) : nothing
+    flag(key) = haskey(p, key) ? Bool(p[key]) : true
+    return (sigma2=num("sigma2"), is_sigma2_estim=flag("is_sigma2_estim"),
+            theta=vector("theta"), is_theta_estim=flag("is_theta_estim"),
+            beta=vector("beta"), is_beta_estim=flag("is_beta_estim"),
+            nugget=num("nugget"), is_nugget_estim=flag("is_nugget_estim"))
+end
+
+"""
+    fit!(k::Kriging, y, X; noise=nothing, regmodel="constant", normalize=false, optim="BFGS", objective="LL", parameters=nothing, method="exact")
+
+Fit `k` on `(X, y)`. `parameters`: initial or fixed hyper-parameters, a dict
+with the keys `sigma2`, `theta`, `beta`, `nugget` and `is_<name>_estim`
+(`false`: fixed at the given value), as in Python / R.
+"""
 function fit!(k::Kriging, y::Vector{Float64}, X::Matrix{Float64};
               noise::Union{Nothing,Vector{Float64}}=nothing,
               regmodel::String="constant",
               normalize::Bool=false,
               optim::String="BFGS",
               objective::String="LL",
+              parameters::Union{Nothing,AbstractDict}=nothing,
               method::String="exact")
     _warn_deprecated_objective(objective, :fit!)
     n, d = size(X)
     @assert length(y) == n
     noise_ptr = noise === nothing ? C_NULL : pointer(noise)
     noise_n = noise === nothing ? 0 : length(noise)
+    p = _kriging_params(parameters)
     ret = ccall(dlsym(_lk(), :lk_kriging_fit), Cint,
                 (Ptr{Nothing}, Ptr{Float64}, Cint,
                  Ptr{Float64}, Cint,
                  Ptr{Float64}, Cint, Cint,
-                 Cstring, Cint, Cstring, Cstring, Cstring),
+                 Cstring, Cint, Cstring, Cstring,
+                 Ptr{Float64}, Cint,
+                 Ptr{Float64}, Cint, Cint,
+                 Ptr{Float64}, Cint, Cint,
+                 Ptr{Float64}, Cint,
+                 Cstring),
                 k.ptr, y, n,
                 noise_ptr, noise_n,
-                X, n, d, regmodel, normalize ? 1 : 0, optim, objective, method)
+                X, n, d, regmodel, normalize ? 1 : 0, optim, objective,
+                p.sigma2 === nothing ? C_NULL : Ref(p.sigma2), p.is_sigma2_estim ? 1 : 0,
+                p.theta === nothing ? C_NULL : p.theta, p.theta === nothing ? 0 : length(p.theta),
+                p.is_theta_estim ? 1 : 0,
+                p.beta === nothing ? C_NULL : p.beta, p.beta === nothing ? 0 : length(p.beta),
+                p.is_beta_estim ? 1 : 0,
+                p.nugget === nothing ? C_NULL : Ref(p.nugget), p.is_nugget_estim ? 1 : 0,
+                method)
     _check_error(ret)
     return k
 end
@@ -321,6 +365,7 @@ end
 
 """
     simulate(k::Kriging, nsim, seed, X_n; with_nugget=nothing, with_noise=nothing, will_update=false, method="exact")
+    simulate(k::Kriging, X_n; nsim=1, seed=123, ...)
 
 `method`: `"exact"` (default), `"vecchia"` / `"vecchia(m)"` or `"nystrom"`
 (see `predict`); `will_update` needs `"exact"`, `with_nugget` / `with_noise`
@@ -328,13 +373,18 @@ end
 `X_n`, like the fit's `noise`) need `"exact"` or `"vecchia"`: `"nystrom"`
 simulates the latent process only (`with_nugget=true` or a non-zero
 `with_noise` raises). `with_nugget` (nugget model) defaults to `true`, except
-with `"nystrom"`.
+with `"nystrom"`; a `Bool` `with_noise` is `with_nugget` (as in Python / R).
 """
 function simulate(k::Kriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
                   with_nugget::Union{Nothing,Bool}=nothing,
-                  with_noise::Union{Nothing,Vector{Float64}}=nothing,
+                  with_noise::Union{Nothing,Bool,Vector{Float64}}=nothing,
                   will_update::Bool=false,
                   method::String="exact")
+    if with_noise isa Bool
+        with_nugget === nothing ||
+            throw(ArgumentError("simulate: with_nugget and a Bool with_noise are the same setting, pass one"))
+        with_nugget, with_noise = with_noise, nothing
+    end
     if with_nugget === nothing
         with_nugget = !startswith(method, "nystrom")
     end
@@ -351,6 +401,10 @@ function simulate(k::Kriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
     _check_error(ret)
     return sim_out
 end
+
+# nsim / seed as keywords with their defaults (as in Python / R)
+simulate(k::Kriging, X_n::Matrix{Float64}; nsim::Int=1, seed::Int=123, kwargs...) =
+    simulate(k, nsim, seed, X_n; kwargs...)
 
 function update!(k::Kriging, y_u::Vector{Float64}, X_u::Matrix{Float64};
                  noise_u::Union{Nothing,Vector{Float64}}=nothing,
@@ -436,46 +490,69 @@ function summary(k::Kriging)
     return unsafe_string(s)
 end
 
+"""
+    model(k::Kriging) -> Dict{String,Any}
+
+All the fields of the model (settings, data, normalization, trend, fitted
+parameters), as `model()` in Python / Octave and `as.list()` in R.
+"""
+function model(k::Kriging)
+    d = Dict{String,Any}(
+        "kernel" => kernel(k), "optim" => optim(k), "objective" => objective(k), "method" => method(k),
+        "noise_model" => noise_model(k),
+        "theta" => theta(k), "is_theta_estim" => is_theta_estim(k),
+        "sigma2" => sigma2(k), "is_sigma2_estim" => is_sigma2_estim(k),
+        "X" => X(k), "centerX" => centerX(k), "scaleX" => scaleX(k),
+        "y" => y(k), "centerY" => centerY(k), "scaleY" => scaleY(k),
+        "normalize" => normalize(k), "regmodel" => regmodel(k),
+        "beta" => beta(k), "is_beta_estim" => is_beta_estim(k),
+        "F" => F(k), "T" => T(k), "M" => M(k), "z" => z(k))
+    if d["noise_model"] == "nugget"
+        d["nugget"] = nugget(k)
+        d["is_nugget_estim"] = is_nugget_estim(k)
+    elseif d["noise_model"] == "heterogeneous"
+        d["noise"] = noise(k)
+    end
+    return d
+end
+
 function log_likelihood_fun(k::Kriging, theta::Vector{Float64};
                              return_grad::Bool=false,
-                             return_hess::Bool=false)
+                             bench::Bool=false)
     n = length(theta)
     ll = Ref{Float64}(0.0)
     grad = return_grad ? Vector{Float64}(undef, n) : Float64[]
-    # Kriging computes no hessian: an empty matrix (as in Python / R), never
-    # an uninitialized n x n one
-    hess = Matrix{Float64}(undef, 0, 0)
     ret = ccall(dlsym(_lk(), :lk_kriging_log_likelihood_fun), Cint,
                 (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint,
-                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-                k.ptr, theta, n, return_grad ? 1 : 0, 0,
-                ll, return_grad ? grad : C_NULL, C_NULL)
+                 Ptr{Float64}, Ptr{Float64}),
+                k.ptr, theta, n, return_grad ? 1 : 0, bench ? 1 : 0,
+                ll, return_grad ? grad : C_NULL)
     _check_error(ret)
-    return (ll=ll[],
-            grad=return_grad ? grad : nothing,
-            hess=return_hess ? hess : nothing)
+    return (ll=ll[], grad=return_grad ? grad : nothing)
 end
 
 function leave_one_out_fun(k::Kriging, theta::Vector{Float64};
-                            return_grad::Bool=false)
+                            return_grad::Bool=false,
+                            bench::Bool=false)
     n = length(theta)
     loo = Ref{Float64}(0.0)
     grad = return_grad ? Vector{Float64}(undef, n) : Float64[]
     ret = ccall(dlsym(_lk(), :lk_kriging_leave_one_out_fun), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Ptr{Float64}),
-                k.ptr, theta, n, return_grad ? 1 : 0, loo, return_grad ? grad : C_NULL)
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint, Ptr{Float64}, Ptr{Float64}),
+                k.ptr, theta, n, return_grad ? 1 : 0, bench ? 1 : 0, loo, return_grad ? grad : C_NULL)
     _check_error(ret)
     return (loo=loo[], grad=return_grad ? grad : nothing)
 end
 
 function log_marg_post_fun(k::Kriging, theta::Vector{Float64};
-                            return_grad::Bool=false)
+                            return_grad::Bool=false,
+                            bench::Bool=false)
     n = length(theta)
     lmp = Ref{Float64}(0.0)
     grad = return_grad ? Vector{Float64}(undef, n) : Float64[]
     ret = ccall(dlsym(_lk(), :lk_kriging_log_marg_post_fun), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Ptr{Float64}),
-                k.ptr, theta, n, return_grad ? 1 : 0, lmp, return_grad ? grad : C_NULL)
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint, Ptr{Float64}, Ptr{Float64}),
+                k.ptr, theta, n, return_grad ? 1 : 0, bench ? 1 : 0, lmp, return_grad ? grad : C_NULL)
     _check_error(ret)
     return (lmp=lmp[], grad=return_grad ? grad : nothing)
 end
@@ -561,6 +638,16 @@ end
 function objective(k::Kriging)
     return unsafe_string(ccall(dlsym(_lk(), :lk_kriging_objective), Cstring, (Ptr{Nothing},), k.ptr))
 end
+
+"""
+    chol_jitter(k) / model_chol_jitter(k)
+
+Diagonal jitter of the fit (`log_likelihood`) and of the committed model
+(`predict`, `simulate`, `update!`), saved with the model; the global setting
+for the next fits is `get_chol_jitter()` (docs/dev/CholJitter.md).
+"""
+chol_jitter(k::Kriging) = ccall(dlsym(_lk(), :lk_kriging_chol_jitter), Cdouble, (Ptr{Nothing},), k.ptr)
+model_chol_jitter(k::Kriging) = ccall(dlsym(_lk(), :lk_kriging_model_chol_jitter), Cdouble, (Ptr{Nothing},), k.ptr)
 
 function nystrom_rank(k::Kriging)
     return Int(ccall(dlsym(_lk(), :lk_kriging_nystrom_rank), Cint, (Ptr{Nothing},), k.ptr))
@@ -984,21 +1071,17 @@ function log_likelihood(wk::WarpKriging)
 end
 
 function log_likelihood_fun(wk::WarpKriging, theta::Vector{Float64};
-                             return_grad::Bool=false,
-                             return_hess::Bool=false)
+                             return_grad::Bool=false)
     n = length(theta)
     ll = Ref{Float64}(0.0)
     grad = return_grad ? Vector{Float64}(undef, n) : Float64[]
-    hess = return_hess ? Matrix{Float64}(undef, n, n) : Matrix{Float64}(undef, 0, 0)
     ret = ccall(dlsym(_lk(), :lk_warp_kriging_log_likelihood_fun), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint,
-                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-                wk.ptr, theta, n, return_grad ? 1 : 0, return_hess ? 1 : 0,
-                ll, return_grad ? grad : C_NULL, return_hess ? hess : C_NULL)
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
+                 Ptr{Float64}, Ptr{Float64}),
+                wk.ptr, theta, n, return_grad ? 1 : 0,
+                ll, return_grad ? grad : C_NULL)
     _check_error(ret)
-    return (ll=ll[],
-            grad=return_grad ? grad : nothing,
-            hess=return_hess ? hess : nothing)
+    return (ll=ll[], grad=return_grad ? grad : nothing)
 end
 
 kernel(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_kernel), Cstring, (Ptr{Nothing},), wk.ptr))
@@ -1023,6 +1106,8 @@ noise(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_noise, wk.ptr)
 warp_params(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_warp_params, wk.ptr)
 optim(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_get_optim), Cstring, (Ptr{Nothing},), wk.ptr))
 objective(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_get_objective), Cstring, (Ptr{Nothing},), wk.ptr))
+chol_jitter(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_chol_jitter), Cdouble, (Ptr{Nothing},), wk.ptr)
+model_chol_jitter(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_model_chol_jitter), Cdouble, (Ptr{Nothing},), wk.ptr)
 method(::WarpKriging) = "exact"  # only the exact covariance is implemented
 
 function cov_mat(wk::WarpKriging, X1::Matrix{Float64}, X2::Matrix{Float64})
@@ -1143,6 +1228,10 @@ function simulate(wk::WarpKriging, nsim::Int, seed::Int, X_n::Matrix{Any}; kwarg
     X_num, _ = encode_string_columns(X_n, get_warping(wk))
     return simulate(wk, nsim, seed, X_num; kwargs...)
 end
+
+# nsim / seed as keywords with their defaults (as in Python / R)
+simulate(wk::WarpKriging, X_n::AbstractMatrix; nsim::Int=1, seed::Int=123, kwargs...) =
+    simulate(wk, nsim, seed, X_n; kwargs...)
 
 # update! accepting mixed-type Matrix{Any}
 function update!(wk::WarpKriging, y_u::Vector{Float64}, X_u::Matrix{Any})
@@ -1320,6 +1409,10 @@ function simulate(mk::MLPKriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
     return sim_out
 end
 
+# nsim / seed as keywords with their defaults (as in Python / R)
+simulate(mk::MLPKriging, X_n::Matrix{Float64}; nsim::Int=1, seed::Int=123, kwargs...) =
+    simulate(mk, nsim, seed, X_n; kwargs...)
+
 function update_simulate(mk::MLPKriging, y_u::Vector{Float64}, X_u::Matrix{Float64})
     n, d = size(X_u)
     @assert length(y_u) == n
@@ -1357,26 +1450,25 @@ function log_likelihood(mk::MLPKriging)
 end
 
 function log_likelihood_fun(mk::MLPKriging, theta::Vector{Float64};
-                             return_grad::Bool=false,
-                             return_hess::Bool=false)
+                             return_grad::Bool=false)
     n = length(theta)
     ll = Ref{Float64}(0.0)
     grad = return_grad ? Vector{Float64}(undef, n) : Float64[]
-    hess = return_hess ? Matrix{Float64}(undef, n, n) : Matrix{Float64}(undef, 0, 0)
     ret = ccall(dlsym(_lk(), :lk_mlp_kriging_log_likelihood_fun), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint,
-                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-                mk.ptr, theta, n, return_grad ? 1 : 0, return_hess ? 1 : 0,
-                ll, return_grad ? grad : C_NULL, return_hess ? hess : C_NULL)
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
+                 Ptr{Float64}, Ptr{Float64}),
+                mk.ptr, theta, n, return_grad ? 1 : 0,
+                ll, return_grad ? grad : C_NULL)
     _check_error(ret)
-    return (ll=ll[],
-            grad=return_grad ? grad : nothing,
-            hess=return_hess ? hess : nothing)
+    return (ll=ll[], grad=return_grad ? grad : nothing)
 end
 
 kernel(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_kernel), Cstring, (Ptr{Nothing},), mk.ptr))
 method(::MLPKriging) = "exact"  # only the exact covariance is implemented
 activation(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_activation), Cstring, (Ptr{Nothing},), mk.ptr))
+objective(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_get_objective), Cstring, (Ptr{Nothing},), mk.ptr))
+chol_jitter(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_chol_jitter), Cdouble, (Ptr{Nothing},), mk.ptr)
+model_chol_jitter(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_model_chol_jitter), Cdouble, (Ptr{Nothing},), mk.ptr)
 normalize(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_get_normalize), Cint, (Ptr{Nothing},), mk.ptr) != 0
 regmodel(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_get_regmodel), Cstring, (Ptr{Nothing},), mk.ptr))
 is_fitted(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_is_fitted), Cint, (Ptr{Nothing},), mk.ptr) != 0
@@ -1531,10 +1623,24 @@ function fit!(k::NestedKriging, y::Vector{Float64}, X::Matrix{Float64}, nb_group
               theta::Union{Nothing,Vector{Float64}}=nothing,
               is_theta_estim::Bool=true,
               beta::Union{Nothing,Vector{Float64}}=nothing,
-              is_beta_estim::Bool=true)
+              is_beta_estim::Bool=true,
+              parameters::Union{Nothing,AbstractDict}=nothing)
     _warn_deprecated_objective(objective, :fit!)
     n, d = size(X)
     @assert length(y) == n
+    # `parameters` (as in Python / R) overrides the sigma2 / theta / beta
+    # keywords, as in the Kriging constructor
+    if parameters !== nothing
+        p = _kriging_params(parameters)
+        given = Set(String(key) for key in keys(parameters))
+        p.nugget === nothing || throw(ArgumentError("NestedKriging fit!: no nugget parameter"))
+        "sigma2" in given && (sigma2 = p.sigma2)
+        "theta" in given && (theta = p.theta)
+        "beta" in given && (beta = p.beta)
+        "is_sigma2_estim" in given && (is_sigma2_estim = p.is_sigma2_estim)
+        "is_theta_estim" in given && (is_theta_estim = p.is_theta_estim)
+        "is_beta_estim" in given && (is_beta_estim = p.is_beta_estim)
+    end
     sigma2_ptr = sigma2 === nothing ? C_NULL : Ref(sigma2)
     theta_ptr = theta === nothing ? C_NULL : theta
     theta_n = theta === nothing ? 0 : length(theta)
@@ -1653,7 +1759,7 @@ end
     get_chol_jitter() / set_chol_jitter(x)
 
 Fixed jitter on the correlation diagonal of noise-free fits: `x < 0` automatic
-per kernel (default: gauss 1e-8, matern5_2 1e-10, 0 otherwise), `x = 0`
+per kernel (default: gauss 1e-9, matern5_2 1e-10, 0 otherwise), `x = 0`
 disabled (former behaviour), `x > 0` this value for every kernel.
 """
 get_chol_jitter() = ccall(dlsym(_lk(), :lk_linalg_get_chol_jitter), Cdouble, ())
@@ -1667,15 +1773,72 @@ Numerical nugget of the Cholesky fallback (default 1e-10).
 get_num_nugget() = ccall(dlsym(_lk(), :lk_linalg_get_num_nugget), Cdouble, ())
 set_num_nugget(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_linalg_set_num_nugget), Cint, (Cdouble,), x))
 
+"""
+    set_chol_warning(warn::Bool)
+
+Warn when the Cholesky fallback adds a numerical nugget.
+"""
+set_chol_warning(warn::Bool) = _check_error(ccall(dlsym(_lk(), :lk_linalg_set_chol_warning), Cint, (Cint,), warn))
+
+"""
+    check_chol_rcond(check::Bool) / chol_rcond_checked()
+
+Check the reciprocal condition number of the Cholesky factorizations.
+"""
+check_chol_rcond(check::Bool) = _check_error(ccall(dlsym(_lk(), :lk_linalg_check_chol_rcond), Cint, (Cint,), check))
+chol_rcond_checked() = ccall(dlsym(_lk(), :lk_linalg_chol_rcond_checked), Cint, ()) != 0
+
+"""
+    jlibkriging.Optim
+
+Global optimizer settings, as `Optim` in C++ / Python / Octave (R:
+`rlibkriging:::optim_<name>`): `jlibkriging.Optim.set_max_iteration(50)`.
+Not exported, not to clash with the Optim.jl package.
+"""
+module Optim
+
+import ..jlibkriging: _lk, _check_error
+using Libdl: dlsym
+
+use_reparametrize(x::Bool) = _check_error(ccall(dlsym(_lk(), :lk_optim_use_reparametrize), Cint, (Cint,), x))
+is_reparametrized() = ccall(dlsym(_lk(), :lk_optim_is_reparametrized), Cint, ()) != 0
+set_theta_lower_factor(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_theta_lower_factor), Cint, (Cdouble,), x))
+get_theta_lower_factor() = ccall(dlsym(_lk(), :lk_optim_get_theta_lower_factor), Cdouble, ())
+set_theta_upper_factor(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_theta_upper_factor), Cint, (Cdouble,), x))
+get_theta_upper_factor() = ccall(dlsym(_lk(), :lk_optim_get_theta_upper_factor), Cdouble, ())
+use_variogram_bounds_heuristic(x::Bool) = _check_error(ccall(dlsym(_lk(), :lk_optim_use_variogram_bounds_heuristic), Cint, (Cint,), x))
+variogram_bounds_heuristic_used() = ccall(dlsym(_lk(), :lk_optim_variogram_bounds_heuristic_used), Cint, ()) != 0
+set_log_level(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_log_level), Cint, (Cint,), x))
+get_log_level() = Int(ccall(dlsym(_lk(), :lk_optim_get_log_level), Cint, ()))
+set_max_iteration(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_max_iteration), Cint, (Cint,), x))
+get_max_iteration() = Int(ccall(dlsym(_lk(), :lk_optim_get_max_iteration), Cint, ()))
+set_gradient_tolerance(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_gradient_tolerance), Cint, (Cdouble,), x))
+get_gradient_tolerance() = ccall(dlsym(_lk(), :lk_optim_get_gradient_tolerance), Cdouble, ())
+set_objective_rel_tolerance(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_objective_rel_tolerance), Cint, (Cdouble,), x))
+get_objective_rel_tolerance() = ccall(dlsym(_lk(), :lk_optim_get_objective_rel_tolerance), Cdouble, ())
+set_thread_start_delay_ms(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_thread_start_delay_ms), Cint, (Cint,), x))
+get_thread_start_delay_ms() = Int(ccall(dlsym(_lk(), :lk_optim_get_thread_start_delay_ms), Cint, ()))
+# Julia's own threads and OpenBLAS are not driven by these (docs/dev/parallel.md 5)
+set_thread_pool_size(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_thread_pool_size), Cint, (Cint,), x))
+get_thread_pool_size() = Int(ccall(dlsym(_lk(), :lk_optim_get_thread_pool_size), Cint, ()))
+# thread budget: x <= 1 ratio, x > 1 percentage of the cores, 0 automatic (100 %)
+set_num_threads_percent(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_num_threads_percent), Cint, (Cdouble,), x))
+get_num_threads_percent() = ccall(dlsym(_lk(), :lk_optim_get_num_threads_percent), Cdouble, ())
+get_num_threads() = Int(ccall(dlsym(_lk(), :lk_optim_get_num_threads), Cint, ()))
+
+end # module Optim
+
 export Kriging, WarpKriging, MLPKriging, NestedKriging
 export get_chol_jitter, set_chol_jitter, get_num_nugget, set_num_nugget
+export set_chol_warning, check_chol_rcond, chol_rcond_checked
 export nb_groups, aggregation, beta0, groups, set_predict_chunk!, set_warp_subsample!
 export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
 export load, load_kriging, load_warp_kriging, load_mlp_kriging, load_nested_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
-export kernel, optim, objective, normalize, regmodel, noise_model
+export kernel, optim, objective, normalize, regmodel, noise_model, model
+export chol_jitter, model_chol_jitter
 export nystrom_rank, vecchia_neighbors
 export method
 export X, centerX, scaleX, y, centerY, scaleY

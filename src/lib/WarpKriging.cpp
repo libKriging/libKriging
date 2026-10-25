@@ -2106,9 +2106,7 @@ void WarpKriging::commit_model_chol_jitter() {
     refresh_cache_theta_only();
 }
 
-std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arma::vec& theta,
-                                                                       bool return_grad,
-                                                                       bool /*return_hess*/) const {
+std::tuple<double, arma::vec> WarpKriging::logLikelihoodFun(const arma::vec& theta, bool return_grad) const {
   auto* self = const_cast<WarpKriging*>(this);
   arma::vec old_theta = m_theta;
   const double old_cache_jitter = m_cache_jitter;
@@ -2127,7 +2125,7 @@ std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arm
   self->m_theta = old_theta;
   self->m_cache_jitter = old_cache_jitter;
   self->refresh_cache();
-  return {ll, grad, arma::mat()};
+  return {ll, grad};
 }
 
 // -------------------------------------------------------------------------

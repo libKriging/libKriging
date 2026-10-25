@@ -395,7 +395,7 @@ class KrigingImpl {
   /// Print a bench timing map in the standard "| key | value |" format.
   static void print_bench(const std::map<std::string, double>& bench);
 
-  /// Dispatch an objective function (scalar + gradient, no hessian) with
+  /// Dispatch an objective function (scalar + gradient) with
   /// optional benchmark timing.  `fn(grad_out, bench_out)` must return the
   /// objective value and write the gradient into *grad_out when non-null.
   template <typename Fn>

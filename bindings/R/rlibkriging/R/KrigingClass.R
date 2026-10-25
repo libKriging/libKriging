@@ -43,7 +43,7 @@ classKriging <- function(nk) {
             )))
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank','vecchia_neighbors','method')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank','vecchia_neighbors','method','chol_jitter','model_chol_jitter')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() kriging_", d, "(nk)"
             )))
@@ -268,6 +268,19 @@ print.Kriging <- function(x, ...) {
     p = kriging_summary(x)
     cat(p)
     invisible(p)
+}
+
+#' Summary of a \code{Kriging} model, as printed by \code{print}.
+#'
+#' @param object S3 Kriging object.
+#' @param ... Ignored.
+#'
+#' @return The description of the model, a character string.
+#'
+#' @method summary Kriging
+#' @export
+summary.Kriging <- function(object, ...) {
+    kriging_summary(object)
 }
 
 
@@ -603,7 +616,9 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL,
 #' lines(x, su[ , 1], col = "blue", lty=2)
 #' lines(x, su[ , 2], col = "blue", lty=2)
 #' lines(x, su[ , 3], col = "blue", lty=2)
-update_simulate.Kriging <- function(object, y_u, ..., X_u = NULL, noise_u = NULL) {
+update_simulate.Kriging <- function(object, y_u, ..., X_u, noise_u = NULL) {
+    # X_u is required, passed by name or positionally through ... (below)
+    if (missing(X_u)) X_u <- NULL
     # Support two calling conventions matching C++ overloads:
     #   update_simulate(y_u, X_u)            - no noise (Nugget / pure Kriging)
     #   update_simulate(y_u, noise_u, X_u)   - with known observation noise
@@ -683,7 +698,9 @@ update_simulate.Kriging <- function(object, y_u, ..., X_u = NULL, noise_u = NULL
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
-update.Kriging <- function(object, y_u, ..., X_u = NULL, noise_u = NULL, refit = TRUE) {
+update.Kriging <- function(object, y_u, ..., X_u, noise_u = NULL, refit = TRUE) {
+    # X_u is required, passed by name or positionally through ... (below)
+    if (missing(X_u)) X_u <- NULL
     # Support multiple calling conventions matching C++ overloads:
     #   update(y_u, X_u)                    - no noise, refit defaults TRUE
     #   update(y_u, X_u, refit)             - no noise, positional refit (logical)
@@ -846,7 +863,6 @@ covMat.Kriging <- function(object, x1, x2, ...) {
 #' @param theta A numeric vector of (positive) range parameters at
 #'     which the log-likelihood will be evaluated.
 #' @param return_grad Logical. Should the function return the gradient?
-#' @param return_hess Logical. Should the function return Hessian?
 #' @param bench Logical. Should the function display benchmarking output?
 #' @param ... Not used.
 #'
@@ -872,7 +888,7 @@ covMat.Kriging <- function(object, x1, x2, ...) {
 #' plot(t, ll(t), type = 'l')
 #' abline(v = k$theta(), col = "blue")
 logLikelihoodFun.Kriging <- function(object, theta,
-                                  return_grad = FALSE, return_hess = FALSE, bench=FALSE, ...) {
+                                  return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (is.data.frame(theta)) theta = data.matrix(theta)
     # Noise/nugget models have an extra parameter (sigma2 or alpha) beyond theta
@@ -883,17 +899,14 @@ logLikelihoodFun.Kriging <- function(object, theta,
     n <- nrow(theta)
     out <- list(logLikelihood = matrix(NA, nrow = n),
                 logLikelihoodGrad = matrix(NA, nrow = n, ncol = d))
-    if (isTRUE(return_hess)) out$logLikelihoodHess <- array(NA, dim = c(n, d, d))
     for (i in 1:n) {
         ll <- kriging_logLikelihoodFun(object, theta[i, ],
                                     return_grad = isTRUE(return_grad),
-                                    return_hess = isTRUE(return_hess),
                                     bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
         if (isTRUE(return_grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
     }
     if (!isTRUE(return_grad)) out$logLikelihoodGrad <- NULL
-    if (!isTRUE(return_hess)) out$logLikelihoodHess <- NULL
 
     return(out)
 }

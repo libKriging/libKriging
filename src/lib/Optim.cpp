@@ -50,8 +50,6 @@ LIBKRIGING_EXPORT bool Optim::is_reparametrized() {
 
 // Unified reparametrization: gamma = log(theta), theta = exp(gamma).
 // Chain rule (theta-space grad -> gamma-space grad): dL/dgamma = dL/dtheta * theta.
-// Hessian (theta-space hess -> gamma-space hess):
-//   d2L/dgamma_k dgamma_l = theta_k * theta_l * d2L/dtheta_k dtheta_l + delta_kl * theta_k * dL/dtheta_k
 std::function<double(const double&)> Optim::reparam_to_ = [](const double& _theta) { return std::log(_theta); };
 std::function<arma::vec(const arma::vec&)> Optim::reparam_to
     = [](const arma::vec& _theta) { return arma::conv_to<arma::colvec>::from(arma::log(_theta)); };
@@ -60,13 +58,6 @@ std::function<arma::vec(const arma::vec&)> Optim::reparam_from
     = [](const arma::vec& _gamma) { return arma::conv_to<arma::colvec>::from(arma::exp(_gamma)); };
 std::function<arma::vec(const arma::vec&, const arma::vec&)> Optim::reparam_from_deriv
     = [](const arma::vec& _theta, const arma::vec& _grad) { return arma::conv_to<arma::colvec>::from(_grad % _theta); };
-std::function<arma::mat(const arma::vec&, const arma::vec&, const arma::mat&)> Optim::reparam_from_deriv2
-    = [](const arma::vec& _theta, const arma::vec& _grad_theta, const arma::mat& _hess_theta) {
-        // Returns gamma-space Hessian given theta-space grad and Hessian.
-        arma::mat H = _hess_theta % (_theta * _theta.t());
-        H.diag() += _grad_theta % _theta;
-        return H;
-      };
 
 double Optim::theta_lower_factor = get_env_or_default("LK_THETA_LOWER_FACTOR", 0.02);
 

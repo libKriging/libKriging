@@ -4,6 +4,7 @@
 #include <libKriging/LinearAlgebra.hpp>
 #include <libKriging/MLPKriging.hpp>
 #include <libKriging/NestedKriging.hpp>
+#include <libKriging/Optim.hpp>
 
 #include <libKriging/Trend.hpp>
 #include <libKriging/WarpKriging.hpp>
@@ -79,6 +80,33 @@ void* lk_kriging_new(const char* kernel, const char* noise_model) {
   CATCH_RETURN_NULL
 }
 
+// Kriging::Parameters from the optional C arguments (NULL / 0 length: absent)
+static Kriging::Parameters kriging_params(const double* sigma2,
+                                          int is_sigma2_estim,
+                                          const double* theta,
+                                          int theta_n,
+                                          int is_theta_estim,
+                                          const double* beta,
+                                          int beta_n,
+                                          int is_beta_estim,
+                                          const double* nugget,
+                                          int is_nugget_estim) {
+  Kriging::Parameters params;
+  if (sigma2)
+    params.sigma2 = *sigma2;
+  params.is_sigma2_estim = is_sigma2_estim != 0;
+  if (theta && theta_n > 0)
+    params.theta = arma::mat(const_cast<double*>(theta), 1, theta_n, false, true);
+  params.is_theta_estim = is_theta_estim != 0;
+  if (beta && beta_n > 0)
+    params.beta = arma::vec(const_cast<double*>(beta), beta_n, false, true);
+  params.is_beta_estim = is_beta_estim != 0;
+  if (nugget)
+    params.nugget = *nugget;
+  params.is_nugget_estim = is_nugget_estim != 0;
+  return params;
+}
+
 void* lk_kriging_new_fit(const double* y,
                          int n,
                          const double* noise,
@@ -108,19 +136,8 @@ void* lk_kriging_new_fit(const double* y,
     arma::vec y_v(const_cast<double*>(y), n, false, true);
     arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
 
-    Kriging::Parameters params;
-    if (sigma2)
-      params.sigma2 = *sigma2;
-    params.is_sigma2_estim = is_sigma2_estim != 0;
-    if (theta && theta_n > 0)
-      params.theta = arma::mat(const_cast<double*>(theta), 1, theta_n, false, true);
-    params.is_theta_estim = is_theta_estim != 0;
-    if (beta && beta_n > 0)
-      params.beta = arma::vec(const_cast<double*>(beta), beta_n, false, true);
-    params.is_beta_estim = is_beta_estim != 0;
-    if (nugget)
-      params.nugget = *nugget;
-    params.is_nugget_estim = is_nugget_estim != 0;
+    Kriging::Parameters params = kriging_params(
+        sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim, nugget, is_nugget_estim);
 
     auto* kr = new Kriging(kernel ? kernel : "matern3_2", nm);
     if (nm == Kriging::NoiseModel::Heterogeneous && noise && noise_n > 0) {
@@ -173,11 +190,23 @@ int lk_kriging_fit(void* ptr,
                    int normalize,
                    const char* optim,
                    const char* objective,
+                   const double* sigma2,
+                   int is_sigma2_estim,
+                   const double* theta,
+                   int theta_n,
+                   int is_theta_estim,
+                   const double* beta,
+                   int beta_n,
+                   int is_beta_estim,
+                   const double* nugget,
+                   int is_nugget_estim,
                    const char* method) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec y_v(const_cast<double*>(y), n, false, true);
     arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
+    Kriging::Parameters params = kriging_params(
+        sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim, nugget, is_nugget_estim);
     if (noise && noise_n > 0) {
       arma::vec noise_v(const_cast<double*>(noise), noise_n, false, true);
       k->fit(y_v,
@@ -187,7 +216,7 @@ int lk_kriging_fit(void* ptr,
              normalize != 0,
              optim ? optim : "BFGS",
              objective ? objective : "LL",
-             Kriging::Parameters{},
+             params,
              method ? method : "exact");
     } else {
       k->fit(y_v,
@@ -196,7 +225,7 @@ int lk_kriging_fit(void* ptr,
              normalize != 0,
              optim ? optim : "BFGS",
              objective ? objective : "LL",
-             Kriging::Parameters{},
+             params,
              method ? method : "exact");
     }
     return 0;
@@ -373,14 +402,13 @@ int lk_kriging_log_likelihood_fun(void* ptr,
                                   const double* theta,
                                   int theta_n,
                                   int return_grad,
-                                  int return_hess,
+                                  int bench,
                                   double* ll_out,
-                                  double* grad_out,
-                                  double* hess_out) {
+                                  double* grad_out) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
-    auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, false);
+    auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, bench != 0);
     if (ll_out)
       *ll_out = ll;
     if (grad_out && return_grad)
@@ -394,12 +422,13 @@ int lk_kriging_leave_one_out_fun(void* ptr,
                                  const double* theta,
                                  int theta_n,
                                  int return_grad,
+                                 int bench,
                                  double* loo_out,
                                  double* grad_out) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
-    auto [loo, grad] = k->leaveOneOutFun(theta_v, return_grad != 0, false);
+    auto [loo, grad] = k->leaveOneOutFun(theta_v, return_grad != 0, bench != 0);
     if (loo_out)
       *loo_out = loo;
     if (grad_out && return_grad)
@@ -413,12 +442,13 @@ int lk_kriging_log_marg_post_fun(void* ptr,
                                  const double* theta,
                                  int theta_n,
                                  int return_grad,
+                                 int bench,
                                  double* lmp_out,
                                  double* grad_out) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
-    auto [lmp, grad] = k->logMargPostFun(theta_v, return_grad != 0, false);
+    auto [lmp, grad] = k->logMargPostFun(theta_v, return_grad != 0, bench != 0);
     if (lmp_out)
       *lmp_out = lmp;
     if (grad_out && return_grad)
@@ -530,6 +560,20 @@ const char* lk_kriging_objective(void* ptr) {
     return static_cast<Kriging*>(ptr)->objective().c_str();
   }
   CATCH_RETURN_NULL
+}
+
+double lk_kriging_chol_jitter(void* ptr) {
+  try {
+    return static_cast<Kriging*>(ptr)->chol_jitter();
+  }
+  CATCH_RETURN_NAN
+}
+
+double lk_kriging_model_chol_jitter(void* ptr) {
+  try {
+    return static_cast<Kriging*>(ptr)->model_chol_jitter();
+  }
+  CATCH_RETURN_NAN
 }
 
 int lk_kriging_nystrom_rank(void* ptr) {
@@ -1156,20 +1200,15 @@ int lk_warp_kriging_log_likelihood_fun(void* ptr,
                                        const double* theta,
                                        int theta_n,
                                        int return_grad,
-                                       int return_hess,
                                        double* ll_out,
-                                       double* grad_out,
-                                       double* hess_out) {
+                                       double* grad_out) {
   try {
     arma::vec theta_vec(const_cast<double*>(theta), theta_n, false, true);
-    auto [ll, grad, hess]
-        = static_cast<WarpKriging*>(ptr)->logLikelihoodFun(theta_vec, return_grad != 0, return_hess != 0);
+    auto [ll, grad] = static_cast<WarpKriging*>(ptr)->logLikelihoodFun(theta_vec, return_grad != 0);
     if (ll_out)
       *ll_out = ll;
     if (return_grad && grad_out)
       std::memcpy(grad_out, grad.memptr(), grad.n_elem * sizeof(double));
-    if (return_hess && hess_out)
-      std::memcpy(hess_out, hess.memptr(), hess.n_elem * sizeof(double));
     return 0;
   }
   CATCH_RETURN
@@ -1395,6 +1434,20 @@ const char* lk_warp_kriging_get_objective(void* ptr) {
     return buf.c_str();
   }
   CATCH_RETURN_NULL
+}
+
+double lk_warp_kriging_chol_jitter(void* ptr) {
+  try {
+    return static_cast<WarpKriging*>(ptr)->chol_jitter();
+  }
+  CATCH_RETURN_NAN
+}
+
+double lk_warp_kriging_model_chol_jitter(void* ptr) {
+  try {
+    return static_cast<WarpKriging*>(ptr)->model_chol_jitter();
+  }
+  CATCH_RETURN_NAN
 }
 int lk_warp_kriging_cov_mat(void* ptr,
                             const double* X1,
@@ -1651,20 +1704,15 @@ int lk_mlp_kriging_log_likelihood_fun(void* ptr,
                                       const double* theta,
                                       int theta_n,
                                       int return_grad,
-                                      int return_hess,
                                       double* ll_out,
-                                      double* grad_out,
-                                      double* hess_out) {
+                                      double* grad_out) {
   try {
     arma::vec theta_vec(const_cast<double*>(theta), theta_n, false, true);
-    auto [ll, grad, hess]
-        = static_cast<MLPKriging*>(ptr)->logLikelihoodFun(theta_vec, return_grad != 0, return_hess != 0);
+    auto [ll, grad] = static_cast<MLPKriging*>(ptr)->logLikelihoodFun(theta_vec, return_grad != 0);
     if (ll_out)
       *ll_out = ll;
     if (return_grad && grad_out)
       std::memcpy(grad_out, grad.memptr(), grad.n_elem * sizeof(double));
-    if (return_hess && hess_out)
-      std::memcpy(hess_out, hess.memptr(), hess.n_elem * sizeof(double));
     return 0;
   }
   CATCH_RETURN
@@ -1686,6 +1734,28 @@ const char* lk_mlp_kriging_activation(void* ptr) {
   } catch (...) {
     return "";
   }
+}
+const char* lk_mlp_kriging_get_objective(void* ptr) {
+  try {
+    static thread_local std::string buf;
+    buf = static_cast<MLPKriging*>(ptr)->objective();
+    return buf.c_str();
+  }
+  CATCH_RETURN_NULL
+}
+
+double lk_mlp_kriging_chol_jitter(void* ptr) {
+  try {
+    return static_cast<MLPKriging*>(ptr)->chol_jitter();
+  }
+  CATCH_RETURN_NAN
+}
+
+double lk_mlp_kriging_model_chol_jitter(void* ptr) {
+  try {
+    return static_cast<MLPKriging*>(ptr)->model_chol_jitter();
+  }
+  CATCH_RETURN_NAN
 }
 
 int lk_mlp_kriging_get_normalize(void* ptr) {
@@ -2253,4 +2323,164 @@ int lk_linalg_set_num_nugget(double nugget) {
     return 0;
   }
   CATCH_RETURN
+}
+
+int lk_linalg_set_chol_warning(int warn) {
+  try {
+    LinearAlgebra::set_chol_warning(warn != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_linalg_check_chol_rcond(int check) {
+  try {
+    LinearAlgebra::check_chol_rcond(check != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_linalg_chol_rcond_checked(void) {
+  return LinearAlgebra::chol_rcond_checked() ? 1 : 0;
+}
+
+/* ========================================================================== */
+/*  Optim settings                                                            */
+/* ========================================================================== */
+
+int lk_optim_use_reparametrize(int reparametrize) {
+  try {
+    Optim::use_reparametrize(reparametrize != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_is_reparametrized(void) {
+  return Optim::is_reparametrized() ? 1 : 0;
+}
+
+int lk_optim_set_theta_lower_factor(double factor) {
+  try {
+    Optim::set_theta_lower_factor(factor);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_optim_get_theta_lower_factor(void) {
+  return Optim::get_theta_lower_factor();
+}
+
+int lk_optim_set_theta_upper_factor(double factor) {
+  try {
+    Optim::set_theta_upper_factor(factor);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_optim_get_theta_upper_factor(void) {
+  return Optim::get_theta_upper_factor();
+}
+
+int lk_optim_use_variogram_bounds_heuristic(int use) {
+  try {
+    Optim::use_variogram_bounds_heuristic(use != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_variogram_bounds_heuristic_used(void) {
+  return Optim::variogram_bounds_heuristic_used() ? 1 : 0;
+}
+
+int lk_optim_set_log_level(int level) {
+  try {
+    Optim::set_log_level(level);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_get_log_level(void) {
+  return Optim::get_log_level();
+}
+
+int lk_optim_set_max_iteration(int max_iteration) {
+  try {
+    Optim::set_max_iteration(max_iteration);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_get_max_iteration(void) {
+  return Optim::get_max_iteration();
+}
+
+int lk_optim_set_gradient_tolerance(double tolerance) {
+  try {
+    Optim::set_gradient_tolerance(tolerance);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_optim_get_gradient_tolerance(void) {
+  return Optim::get_gradient_tolerance();
+}
+
+int lk_optim_set_objective_rel_tolerance(double tolerance) {
+  try {
+    Optim::set_objective_rel_tolerance(tolerance);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_optim_get_objective_rel_tolerance(void) {
+  return Optim::get_objective_rel_tolerance();
+}
+
+int lk_optim_set_thread_start_delay_ms(int delay_ms) {
+  try {
+    Optim::set_thread_start_delay_ms(delay_ms);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_get_thread_start_delay_ms(void) {
+  return Optim::get_thread_start_delay_ms();
+}
+
+int lk_optim_set_thread_pool_size(int pool_size) {
+  try {
+    Optim::set_thread_pool_size(pool_size);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_get_thread_pool_size(void) {
+  return Optim::get_thread_pool_size();
+}
+
+int lk_optim_set_num_threads_percent(double percent) {
+  try {
+    Optim::set_num_threads_percent(percent);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_optim_get_num_threads_percent(void) {
+  return Optim::get_num_threads_percent();
+}
+
+int lk_optim_get_num_threads(void) {
+  return Optim::get_num_threads();
 }

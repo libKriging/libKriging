@@ -8,27 +8,22 @@ X = [mod(0.3819660 * (1:n)', 1), mod(0.7548777 * (1:n)', 1)];
 y = sin(3 * X(:, 1)) + cos(5 * X(:, 2));
 Xn = [0.2 0.3; 0.5 0.5; 0.8 0.1];
 
-% logLikelihoodFun(theta, return_grad, return_hess, bench): Kriging has no
-% hessian (empty, as in Python / R), bench only prints timings
+% logLikelihoodFun(theta, return_grad, bench): bench only prints timings
 k = Kriging(y, X, "matern5_2");
 th = [0.4; 0.6];
 [ll, g] = k.logLikelihoodFun(th, true);
-[ll2, g2, h] = k.logLikelihoodFun(th, true, true);
-assert(ll2, ll, -1e-14);
-assert(g2, g, -1e-14);
-assert(isempty(h));
-[ll3, g3] = k.logLikelihoodFun(th, true, false, true);  % bench=true
+[ll3, g3] = k.logLikelihoodFun(th, true, true);  % bench=true
 assert(ll3, ll, -1e-14);
 assert(g3, g, -1e-14);
-ll4 = k.logLikelihoodFun(th, false, false, false);
+ll4 = k.logLikelihoodFun(th, false, false);
 assert(ll4, ll, -1e-14);
 failed = false;
 try
-  [ll5, g5] = k.logLikelihoodFun(th, true, true);  % return_hess without its output
+  [ll5, g5, h5] = k.logLikelihoodFun(th, true);  % no hessian output
 catch
   failed = true;
 end
-assert(failed, "return_hess without the hessian output should raise");
+assert(failed, "a third output (hessian) should raise");
 
 % heterogeneous model: simulate with_noise holds noise VARIANCES
 noise = 0.01 * ones(n, 1);

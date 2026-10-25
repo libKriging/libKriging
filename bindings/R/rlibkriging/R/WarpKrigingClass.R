@@ -34,6 +34,8 @@ classWarpKriging <- function(obj) {
     obj$optim <- function() warpKriging_optim(obj$ptr)
     obj$objective <- function() warpKriging_objective(obj$ptr)
     obj$method <- function() warpKriging_method(obj$ptr)
+    obj$chol_jitter <- function() warpKriging_chol_jitter(obj$ptr)
+    obj$model_chol_jitter <- function() warpKriging_model_chol_jitter(obj$ptr)
     # `k$F()` / `k$T()` as for Kriging (the S3 generics are named F_ / T_ so
     # as not to mask base::F / base::T)
     obj$F <- function() F_(obj)
@@ -507,13 +509,12 @@ logLikelihood.WarpKriging <- function(object, ...) {
 #' @param object WarpKriging object
 #' @param theta range parameter vector
 #' @param return_grad return gradient?
-#' @param return_hess return hessian?
 #' @param ... ignored
-#' @return list with \code{logLikelihood} and optionally \code{gradient}, \code{hessian}
+#' @return list with \code{logLikelihood} and optionally \code{gradient}
 #' @method logLikelihoodFun WarpKriging
 #' @export
-logLikelihoodFun.WarpKriging <- function(object, theta, return_grad = FALSE, return_hess = FALSE, ...) {
-  warpKriging_logLikelihoodFun(object$ptr, theta, return_grad, return_hess)
+logLikelihoodFun.WarpKriging <- function(object, theta, return_grad = FALSE, ...) {
+  warpKriging_logLikelihoodFun(object$ptr, theta, return_grad)
 }
 
 #' @title Get GP range parameters

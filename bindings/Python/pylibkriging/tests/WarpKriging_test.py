@@ -225,7 +225,7 @@ def test_loglikelihood_fun_gradient():
 
     # Evaluate at a fixed benign theta (not the optimum) so FD is well-conditioned.
     th = np.full_like(k.theta(), 0.3)
-    ll, grad, _ = k.logLikelihoodFun(th, return_grad=True)
+    ll, grad = k.logLikelihoodFun(th, return_grad=True)
     assert np.isfinite(ll)
     assert np.all(np.isfinite(grad))
 
@@ -236,8 +236,8 @@ def test_loglikelihood_fun_gradient():
         tm = th.copy()
         tp[i] += h
         tm[i] -= h
-        ll_p, _, _ = k.logLikelihoodFun(tp, return_grad=False)
-        ll_m, _, _ = k.logLikelihoodFun(tm, return_grad=False)
+        ll_p, _ = k.logLikelihoodFun(tp, return_grad=False)
+        ll_m, _ = k.logLikelihoodFun(tm, return_grad=False)
         grad_num[i] = (ll_p - ll_m) / (2 * h)
 
     rel = float(np.linalg.norm(grad.ravel() - grad_num.ravel())

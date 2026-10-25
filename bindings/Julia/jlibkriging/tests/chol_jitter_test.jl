@@ -37,3 +37,23 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         set_chol_jitter(saved_jitter)
     end
 end
+
+@testset "jitters of a fitted model, kept by save / load" begin
+    X = reshape(collect(range(0.0, 1.0; length=10)), :, 1)
+    y = sin.(6 .* vec(X))
+    models = [Kriging(y, X, "gauss"),
+              WarpKriging(y, X, ["kumaraswamy"], "gauss"),
+              MLPKriging(y, X, [4], 1; kernel="gauss", parameters=Dict("max_iter_adam" => "20"))]
+    for k in models
+        @test chol_jitter(k) > 0  # gauss, noise-free
+        @test 0 <= model_chol_jitter(k) <= chol_jitter(k)
+        f = tempname() * ".json"
+        save(k, f)
+        k2 = load(f)
+        @test chol_jitter(k2) == chol_jitter(k)
+        @test model_chol_jitter(k2) == model_chol_jitter(k)
+        rm(f)
+    end
+    @test model_chol_jitter(models[1]) == 0  # Kriging: exact committed model
+end
+

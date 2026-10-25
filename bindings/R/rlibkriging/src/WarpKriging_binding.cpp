@@ -198,19 +198,14 @@ double warpKriging_logLikelihood(SEXP model_ptr) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List warpKriging_logLikelihoodFun(SEXP model_ptr,
-                                        const arma::vec& theta_gp,
-                                        bool withGrad = true,
-                                        bool withHess = false) {
+Rcpp::List warpKriging_logLikelihoodFun(SEXP model_ptr, const arma::vec& theta_gp, bool withGrad = true) {
   WarpKrigingPtr model(lk_xptr(model_ptr));
-  auto [ll, grad, hess] = model->logLikelihoodFun(theta_gp, withGrad, withHess);
+  auto [ll, grad] = model->logLikelihoodFun(theta_gp, withGrad);
 
   Rcpp::List result;
   result["logLikelihood"] = ll;
   if (withGrad)
     result["gradient"] = grad;
-  if (withHess)
-    result["hessian"] = hess;
   return result;
 }
 
@@ -370,6 +365,18 @@ std::string warpKriging_method(SEXP model_ptr) {
 std::string warpKriging_objective(SEXP model_ptr) {
   WarpKrigingPtr model(lk_xptr(model_ptr));
   return model->objective();
+}
+
+// [[Rcpp::export]]
+double warpKriging_chol_jitter(SEXP model_ptr) {
+  WarpKrigingPtr model(lk_xptr(model_ptr));
+  return model->chol_jitter();
+}
+
+// [[Rcpp::export]]
+double warpKriging_model_chol_jitter(SEXP model_ptr) {
+  WarpKrigingPtr model(lk_xptr(model_ptr));
+  return model->model_chol_jitter();
 }
 
 // [[Rcpp::export]]

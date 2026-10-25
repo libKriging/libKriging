@@ -145,6 +145,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::objective"_hash:
       return KrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::chol_jitter"_hash:
+      return KrigingBinding::chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::model_chol_jitter"_hash:
+      return KrigingBinding::model_chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::nystrom_rank"_hash:
       return KrigingBinding::nystrom_rank(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::vecchia_neighbors"_hash:
@@ -297,6 +301,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return WarpKrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::objective"_hash:
       return WarpKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::chol_jitter"_hash:
+      return WarpKrigingBinding::chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::model_chol_jitter"_hash:
+      return WarpKrigingBinding::model_chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::method"_hash:
       return WarpKrigingBinding::method(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::covMat"_hash:
@@ -378,6 +386,12 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return MLPKrigingBinding::hidden_dims(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::activation"_hash:
       return MLPKrigingBinding::activation(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::objective"_hash:
+      return MLPKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::chol_jitter"_hash:
+      return MLPKrigingBinding::chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::model_chol_jitter"_hash:
+      return MLPKrigingBinding::model_chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::copy"_hash:
       return MLPKrigingBinding::copy(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::save"_hash:
@@ -429,6 +443,12 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return LinearAlgebraBinding::get_num_nugget(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearAlgebra::set_num_nugget"_hash:
       return LinearAlgebraBinding::set_num_nugget(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::set_chol_warning"_hash:
+      return LinearAlgebraBinding::set_chol_warning(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::check_chol_rcond"_hash:
+      return LinearAlgebraBinding::check_chol_rcond(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::chol_rcond_checked"_hash:
+      return LinearAlgebraBinding::chol_rcond_checked(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::get_thread_pool_size"_hash:
       return OptimBinding::get_thread_pool_size(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::set_thread_pool_size"_hash:

@@ -502,10 +502,12 @@ def test_vecchia_noise_models(tmp_path):
     mean, stdev, _, _, _ = k.predict(Xn, method="vecchia")
     assert np.all(np.isfinite(mean)) and np.all(stdev > 0)
     assert np.isfinite(k.logLikelihood(method="vecchia"))
-    s = k.simulate(5, 123, Xn, method="vecchia")
+    s = k.simulate(5, 123, Xn, with_noise=False, method="vecchia")
     assert s.shape == (6, 5)
     s_nug = k.simulate(5, 123, Xn, with_noise=True, method="vecchia")
     assert s_nug.shape == (6, 5) and not np.array_equal(s, s_nug)
+    # default: with the nugget (as in R / Julia)
+    assert np.array_equal(k.simulate(5, 123, Xn, method="vecchia"), s_nug)
     with pytest.raises(ValueError):
         k.simulate(5, 123, Xn, with_noise=True, method="nystrom")
     k.update(y[:5] + 0.01, X[:5] + 0.01, False)

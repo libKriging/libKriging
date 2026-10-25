@@ -133,15 +133,23 @@ double PyMLPKriging::logLikelihood() {
   return m_internal->logLikelihood();
 }
 
-std::tuple<double, py::array_t<double>, py::array_t<double>>
-PyMLPKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool return_hess) {
+std::tuple<double, py::array_t<double>> PyMLPKriging::logLikelihoodFun(const py::array_t<double>& theta,
+                                                                       const bool return_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, return_hess);
-  return {ll, vec_to_arr(grad), carma::mat_to_arr(hess)};
+  auto [ll, grad] = m_internal->logLikelihoodFun(vec_theta, return_grad);
+  return {ll, vec_to_arr(grad)};
 }
 
 std::string PyMLPKriging::objective() {
   return m_internal->objective();
+}
+
+double PyMLPKriging::chol_jitter() {
+  return m_internal->chol_jitter();
+}
+
+double PyMLPKriging::model_chol_jitter() {
+  return m_internal->model_chol_jitter();
 }
 
 std::string PyMLPKriging::method() {
