@@ -127,7 +127,15 @@ int main(int argc, char** argv) {
             th += b;
           }
           std::printf("%d,%g,%g,%s,%.17g,%.6g,%.1f,%.6g,%.6g\n",
-                      s, jitter, pct, th.c_str(), k.logLikelihood(), rmse, ms, lmax, lmin);
+                      s,
+                      jitter,
+                      pct,
+                      th.c_str(),
+                      k.logLikelihood(),
+                      rmse,
+                      ms,
+                      lmax,
+                      lmin);
         } catch (const std::exception& e) {
           std::printf("%d,%g,%g,nan,nan,nan,nan,nan,nan\n", s, jitter, pct);
         }
