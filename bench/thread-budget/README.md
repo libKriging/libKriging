@@ -6,6 +6,8 @@ output directory. Machine of the published numbers: `machine.txt`.
 
 - Timing sweeps: `bench/bench-threads.sh` / `bench/bench-threads-ops.sh <build-dir> out.csv`
   (built by CMake), `summarize.py out.csv`.
+- Jitter versus n (#426): `run_jitter_n.sh <jitter_n_study binary> <out dir>`, then
+  `summarize_jitter_n.py <out dir>`; `jitter_n_study` marks each fit on stderr.
 - Study drivers (`*_study.cpp`, `*_probe.cpp`, `unstable_ll_profile.cpp`) are not built by
   CMake: compile them with the flags of `bench-fit-profile` from
   `<build-dir>/compile_commands.json`, then link with
