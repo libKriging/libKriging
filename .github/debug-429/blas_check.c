@@ -266,6 +266,188 @@ static void check_gesv(int n, int nrhs) {
   free(a), free(lu), free(b), free(x), free(ipiv);
 }
 
+/* LAPACK routines armadillo / libKriging call besides the ones above */
+extern void dpotrs_(const char*, const blasint*, const blasint*, const double*, const blasint*, double*, const blasint*,
+                    blasint*);
+extern void dtrtrs_(const char*, const char*, const char*, const blasint*, const blasint*, const double*,
+                    const blasint*, double*, const blasint*, blasint*);
+extern void dposv_(const char*, const blasint*, const blasint*, double*, const blasint*, double*, const blasint*,
+                   blasint*);
+extern void dsyevd_(const char*, const char*, const blasint*, double*, const blasint*, double*, double*,
+                    const blasint*, blasint*, const blasint*, blasint*);
+extern void dgeqrf_(const blasint*, const blasint*, double*, const blasint*, double*, double*, const blasint*,
+                    blasint*);
+extern void dorgqr_(const blasint*, const blasint*, const blasint*, double*, const blasint*, const double*, double*,
+                    const blasint*, blasint*);
+extern void dgesdd_(const char*, const blasint*, const blasint*, double*, const blasint*, double*, double*,
+                    const blasint*, double*, const blasint*, double*, const blasint*, blasint*, blasint*);
+extern void dtrcon_(const char*, const char*, const char*, const blasint*, const double*, const blasint*, double*,
+                    double*, blasint*, blasint*);
+extern void dpocon_(const char*, const blasint*, const double*, const blasint*, const double*, double*, double*,
+                    blasint*, blasint*);
+
+/* max_ij |(A X)_ij - B_ij| / ((|A||X| + |B|)_ij n eps 16) for n x n A, n x k X, B */
+static double residual(int n, int k, const double* a, const double* x, const double* b) {
+  double ratio = 0;
+  for (int j = 0; j < k; j++)
+    for (int i = 0; i < n; i++) {
+      long double s = 0, sa = 0;
+      for (int l = 0; l < n; l++) {
+        long double p = (long double)a[i + (long)l * n] * x[l + (long)j * n];
+        s += p, sa += fabsl(p);
+      }
+      double r = (double)(fabsl(s - b[i + (long)j * n]) / ((sa + fabs(b[i + (long)j * n])) * (n + 2) * EPS * 16 + 1e-300));
+      if (!(r <= ratio)) ratio = r;
+    }
+  return ratio;
+}
+
+static void check_lapack_spd(int n, int nrhs) {
+  char name[128];
+  double *a = spd(n), *f = malloc(sizeof(double) * (size_t)n * n), *b = rmat(n, nrhs), *x = malloc(sizeof(double) * (size_t)n * nrhs);
+  blasint info = 0, one = 1;
+  /* dposv */
+  memcpy(f, a, sizeof(double) * (size_t)n * n), memcpy(x, b, sizeof(double) * (size_t)n * nrhs);
+  dposv_("L", &n, &nrhs, f, &n, x, &n, &info);
+  snprintf(name, sizeof name, "dposv_L_n%d_nrhs%d_info%d", n, nrhs, (int)info);
+  record(name, info ? INFINITY : residual(n, nrhs, a, x, b));
+  /* dpotrs on the dpotrf factor */
+  memcpy(f, a, sizeof(double) * (size_t)n * n), memcpy(x, b, sizeof(double) * (size_t)n * nrhs);
+  dpotrf_("U", &n, f, &n, &info);
+  if (!info) dpotrs_("U", &n, &nrhs, f, &n, x, &n, &info);
+  snprintf(name, sizeof name, "dpotrs_U_n%d_nrhs%d_info%d", n, nrhs, (int)info);
+  record(name, info ? INFINITY : residual(n, nrhs, a, x, b));
+  /* dpocon (from the U factor) and dtrcon (on L = U^T) against the exact 1-norm rcond */
+  double anorm = 0;
+  for (int j = 0; j < n; j++) {
+    double s = 0;
+    for (int i = 0; i < n; i++)
+      s += fabs(a[i + (long)j * n]);
+    if (s > anorm) anorm = s;
+  }
+  double *inv = malloc(sizeof(double) * (size_t)n * n), *e = calloc((size_t)n * n, sizeof(double));
+  for (int i = 0; i < n; i++)
+    e[i + (long)i * n] = 1;
+  memcpy(inv, e, sizeof(double) * (size_t)n * n);
+  if (!info) dpotrs_("U", &n, &n, f, &n, inv, &n, &info);
+  double inorm = 0;
+  for (int j = 0; j < n; j++) {
+    double s = 0;
+    for (int i = 0; i < n; i++)
+      s += fabs(inv[i + (long)j * n]);
+    if (s > inorm) inorm = s;
+  }
+  double rc_exact = 1.0 / (anorm * inorm), rc = -1, *work = malloc(sizeof(double) * 3 * (size_t)n);
+  blasint* iwork = malloc(sizeof(blasint) * (size_t)n);
+  if (!info) dpocon_("U", &n, f, &n, &anorm, &rc, work, iwork, &info);
+  /* LAPACK underestimates ||A^-1||_1: the estimate is >= the exact rcond, within a factor ~n */
+  double rr = rc / rc_exact;
+  snprintf(name, sizeof name, "dpocon_U_n%d", n);
+  record(name, (info || !(rr > 1.0 - 1e-6 && rr < 10.0 * n)) ? INFINITY : 0.0);
+  if (info || !(rr > 1.0 - 1e-6 && rr < 10.0 * n)) printf("  dpocon n=%d rcond %.3g exact %.3g\n", n, rc, rc_exact);
+  if (!info) dtrcon_("1", "U", "N", &n, f, &n, &rc, work, iwork, &info);
+  snprintf(name, sizeof name, "dtrcon_1UN_n%d", n);
+  record(name, (info || !(rc > 0 && rc <= 1.0 + 1e-12)) ? INFINITY : 0.0);
+  /* dtrtrs with the factor: U^T U x = b */
+  memcpy(x, b, sizeof(double) * (size_t)n * nrhs);
+  if (!info) dtrtrs_("U", "T", "N", &n, &nrhs, f, &n, x, &n, &info);
+  if (!info) dtrtrs_("U", "N", "N", &n, &nrhs, f, &n, x, &n, &info);
+  snprintf(name, sizeof name, "dtrtrs_U_TN_n%d_nrhs%d_info%d", n, nrhs, (int)info);
+  record(name, info ? INFINITY : residual(n, nrhs, a, x, b));
+  /* dsyevd: A V = V diag(w), V^T V = I */
+  memcpy(f, a, sizeof(double) * (size_t)n * n);
+  double* w = malloc(sizeof(double) * (size_t)n);
+  blasint lwork = -1, liwork = -1, iw0 = 0;
+  double w0 = 0;
+  dsyevd_("V", "L", &n, f, &n, w, &w0, &lwork, &iw0, &liwork, &info);
+  lwork = (blasint)w0, liwork = iw0;
+  double* wk = malloc(sizeof(double) * (size_t)(lwork > 1 ? lwork : 1));
+  blasint* iwk = malloc(sizeof(blasint) * (size_t)(liwork > 1 ? liwork : 1));
+  dsyevd_("V", "L", &n, f, &n, w, wk, &lwork, iwk, &liwork, &info);
+  double ratio = 0;
+  if (info) ratio = INFINITY;
+  else
+    for (int j = 0; j < n; j++)
+      for (int i = 0; i < n; i++) {
+        long double s = 0, sa = 0, q = 0;
+        for (int l = 0; l < n; l++) {
+          long double p = (long double)a[i + (long)l * n] * f[l + (long)j * n];
+          s += p, sa += fabsl(p);
+          q += (long double)f[l + (long)i * n] * f[l + (long)j * n];
+        }
+        double r1 = (double)(fabsl(s - w[j] * f[i + (long)j * n]) / ((sa + fabs(w[j] * f[i + (long)j * n])) * (n + 2) * EPS * 64 + 1e-300));
+        double r2 = (double)(fabsl(q - (i == j)) / ((n + 2) * EPS * 64));
+        if (!(r1 <= ratio)) ratio = r1;
+        if (!(r2 <= ratio)) ratio = r2;
+      }
+  snprintf(name, sizeof name, "dsyevd_VL_n%d_info%d", n, (int)info);
+  record(name, ratio);
+  free(a), free(f), free(b), free(x), free(inv), free(e), free(work), free(iwork), free(w), free(wk), free(iwk);
+  (void)one;
+}
+
+static void check_qr_svd(int m, int n) {
+  char name[128];
+  int k = m < n ? m : n;
+  double *a = rmat(m, n), *f = malloc(sizeof(double) * (size_t)m * n), *tau = malloc(sizeof(double) * (size_t)k);
+  blasint info = 0, lwork = -1;
+  double w0 = 0;
+  /* dgeqrf + dorgqr (economy, m >= n): Q R = A, Q^T Q = I */
+  if (m >= n) {
+    memcpy(f, a, sizeof(double) * (size_t)m * n);
+    dgeqrf_(&m, &n, f, &m, tau, &w0, &lwork, &info);
+    lwork = (blasint)w0;
+    double* wk = malloc(sizeof(double) * (size_t)(lwork > 1 ? lwork : 1));
+    dgeqrf_(&m, &n, f, &m, tau, wk, &lwork, &info);
+    double* r = calloc((size_t)n * n, sizeof(double));
+    for (int j = 0; j < n; j++)
+      for (int i = 0; i <= j; i++)
+        r[i + (long)j * n] = f[i + (long)j * m];
+    lwork = -1;
+    dorgqr_(&m, &n, &n, f, &m, tau, &w0, &lwork, &info);
+    lwork = (blasint)w0;
+    wk = realloc(wk, sizeof(double) * (size_t)(lwork > 1 ? lwork : 1));
+    if (!info) dorgqr_(&m, &n, &n, f, &m, tau, wk, &lwork, &info);
+    double ratio = info ? INFINITY : 0;
+    for (int j = 0; j < n && !info; j++)
+      for (int i = 0; i < m; i++) {
+        long double s = 0, sa = 0;
+        for (int l = 0; l <= j; l++) {
+          long double p = (long double)f[i + (long)l * m] * r[l + (long)j * n];
+          s += p, sa += fabsl(p);
+        }
+        double rr = (double)(fabsl(s - a[i + (long)j * m]) / ((sa + fabs(a[i + (long)j * m])) * (m + 2) * EPS * 64 + 1e-300));
+        if (!(rr <= ratio)) ratio = rr;
+      }
+    snprintf(name, sizeof name, "dgeqrf_dorgqr_m%d_n%d_info%d", m, n, (int)info);
+    record(name, ratio);
+    free(wk), free(r);
+  }
+  /* dgesdd ("S"): U diag(s) V^T = A */
+  memcpy(f, a, sizeof(double) * (size_t)m * n);
+  double *s = malloc(sizeof(double) * (size_t)k), *u = malloc(sizeof(double) * (size_t)m * k), *vt = malloc(sizeof(double) * (size_t)k * n);
+  blasint* iw = malloc(sizeof(blasint) * 8 * (size_t)k);
+  lwork = -1;
+  dgesdd_("S", &m, &n, f, &m, s, u, &m, vt, &k, &w0, &lwork, iw, &info);
+  lwork = (blasint)w0;
+  double* wk = malloc(sizeof(double) * (size_t)(lwork > 1 ? lwork : 1));
+  dgesdd_("S", &m, &n, f, &m, s, u, &m, vt, &k, wk, &lwork, iw, &info);
+  double ratio = info ? INFINITY : 0;
+  for (int j = 0; j < n && !info; j++)
+    for (int i = 0; i < m; i++) {
+      long double t = 0, ta = 0;
+      for (int l = 0; l < k; l++) {
+        long double p = (long double)u[i + (long)l * m] * s[l] * vt[l + (long)j * k];
+        t += p, ta += fabsl(p);
+      }
+      double rr = (double)(fabsl(t - a[i + (long)j * m]) / ((ta + fabs(a[i + (long)j * m])) * (m + n + 2) * EPS * 64 + 1e-300));
+      if (!(rr <= ratio)) ratio = rr;
+    }
+  snprintf(name, sizeof name, "dgesdd_S_m%d_n%d_info%d", m, n, (int)info);
+  record(name, ratio);
+  free(a), free(f), free(tau), free(s), free(u), free(vt), free(iw), free(wk);
+}
+
 int main(void) {
   srand(429);
   const char* core = "unknown";
@@ -330,7 +512,11 @@ int main(void) {
       }
     check_potrf(n, 'L'), check_potrf(n, 'U');
     check_gesv(n, 1), check_gesv(n, 9);
+    check_lapack_spd(n, 1), check_lapack_spd(n, 9);
   }
+  static const int qs[][2] = {{1, 1}, {5, 3}, {17, 17}, {64, 8}, {100, 30}, {200, 200}, {33, 65}, {450, 4}};
+  for (unsigned s = 0; s < sizeof qs / sizeof *qs; s++)
+    check_qr_svd(qs[s][0], qs[s][1]);
 
   printf("SUMMARY core=%s threads=%d cases=%d fails=%d worst=%s ratio=%.3g\n", core, threads, n_cases, n_fails, worst_case,
          worst_ratio);

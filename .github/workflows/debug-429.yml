@@ -122,7 +122,7 @@ jobs:
         shell: bash
         run: |
           gcc -O2 -o "$RUNNER_TEMP/blas_check" .github/debug-429/blas_check.c \
-            /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/libblas.so.3 -ldl -lm
+            /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/libblas.so.3 -ldl -Wl,--no-as-needed -lm
           ldd "$RUNNER_TEMP/blas_check" | grep -E "blas|lapack"
           {
             echo "| OPENBLAS_CORETYPE | threads | core used | cases | fails | worst case | ratio |"
@@ -242,7 +242,7 @@ jobs:
         run: |
           gcc -O1 -o "$RUNNER_TEMP/cpuid" .github/debug-429/cpuid.c
           gcc -O2 -o "$RUNNER_TEMP/blas_check" .github/debug-429/blas_check.c \
-            /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/libblas.so.3 -ldl -lm
+            /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/libblas.so.3 -ldl -Wl,--no-as-needed -lm
           {
             echo "### SDE (OpenBLAS 0.3.20, host $(LC_ALL=C lscpu | sed -n 's/^Model name: *//p'))"
             echo ""
@@ -386,7 +386,7 @@ jobs:
           sudo apt-get update -q
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy liblapack-dev libopenblas0-pthread libblis3-pthread gdb
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy intel-mkl || echo "::warning::intel-mkl not installed"
-          python3 -m pip install -q mkl || echo "::warning::pip mkl not installed"
+          python3 -m venv "$RUNNER_TEMP/venv-mkl" && "$RUNNER_TEMP/venv-mkl/bin/pip" install -q mkl || echo "::warning::pip mkl not installed"
           A=/usr/lib/x86_64-linux-gnu
           B="$RUNNER_TEMP/blas"; mkdir -p "$B"
           link() { mkdir -p "$B/$1"; ln -sf "$2" "$B/$1/libblas.so.3"; ln -sf "$3" "$B/$1/liblapack.so.3"; }
@@ -394,7 +394,7 @@ jobs:
           link reference $A/blas/libblas.so.3 $A/lapack/liblapack.so.3
           link blis-0.8.1 $A/blis-pthread/libblas.so.3 $A/lapack/liblapack.so.3
           [ -e $A/libmkl_rt.so ] && link mkl-apt $A/libmkl_rt.so $A/libmkl_rt.so
-          pipmkl="$(find "$(python3 -c 'import sys; print(sys.prefix)')" -name 'libmkl_rt.so*' 2>/dev/null | head -1 || true)"
+          pipmkl="$(find "$RUNNER_TEMP/venv-mkl" -name 'libmkl_rt.so*' 2>/dev/null | head -1 || true)"
           if [ -n "$pipmkl" ]; then link mkl-pip "$pipmkl" "$pipmkl"; echo "MKL_PIP_DIR=$(dirname "$pipmkl")" >> "$GITHUB_ENV"; fi
           ls -la "$B"/*
 
@@ -418,7 +418,7 @@ jobs:
             ln -sf "$so" "$B/openblas-$v/libopenblas.so.0"
           done
           gcc -O2 -o "$RUNNER_TEMP/blas_check" .github/debug-429/blas_check.c \
-            /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/libblas.so.3 -ldl -lm
+            /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/libblas.so.3 -ldl -Wl,--no-as-needed -lm
           {
             echo "| BLAS | setting | threads | identified as | core | fails / cases | worst case | ratio |"
             echo "|---|---|---|---|---|---|---|---|"
@@ -432,7 +432,8 @@ jobs:
             esac
             for setting in $settings; do
               for threads in 4 1; do
-                envs="LD_LIBRARY_PATH=$dir${MKL_PIP_DIR:+:$MKL_PIP_DIR} OPENBLAS_NUM_THREADS=$threads MKL_NUM_THREADS=$threads BLIS_NUM_THREADS=$threads OMP_NUM_THREADS=$threads"
+                lp="$dir"; [ "$impl" != "mkl-pip" ] || lp="$dir:$MKL_PIP_DIR"
+                envs="LD_LIBRARY_PATH=$lp OPENBLAS_NUM_THREADS=$threads MKL_NUM_THREADS=$threads BLIS_NUM_THREADS=$threads OMP_NUM_THREADS=$threads"
                 [ "$setting" == "auto" ] || envs="$envs $setting"
                 rc=0; out="$(env $envs timeout 600 "$RUNNER_TEMP/blas_check" 2>&1)" || rc=$?
                 if [ "$rc" != "0" ]; then
@@ -454,7 +455,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
       - name: build C++ core and tests
-        if: steps.arch.outputs.bf16 == '1'
+        if: steps.arch.outputs.avx512 == '1'
         shell: bash
         run: |
           export MODE=Release ENABLE_PYTHON_BINDING=off ENABLE_OCTAVE_BINDING=off ENABLE_MATLAB_BINDING=off \
@@ -464,7 +465,7 @@ jobs:
           tools/linux-macos/build.sh
 
       - name: ctest per implementation
-        if: steps.arch.outputs.bf16 == '1'
+        if: steps.arch.outputs.avx512 == '1'
         shell: bash
         run: |
           cd build
@@ -475,17 +476,27 @@ jobs:
           for dir in "$RUNNER_TEMP"/blas/*; do
             [ -e "$dir/libmkl_rt.so" ] || ln -sf "$(readlink -f "$dir/libblas.so.3")" "$dir/libmkl_rt.so"
           done
-          echo "| BLAS (ctest, default settings) | result |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| BLAS (ctest) | setting | result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
           for dir in "$RUNNER_TEMP"/blas/*; do
             impl="${dir##*/}"
-            set +e
-            # libmkl_rt.so -> libblas.so.3 lacks LAPACK for reference / BLIS: preload it
-            env LD_LIBRARY_PATH="$dir${MKL_PIP_DIR:+:$MKL_PIP_DIR}" LD_PRELOAD="$(readlink -f "$dir/liblapack.so.3")" ctest -C Release -j "$(nproc)" --timeout 900 --output-on-failure > "ctest-$impl.log" 2>&1
-            set -e
-            s="$(grep -E 'tests passed|tests failed' "ctest-$impl.log" | tail -1 || true)"
-            echo "${impl}: ${s}"
-            echo "| ${impl} | ${s} |" >> "$GITHUB_STEP_SUMMARY"
+            lp="$dir"; [ "$impl" != "mkl-pip" ] || lp="$dir:$MKL_PIP_DIR"
+            case "$impl" in
+              # MKL NaN on AMD (run 40169629368): generic code path, sequential, AVX2
+              mkl*) settings="auto MKL_CBWR=COMPATIBLE MKL_THREADING_LAYER=SEQUENTIAL MKL_ENABLE_INSTRUCTIONS=AVX2" ;;
+              *) settings="auto" ;;
+            esac
+            for setting in $settings; do
+              tag="$impl"; [ "$setting" == "auto" ] || tag="$impl-${setting//[=,]/-}"
+              extra=""; [ "$setting" == "auto" ] || extra="$setting"
+              set +e
+              # libmkl_rt.so -> libblas.so.3 lacks LAPACK for reference / BLIS: preload it
+              env LD_LIBRARY_PATH="$lp" LD_PRELOAD="$(readlink -f "$dir/liblapack.so.3")" $extra ctest -C Release -j "$(nproc)" --timeout 900 --output-on-failure > "ctest-$tag.log" 2>&1
+              set -e
+              s="$(grep -E 'tests passed|tests failed' "ctest-$tag.log" | tail -1 || true)"
+              echo "${impl} ${setting}: ${s}"
+              echo "| ${impl} | ${setting} | ${s} |" >> "$GITHUB_STEP_SUMMARY"
+            done
           done
 
       - if: always()
