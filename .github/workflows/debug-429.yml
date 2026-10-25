@@ -476,7 +476,8 @@ jobs:
           for dir in "$RUNNER_TEMP"/blas/*; do
             impl="${dir##*/}"
             set +e
-            env LD_LIBRARY_PATH="$dir${MKL_PIP_DIR:+:$MKL_PIP_DIR}" ctest -C Release -j "$(nproc)" --timeout 900 > "ctest-$impl.log" 2>&1
+            # libmkl_rt.so -> libblas.so.3 lacks LAPACK for reference / BLIS: preload it
+            env LD_LIBRARY_PATH="$dir${MKL_PIP_DIR:+:$MKL_PIP_DIR}" LD_PRELOAD="$(readlink -f "$dir/liblapack.so.3")" ctest -C Release -j "$(nproc)" --timeout 900 > "ctest-$impl.log" 2>&1
             set -e
             s="$(grep -E 'tests passed|tests failed' "ctest-$impl.log" | tail -1)"
             echo "${impl}: ${s}"
