@@ -276,7 +276,26 @@ int main(void) {
   int (*nthreads)(void) = h ? (int (*)(void))dlsym(h, "openblas_get_num_threads") : NULL;
   if (corename) core = corename();
   if (nthreads) threads = nthreads();
-  printf("BLAS: %s | core: %s | threads: %d\n", config ? config() : "not OpenBLAS", core, threads);
+  char other[256] = "";
+  void (*mkl_version)(char*, int) = h ? (void (*)(char*, int))dlsym(h, "mkl_get_version_string") : NULL;
+  int (*mkl_threads)(void) = h ? (int (*)(void))dlsym(h, "MKL_Get_Max_Threads") : NULL;
+  char* (*bli_version)(void) = h ? (char* (*)(void))dlsym(h, "bli_info_get_version_str") : NULL;
+  int (*bli_arch_id)(void) = h ? (int (*)(void))dlsym(h, "bli_arch_query_id") : NULL;
+  const char* (*bli_arch_str)(int) = h ? (const char* (*)(int))dlsym(h, "bli_arch_string") : NULL;
+  if (mkl_version) {
+    char v[198] = "";
+    mkl_version(v, (int)sizeof v - 1);
+    snprintf(other, sizeof other, "MKL %s", v);
+    core = "mkl";
+    if (mkl_threads) threads = mkl_threads();
+  } else if (bli_version) {
+    const char* arch = (bli_arch_id && bli_arch_str) ? bli_arch_str(bli_arch_id()) : "?";
+    snprintf(other, sizeof other, "BLIS %s arch %s", bli_version(), arch);
+    static char core_blis[64];
+    snprintf(core_blis, sizeof core_blis, "blis-%s", arch);
+    core = core_blis;
+  }
+  printf("BLAS: %s | core: %s | threads: %d\n", config ? config() : (other[0] ? other : "not OpenBLAS"), core, threads);
 
   static const int sq[] = {1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 23, 24, 31, 32, 33, 47, 48, 63, 64, 65, 96, 100, 127, 128, 129, 200, 256, 257};
   static const int shapes[][3] = {{100, 1, 100}, {1, 100, 100}, {100, 100, 1}, {37, 211, 19}, {211, 37, 19}, {19, 37, 211},
