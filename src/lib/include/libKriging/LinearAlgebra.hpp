@@ -170,7 +170,9 @@ class LinearAlgebra {
   /// (matrix product, Cholesky, triangular and general solves, inverse, QR,
   /// symmetric eigen decomposition), compared with long double references:
   /// once from the calling thread, then from n_threads concurrent threads
-  /// (0: hardware concurrency, at least 2). Takes a fraction of a second.
+  /// (0: hardware concurrency, at least 2), all but the eigen decomposition,
+  /// which libKriging does not call from its thread pool. Takes a fraction
+  /// of a second.
   /// Detects e.g. OpenBLAS 0.3.19 / 0.3.20 DYNAMIC_ARCH on CPUs with
   /// avx512_bf16 and MKL 2020 with concurrent callers (#429).
   LIBKRIGING_EXPORT static BlasCheck check_blas(int n_threads = 0);

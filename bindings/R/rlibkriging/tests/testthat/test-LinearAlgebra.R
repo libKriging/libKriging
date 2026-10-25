@@ -98,7 +98,7 @@ test_that("linalg_check_blas: BLAS / LAPACK self-test passes (#429)", {
   expect_setequal(names(c), c("ok", "library", "report"))
   expect_true(nchar(c$library) > 0)
   expect_true(grepl("single thread:", c$report, fixed = TRUE))
-  expect_true(grepl("2 concurrent threads:", c$report, fixed = TRUE))
+  expect_true(grepl("2 concurrent threads", c$report, fixed = TRUE))
   if (!c$ok) cat(c$report)
   expect_true(c$ok)
 })

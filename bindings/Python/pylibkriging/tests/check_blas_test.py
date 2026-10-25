@@ -7,7 +7,7 @@ def test_check_blas():
     assert set(c.keys()) == {"ok", "library", "report"}
     assert c["library"]
     assert "single thread:" in c["report"]
-    assert "2 concurrent threads:" in c["report"]
+    assert "2 concurrent threads" in c["report"]
     assert c["ok"], c["report"]
 
 

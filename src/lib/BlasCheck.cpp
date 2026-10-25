@@ -174,7 +174,10 @@ void keep_worst(Results& into, const std::string& name, double r) {
 
 // One pass over the routines libKriging relies on; sizes above the
 // small-matrix paths of the BLAS (the #429 DGEMM failed from 65^3 on).
-Results run_checks(std::uint64_t seed) {
+// concurrent: only the routines libKriging calls from its thread pool (the
+// symmetric eigen decomposition is used by simulate / update_simulate only,
+// and crashed concurrently with MKL on Windows, MSVC OpenMP next to Intel's).
+Results run_checks(std::uint64_t seed, bool concurrent) {
   Results res;
   std::mt19937_64 g(seed);
   const arma::uword n = 150;
@@ -266,6 +269,8 @@ Results run_checks(std::uint64_t seed) {
     const arma::mat qt = q.t();
     return std::max(ratio(q, r, a, 64), ratio(qt, q, arma::eye(q.n_cols, q.n_cols), 64));
   });
+  if (concurrent)
+    return res;
   guarded("symmetric eigen (dsyevd)", [&] {
     arma::vec w;
     arma::mat v;
@@ -296,7 +301,7 @@ LIBKRIGING_EXPORT LinearAlgebra::BlasCheck LinearAlgebra::check_blas(int n_threa
   std::transform(lay.begin(), lay.end(), lay.begin(), [](unsigned char c) { return std::toupper(c); });
   const bool skip = is_mkl_2020(out.library) && lay != "SEQUENTIAL" && lay != "GNU";
 
-  const Results single = skip ? Results{} : run_checks(1);
+  const Results single = skip ? Results{} : run_checks(1, false);
 
   // the same checks from concurrent threads, as the multistart fits do
   std::vector<Results> per_thread(skip ? 0 : n_threads);
@@ -305,7 +310,7 @@ LIBKRIGING_EXPORT LinearAlgebra::BlasCheck LinearAlgebra::check_blas(int n_threa
     for (int t = 0; t < n_threads; ++t)
       threads.emplace_back([t, &per_thread] {
         for (int rep = 0; rep < 2; ++rep)
-          for (const auto& kv : run_checks(1000 + 100 * t + rep))
+          for (const auto& kv : run_checks(1000 + 100 * t + rep, true))
             keep_worst(per_thread[t], kv.first, kv.second);
       });
     for (auto& th : threads)
@@ -338,7 +343,7 @@ LIBKRIGING_EXPORT LinearAlgebra::BlasCheck LinearAlgebra::check_blas(int n_threa
     rep += "checks not run: MKL 2020 with its Intel threading layer (see below)\n";
   } else {
     section("single thread:\n", single);
-    std::snprintf(line, sizeof line, "%d concurrent threads:\n", n_threads);
+    std::snprintf(line, sizeof line, "%d concurrent threads (no eigen decomposition):\n", n_threads);
     section(line, concurrent);
   }
 

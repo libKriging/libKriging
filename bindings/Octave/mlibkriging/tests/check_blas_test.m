@@ -3,7 +3,7 @@
 disp(report)
 assert(ischar(library) && ~isempty(library))
 assert(~isempty(strfind(report, "single thread:")))
-assert(~isempty(strfind(report, "2 concurrent threads:")))
+assert(~isempty(strfind(report, "2 concurrent threads")))
 assert(ok)
 
 % default thread count, ok only

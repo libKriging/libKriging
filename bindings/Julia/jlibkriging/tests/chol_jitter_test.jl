@@ -27,7 +27,7 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         c = check_blas(2)
         @test !isempty(c.library)
         @test occursin("single thread:", c.report)
-        @test occursin("2 concurrent threads:", c.report)
+        @test occursin("2 concurrent threads", c.report)
         c.ok || println(c.report)
         @test c.ok
     end

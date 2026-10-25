@@ -87,7 +87,7 @@ This page collects questions about libKriging development
  (Julia) checks, in a fraction of a second, the routines libKriging relies on (matrix product,
  Cholesky, triangular and general solves, inverse, rcond, QR, symmetric eigen decomposition)
  against long double references, from one thread then from concurrent threads as the
- multistart fits do. It returns `ok`, the BLAS identification (OpenBLAS configuration and
+ multistart fits do (the eigen decomposition, used by `simulate` only, from one thread). It returns `ok`, the BLAS identification (OpenBLAS configuration and
  kernels, MKL or BLIS version) and a report, with the workaround of a known faulty BLAS.
 
  Known faulty configurations ([#429](https://github.com/libKriging/libKriging/issues/429)),

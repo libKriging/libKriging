@@ -829,7 +829,7 @@ TEST_CASE("LinearAlgebra::check_blas passes, reports the BLAS and keeps the RNG 
   CHECK(c.ok);
   CHECK(!c.library.empty());
   CHECK(c.report.find("single thread:") != std::string::npos);
-  CHECK(c.report.find("3 concurrent threads:") != std::string::npos);
+  CHECK(c.report.find("3 concurrent threads") != std::string::npos);
   CHECK(c.report.find("Cholesky (dpotrf)") != std::string::npos);
 
   // the checks use their own generator
