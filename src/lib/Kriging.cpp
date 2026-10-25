@@ -2275,7 +2275,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateNystrom(int nsim, int seed, const a
   // eigendirection(s) and leaves well-conditioned points' variances alone.
   arma::vec eigval;
   arma::mat eigvec;
-  arma::eig_sym(eigval, eigvec, Sigma_n);
+  LinearAlgebra::eig_sym(eigval, eigvec, Sigma_n);
   const double floor_val = std::max(LinearAlgebra::num_nugget, std::sqrt(arma::datum::eps) * eigval.max());
   eigval = arma::clamp(eigval, floor_val, arma::datum::inf);
   Sigma_n = arma::symmatu(eigvec * arma::diagmat(eigval) * eigvec.t());

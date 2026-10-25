@@ -159,16 +159,22 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static arma::mat inv_sympd(const arma::mat& L);
   LIBKRIGING_EXPORT static arma::mat chol_upper(const arma::mat& A);
   LIBKRIGING_EXPORT static void qr_econ(arma::mat& Q, arma::mat& R, const arma::mat& A);
+  /// Symmetric eigen decomposition (arma::eig_sym, LAPACK dsyevd); false on failure.
+  LIBKRIGING_EXPORT static bool eig_sym(arma::vec& eigval, arma::mat& eigvec, const arma::mat& A);
 
   /// Outcome of check_blas().
   struct BlasCheck {
     bool ok = false;      ///< every result within its rounding bound
-    std::string library;  ///< OpenBLAS config and core, MKL or BLIS version, or "unknown"
+    std::string library;  ///< vendor (OpenBLAS config and core, MKL version and threading layer, BLIS,
+                          ///< FlexiBLAS backend, Accelerate) and the file providing dgemm_
     std::string report;   ///< one line per check, then advice for a BLAS known to be faulty
   };
-  /// Quick self-test of the BLAS / LAPACK routines libKriging relies on
-  /// (matrix product, Cholesky, triangular and general solves, inverse, QR,
-  /// symmetric eigen decomposition), compared with long double references:
+  /// Quick self-test of the BLAS / LAPACK behind the LinearAlgebra routines
+  /// libKriging relies on (crossprod, diagABA, safe_chol_lower, chol_upper,
+  /// solve_lower / solve_upper / rsolve_upper, solve, inv_sympd, rcond_chol,
+  /// qr_econ, woodbury_solve, eig_sym), each call compared with an oracle
+  /// computed in long double without the BLAS, whatever the BLAS (OpenBLAS,
+  /// MKL, Accelerate, BLIS, FlexiBLAS, reference):
   /// once from the calling thread, then from n_threads concurrent threads
   /// (0: hardware concurrency, at least 2), all but the eigen decomposition,
   /// which libKriging does not call from its thread pool. Takes a fraction

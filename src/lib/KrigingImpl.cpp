@@ -636,7 +636,7 @@ arma::mat KrigingImpl::update_simulate_impl(const arma::vec& y_u,
     const arma::mat A = LinearAlgebra::solve_lower(lastsim_LSigma_nKo, Sigma_unKo.t() / Sigma_divisor);
     arma::vec S_eigval;
     arma::mat S_eigvec;
-    arma::eig_sym(S_eigval, S_eigvec, arma::symmatu(Sigma_uKo / Sigma_divisor - A.t() * A));
+    LinearAlgebra::eig_sym(S_eigval, S_eigvec, arma::symmatu(Sigma_uKo / Sigma_divisor - A.t() * A));
     const arma::mat LS_u = S_eigvec * arma::diagmat(arma::sqrt(arma::clamp(S_eigval, 0.0, arma::datum::inf)));
 
     arma::vec yhat_u = F_u * m_beta + Rstar_ou.t() * m_z;

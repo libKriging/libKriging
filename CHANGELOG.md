@@ -12,11 +12,13 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
-- **BLAS self-test**: `LinearAlgebra::check_blas(n_threads = 0)` checks the BLAS / LAPACK
-  routines libKriging relies on (product, Cholesky, solves, inverse, rcond, QR, symmetric
-  eigen) against long double references, from one thread then from `n_threads` concurrent
-  threads, and returns `ok`, the BLAS identification and a report with the workaround of a
-  known faulty BLAS (OpenBLAS 0.3.19 / 0.3.20 `Cooperlake` kernels, MKL 2020 with its Intel
+- **BLAS self-test**: `LinearAlgebra::check_blas(n_threads = 0)` calls the `LinearAlgebra`
+  routines libKriging relies on (crossprod, diagABA, Cholesky, triangular / general solves,
+  inverse, rcond, QR, Woodbury solve, symmetric eigen) and compares each result with a long
+  double oracle computed without the BLAS, whatever the BLAS (OpenBLAS, MKL, Accelerate, BLIS,
+  FlexiBLAS, reference), from one thread then from `n_threads` concurrent threads, and returns
+  `ok`, the BLAS identification (file providing `dgemm_` and vendor details) and a report with
+  the workaround of a known faulty BLAS (OpenBLAS 0.3.19 / 0.3.20 `Cooperlake` kernels, MKL 2020 with its Intel
   threading layer). Bindings: Python `LinearAlgebra.check_blas` (dict), R
   `rlibkriging:::linalg_check_blas` (list), Octave `[ok, library, report] =
   LinearAlgebra.check_blas()`, Julia `check_blas()` (named tuple). See

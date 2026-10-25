@@ -825,12 +825,14 @@ TEST_CASE("LinearAlgebra::check_blas passes, reports the BLAS and keeps the RNG 
   arma::arma_rng::set_seed(123);
 
   const LinearAlgebra::BlasCheck c = LinearAlgebra::check_blas(3);
+  std::cout << c.report;  // BLAS identification and results in the CI logs of each platform
   INFO(c.report);
   CHECK(c.ok);
   CHECK(!c.library.empty());
   CHECK(c.report.find("single thread:") != std::string::npos);
   CHECK(c.report.find("3 concurrent threads") != std::string::npos);
-  CHECK(c.report.find("Cholesky (dpotrf)") != std::string::npos);
+  CHECK(c.report.find("safe_chol_lower (dpotrf)") != std::string::npos);
+  CHECK(c.report.find("eig_sym (dsyevd)") != std::string::npos);
 
   // the checks use their own generator
   CHECK(arma::randu() == expected);

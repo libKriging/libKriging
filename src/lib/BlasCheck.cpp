@@ -7,7 +7,6 @@
 #include "libKriging/LinearAlgebra.hpp"
 
 #include <algorithm>
-#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -22,74 +21,126 @@
 #include <thread>
 #include <vector>
 
-// BLAS identification (#429): OpenBLAS / MKL / BLIS entry points, when loaded.
+// BLAS identification (#429): the module providing dgemm_ (whatever the BLAS:
+// OpenBLAS, MKL, BLIS, FlexiBLAS, Accelerate, reference), then the vendor's
+// own version entry points when it has some.
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <windows.h>
-#elif defined(__APPLE__)
-#include <dlfcn.h>
 #else
-extern "C" {
-char* openblas_get_config(void) __attribute__((weak));
-char* openblas_get_corename(void) __attribute__((weak));
-void mkl_get_version_string(char* buf, int len) __attribute__((weak));
-char* bli_info_get_version_str(void) __attribute__((weak));
-}
+#include <dlfcn.h>
 #endif
 
 namespace {
 
-using config_fn = char* (*)();
-using mkl_version_fn = void (*)(char*, int);
-
-template <typename F>
-F blas_symbol(const char* name) {
 #if defined(_WIN32)
-  for (const char* dll : {"libopenblas.dll", "openblas.dll", "mkl_rt.2.dll", "mkl_rt.dll", "libblis.dll"}) {
-    if (HMODULE h = GetModuleHandleA(dll))
-      if (FARPROC p = GetProcAddress(h, name))
-        return reinterpret_cast<F>(p);
+// candidate BLAS DLLs, vendor libraries first (conda's libblas.dll forwards to one of them)
+const char* const kWinBlasDlls[] = {"libopenblas.dll",
+                                    "openblas.dll",
+                                    "mkl_rt.2.dll",
+                                    "mkl_rt.dll",
+                                    "libblis.dll",
+                                    "libflexiblas.dll",
+                                    "Rblas.dll",
+                                    "libblas.dll",
+                                    "blas.dll"};
+#endif
+
+// address of an exported symbol of the process (nullptr if absent), and the
+// file of the module exporting it ("" if unknown)
+template <typename F>
+F blas_symbol(const char* name, std::string* module = nullptr) {
+#if defined(_WIN32)
+  for (const char* dll : kWinBlasDlls) {
+    HMODULE h = GetModuleHandleA(dll);
+    if (!h)
+      continue;
+    FARPROC p = GetProcAddress(h, name);
+    if (!p)
+      continue;
+    if (module) {
+      char path[MAX_PATH] = {0};
+      GetModuleFileNameA(h, path, MAX_PATH);
+      *module = path;
+    }
+    return reinterpret_cast<F>(reinterpret_cast<void (*)()>(p));
   }
   return nullptr;
-#elif defined(__APPLE__)
-  return reinterpret_cast<F>(dlsym(RTLD_DEFAULT, name));
 #else
-  const std::string n = name;
-  if (n == "openblas_get_config")
-    return reinterpret_cast<F>(&openblas_get_config);
-  if (n == "openblas_get_corename")
-    return reinterpret_cast<F>(&openblas_get_corename);
-  if (n == "mkl_get_version_string")
-    return reinterpret_cast<F>(&mkl_get_version_string);
-  if (n == "bli_info_get_version_str")
-    return reinterpret_cast<F>(&bli_info_get_version_str);
-  return nullptr;
+  void* p = dlsym(RTLD_DEFAULT, name);
+  if (p && module) {
+    Dl_info info;
+    if (dladdr(p, &info) && info.dli_fname) {
+      // the file behind the symlinks (e.g. libblas.so.3 -> openblas-pthread/...)
+      char* real = realpath(info.dli_fname, nullptr);
+      *module = real ? real : info.dli_fname;
+      std::free(real);
+    }
+  }
+  return reinterpret_cast<F>(p);
 #endif
 }
 
+using config_fn = char* (*)();
+using mkl_version_fn = void (*)(char*, int);
+using flexiblas_backend_fn = int (*)(char*, size_t);
+
 std::string blas_library() {
-  if (auto config = blas_symbol<config_fn>("openblas_get_config")) {
-    std::string s = config();
+  std::string module;
+  (void)blas_symbol<void (*)()>("dgemm_", &module);
+  std::string vendor;
+  if (auto backend = blas_symbol<flexiblas_backend_fn>("flexiblas_current_backend")) {
+    char buf[256] = {0};
+    backend(buf, sizeof(buf) - 1);
+    vendor = "FlexiBLAS, backend " + std::string(buf);
+  } else if (auto config = blas_symbol<config_fn>("openblas_get_config")) {
+    vendor = config();
     if (auto core = blas_symbol<config_fn>("openblas_get_corename"))
-      s += " | core " + std::string(core());
-    return s;
-  }
-  if (auto version = blas_symbol<mkl_version_fn>("mkl_get_version_string")) {
+      vendor += " | core " + std::string(core());
+  } else if (auto version = blas_symbol<mkl_version_fn>("mkl_get_version_string")) {
     char buf[256] = {0};
     version(buf, sizeof(buf) - 1);
-    std::string s = buf;
-    s.erase(s.find_last_not_of(' ') + 1);
-    return s;
+    vendor = buf;
+    vendor.erase(vendor.find_last_not_of(' ') + 1);
+    const char* layer = std::getenv("MKL_THREADING_LAYER");
+    vendor += " | threading layer " + std::string(layer ? layer : "INTEL (default)");
+  } else if (auto version = blas_symbol<config_fn>("bli_info_get_version_str")) {
+    vendor = "BLIS " + std::string(version());
+  } else {
+    // no version entry point: guess from the file name
+    std::string f = module;
+    std::transform(f.begin(), f.end(), f.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    auto has = [&f](const char* x) { return f.find(x) != std::string::npos; };
+    if (has("accelerate") || has("veclib"))
+      vendor = "Apple Accelerate";
+    else if (has("blis"))
+      vendor = "BLIS";
+    else if (has("flexiblas"))
+      vendor = "FlexiBLAS";
+    else if (has("openblas"))
+      vendor = "OpenBLAS";
+    else if (has("mkl"))
+      vendor = "MKL";
+    else if (has("rblas"))
+      vendor = "R reference BLAS";
+    else if (has("/blas/") || has("libblas") || has("\\blas"))
+      vendor = "reference BLAS (Netlib) or unknown";
+    else
+      vendor = "unknown vendor";
   }
-  if (auto version = blas_symbol<config_fn>("bli_info_get_version_str"))
-    return "BLIS " + std::string(version());
-  return "unknown";
+  return module.empty() ? vendor : vendor + " (" + module + ")";
 }
 
-bool is_mkl_2020(const std::string& library) {
-  return library.find("Math Kernel Library Version 2020") != std::string::npos;
+// MKL 2020 with its default Intel threading layer next to the GNU OpenMP
+// runtime of libKriging gives NaN or crashes in dgetrf (#429)
+bool is_mkl_2020_unsafe(const std::string& library) {
+  return library.find("Math Kernel Library Version 2020") != std::string::npos
+         && library.find("threading layer GNU") == std::string::npos
+         && library.find("threading layer gnu") == std::string::npos
+         && library.find("threading layer SEQUENTIAL") == std::string::npos
+         && library.find("threading layer sequential") == std::string::npos;
 }
 
 // Configurations known to give wrong results (#429), with their workaround.
@@ -104,7 +155,7 @@ std::string known_issues(const std::string& library) {
                + (version == "20" ? "SkylakeX" : "Haswell")
                + " in the environment before starting the process, or use OpenBLAS >= 0.3.21.";
   }
-  if (is_mkl_2020(library))
+  if (is_mkl_2020_unsafe(library))
     advice
         = "MKL 2020 with its default Intel threading layer gives NaN results or crashes next to the "
           "GNU OpenMP runtime of libKriging (#429): set MKL_THREADING_LAYER=GNU (or SEQUENTIAL) before "
@@ -172,7 +223,7 @@ void keep_worst(Results& into, const std::string& name, double r) {
     into[name] = r;
 }
 
-// One pass over the routines libKriging relies on; sizes above the
+// One pass over the LinearAlgebra routines libKriging relies on; sizes above the
 // small-matrix paths of the BLAS (the #429 DGEMM failed from 65^3 on).
 // concurrent: only the routines libKriging calls from its thread pool (the
 // symmetric eigen decomposition is used by simulate / update_simulate only,
@@ -208,24 +259,48 @@ Results run_checks(std::uint64_t seed, bool concurrent) {
   } catch (const std::exception&) {
   }
 
-  guarded("matrix product (dgemm)", [&] {
-    const arma::mat a = random_mat(g, 120, 90), b = random_mat(g, 90, 130);
-    const arma::mat c = a * b;
-    return ratio(a, b, c, 1);
-  });
+  // each check: one public LinearAlgebra call, against an oracle computed
+  // here in long double without the BLAS
   guarded("crossprod (dgemm / dsyrk)", [&] {
     const arma::mat a = random_mat(g, 140, 70);
     const arma::mat c = LinearAlgebra::crossprod(a);
     const arma::mat at = a.t();
     return ratio(at, a, c, 1);
   });
-  guarded("Cholesky (dpotrf)", [&] {
+  guarded("diagABA (dgemm)", [&] {
+    // diagABA(A, B)_i = a_i^T B a_i for a symmetric B, a_i the i-th row of A
+    const arma::mat a = random_mat(g, n, 130);
+    arma::mat b = random_mat(g, 130, 130);
+    b = 0.5 * (b + b.t());
+    const arma::vec d = LinearAlgebra::diagABA(a, b);
+    double worst = 0;
+    for (arma::uword i = 0; i < a.n_rows; ++i) {
+      long double s = 0, sa = 0;
+      for (arma::uword k = 0; k < b.n_rows; ++k)
+        for (arma::uword j = 0; j < b.n_cols; ++j) {
+          const long double p = static_cast<long double>(a.at(i, k)) * b.at(k, j) * a.at(i, j);
+          s += p;
+          sa += std::fabs(p);
+        }
+      const double r
+          = static_cast<double>(std::fabs(s - d[i]) / ((sa + std::fabs(d[i])) * (b.n_rows + 2) * kEps * 4 + 1e-300L));
+      if (!(r <= worst))
+        worst = r;
+    }
+    return worst;
+  });
+  guarded("safe_chol_lower (dpotrf)", [&] {
     if (L.n_rows != n)
       return std::numeric_limits<double>::infinity();
     const arma::mat lt = L.t();
     return ratio(L, lt, R, 4);
   });
-  guarded("triangular solve (dtrsm / dtrtrs)", [&] {
+  guarded("chol_upper (dpotrf)", [&] {
+    const arma::mat u = LinearAlgebra::chol_upper(R);
+    const arma::mat ut = u.t();
+    return ratio(ut, u, R, 4);
+  });
+  guarded("solve_lower / solve_upper (dtrsm)", [&] {
     if (L.n_rows != n)
       return std::numeric_limits<double>::infinity();
     const arma::mat x = LinearAlgebra::solve_lower(L, B);
@@ -233,18 +308,25 @@ Results run_checks(std::uint64_t seed, bool concurrent) {
     const arma::mat y = LinearAlgebra::solve_upper(lt, B);
     return std::max(ratio(L, x, B, 16), ratio(lt, y, B, 16));
   });
-  guarded("general solve (dgesv)", [&] {
+  guarded("rsolve_upper (dtrsm)", [&] {
+    if (L.n_rows != n)
+      return std::numeric_limits<double>::infinity();
+    const arma::mat u = L.t(), bt = B.t();
+    const arma::mat x = LinearAlgebra::rsolve_upper(u, bt);  // X U = B^T
+    return ratio(x, u, bt, 16);
+  });
+  guarded("solve (dgesv)", [&] {
     arma::mat a = R + 0.1 * random_mat(g, n, n);
     const arma::mat x = LinearAlgebra::solve(a, B);
     return ratio(a, x, B, 16);
   });
-  guarded("inverse from Cholesky", [&] {
+  guarded("inv_sympd", [&] {
     if (L.n_rows != n)
       return std::numeric_limits<double>::infinity();
     const arma::mat inv = LinearAlgebra::inv_sympd(L);
     return ratio(R, inv, arma::eye(n, n), 64);
   });
-  guarded("rcond of Cholesky factor (*trcon / *gecon)", [&] {
+  guarded("rcond_chol (*trcon / *gecon)", [&] {
     if (L.n_rows != n)
       return std::numeric_limits<double>::infinity();
     // exact 1-norm condition of L, from its inverse computed by hand
@@ -262,19 +344,37 @@ Results run_checks(std::uint64_t seed, bool concurrent) {
     const double q = est / exact;
     return (q > 1 - 1e-6 && q < 10.0 * n) ? 0.0 : std::numeric_limits<double>::infinity();
   });
-  guarded("QR (dgeqrf / dorgqr)", [&] {
+  guarded("qr_econ (dgeqrf / dorgqr)", [&] {
     const arma::mat a = random_mat(g, n, 40);
     arma::mat q, r;
     LinearAlgebra::qr_econ(q, r, a);
     const arma::mat qt = q.t();
     return std::max(ratio(q, r, a, 64), ratio(qt, q, arma::eye(q.n_cols, q.n_cols), 64));
   });
+  guarded("woodbury_solve (dgemm / dgesv)", [&] {
+    // (diag(D) + U U^T) X = B, the matrix built by hand
+    const arma::mat u = random_mat(g, n, 20);
+    const arma::mat r = random_mat(g, n, 1);
+    arma::vec dv(n);
+    for (arma::uword i = 0; i < n; ++i)
+      dv[i] = 1.0 + std::fabs(r.at(i, 0));
+    const arma::mat x = LinearAlgebra::woodbury_solve(u, dv, B);
+    arma::mat m(n, n);
+    for (arma::uword j = 0; j < n; ++j)
+      for (arma::uword i = 0; i < n; ++i) {
+        long double s = (i == j) ? dv[i] : 0.0L;
+        for (arma::uword l = 0; l < u.n_cols; ++l)
+          s += static_cast<long double>(u.at(i, l)) * u.at(j, l);
+        m.at(i, j) = static_cast<double>(s);
+      }
+    return ratio(m, x, B, 64);
+  });
   if (concurrent)
     return res;
-  guarded("symmetric eigen (dsyevd)", [&] {
+  guarded("eig_sym (dsyevd)", [&] {
     arma::vec w;
     arma::mat v;
-    if (!arma::eig_sym(w, v, R))
+    if (!LinearAlgebra::eig_sym(w, v, R))
       return std::numeric_limits<double>::infinity();
     arma::mat vw = v;
     vw.each_row() %= w.t();
@@ -294,12 +394,8 @@ LIBKRIGING_EXPORT LinearAlgebra::BlasCheck LinearAlgebra::check_blas(int n_threa
   BlasCheck out;
   out.library = blas_library();
 
-  // MKL 2020 with its default (Intel) threading layer next to the GNU OpenMP
-  // runtime of libKriging gives NaN or crashes in dgetrf (#429): not run
-  const char* layer = std::getenv("MKL_THREADING_LAYER");
-  std::string lay = layer ? layer : "";
-  std::transform(lay.begin(), lay.end(), lay.begin(), [](unsigned char c) { return std::toupper(c); });
-  const bool skip = is_mkl_2020(out.library) && lay != "SEQUENTIAL" && lay != "GNU";
+  // not run where it would crash (MKL 2020, Intel threading layer)
+  const bool skip = is_mkl_2020_unsafe(out.library);
 
   const Results single = skip ? Results{} : run_checks(1, false);
 

@@ -37,6 +37,8 @@ if (CXX_CLANG_TIDY)
 endif ()
 
 target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp) # maybe PRIVATE
+# dlsym / dladdr of LinearAlgebra::check_blas (BLAS identification)
+target_link_libraries(Kriging PRIVATE ${CMAKE_DL_LIBS})
 
 # Link OpenMP if found (OpenMP loops, fork handlers in Kriging.cpp)
 if(OpenMP_CXX_FOUND)
