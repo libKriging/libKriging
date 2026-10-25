@@ -239,11 +239,20 @@ Results run_checks(std::uint64_t seed, bool concurrent) {
       std::fprintf(stderr, "LinearAlgebra::check[%llu] %s\n", static_cast<unsigned long long>(seed), name.c_str());
       std::fflush(stderr);
     }
+    const auto t0 = std::chrono::steady_clock::now();
     double r;
     try {
       r = f();
     } catch (const std::exception&) {
       r = std::numeric_limits<double>::infinity();
+    }
+    if (trace) {
+      std::fprintf(stderr,
+                   "LinearAlgebra::check[%llu] %s done in %.3f s\n",
+                   static_cast<unsigned long long>(seed),
+                   name.c_str(),
+                   std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count());
+      std::fflush(stderr);
     }
     keep_worst(res, name, r);
   };
@@ -393,11 +402,13 @@ LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads)
 
   CheckResult out;
   out.backend = detect_backend();
+  const auto t1 = std::chrono::steady_clock::now();
 
   // not run where it would crash (MKL 2020, Intel threading layer)
   const bool skip = is_mkl_2020_unsafe(out.backend);
 
   const Results single = skip ? Results{} : run_checks(1, false);
+  const auto t2 = std::chrono::steady_clock::now();
 
   // the same checks from concurrent threads, as the multistart fits do
   std::vector<Results> per_thread(skip ? 0 : n_threads);
@@ -446,8 +457,18 @@ LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads)
   const std::string advice = known_issues(out.backend);
   if (!advice.empty())
     rep += "known issue: " + advice + "\n";
-  const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-  std::snprintf(line, sizeof line, "%s in %.2f s\n", out.ok ? "all checks passed" : "SOME CHECKS FAILED", secs);
+  const auto t3 = std::chrono::steady_clock::now();
+  auto secs = [](std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b) {
+    return std::chrono::duration<double>(b - a).count();
+  };
+  std::snprintf(line,
+                sizeof line,
+                "%s in %.2f s (backend detection %.2f s, single thread %.2f s, concurrent %.2f s)\n",
+                out.ok ? "all checks passed" : "SOME CHECKS FAILED",
+                secs(t0, t3),
+                secs(t0, t1),
+                secs(t1, t2),
+                secs(t2, t3));
   rep += line;
   out.report = rep;
   return out;
