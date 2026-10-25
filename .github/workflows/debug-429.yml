@@ -384,7 +384,7 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update -q
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy liblapack-dev libopenblas0-pthread libblis3-pthread
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy liblapack-dev libopenblas0-pthread libblis3-pthread gdb
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -qy intel-mkl || echo "::warning::intel-mkl not installed"
           python3 -m pip install -q mkl || echo "::warning::pip mkl not installed"
           A=/usr/lib/x86_64-linux-gnu
@@ -434,7 +434,11 @@ jobs:
               for threads in 4 1; do
                 envs="LD_LIBRARY_PATH=$dir${MKL_PIP_DIR:+:$MKL_PIP_DIR} OPENBLAS_NUM_THREADS=$threads MKL_NUM_THREADS=$threads BLIS_NUM_THREADS=$threads OMP_NUM_THREADS=$threads"
                 [ "$setting" == "auto" ] || envs="$envs $setting"
-                out="$(env $envs timeout 600 "$RUNNER_TEMP/blas_check" 2>&1)" || echo "exit code $?"
+                rc=0; out="$(env $envs timeout 600 "$RUNNER_TEMP/blas_check" 2>&1)" || rc=$?
+                if [ "$rc" != "0" ]; then
+                  echo "exit code $rc (${impl} ${setting} ${threads}t), backtrace:"
+                  env $envs gdb -q -batch -ex run -ex bt -ex "info registers rip" -ex "x/3i \$pc" "$RUNNER_TEMP/blas_check" 2>&1 | grep -vE "^\[(New|Thread)|^SUMMARY|^FAIL" | tail -25 || true
+                fi
                 id="$(echo "$out" | sed -n 's/^BLAS: \(.*\) | core: .*/\1/p' | head -1)"
                 s="$(echo "$out" | grep '^SUMMARY' || echo 'SUMMARY core=crash threads=? cases=? fails=? worst=? ratio=?')"
                 get() { echo "$s" | sed -n "s/.* $1=\([^ ]*\).*/\1/p"; }
@@ -477,7 +481,7 @@ jobs:
             impl="${dir##*/}"
             set +e
             # libmkl_rt.so -> libblas.so.3 lacks LAPACK for reference / BLIS: preload it
-            env LD_LIBRARY_PATH="$dir${MKL_PIP_DIR:+:$MKL_PIP_DIR}" LD_PRELOAD="$(readlink -f "$dir/liblapack.so.3")" ctest -C Release -j "$(nproc)" --timeout 900 > "ctest-$impl.log" 2>&1
+            env LD_LIBRARY_PATH="$dir${MKL_PIP_DIR:+:$MKL_PIP_DIR}" LD_PRELOAD="$(readlink -f "$dir/liblapack.so.3")" ctest -C Release -j "$(nproc)" --timeout 900 --output-on-failure > "ctest-$impl.log" 2>&1
             set -e
             s="$(grep -E 'tests passed|tests failed' "ctest-$impl.log" | tail -1 || true)"
             echo "${impl}: ${s}"
