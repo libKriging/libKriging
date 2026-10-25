@@ -380,7 +380,7 @@ jobs:
           echo "avx512=${avx512}" >> "$GITHUB_OUTPUT"
 
       - name: install the BLAS implementations
-        if: steps.arch.outputs.bf16 == '1'
+        if: steps.arch.outputs.avx512 == '1'
         shell: bash
         run: |
           sudo apt-get update -q
@@ -399,7 +399,7 @@ jobs:
           ls -la "$B"/*
 
       - name: download the OpenBLAS builds
-        if: steps.arch.outputs.bf16 == '1'
+        if: steps.arch.outputs.avx512 == '1'
         uses: actions/download-artifact@v4
         with:
           pattern: openblas-*
@@ -407,7 +407,7 @@ jobs:
 
       - name: BLAS check per implementation
         id: blas
-        if: steps.arch.outputs.bf16 == '1'
+        if: steps.arch.outputs.avx512 == '1'
         shell: bash
         run: |
           B="$RUNNER_TEMP/blas"
@@ -439,7 +439,7 @@ jobs:
                 s="$(echo "$out" | grep '^SUMMARY' || echo 'SUMMARY core=crash threads=? cases=? fails=? worst=? ratio=?')"
                 get() { echo "$s" | sed -n "s/.* $1=\([^ ]*\).*/\1/p"; }
                 echo "== ${impl} ${setting} ${threads}t: ${id} | $s"
-                echo "$out" | grep '^FAIL' | head -5
+                echo "$out" | grep '^FAIL' | head -5 || true
                 echo "| ${impl} | ${setting} | ${threads} | ${id} | $(get core) | $(get fails) / $(get cases) | $(get worst) | $(get ratio) |" >> "$GITHUB_STEP_SUMMARY"
                 if [ "$(get fails)" != "0" ]; then
                   echo "::error title=${impl} ${setting} ${threads}t::$(get core): $(get fails) failing cases, worst $(get worst)"
@@ -467,7 +467,7 @@ jobs:
           # the bundled armadillo picks FlexiBLAS > MKL > OpenBLAS > libblas at
           # configure time: MKL is installed above, so it needs libmkl_rt.so;
           # every directory provides that name too, pointing at its own BLAS
-          a="$(find . -name 'libarmadillo.so*' -type f | head -1)"; readelf -d "$a" | grep NEEDED
+          a="$(find . -name 'libarmadillo.so*' -type f | head -1)"; readelf -d "$a" | grep NEEDED || true
           for dir in "$RUNNER_TEMP"/blas/*; do
             [ -e "$dir/libmkl_rt.so" ] || ln -sf "$(readlink -f "$dir/libblas.so.3")" "$dir/libmkl_rt.so"
           done
@@ -479,7 +479,7 @@ jobs:
             # libmkl_rt.so -> libblas.so.3 lacks LAPACK for reference / BLIS: preload it
             env LD_LIBRARY_PATH="$dir${MKL_PIP_DIR:+:$MKL_PIP_DIR}" LD_PRELOAD="$(readlink -f "$dir/liblapack.so.3")" ctest -C Release -j "$(nproc)" --timeout 900 > "ctest-$impl.log" 2>&1
             set -e
-            s="$(grep -E 'tests passed|tests failed' "ctest-$impl.log" | tail -1)"
+            s="$(grep -E 'tests passed|tests failed' "ctest-$impl.log" | tail -1 || true)"
             echo "${impl}: ${s}"
             echo "| ${impl} | ${s} |" >> "$GITHUB_STEP_SUMMARY"
           done
