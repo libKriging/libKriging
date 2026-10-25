@@ -84,16 +84,21 @@ class PyKriging {
 
   static PyKriging load(const std::string filename);
 
-  std::tuple<double, py::array_t<double>> leaveOneOutFun(const py::array_t<double>& theta, const bool return_grad);
+  std::tuple<double, py::array_t<double>> leaveOneOutFun(const py::array_t<double>& theta,
+                                                         const bool return_grad,
+                                                         const bool bench = false);
 
   std::tuple<py::array_t<double>, py::array_t<double>> leaveOneOutVec(const py::array_t<double>& theta,
                                                                       const std::string& method = "exact");
 
   std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta,
                                                                                 const bool return_grad,
-                                                                                const bool want_hess = false);
+                                                                                const bool return_hess = false,
+                                                                                const bool bench = false);
 
-  std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta, const bool return_grad);
+  std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta,
+                                                         const bool return_grad,
+                                                         const bool bench = false);
 
   double logLikelihood(const std::string& method);
   double leaveOneOut(const std::string& method = "exact");

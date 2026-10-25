@@ -616,7 +616,9 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL,
 #' lines(x, su[ , 1], col = "blue", lty=2)
 #' lines(x, su[ , 2], col = "blue", lty=2)
 #' lines(x, su[ , 3], col = "blue", lty=2)
-update_simulate.Kriging <- function(object, y_u, ..., X_u = NULL, noise_u = NULL) {
+update_simulate.Kriging <- function(object, y_u, ..., X_u, noise_u = NULL) {
+    # X_u is required, passed by name or positionally through ... (below)
+    if (missing(X_u)) X_u <- NULL
     # Support two calling conventions matching C++ overloads:
     #   update_simulate(y_u, X_u)            - no noise (Nugget / pure Kriging)
     #   update_simulate(y_u, noise_u, X_u)   - with known observation noise
@@ -696,7 +698,9 @@ update_simulate.Kriging <- function(object, y_u, ..., X_u = NULL, noise_u = NULL
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
-update.Kriging <- function(object, y_u, ..., X_u = NULL, noise_u = NULL, refit = TRUE) {
+update.Kriging <- function(object, y_u, ..., X_u, noise_u = NULL, refit = TRUE) {
+    # X_u is required, passed by name or positionally through ... (below)
+    if (missing(X_u)) X_u <- NULL
     # Support multiple calling conventions matching C++ overloads:
     #   update(y_u, X_u)                    - no noise, refit defaults TRUE
     #   update(y_u, X_u, refit)             - no noise, positional refit (logical)

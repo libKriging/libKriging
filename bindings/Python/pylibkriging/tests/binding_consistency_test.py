@@ -98,6 +98,27 @@ def test_linalg_settings():
     lk.LinearAlgebra.set_chol_warning(False)
 
 
+def test_arguments_as_in_r_julia():
+    # argument names aligned with R / Julia (tools/checks/binding_api)
+    X = np.linspace(0, 1, 12).reshape(-1, 1)
+    y = np.sin(6 * X[:, 0])
+    k = lk.Kriging(y, X, "gauss")
+    t = k.theta()[:, 0] if k.theta().ndim == 2 else k.theta()
+    ll, grad, hess = k.logLikelihoodFun(t, return_grad=True, return_hess=False, bench=True)
+    assert ll == pytest.approx(k.logLikelihoodFun(t)[0])
+    assert grad.size == 1 and hess.size == 0  # Kriging computes no Hessian
+    assert k.leaveOneOutFun(theta=t, return_grad=False, bench=True)[0] == pytest.approx(k.leaveOneOutFun(t)[0])
+    assert k.logMargPostFun(theta=t, return_grad=False, bench=True)[0] == pytest.approx(k.logMargPostFun(t)[0])
+
+    wk = lk.WarpKriging(y, X, ["none"], "gauss")
+    tw = np.atleast_1d(np.asarray(wk.theta()).ravel())
+    ll, grad, hess = wk.logLikelihoodFun(tw, return_grad=True, return_hess=True)
+    assert grad.size == tw.size and hess.size == 0  # no Hessian computed either
+    with pytest.raises(TypeError):
+        wk.simulate(nsim=2, seed=1)  # X required
+    assert wk.simulate(nsim=2, seed=1, X=X[:3]).shape == (3, 2)
+
+
 def test_data1():
     refpath = find_dir()
     prefix = "data1-scal"

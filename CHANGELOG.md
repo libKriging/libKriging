@@ -30,6 +30,20 @@ past release, see the corresponding entry on the
   (Python, R, Julia; Octave's methods take `varargin`) are compared too, as warnings only:
   argument missing from some bindings, required in some and optional in others. The log and
   the job summary end with a synthesis table of all the compared methods.
+- **Bindings**, argument differences found by that comparison:
+  - **Julia**: `fit!(::Kriging, …; parameters=)` and `fit!(::NestedKriging, …; parameters=)`
+    (a dict with the keys `sigma2`, `theta`, `beta`, `nugget`, `is_<name>_estim`, as in Python / R;
+    C API `lk_kriging_fit` takes the parameters); `simulate(model, X; nsim=1, seed=123, …)` for
+    `Kriging`, `WarpKriging`, `MLPKriging` (the defaults of Python / R; `simulate(model, nsim, seed, X)`
+    unchanged); `simulate(::Kriging, …; with_noise=true/false)` = `with_nugget` (as in Python / R);
+    `bench=` of `log_likelihood_fun`, `leave_one_out_fun`, `log_marg_post_fun` (`Kriging`).
+  - **Python**: `Kriging.logLikelihoodFun(theta, return_grad, return_hess, bench)`: `want_hess`
+    renamed `return_hess` (as in R / Julia and the other classes; positional calls unchanged), and
+    `bench=`; `leaveOneOutFun` / `logMargPostFun` take `theta`, `return_grad`, `bench` by name;
+    `WarpKriging.logLikelihoodFun(theta, return_grad, return_hess)` (was `**kw`);
+    `WarpKriging.simulate` without `X` raises `TypeError` (passed `None` down).
+  - **R**: `update()` / `update_simulate()` of a `Kriging`: `X_u` has no default in the
+    signature (it was `NULL`, then an error); calls unchanged.
 - **Bindings**, gaps found by that comparison:
   - **Julia**: the `Optim` settings, as `jlibkriging.Optim.<name>` (not exported, not to clash
     with Optim.jl): iterations, tolerances, log level, reparametrization, theta bounds,

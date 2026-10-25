@@ -322,7 +322,11 @@ needs "exact" or "vecchia"
       .def("summary", &PyKriging::summary)
       .def("save", &PyKriging::save)
       .def_static("load", &PyKriging::load)
-      .def("leaveOneOutFun", &PyKriging::leaveOneOutFun)
+      .def("leaveOneOutFun",
+           &PyKriging::leaveOneOutFun,
+           py::arg("theta"),
+           py::arg("return_grad") = false,
+           py::arg("bench") = false)
       .def("leaveOneOutVec",
            &PyKriging::leaveOneOutVec,
            py::arg("theta"),
@@ -333,8 +337,15 @@ needs "exact" or "vecchia"
            &PyKriging::logLikelihoodFun,
            py::arg("theta"),
            py::arg("return_grad") = false,
-           py::arg("want_hess") = false)
-      .def("logMargPostFun", &PyKriging::logMargPostFun)
+           py::arg("return_hess") = false,
+           py::arg("bench") = false,
+           "Log-likelihood at theta: (value, gradient if return_grad, empty Hessian: Kriging computes none); "
+           "bench prints the timings of the steps.")
+      .def("logMargPostFun",
+           &PyKriging::logMargPostFun,
+           py::arg("theta"),
+           py::arg("return_grad") = false,
+           py::arg("bench") = false)
       .def("logLikelihood",
            &PyKriging::logLikelihood,
            py::arg("method") = "exact",

@@ -28,6 +28,7 @@ p = predict(k, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
 # p.mean, p.stdev, p.cov, p.mean_deriv, p.stdev_deriv
 
 s = simulate(k, 10, 123, Xnew; will_update=true)   # (k, nsim, seed, X) -> size(Xnew,1) x nsim
+# or simulate(k, Xnew; nsim=10, seed=123, will_update=true)  (defaults nsim=1, seed=123, as in Python / R)
 s_u = update_simulate(k, y_u, X_u)   # condition those paths on new observations
 update!(k, y_u, X_u; refit=true)
 # heterogeneous noise model (noise=<variance vector>): with_noise= / noise_u= are

@@ -327,3 +327,20 @@ test_that("jitters of a fitted model are kept by save / load", {
   expect_equal(models[[1]]$model_chol_jitter(), 0)  # Kriging: exact committed model
 })
 
+
+test_that("update / update_simulate: X_u required, by name or position", {
+  set.seed(1)
+  X <- matrix(runif(10), ncol = 1)
+  y <- sin(6 * X[, 1])
+  Xu <- matrix(c(0.33, 0.66), ncol = 1)
+  yu <- sin(6 * Xu[, 1])
+  k1 <- Kriging(y, X, "gauss")
+  k2 <- Kriging(y, X, "gauss")
+  update(k1, yu, Xu, refit = FALSE)
+  update(k2, yu, X_u = Xu, refit = FALSE)
+  expect_equal(k1$X(), k2$X())
+  expect_equal(nrow(k1$X()), 12)
+  expect_error(update(k1, yu), "X_u")
+  expect_false("X_u" %in% names(Filter(function(d) !identical(d, quote(expr = )),
+                                       formals(rlibkriging:::update.Kriging))))
+})

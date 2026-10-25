@@ -46,7 +46,7 @@ model.update(y_u, X_u, refit=True)
 model.logLikelihood()
 model.leaveOneOut()
 model.logMargPost()
-ll, grad, _hess = model.logLikelihoodFun(theta, return_grad=True, want_hess=False)  # (ll, grad, hess: always empty)
+ll, grad, _hess = model.logLikelihoodFun(theta, return_grad=True)  # (ll, grad, hess: always empty)
 ```
 
 Do **not** instantiate `NuggetKriging`/`NoiseKriging` — pass `noise=` to

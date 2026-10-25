@@ -27,7 +27,8 @@ ARG_ALIASES), and every difference is a warning, never an error: argument
 missing from some bindings, required in some and optional in others, or
 another number of arguments when a binding has no argument names (pybind11
 arg0, arg1...). The order is not compared (Julia keyword arguments), nor
-the name of the argument when every binding has a single one (setters).
+the name of the argument when every binding has a single one (setters), nor
+the arguments of one binding only by design (ARG_IDIOMS).
 
 The log ends with the synthesis of all the compared methods (one line per
 method, then the counts per scope); --markdown writes it too, e.g. to
@@ -68,6 +69,17 @@ ALIASES = {
 # the same argument under another name: {lang: {argument: name in the other bindings}}
 ARG_ALIASES = {
     "julia": {"X_n": "X"},  # the prediction points
+}
+
+# arguments of one binding only, by design: {lang: {method: arguments}}
+ARG_IDIOMS = {
+    "julia": {
+        # keyword shortcuts of the entries of `parameters`
+        "fit!": {"sigma2", "is_sigma2_estim", "theta", "is_theta_estim", "beta", "is_beta_estim",
+                 "nugget", "is_nugget_estim", "warp_params"},
+        # Kriging nugget model: with_nugget=b is with_noise=b (Python / R)
+        "simulate": {"with_nugget"},
+    },
 }
 
 # scopes of the model classes, whose Julia getters had a "get_" prefix
@@ -153,7 +165,9 @@ def compare_args(langs, table, sigs):
             # a single argument in every binding (setters): its name is not compared
             if all(len(args) == 1 for args in chosen.values()):
                 anonymous = set(chosen)
-            named = {lang: {normalize_arg(lang, a): (a, req) for a, req in args}
+            idioms = {lang: set().union(*[ARG_IDIOMS.get(lang, {}).get(name, set()) for name in entry.get(lang, [])])
+                      for lang in chosen}
+            named = {lang: {normalize_arg(lang, a): (a, req) for a, req in args if a not in idioms[lang]}
                      for lang, args in chosen.items() if lang not in anonymous}
             problems = []
             union = sorted({a for args in named.values() for a in args})

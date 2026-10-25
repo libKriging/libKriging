@@ -80,6 +80,33 @@ void* lk_kriging_new(const char* kernel, const char* noise_model) {
   CATCH_RETURN_NULL
 }
 
+// Kriging::Parameters from the optional C arguments (NULL / 0 length: absent)
+static Kriging::Parameters kriging_params(const double* sigma2,
+                                          int is_sigma2_estim,
+                                          const double* theta,
+                                          int theta_n,
+                                          int is_theta_estim,
+                                          const double* beta,
+                                          int beta_n,
+                                          int is_beta_estim,
+                                          const double* nugget,
+                                          int is_nugget_estim) {
+  Kriging::Parameters params;
+  if (sigma2)
+    params.sigma2 = *sigma2;
+  params.is_sigma2_estim = is_sigma2_estim != 0;
+  if (theta && theta_n > 0)
+    params.theta = arma::mat(const_cast<double*>(theta), 1, theta_n, false, true);
+  params.is_theta_estim = is_theta_estim != 0;
+  if (beta && beta_n > 0)
+    params.beta = arma::vec(const_cast<double*>(beta), beta_n, false, true);
+  params.is_beta_estim = is_beta_estim != 0;
+  if (nugget)
+    params.nugget = *nugget;
+  params.is_nugget_estim = is_nugget_estim != 0;
+  return params;
+}
+
 void* lk_kriging_new_fit(const double* y,
                          int n,
                          const double* noise,
@@ -109,19 +136,8 @@ void* lk_kriging_new_fit(const double* y,
     arma::vec y_v(const_cast<double*>(y), n, false, true);
     arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
 
-    Kriging::Parameters params;
-    if (sigma2)
-      params.sigma2 = *sigma2;
-    params.is_sigma2_estim = is_sigma2_estim != 0;
-    if (theta && theta_n > 0)
-      params.theta = arma::mat(const_cast<double*>(theta), 1, theta_n, false, true);
-    params.is_theta_estim = is_theta_estim != 0;
-    if (beta && beta_n > 0)
-      params.beta = arma::vec(const_cast<double*>(beta), beta_n, false, true);
-    params.is_beta_estim = is_beta_estim != 0;
-    if (nugget)
-      params.nugget = *nugget;
-    params.is_nugget_estim = is_nugget_estim != 0;
+    Kriging::Parameters params = kriging_params(
+        sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim, nugget, is_nugget_estim);
 
     auto* kr = new Kriging(kernel ? kernel : "matern3_2", nm);
     if (nm == Kriging::NoiseModel::Heterogeneous && noise && noise_n > 0) {
@@ -174,11 +190,23 @@ int lk_kriging_fit(void* ptr,
                    int normalize,
                    const char* optim,
                    const char* objective,
+                   const double* sigma2,
+                   int is_sigma2_estim,
+                   const double* theta,
+                   int theta_n,
+                   int is_theta_estim,
+                   const double* beta,
+                   int beta_n,
+                   int is_beta_estim,
+                   const double* nugget,
+                   int is_nugget_estim,
                    const char* method) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec y_v(const_cast<double*>(y), n, false, true);
     arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
+    Kriging::Parameters params = kriging_params(
+        sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim, nugget, is_nugget_estim);
     if (noise && noise_n > 0) {
       arma::vec noise_v(const_cast<double*>(noise), noise_n, false, true);
       k->fit(y_v,
@@ -188,7 +216,7 @@ int lk_kriging_fit(void* ptr,
              normalize != 0,
              optim ? optim : "BFGS",
              objective ? objective : "LL",
-             Kriging::Parameters{},
+             params,
              method ? method : "exact");
     } else {
       k->fit(y_v,
@@ -197,7 +225,7 @@ int lk_kriging_fit(void* ptr,
              normalize != 0,
              optim ? optim : "BFGS",
              objective ? objective : "LL",
-             Kriging::Parameters{},
+             params,
              method ? method : "exact");
     }
     return 0;
@@ -375,13 +403,14 @@ int lk_kriging_log_likelihood_fun(void* ptr,
                                   int theta_n,
                                   int return_grad,
                                   int return_hess,
+                                  int bench,
                                   double* ll_out,
                                   double* grad_out,
                                   double* hess_out) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
-    auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, false);
+    auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, bench != 0);
     if (ll_out)
       *ll_out = ll;
     if (grad_out && return_grad)
@@ -395,12 +424,13 @@ int lk_kriging_leave_one_out_fun(void* ptr,
                                  const double* theta,
                                  int theta_n,
                                  int return_grad,
+                                 int bench,
                                  double* loo_out,
                                  double* grad_out) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
-    auto [loo, grad] = k->leaveOneOutFun(theta_v, return_grad != 0, false);
+    auto [loo, grad] = k->leaveOneOutFun(theta_v, return_grad != 0, bench != 0);
     if (loo_out)
       *loo_out = loo;
     if (grad_out && return_grad)
@@ -414,12 +444,13 @@ int lk_kriging_log_marg_post_fun(void* ptr,
                                  const double* theta,
                                  int theta_n,
                                  int return_grad,
+                                 int bench,
                                  double* lmp_out,
                                  double* grad_out) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
-    auto [lmp, grad] = k->logMargPostFun(theta_v, return_grad != 0, false);
+    auto [lmp, grad] = k->logMargPostFun(theta_v, return_grad != 0, bench != 0);
     if (lmp_out)
       *lmp_out = lmp;
     if (grad_out && return_grad)

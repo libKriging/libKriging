@@ -56,6 +56,17 @@ int lk_kriging_fit(void* ptr,
                    int normalize,
                    const char* optim,
                    const char* objective,
+                   /* optional parameters (NULL to skip), as lk_kriging_new_fit */
+                   const double* sigma2,
+                   int is_sigma2_estim,
+                   const double* theta,
+                   int theta_n,
+                   int is_theta_estim,
+                   const double* beta,
+                   int beta_n,
+                   int is_beta_estim,
+                   const double* nugget,
+                   int is_nugget_estim,
                    const char* method);
 
 int lk_kriging_predict(void* ptr,
@@ -124,6 +135,7 @@ int lk_kriging_log_likelihood_fun(void* ptr,
                                   int theta_n,
                                   int return_grad,
                                   int return_hess,
+                                  int bench, /* print the timings of the steps */
                                   double* ll_out,
                                   double* grad_out,
                                   double* hess_out);
@@ -132,6 +144,7 @@ int lk_kriging_leave_one_out_fun(void* ptr,
                                  const double* theta,
                                  int theta_n,
                                  int return_grad,
+                                 int bench,
                                  double* loo_out,
                                  double* grad_out);
 
@@ -139,6 +152,7 @@ int lk_kriging_log_marg_post_fun(void* ptr,
                                  const double* theta,
                                  int theta_n,
                                  int return_grad,
+                                 int bench,
                                  double* lmp_out,
                                  double* grad_out);
 

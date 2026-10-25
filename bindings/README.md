@@ -41,7 +41,7 @@ python3 tools/checks/binding_api/compare.py python.txt julia.txt
 | Fit | `kriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `kriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `kriging_predict(obj,x,…,method)` | `obj$predict(x,…,method=)` | `obj.predict(x,…,method=)` | `predict(obj,x,stdev,cov,deriv[,method])` | `predict(obj,X;…,method=)` |
-| Simulate | `kriging_simulate(obj,nsim,seed,x,…,method)` | `obj$simulate(nsim,seed,x,…,method=)` | `obj.simulate(nsim,seed,x,…,method=)` | `simulate(obj,nsim,seed,x,will_update[,method])` | `simulate(obj,nsim,seed,X;…,method=)` |
+| Simulate | `kriging_simulate(obj,nsim,seed,x,…,method)` | `obj$simulate(nsim,seed,x,…,method=)` | `obj.simulate(nsim,seed,x,…,method=)` | `simulate(obj,nsim,seed,x,will_update[,method])` | `simulate(obj,nsim,seed,X;…,method=)` / `simulate(obj,X;nsim=1,seed=123,…)` |
 | Update | `kriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u;…)` |
 | Update simulate | `kriging_update_simulate(obj,y_u,noise_u,X_u)` | `obj$update_simulate(y_u,X_u)` / `obj$update_simulate(y_u,noise_u,X_u)` | `obj.update_simulate(y_u,X_u,noise_u=)` | `update_simulate(obj,y_u,X_u)` / `update_simulate(obj,y_u,noise_u,X_u)` | `update_simulate(obj,y_u,X_u;noise_u=)` |
 | Save | `kriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
@@ -163,7 +163,7 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 | Fit | `warpKriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `warpKriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `warpKriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
-| Simulate | `warpKriging_simulate(obj,nsim,seed,x,will_update,with_noise)` | `obj$simulate(nsim,seed,x,will_update,with_noise)` | `obj.simulate(nsim,seed,x,will_update,with_noise)` | `simulate(obj,nsim,seed,x[,will_update[,with_noise]])` | `simulate(obj,nsim,seed,X;will_update,with_noise)` |
+| Simulate | `warpKriging_simulate(obj,nsim,seed,x,will_update,with_noise)` | `obj$simulate(nsim,seed,x,will_update,with_noise)` | `obj.simulate(nsim,seed,x,will_update,with_noise)` | `simulate(obj,nsim,seed,x[,will_update[,with_noise]])` | `simulate(obj,nsim,seed,X;will_update,with_noise)` / `simulate(obj,X;nsim=1,seed=123,…)` |
 | Update | `warpKriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u)` |
 | Update simulate | `warpKriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
 | Save | `warpKriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
@@ -209,7 +209,7 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 | Fit | `mlpKriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `mlpKriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `mlpKriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
-| Simulate | `mlpKriging_simulate(obj,nsim,seed,x,will_update,with_noise)` | `obj$simulate(nsim,seed,x,will_update,with_noise)` | `obj.simulate(nsim,seed,x,will_update,with_noise)` | `simulate(obj,nsim,seed,x[,will_update[,with_noise]])` | `simulate(obj,nsim,seed,X;will_update,with_noise)` |
+| Simulate | `mlpKriging_simulate(obj,nsim,seed,x,will_update,with_noise)` | `obj$simulate(nsim,seed,x,will_update,with_noise)` | `obj.simulate(nsim,seed,x,will_update,with_noise)` | `simulate(obj,nsim,seed,x[,will_update[,with_noise]])` | `simulate(obj,nsim,seed,X;will_update,with_noise)` / `simulate(obj,X;nsim=1,seed=123,…)` |
 | Update | `mlpKriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u)` |
 | Update simulate | `mlpKriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
 | Save | `mlpKriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |

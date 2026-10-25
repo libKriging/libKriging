@@ -305,12 +305,16 @@ class WarpKriging:
                                   return_stdev, return_cov, return_deriv)
 
     def simulate(self, nsim=1, seed=123, X=None, will_update=False, with_noise=None):
-        """Conditional simulations at X. with_noise (default None: no noise):
+        """simulate(nsim=1, seed=123, X, will_update=False, with_noise=None)
+
+        Conditional simulations at X (required: the default None only lets
+        it follow nsim and seed). with_noise (default None: no noise):
         observation-noise VARIANCES (raw y scale, like fit's noise), a scalar
         or one per row of X, added as N(0, with_noise) draws; negative / NaN
         values raise ValueError."""
-        if X is not None:
-            X = self._encode_X(X)
+        if X is None:
+            raise TypeError("simulate() missing required argument: 'X'")
+        X = self._encode_X(X)
         if with_noise is not None and not isinstance(with_noise, (bool, int, float)):
             with_noise = _np.atleast_1d(_np.asarray(with_noise, dtype=_np.float64)).ravel()
         return self._impl.simulate(nsim, seed, X, will_update, with_noise)
@@ -347,7 +351,8 @@ class WarpKriging:
     # Forward all other methods directly
     def summary(self): return self._impl.summary()
     def logLikelihood(self): return self._impl.logLikelihood()
-    def logLikelihoodFun(self, theta, **kw): return self._impl.logLikelihoodFun(theta, **kw)
+    def logLikelihoodFun(self, theta, return_grad=False, return_hess=False):
+        return self._impl.logLikelihoodFun(theta, return_grad, return_hess)
     def kernel(self): return self._impl.kernel()
     def X(self): return self._impl.X()
     def centerX(self): return self._impl.centerX()

@@ -56,9 +56,9 @@ if isdefined(jlibkriging, :Optim)
     end
 end
 
-# the arguments of the fullest method of name in scope, the object excluded:
-# positional ones (with a default when a shorter method exists), then the
-# keyword ones (all with a default), "kwargs..." as "*"
+# the arguments of the methods of name in scope, the object excluded: those
+# of the fullest method first, then the others'; required when positional in
+# every method, "kwargs..." as "*"
 function signature(scope, name)
     mod = scope == "Optim" ? jlibkriging.Optim : jlibkriging
     isdefined(mod, Symbol(name)) || return nothing
@@ -78,10 +78,12 @@ function signature(scope, name)
     positional(m) = String.(Base.method_argnames(m)[(drop ? 3 : 2):end])
     keywords(m) = [k == Symbol("kwargs...") ? "*" : String(k) * "=" for k in Base.kwarg_decl(m)]
     named(m) = count(!=("*"), vcat(positional(m), keywords(m)))
-    full = ms[argmax(named.(ms))]
-    required = minimum(length(positional(m)) for m in ms)
-    args = [i > required ? a * "=" : a for (i, a) in enumerate(positional(full))]
-    join(vcat(args, keywords(full)), ",")
+    args = String[]
+    for m in sort(ms; by=named, rev=true), a in vcat(positional(m), rstrip.(keywords(m), '='))
+        a in args || push!(args, a)
+    end
+    required(a) = all(a in positional(m) for m in ms)
+    join([a == "*" || required(a) ? a : a * "=" for a in args], ",")
 end
 
 open(ARGS[1], "w") do io

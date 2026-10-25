@@ -264,9 +264,10 @@ PyKriging PyKriging::load(const std::string filename) {
 }
 
 std::tuple<double, py::array_t<double>> PyKriging::leaveOneOutFun(const py::array_t<double>& theta,
-                                                                  const bool return_grad) {
+                                                                  const bool return_grad,
+                                                                  const bool bench) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [llo, grad] = m_internal->leaveOneOutFun(vec_theta, return_grad, false);
+  auto [llo, grad] = m_internal->leaveOneOutFun(vec_theta, return_grad, bench);
   return {llo, vec_to_arr(grad)};
 }
 
@@ -281,10 +282,13 @@ double PyKriging::leaveOneOut(const std::string& method) {
   return m_internal->leaveOneOut(method);
 }
 
-std::tuple<double, py::array_t<double>, py::array_t<double>>
-PyKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool /*want_hess*/) {
+std::tuple<double, py::array_t<double>, py::array_t<double>> PyKriging::logLikelihoodFun(
+    const py::array_t<double>& theta,
+    const bool return_grad,
+    const bool /*return_hess: Kriging computes no Hessian*/,
+    const bool bench) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta, return_grad, false);
+  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta, return_grad, bench);
   return {llo, vec_to_arr(grad), {}};
 }
 
@@ -293,9 +297,10 @@ double PyKriging::logLikelihood(const std::string& method) {
 }
 
 std::tuple<double, py::array_t<double>> PyKriging::logMargPostFun(const py::array_t<double>& theta,
-                                                                  const bool return_grad) {
+                                                                  const bool return_grad,
+                                                                  const bool bench) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta, return_grad, false);
+  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta, return_grad, bench);
   return {lmp, vec_to_arr(grad)};
 }
 
