@@ -78,20 +78,20 @@ This page collects questions about libKriging development
  `OPENBLAS_NUM_THREADS=1`, at the cost of speed) and use the same BLAS build; a nugget or noise
  model, or tighter `theta` bounds, also reduce the sensitivity.
 
-# Are my BLAS / LAPACK results correct? (`check_blas`)
+# Are my BLAS / LAPACK results correct? (`linearalgebra_check`)
 
  Some BLAS builds give wrong results on some CPUs, without any error message: fits then fail
- with "Exceed max numerical nugget", or return NaN or nonsense. `LinearAlgebra::check_blas()`
- (C++), `lk.LinearAlgebra.check_blas()` (Python), `rlibkriging:::linalg_check_blas()` (R),
- `LinearAlgebra.check_blas()` (Octave / MATLAB, `[ok, library, report]`), `check_blas()`
- (Julia) calls, in a fraction of a second, the `LinearAlgebra` routines libKriging relies on
+ with "Exceed max numerical nugget", or return NaN or nonsense. `LinearAlgebra::check()` (C++),
+ `linearalgebra_check()` in every binding (Python `pylibkriging.linearalgebra_check()` dict, R
+ `linearalgebra_check()` list, Octave / MATLAB `[ok, backend, report] = linearalgebra_check()`,
+ Julia `linearalgebra_check()` named tuple) calls, in a fraction of a second, the `LinearAlgebra` routines libKriging relies on
  (`crossprod`, `diagABA`, `safe_chol_lower`, `chol_upper`, `solve_lower` / `solve_upper` /
  `rsolve_upper`, `solve`, `inv_sympd`, `rcond_chol`, `qr_econ`, `woodbury_solve`, `eig_sym`) and
  compares each result with an oracle computed in long double without the BLAS, so that it works
  the same with any BLAS: OpenBLAS, MKL, Apple Accelerate, BLIS, FlexiBLAS, the reference BLAS.
- It runs once from the calling thread, then from concurrent threads as the multistart fits do
- (`eig_sym`, used by `simulate` only, from one thread). It returns `ok`, the BLAS
- identification (the file providing `dgemm_`, plus OpenBLAS configuration and kernels, MKL
+ The backend is detected, not chosen. It runs once from the calling thread, then from
+ concurrent threads as the multistart fits do (`eig_sym`, used by `simulate` only, from one
+ thread). It returns `ok`, the backend identification (the file providing `dgemm_`, plus OpenBLAS configuration and kernels, MKL
  version and threading layer, FlexiBLAS backend when available) and a report, with the
  workaround of a known faulty BLAS.
 

@@ -21,7 +21,7 @@
 #include <thread>
 #include <vector>
 
-// BLAS identification (#429): the module providing dgemm_ (whatever the BLAS:
+// Backend identification (#429): the module providing dgemm_ (whatever the BLAS:
 // OpenBLAS, MKL, BLIS, FlexiBLAS, Accelerate, reference), then the vendor's
 // own version entry points when it has some.
 #if defined(_WIN32)
@@ -87,7 +87,7 @@ using config_fn = char* (*)();
 using mkl_version_fn = void (*)(char*, int);
 using flexiblas_backend_fn = int (*)(char*, size_t);
 
-std::string blas_library() {
+std::string detect_backend() {
   std::string module;
   (void)blas_symbol<void (*)()>("dgemm_", &module);
   std::string vendor;
@@ -232,11 +232,11 @@ Results run_checks(std::uint64_t seed, bool concurrent) {
   Results res;
   std::mt19937_64 g(seed);
   const arma::uword n = 150;
-  // LK_CHECK_BLAS_TRACE: one stderr line per check, to locate a BLAS crash
-  static const bool trace = std::getenv("LK_CHECK_BLAS_TRACE") != nullptr;
+  // LK_LINEARALGEBRA_CHECK_TRACE: one stderr line per check, to locate a BLAS crash
+  static const bool trace = std::getenv("LK_LINEARALGEBRA_CHECK_TRACE") != nullptr;
   auto guarded = [&res, seed](const std::string& name, const std::function<double()>& f) {
     if (trace) {
-      std::fprintf(stderr, "check_blas[%llu] %s\n", static_cast<unsigned long long>(seed), name.c_str());
+      std::fprintf(stderr, "LinearAlgebra::check[%llu] %s\n", static_cast<unsigned long long>(seed), name.c_str());
       std::fflush(stderr);
     }
     double r;
@@ -252,7 +252,7 @@ Results run_checks(std::uint64_t seed, bool concurrent) {
   arma::mat L;
   try {
     if (trace) {
-      std::fprintf(stderr, "check_blas[%llu] safe_chol_lower\n", static_cast<unsigned long long>(seed));
+      std::fprintf(stderr, "LinearAlgebra::check[%llu] safe_chol_lower\n", static_cast<unsigned long long>(seed));
       std::fflush(stderr);
     }
     L = LinearAlgebra::safe_chol_lower(R);
@@ -386,16 +386,16 @@ Results run_checks(std::uint64_t seed, bool concurrent) {
 
 }  // namespace
 
-LIBKRIGING_EXPORT LinearAlgebra::BlasCheck LinearAlgebra::check_blas(int n_threads) {
+LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads) {
   const auto t0 = std::chrono::steady_clock::now();
   if (n_threads <= 0)
     n_threads = std::max(2, static_cast<int>(std::thread::hardware_concurrency()));
 
-  BlasCheck out;
-  out.library = blas_library();
+  CheckResult out;
+  out.backend = detect_backend();
 
   // not run where it would crash (MKL 2020, Intel threading layer)
-  const bool skip = is_mkl_2020_unsafe(out.library);
+  const bool skip = is_mkl_2020_unsafe(out.backend);
 
   const Results single = skip ? Results{} : run_checks(1, false);
 
@@ -418,7 +418,7 @@ LIBKRIGING_EXPORT LinearAlgebra::BlasCheck LinearAlgebra::check_blas(int n_threa
       keep_worst(concurrent, kv.first, kv.second);
 
   out.ok = true;
-  std::string rep = "BLAS: " + out.library + "\n";
+  std::string rep = "backend: " + out.backend + "\n";
   char line[256];
   auto section = [&](const char* title, const Results& r) {
     rep += title;
@@ -443,7 +443,7 @@ LIBKRIGING_EXPORT LinearAlgebra::BlasCheck LinearAlgebra::check_blas(int n_threa
     section(line, concurrent);
   }
 
-  const std::string advice = known_issues(out.library);
+  const std::string advice = known_issues(out.backend);
   if (!advice.empty())
     rep += "known issue: " + advice + "\n";
   const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();

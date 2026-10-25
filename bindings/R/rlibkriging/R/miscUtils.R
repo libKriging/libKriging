@@ -40,3 +40,26 @@ as_numeric_matrix = function(x) {
     return(data.matrix(x))
   stop(paste0("Data no convertible to numeric matrix: ", typeof(x)))
 }
+
+
+#' Self-test of the linear algebra backend
+#'
+#' Calls the linear algebra routines libKriging relies on (crossprod,
+#' Cholesky, triangular and general solves, inverse, rcond, QR, Woodbury
+#' solve, symmetric eigen decomposition) and compares each result with an
+#' oracle computed in long double without the BLAS, from one thread then from
+#' \code{n_threads} concurrent threads. The BLAS / LAPACK backend (OpenBLAS,
+#' MKL, Accelerate, BLIS, FlexiBLAS, reference, ...) is detected, not chosen.
+#'
+#' @param n_threads Number of concurrent threads (0: hardware concurrency, at
+#'   least 2).
+#' @return A list: \code{ok} (logical), \code{backend} (detected backend and
+#'   file providing dgemm), \code{report} (one line per check, then the
+#'   workaround of a backend known to be faulty).
+#' @examples
+#' c <- linearalgebra_check()
+#' cat(c$report)
+#' @export
+linearalgebra_check <- function(n_threads = 0) {
+  linalg_check(as.integer(n_threads))
+}

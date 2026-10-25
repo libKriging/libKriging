@@ -545,9 +545,9 @@ double lk_linalg_get_chol_jitter(void);
 int lk_linalg_set_chol_jitter(double jitter);
 double lk_linalg_get_num_nugget(void);
 int lk_linalg_set_num_nugget(double nugget);
-/* BLAS / LAPACK self-test (#429): 1 ok, 0 failed, -1 error; library / report
-   point to thread-local strings valid until the next call from the thread */
-int lk_linalg_check_blas(int n_threads, const char** library, const char** report);
+/* Self-test of the detected BLAS / LAPACK backend (#429): 1 ok, 0 failed, -1 error;
+   backend / report point to thread-local strings valid until the next call from the thread */
+int lk_linearalgebra_check(int n_threads, const char** backend, const char** report);
 
 #ifdef __cplusplus
 }

@@ -254,16 +254,17 @@ void set_num_nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   LinearAlgebra::set_num_nugget(input.get<double>(0, "num_nugget"));
 }
 
-// BLAS / LAPACK self-test (#429): [ok, library, report] = check_blas(int32 n_threads)
-void check_blas(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+// Self-test of the detected BLAS / LAPACK backend (#429):
+// [ok, backend, report] = linearalgebra_check(int32 n_threads)
+void check(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Range{0, 1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
-  const auto c = LinearAlgebra::check_blas(input.getOptional<int>(0, "n_threads").value_or(0));
+  const auto c = LinearAlgebra::check(input.getOptional<int>(0, "n_threads").value_or(0));
   output.set(0, c.ok, "ok");
-  output.setOptional(1, c.library, "library");
+  output.setOptional(1, c.backend, "backend");
   output.setOptional(2, c.report, "report");
 }
 

@@ -23,9 +23,10 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test get_num_nugget() == saved_nugget
     end
 
-    @testset "check_blas (#429)" begin
-        c = check_blas(2)
-        @test !isempty(c.library)
+    @testset "linearalgebra_check (#429)" begin
+        c = linearalgebra_check(2)
+        @test !isempty(c.backend)
+        @test startswith(c.report, "backend: ")
         @test occursin("single thread:", c.report)
         @test occursin("2 concurrent threads", c.report)
         c.ok || println(c.report)

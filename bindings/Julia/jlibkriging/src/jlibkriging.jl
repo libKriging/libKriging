@@ -1668,25 +1668,27 @@ get_num_nugget() = ccall(dlsym(_lk(), :lk_linalg_get_num_nugget), Cdouble, ())
 set_num_nugget(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_linalg_set_num_nugget), Cint, (Cdouble,), x))
 
 """
-    check_blas(n_threads::Integer=0) -> (ok, library, report)
+    linearalgebra_check(n_threads::Integer=0) -> (ok, backend, report)
 
-Self-test of the BLAS / LAPACK routines libKriging relies on (matrix product,
-Cholesky, solves, inverse, QR, symmetric eigen decomposition) against long
-double references, from one thread then `n_threads` concurrent threads
-(0: hardware concurrency). `report` holds one line per check and the advice
-for a BLAS known to be faulty (#429).
+Self-test of the linear algebra backend: calls the linear algebra routines
+libKriging relies on (crossprod, Cholesky, triangular and general solves,
+inverse, rcond, QR, Woodbury solve, symmetric eigen decomposition) and compares
+each result with an oracle computed in long double without the BLAS, from one
+thread then `n_threads` concurrent threads (0: hardware concurrency). The
+BLAS / LAPACK backend is detected, not chosen; `report` holds one line per
+check and the workaround of a backend known to be faulty (#429).
 """
-function check_blas(n_threads::Integer=0)
-    lib = Ref{Cstring}()
+function linearalgebra_check(n_threads::Integer=0)
+    be = Ref{Cstring}()
     rep = Ref{Cstring}()
-    ret = ccall(dlsym(_lk(), :lk_linalg_check_blas), Cint, (Cint, Ref{Cstring}, Ref{Cstring}),
-                n_threads, lib, rep)
+    ret = ccall(dlsym(_lk(), :lk_linearalgebra_check), Cint, (Cint, Ref{Cstring}, Ref{Cstring}),
+                n_threads, be, rep)
     ret < 0 && _check_error(ret)
-    return (ok=ret == 1, library=unsafe_string(lib[]), report=unsafe_string(rep[]))
+    return (ok=ret == 1, backend=unsafe_string(be[]), report=unsafe_string(rep[]))
 end
 
 export Kriging, WarpKriging, MLPKriging, NestedKriging
-export get_chol_jitter, set_chol_jitter, get_num_nugget, set_num_nugget, check_blas
+export get_chol_jitter, set_chol_jitter, get_num_nugget, set_num_nugget, linearalgebra_check
 export nb_groups, aggregation, beta0, groups, set_predict_chunk!, set_warp_subsample!
 export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
 export load, load_kriging, load_warp_kriging, load_mlp_kriging, load_nested_kriging

@@ -34,7 +34,7 @@ void get_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void set_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void get_num_nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void set_num_nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
-void check_blas(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void check(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace LinearAlgebraBinding
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_OPTIM_BINDING_HPP

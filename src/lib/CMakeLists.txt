@@ -9,7 +9,7 @@ add_library(Kriging
         Optim.cpp include/libKriging/Optim.hpp
         Random.cpp include/libKriging/Random.hpp
         LinearAlgebra.cpp include/libKriging/LinearAlgebra.hpp
-        BlasCheck.cpp
+        LinearAlgebraCheck.cpp
         Covariance.cpp include/libKriging/Covariance.hpp
         KrigingImpl.cpp include/libKriging/KrigingImpl.hpp
         Kriging.cpp include/libKriging/Kriging.hpp
@@ -37,7 +37,7 @@ if (CXX_CLANG_TIDY)
 endif ()
 
 target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp) # maybe PRIVATE
-# dlsym / dladdr of LinearAlgebra::check_blas (BLAS identification)
+# dlsym / dladdr of LinearAlgebra::check (backend identification)
 target_link_libraries(Kriging PRIVATE ${CMAKE_DL_LIBS})
 
 # Link OpenMP if found (OpenMP loops, fork handlers in Kriging.cpp)

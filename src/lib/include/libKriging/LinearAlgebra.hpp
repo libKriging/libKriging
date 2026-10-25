@@ -162,14 +162,14 @@ class LinearAlgebra {
   /// Symmetric eigen decomposition (arma::eig_sym, LAPACK dsyevd); false on failure.
   LIBKRIGING_EXPORT static bool eig_sym(arma::vec& eigval, arma::mat& eigvec, const arma::mat& A);
 
-  /// Outcome of check_blas().
-  struct BlasCheck {
+  /// Outcome of check().
+  struct CheckResult {
     bool ok = false;      ///< every result within its rounding bound
-    std::string library;  ///< vendor (OpenBLAS config and core, MKL version and threading layer, BLIS,
+    std::string backend;  ///< BLAS / LAPACK vendor (OpenBLAS config and core, MKL version and threading layer, BLIS,
                           ///< FlexiBLAS backend, Accelerate) and the file providing dgemm_
     std::string report;   ///< one line per check, then advice for a BLAS known to be faulty
   };
-  /// Quick self-test of the BLAS / LAPACK behind the LinearAlgebra routines
+  /// Quick self-test of the BLAS / LAPACK backend (detected, not chosen) behind the LinearAlgebra routines
   /// libKriging relies on (crossprod, diagABA, safe_chol_lower, chol_upper,
   /// solve_lower / solve_upper / rsolve_upper, solve, inv_sympd, rcond_chol,
   /// qr_econ, woodbury_solve, eig_sym), each call compared with an oracle
@@ -181,7 +181,7 @@ class LinearAlgebra {
   /// of a second.
   /// Detects e.g. OpenBLAS 0.3.19 / 0.3.20 DYNAMIC_ARCH on CPUs with
   /// avx512_bf16 and MKL 2020 with concurrent callers (#429).
-  LIBKRIGING_EXPORT static BlasCheck check_blas(int n_threads = 0);
+  LIBKRIGING_EXPORT static CheckResult check(int n_threads = 0);
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
