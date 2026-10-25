@@ -955,20 +955,6 @@ void KrigingImpl::print_bench(const std::map<std::string, double>& bench) {
     arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
 }
 
-arma::mat KrigingImpl::hessian_from_gradient(const arma::vec& x,
-                                             const std::function<arma::vec(const arma::vec&)>& grad) {
-  const arma::uword p = x.n_elem;
-  arma::mat hess(p, p);
-  for (arma::uword i = 0; i < p; ++i) {
-    const double h = (x[i] != 0) ? 1e-4 * std::abs(x[i]) : 1e-6;
-    arma::vec xp = x, xm = x;
-    xp[i] += h;
-    xm[i] -= h;
-    hess.col(i) = (grad(xp) - grad(xm)) / (2 * h);
-  }
-  return 0.5 * (hess + hess.t());
-}
-
 void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
                                              const arma::mat& Rinv,
                                              const arma::mat& x,

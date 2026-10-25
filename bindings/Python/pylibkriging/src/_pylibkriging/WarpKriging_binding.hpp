@@ -74,9 +74,7 @@ class PyWarpKriging {
 
   double logLikelihood();
 
-  std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta,
-                                                                                const bool return_grad,
-                                                                                const bool return_hess);
+  std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad);
 
   py::array_t<double> covMat(const py::array_t<double>& X1, const py::array_t<double>& X2);
 

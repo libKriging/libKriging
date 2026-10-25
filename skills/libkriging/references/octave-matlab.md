@@ -39,7 +39,7 @@ k.update(y_u, X_u, true);   % (y_u, X_u, refit)
 % fit's noise; update without noise_u raises an error
 %   s = k.simulate(int32(10), int32(123), Xnew, noise_var_new, false);   % (nsim, seed, X, with_noise, will_update)
 %   k.update(y_u, noise_var_u, X_u, true);   % (y_u, noise_u, X_u, refit)
-% [ll, llgrad, llhess] = k.logLikelihoodFun(theta, return_grad, return_hess, bench): llhess is empty
+% [ll, llgrad] = k.logLikelihoodFun(theta, return_grad, bench)
 
 k.save("k.json");              % JSON, any libKriging class
 k = load_kriging("k.json");    % auto-detects the class

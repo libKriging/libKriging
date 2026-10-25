@@ -51,8 +51,8 @@ def test_normalize_true_matches_false(regmodel):
     np.testing.assert_allclose(kn.leaveOneOut(), ko.leaveOneOut(), rtol=1e-8)
     np.testing.assert_allclose(kn.logMargPost(), ko.logMargPost(), rtol=1e-10)
     t = ko.theta()
-    lln, gn, _ = kn.logLikelihoodFun(t, return_grad=True)
-    llo, go, _ = ko.logLikelihoodFun(t, return_grad=True)
+    lln, gn = kn.logLikelihoodFun(t, return_grad=True)
+    llo, go = ko.logLikelihoodFun(t, return_grad=True)
     np.testing.assert_allclose(lln, llo, rtol=1e-10)
     np.testing.assert_allclose(gn, go, rtol=1e-6)
     np.testing.assert_allclose(kn.leaveOneOutFun(t, True)[1], ko.leaveOneOutFun(t, True)[1], rtol=1e-6)
@@ -67,7 +67,7 @@ def test_objective_at_theta_and_gradient():
     np.testing.assert_allclose(k.leaveOneOutFun(t, False)[0], k.leaveOneOut(), rtol=1e-10)
     np.testing.assert_allclose(k.logMargPostFun(t, False)[0], k.logMargPost(), rtol=1e-10)
     t1 = t * np.array([1.3, 0.8])
-    _, g, _ = k.logLikelihoodFun(t1, return_grad=True)
+    _, g = k.logLikelihoodFun(t1, return_grad=True)
     fd = np.zeros(2)
     for i in range(2):
         h = 1e-5 * t1[i]

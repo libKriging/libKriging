@@ -114,11 +114,11 @@ try
     ll_val = k.logLikelihood();
     assert(isfinite(ll_val));
 
-    [ll, grad] = k.logLikelihoodFun(th, true, false);
+    [ll, grad] = k.logLikelihoodFun(th, true);
     assert(isfinite(ll));
     assert(all(isfinite(grad)));
 
-    [ll2, ~] = k.logLikelihoodFun(th, false, false);
+    [ll2, ~] = k.logLikelihoodFun(th, false);
     assert(isfinite(ll2));
     fprintf("  Test 4 MLP logLikelihoodFun OK\n");
 catch err

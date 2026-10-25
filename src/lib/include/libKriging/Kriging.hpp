@@ -246,13 +246,6 @@ class Kriging : public KrigingImpl {
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& gamma,
                                                                    bool return_grad,
                                                                    bool bench);
-  /** Same, with the Hessian (empty unless return_hess): central differences
-   * of the analytic gradient (KrigingImpl::hessian_from_gradient), in the
-   * same parameters as the gradient. */
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& gamma,
-                                                                              bool return_grad,
-                                                                              bool return_hess,
-                                                                              bool bench);
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutFun(const arma::vec& theta, bool return_grad, bool bench);
 

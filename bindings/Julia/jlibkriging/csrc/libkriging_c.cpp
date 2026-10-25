@@ -402,21 +402,17 @@ int lk_kriging_log_likelihood_fun(void* ptr,
                                   const double* theta,
                                   int theta_n,
                                   int return_grad,
-                                  int return_hess,
                                   int bench,
                                   double* ll_out,
-                                  double* grad_out,
-                                  double* hess_out) {
+                                  double* grad_out) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
-    auto [ll, grad, hess] = k->logLikelihoodFun(theta_v, return_grad != 0, return_hess != 0, bench != 0);
+    auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, bench != 0);
     if (ll_out)
       *ll_out = ll;
     if (grad_out && return_grad)
       std::memcpy(grad_out, grad.memptr(), grad.n_elem * sizeof(double));
-    if (hess_out && return_hess)  // theta_n x theta_n, column-major
-      std::memcpy(hess_out, hess.memptr(), hess.n_elem * sizeof(double));
     return 0;
   }
   CATCH_RETURN
@@ -1204,20 +1200,15 @@ int lk_warp_kriging_log_likelihood_fun(void* ptr,
                                        const double* theta,
                                        int theta_n,
                                        int return_grad,
-                                       int return_hess,
                                        double* ll_out,
-                                       double* grad_out,
-                                       double* hess_out) {
+                                       double* grad_out) {
   try {
     arma::vec theta_vec(const_cast<double*>(theta), theta_n, false, true);
-    auto [ll, grad, hess]
-        = static_cast<WarpKriging*>(ptr)->logLikelihoodFun(theta_vec, return_grad != 0, return_hess != 0);
+    auto [ll, grad] = static_cast<WarpKriging*>(ptr)->logLikelihoodFun(theta_vec, return_grad != 0);
     if (ll_out)
       *ll_out = ll;
     if (return_grad && grad_out)
       std::memcpy(grad_out, grad.memptr(), grad.n_elem * sizeof(double));
-    if (return_hess && hess_out)
-      std::memcpy(hess_out, hess.memptr(), hess.n_elem * sizeof(double));
     return 0;
   }
   CATCH_RETURN
@@ -1713,20 +1704,15 @@ int lk_mlp_kriging_log_likelihood_fun(void* ptr,
                                       const double* theta,
                                       int theta_n,
                                       int return_grad,
-                                      int return_hess,
                                       double* ll_out,
-                                      double* grad_out,
-                                      double* hess_out) {
+                                      double* grad_out) {
   try {
     arma::vec theta_vec(const_cast<double*>(theta), theta_n, false, true);
-    auto [ll, grad, hess]
-        = static_cast<MLPKriging*>(ptr)->logLikelihoodFun(theta_vec, return_grad != 0, return_hess != 0);
+    auto [ll, grad] = static_cast<MLPKriging*>(ptr)->logLikelihoodFun(theta_vec, return_grad != 0);
     if (ll_out)
       *ll_out = ll;
     if (return_grad && grad_out)
       std::memcpy(grad_out, grad.memptr(), grad.n_elem * sizeof(double));
-    if (return_hess && hess_out)
-      std::memcpy(hess_out, hess.memptr(), hess.n_elem * sizeof(double));
     return 0;
   }
   CATCH_RETURN

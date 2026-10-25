@@ -171,11 +171,11 @@ double PyWarpKriging::logLikelihood() {
   return m_internal->logLikelihood();
 }
 
-std::tuple<double, py::array_t<double>, py::array_t<double>>
-PyWarpKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool return_hess) {
+std::tuple<double, py::array_t<double>> PyWarpKriging::logLikelihoodFun(const py::array_t<double>& theta,
+                                                                        const bool return_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, return_hess);
-  return {ll, vec_to_arr(grad), carma::mat_to_arr(hess)};
+  auto [ll, grad] = m_internal->logLikelihoodFun(vec_theta, return_grad);
+  return {ll, vec_to_arr(grad)};
 }
 
 py::array_t<double> PyWarpKriging::covMat(const py::array_t<double>& X1, const py::array_t<double>& X2) {

@@ -354,19 +354,16 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 5}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
+                 RequiresArg::Range{2, 4}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  // [ll, llgrad, llhess] = logLikelihoodFun(theta, return_grad, return_hess, bench),
-  // as in the Python / R bindings; llhess: central differences of the
-  // analytic gradient (C++); bench only prints timings
+  // [ll, llgrad] = logLikelihoodFun(theta, return_grad, bench), as in the
+  // Python / R bindings; bench only prints timings
   const bool return_grad = flag_output_compliance(input, 2, "return_grad", output, 1);
-  const bool return_hess = flag_output_compliance(input, 3, "return_hess", output, 2);
-  const bool bench = input.getOptional<bool>(4, "bench").value_or(false);
-  auto [ll, llgrad, llhess] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, return_hess, bench);
+  const bool bench = input.getOptional<bool>(3, "bench").value_or(false);
+  auto [ll, llgrad] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, bench);
   output.set(0, ll, "ll");                  // FIXME better name
   output.setOptional(1, llgrad, "llgrad");  // FIXME better name
-  output.setOptional(2, llhess, "llhess");
 }
 
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

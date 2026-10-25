@@ -344,22 +344,3 @@ test_that("update / update_simulate: X_u required, by name or position", {
   expect_false("X_u" %in% names(Filter(function(d) !identical(d, quote(expr = )),
                                        formals(rlibkriging:::update.Kriging))))
 })
-
-test_that("logLikelihoodFun Hessian: central differences of the analytic gradient", {
-  X <- matrix(seq(0, 1, length.out = 12), ncol = 1)
-  y <- sin(6 * X[, 1])
-  k <- Kriging(y, X, "matern5_2")
-  t <- 0.5
-  h <- 1e-3 * t
-  f <- function(v) logLikelihoodFun(k, v)$logLikelihood[1]
-  H <- logLikelihoodFun(k, t, return_hess = TRUE)$logLikelihoodHess
-  expect_equal(dim(H), c(1, 1, 1))
-  expect_equal(H[1, 1, 1], (f(t + h) - 2 * f(t) + f(t - h)) / h^2, tolerance = 1e-3)
-  expect_null(logLikelihoodFun(k, t)$logLikelihoodHess)
-
-  wk <- WarpKriging(y, X, warping = "none", kernel = "matern5_2")
-  tw <- as.numeric(wk$theta())
-  Hw <- logLikelihoodFun(wk, tw, return_hess = TRUE)$hessian
-  expect_equal(dim(Hw), c(length(tw), length(tw)))
-  expect_equal(Hw, t(Hw))
-})

@@ -134,11 +134,9 @@ int lk_kriging_log_likelihood_fun(void* ptr,
                                   const double* theta,
                                   int theta_n,
                                   int return_grad,
-                                  int return_hess,
                                   int bench, /* print the timings of the steps */
                                   double* ll_out,
-                                  double* grad_out,
-                                  double* hess_out);
+                                  double* grad_out);
 
 int lk_kriging_leave_one_out_fun(void* ptr,
                                  const double* theta,
@@ -333,10 +331,8 @@ int lk_warp_kriging_log_likelihood_fun(void* ptr,
                                        const double* theta,
                                        int theta_n,
                                        int return_grad,
-                                       int return_hess,
                                        double* ll_out,
-                                       double* grad_out,
-                                       double* hess_out);
+                                       double* grad_out);
 
 const char* lk_warp_kriging_kernel(void* ptr);
 int lk_warp_kriging_get_normalize(void* ptr);
@@ -453,10 +449,8 @@ int lk_mlp_kriging_log_likelihood_fun(void* ptr,
                                       const double* theta,
                                       int theta_n,
                                       int return_grad,
-                                      int return_hess,
                                       double* ll_out,
-                                      double* grad_out,
-                                      double* hess_out);
+                                      double* grad_out);
 
 const char* lk_mlp_kriging_kernel(void* ptr);
 const char* lk_mlp_kriging_activation(void* ptr);

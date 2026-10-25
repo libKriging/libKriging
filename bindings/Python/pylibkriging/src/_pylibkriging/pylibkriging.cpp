@@ -338,10 +338,8 @@ needs "exact" or "vecchia"
            &PyKriging::logLikelihoodFun,
            py::arg("theta"),
            py::arg("return_grad") = false,
-           py::arg("return_hess") = false,
            py::arg("bench") = false,
-           "Log-likelihood at theta: (value, gradient if return_grad, Hessian if return_hess: central "
-           "differences of the analytic gradient); bench prints the timings of the steps.")
+           "Log-likelihood at theta: (value, gradient if return_grad); bench prints the timings of the steps.")
       .def("logMargPostFun",
            &PyKriging::logMargPostFun,
            py::arg("theta"),
@@ -542,11 +540,7 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def("covMat", &PyWarpKriging::covMat, py::arg("X1"), py::arg("X2"))
       .def("summary", &PyWarpKriging::summary)
       .def("logLikelihood", &PyWarpKriging::logLikelihood)
-      .def("logLikelihoodFun",
-           &PyWarpKriging::logLikelihoodFun,
-           py::arg("theta"),
-           py::arg("return_grad") = false,
-           py::arg("return_hess") = false)
+      .def("logLikelihoodFun", &PyWarpKriging::logLikelihoodFun, py::arg("theta"), py::arg("return_grad") = false)
       .def("kernel", &PyWarpKriging::kernel)
       .def("optim", &PyWarpKriging::optim)
       .def("objective", &PyWarpKriging::objective)
@@ -637,11 +631,7 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def("update", &PyMLPKriging::update, py::arg("y_u"), py::arg("X_u"), py::arg("refit") = true)
       .def("summary", &PyMLPKriging::summary)
       .def("logLikelihood", &PyMLPKriging::logLikelihood)
-      .def("logLikelihoodFun",
-           &PyMLPKriging::logLikelihoodFun,
-           py::arg("theta"),
-           py::arg("return_grad") = false,
-           py::arg("return_hess") = false)
+      .def("logLikelihoodFun", &PyMLPKriging::logLikelihoodFun, py::arg("theta"), py::arg("return_grad") = false)
       .def("kernel", &PyMLPKriging::kernel)
       .def("objective", &PyMLPKriging::objective)
       .def("chol_jitter", &PyMLPKriging::chol_jitter, "Diagonal jitter of the fit (logLikelihood).")

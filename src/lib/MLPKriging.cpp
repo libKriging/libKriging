@@ -120,10 +120,8 @@ double MLPKriging::logLikelihood() const {
   return m_impl.logLikelihood();
 }
 
-std::tuple<double, arma::vec, arma::mat> MLPKriging::logLikelihoodFun(const arma::vec& theta,
-                                                                      bool return_grad,
-                                                                      bool return_hess) const {
-  return m_impl.logLikelihoodFun(theta, return_grad, return_hess);
+std::tuple<double, arma::vec> MLPKriging::logLikelihoodFun(const arma::vec& theta, bool return_grad) const {
+  return m_impl.logLikelihoodFun(theta, return_grad);
 }
 
 // -------------------------------------------------------------------------

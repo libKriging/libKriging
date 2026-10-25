@@ -114,11 +114,11 @@ def test_mlpkriging_loglikelihood_fun():
     ll_val = k.logLikelihood()
     assert np.isfinite(ll_val)
 
-    ll, grad, _ = k.logLikelihoodFun(th, return_grad=True)
+    ll, grad = k.logLikelihoodFun(th, return_grad=True)
     assert np.isfinite(ll)
     assert np.all(np.isfinite(grad))
 
-    ll2, _, _ = k.logLikelihoodFun(th, return_grad=False)
+    ll2, _ = k.logLikelihoodFun(th, return_grad=False)
     assert np.isfinite(ll2)
 
 

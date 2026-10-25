@@ -110,7 +110,7 @@ for (i in 1:length(logn)) {
 
   kernel <- "gauss"
   r <- Kriging(y, X, kernel)
-  loglik = rlibkriging::logLikelihoodFun(r, x, return_grad = TRUE) # TODO needs also Hessian ?
+  loglik = rlibkriging::logLikelihoodFun(r, x, return_grad = TRUE)
   for (n in names(loglik)) {
     filer <- file.path(refpath, sprintf("%s-%i-result-%s.csv", prefix, i, n))
     if (do_write) {

@@ -104,27 +104,16 @@ def test_arguments_as_in_r_julia():
     y = np.sin(6 * X[:, 0])
     k = lk.Kriging(y, X, "gauss")
     t = k.theta()[:, 0] if k.theta().ndim == 2 else k.theta()
-    ll, grad, hess = k.logLikelihoodFun(t, return_grad=True, return_hess=False, bench=True)
+    ll, grad = k.logLikelihoodFun(t, return_grad=True, bench=True)
     assert ll == pytest.approx(k.logLikelihoodFun(t)[0])
-    assert grad.size == 1 and hess.size == 0
-    # Hessian: central differences of the analytic gradient, vs second
-    # differences of the values (matern5_2: well conditioned without the
-    # jitter this module disables, unlike gauss)
-    km = lk.Kriging(y, X, "matern5_2")
-    t = np.array([0.5])
-    _, _, hess = km.logLikelihoodFun(t, return_grad=True, return_hess=True)
-    h = 1e-3 * t[0]
-    f = lambda v: km.logLikelihoodFun(np.array([v]))[0]
-    assert hess.shape == (1, 1)
-    assert hess[0, 0] == pytest.approx((f(t[0] + h) - 2 * f(t[0]) + f(t[0] - h)) / h**2, rel=1e-3)
+    assert grad.size == 1
     assert k.leaveOneOutFun(theta=t, return_grad=False, bench=True)[0] == pytest.approx(k.leaveOneOutFun(t)[0])
     assert k.logMargPostFun(theta=t, return_grad=False, bench=True)[0] == pytest.approx(k.logMargPostFun(t)[0])
 
     wk = lk.WarpKriging(y, X, ["none"], "gauss")
     tw = np.atleast_1d(np.asarray(wk.theta()).ravel())
-    ll, grad, hess = wk.logLikelihoodFun(tw, return_grad=True, return_hess=True)
-    assert grad.size == tw.size and hess.shape == (tw.size, tw.size)
-    assert np.allclose(hess, hess.T)
+    ll, grad = wk.logLikelihoodFun(tw, return_grad=True)
+    assert grad.size == tw.size
     with pytest.raises(TypeError):
         wk.simulate(nsim=2, seed=1)  # X required
     assert wk.simulate(nsim=2, seed=1, X=X[:3]).shape == (3, 2)
@@ -160,7 +149,7 @@ def test_data1():
     assert relative_error(loo, loo_ref) < tolerance
     assert relative_error(loograd, loograd_ref) < tolerance
 
-    ll, llgrad, llhess = r.logLikelihoodFun(x, True, False)
+    ll, llgrad = r.logLikelihoodFun(x, True, False)
     assert relative_error(ll, ll_ref) < tolerance
     assert relative_error(llgrad, llgrad_ref) < tolerance
 
@@ -183,7 +172,7 @@ def test_data2(i):
 
     x = 0.3 * np.ones(np.shape(X)[1])
 
-    ll, llgrad, llhess = r.logLikelihoodFun(x, True, False)
+    ll, llgrad = r.logLikelihoodFun(x, True, False)
     assert relative_error(ll, ll_ref) < tolerance
     assert relative_error(llgrad, llgrad_ref) < tolerance
 
@@ -209,6 +198,6 @@ def test_data2_with_save_reload(i):
 
     x = 0.3 * np.ones(np.shape(X)[1])
 
-    ll, llgrad, llhess = r.logLikelihoodFun(x, True, False)
+    ll, llgrad = r.logLikelihoodFun(x, True, False)
     assert relative_error(ll, ll_ref) < tolerance
     assert relative_error(llgrad, llgrad_ref) < tolerance

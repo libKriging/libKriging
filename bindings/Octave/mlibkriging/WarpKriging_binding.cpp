@@ -264,17 +264,15 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 4}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
+                 RequiresArg::Range{2, 3}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
 
   const bool return_grad = flag_output_compliance(input, 2, "return_grad", output, 1);
-  const bool return_hess = flag_output_compliance(input, 3, "return_hess", output, 2);
 
-  auto [ll, grad, hess] = wk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), return_grad, return_hess);
+  auto [ll, grad] = wk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), return_grad);
   output.set(0, ll, "log-likelihood value");
   output.setOptional(1, grad, "log-likelihood gradient");
-  output.setOptional(2, hess, "log-likelihood hessian");
 }
 
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

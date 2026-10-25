@@ -48,8 +48,7 @@ model.update(y_u, X_u, refit=True)
 model.logLikelihood()
 model.leaveOneOut()
 model.logMargPost()
-ll, grad, hess = model.logLikelihoodFun(theta, return_grad=True, return_hess=True)
-# hess: central differences of the analytic gradient (empty unless return_hess)
+ll, grad = model.logLikelihoodFun(theta, return_grad=True)
 ```
 
 Do **not** instantiate `NuggetKriging`/`NoiseKriging` — pass `noise=` to

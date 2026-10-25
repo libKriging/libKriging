@@ -863,8 +863,6 @@ covMat.Kriging <- function(object, x1, x2, ...) {
 #' @param theta A numeric vector of (positive) range parameters at
 #'     which the log-likelihood will be evaluated.
 #' @param return_grad Logical. Should the function return the gradient?
-#' @param return_hess Logical. Should the function return the Hessian
-#'     (central differences of the analytic gradient)?
 #' @param bench Logical. Should the function display benchmarking output?
 #' @param ... Not used.
 #'
@@ -890,7 +888,7 @@ covMat.Kriging <- function(object, x1, x2, ...) {
 #' plot(t, ll(t), type = 'l')
 #' abline(v = k$theta(), col = "blue")
 logLikelihoodFun.Kriging <- function(object, theta,
-                                  return_grad = FALSE, return_hess = FALSE, bench=FALSE, ...) {
+                                  return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (is.data.frame(theta)) theta = data.matrix(theta)
     # Noise/nugget models have an extra parameter (sigma2 or alpha) beyond theta
@@ -901,18 +899,14 @@ logLikelihoodFun.Kriging <- function(object, theta,
     n <- nrow(theta)
     out <- list(logLikelihood = matrix(NA, nrow = n),
                 logLikelihoodGrad = matrix(NA, nrow = n, ncol = d))
-    if (isTRUE(return_hess)) out$logLikelihoodHess <- array(NA, dim = c(n, d, d))
     for (i in 1:n) {
         ll <- kriging_logLikelihoodFun(object, theta[i, ],
                                     return_grad = isTRUE(return_grad),
-                                    return_hess = isTRUE(return_hess),
                                     bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
         if (isTRUE(return_grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
-        if (isTRUE(return_hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
     }
     if (!isTRUE(return_grad)) out$logLikelihoodGrad <- NULL
-    if (!isTRUE(return_hess)) out$logLikelihoodHess <- NULL
 
     return(out)
 }

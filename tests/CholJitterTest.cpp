@@ -160,14 +160,14 @@ TEST_CASE("WarpKriging: the multistart searches the jittered objective", "[jitte
   libKriging::WarpKriging wk(y, X, {"none", "none"}, "gauss", Trend::RegressionModel::Constant, true, "BFGS8");
   const arma::vec theta = wk.theta();
   const double ll = wk.logLikelihood();
-  CHECK(std::abs(ll - std::get<0>(wk.logLikelihoodFun(theta, false, false))) < 1e-10 * std::max(1.0, std::abs(ll)));
+  CHECK(std::abs(ll - std::get<0>(wk.logLikelihoodFun(theta, false))) < 1e-10 * std::max(1.0, std::abs(ll)));
   // a maximum of that objective along each theta axis
   for (arma::uword k = 0; k < theta.n_elem; ++k)
     for (const double f : {0.99, 1.01}) {
       arma::vec t = theta;
       t(k) *= f;
       INFO("theta " << theta.t() << "axis " << k << " factor " << f);
-      CHECK(std::get<0>(wk.logLikelihoodFun(t, false, false)) <= ll + 1e-6 * std::abs(ll));
+      CHECK(std::get<0>(wk.logLikelihoodFun(t, false)) <= ll + 1e-6 * std::abs(ll));
     }
   LinearAlgebra::set_chol_jitter(saved);
 }

@@ -351,8 +351,8 @@ class WarpKriging:
     # Forward all other methods directly
     def summary(self): return self._impl.summary()
     def logLikelihood(self): return self._impl.logLikelihood()
-    def logLikelihoodFun(self, theta, return_grad=False, return_hess=False):
-        return self._impl.logLikelihoodFun(theta, return_grad, return_hess)
+    def logLikelihoodFun(self, theta, return_grad=False):
+        return self._impl.logLikelihoodFun(theta, return_grad)
     def kernel(self): return self._impl.kernel()
     def X(self): return self._impl.X()
     def centerX(self): return self._impl.centerX()

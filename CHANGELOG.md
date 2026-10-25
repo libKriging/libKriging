@@ -37,20 +37,25 @@ past release, see the corresponding entry on the
     `Kriging`, `WarpKriging`, `MLPKriging` (the defaults of Python / R; `simulate(model, nsim, seed, X)`
     unchanged); `simulate(::Kriging, …; with_noise=true/false)` = `with_nugget` (as in Python / R);
     `bench=` of `log_likelihood_fun`, `leave_one_out_fun`, `log_marg_post_fun` (`Kriging`).
-  - **Python**: `Kriging.logLikelihoodFun(theta, return_grad, return_hess, bench)`: `want_hess`
-    renamed `return_hess` (as in R / Julia and the other classes; positional calls unchanged), and
-    `bench=`; `leaveOneOutFun` / `logMargPostFun` take `theta`, `return_grad`, `bench` by name;
-    `WarpKriging.logLikelihoodFun(theta, return_grad, return_hess)` (was `**kw`);
+  - **Python**: `Kriging.logLikelihoodFun`, `leaveOneOutFun`, `logMargPostFun` take `theta`,
+    `return_grad`, `bench` by name; `WarpKriging.logLikelihoodFun(theta, return_grad)` (was `**kw`);
     `WarpKriging.simulate` without `X` raises `TypeError` (passed `None` down).
   - **R**: `update()` / `update_simulate()` of a `Kriging`: `X_u` has no default in the
     signature (it was `NULL`, then an error); calls unchanged.
-- **Log-likelihood Hessian** (`logLikelihoodFun(theta, return_grad, return_hess)`): computed for
-  `Kriging` (every noise model, `normalize`) and `WarpKriging` / `MLPKriging`, by central differences
-  of the analytic gradient (`KrigingImpl::hessian_from_gradient`, step `1e-4 |theta_i|`, symmetrized;
-  2 dim(theta) gradients, only when asked). Before, `return_hess` returned an empty matrix in every
-  binding. C++: `Kriging::logLikelihoodFun(theta, return_grad, return_hess, bench)` overload (the
-  3-argument one unchanged); Python / R / Octave / Julia return it. Checked against second
-  differences of the values (`tests/LogLikelihoodHessianTest.cpp`, each binding).
+- **Log-likelihood Hessian removed** (breaking): `logLikelihoodFun` has no `return_hess` argument
+  nor Hessian output any more, in C++ and every binding; it was never computed (an empty matrix,
+  since the analytic Hessian of the former Newton optimizer was dropped).
+  - C++: `WarpKriging::logLikelihoodFun(theta, return_grad)` and `MLPKriging::logLikelihoodFun`
+    return `(ll, grad)` (was `(ll, grad, hess)`); `Kriging::logLikelihoodFun(theta, return_grad,
+    bench)` unchanged; the unused `Optim::reparam_from_deriv2` is removed.
+  - Python: `logLikelihoodFun` returns `(ll, grad)` (was `(ll, grad, hess)`), arguments
+    `(theta, return_grad=False, bench=False)` for `Kriging` (`want_hess` removed: a third positional
+    argument is now `bench`), `(theta, return_grad=False)` for `WarpKriging` / `MLPKriging`.
+  - R: no `return_hess` (`logLikelihoodHess` / `hessian` no longer returned).
+  - Octave: `[ll, llgrad] = logLikelihoodFun(theta, return_grad[, bench])` (`Kriging`),
+    `logLikelihoodFun(theta, return_grad)` (`WarpKriging` / `MLPKriging`); a third output raises.
+  - Julia: no `return_hess`; `log_likelihood_fun` returns `(ll=, grad=)`; C API
+    `lk_*_log_likelihood_fun` without `return_hess` / `hess_out`.
 - **Python `Kriging.simulate` on a nugget model**: without `with_noise`, the draws include the nugget
   (as in R / Julia; Octave takes `with_nugget` explicitly), except with `method="nystrom"` (latent
   process only). Before, Python simulated the latent process: pass `with_noise=False` for it.

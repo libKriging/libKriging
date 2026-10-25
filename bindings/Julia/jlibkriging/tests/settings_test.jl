@@ -129,17 +129,4 @@ end
     @test leave_one_out_fun(k, t; bench=true).loo ≈ leave_one_out_fun(k, t).loo
     @test log_marg_post_fun(k, t; bench=true).lmp ≈ log_marg_post_fun(k, t).lmp
 
-    # Hessian (central differences of the analytic gradient) vs second
-    # differences of the values
-    km = Kriging(y, X, "matern5_2")
-    t = [0.5]
-    h = 1e-3 * t[1]
-    f(v) = log_likelihood_fun(km, [v]).ll
-    H = log_likelihood_fun(km, t; return_hess=true).hess
-    @test size(H) == (1, 1)
-    @test H[1, 1] ≈ (f(t[1] + h) - 2 * f(t[1]) + f(t[1] - h)) / h^2 rtol = 1e-3
-    @test log_likelihood_fun(km, t).hess === nothing
-    tw = vec(theta(wk))
-    Hw = log_likelihood_fun(wk, tw; return_hess=true).hess
-    @test size(Hw) == (length(tw), length(tw)) && Hw ≈ Hw'
 end

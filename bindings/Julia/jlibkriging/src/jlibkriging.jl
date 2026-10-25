@@ -518,22 +518,17 @@ end
 
 function log_likelihood_fun(k::Kriging, theta::Vector{Float64};
                              return_grad::Bool=false,
-                             return_hess::Bool=false,
                              bench::Bool=false)
     n = length(theta)
     ll = Ref{Float64}(0.0)
     grad = return_grad ? Vector{Float64}(undef, n) : Float64[]
-    # hessian: central differences of the analytic gradient (C++)
-    hess = return_hess ? Matrix{Float64}(undef, n, n) : Matrix{Float64}(undef, 0, 0)
     ret = ccall(dlsym(_lk(), :lk_kriging_log_likelihood_fun), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint, Cint,
-                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-                k.ptr, theta, n, return_grad ? 1 : 0, return_hess ? 1 : 0, bench ? 1 : 0,
-                ll, return_grad ? grad : C_NULL, return_hess ? hess : C_NULL)
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint,
+                 Ptr{Float64}, Ptr{Float64}),
+                k.ptr, theta, n, return_grad ? 1 : 0, bench ? 1 : 0,
+                ll, return_grad ? grad : C_NULL)
     _check_error(ret)
-    return (ll=ll[],
-            grad=return_grad ? grad : nothing,
-            hess=return_hess ? hess : nothing)
+    return (ll=ll[], grad=return_grad ? grad : nothing)
 end
 
 function leave_one_out_fun(k::Kriging, theta::Vector{Float64};
@@ -1076,21 +1071,17 @@ function log_likelihood(wk::WarpKriging)
 end
 
 function log_likelihood_fun(wk::WarpKriging, theta::Vector{Float64};
-                             return_grad::Bool=false,
-                             return_hess::Bool=false)
+                             return_grad::Bool=false)
     n = length(theta)
     ll = Ref{Float64}(0.0)
     grad = return_grad ? Vector{Float64}(undef, n) : Float64[]
-    hess = return_hess ? Matrix{Float64}(undef, n, n) : Matrix{Float64}(undef, 0, 0)
     ret = ccall(dlsym(_lk(), :lk_warp_kriging_log_likelihood_fun), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint,
-                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-                wk.ptr, theta, n, return_grad ? 1 : 0, return_hess ? 1 : 0,
-                ll, return_grad ? grad : C_NULL, return_hess ? hess : C_NULL)
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
+                 Ptr{Float64}, Ptr{Float64}),
+                wk.ptr, theta, n, return_grad ? 1 : 0,
+                ll, return_grad ? grad : C_NULL)
     _check_error(ret)
-    return (ll=ll[],
-            grad=return_grad ? grad : nothing,
-            hess=return_hess ? hess : nothing)
+    return (ll=ll[], grad=return_grad ? grad : nothing)
 end
 
 kernel(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_kernel), Cstring, (Ptr{Nothing},), wk.ptr))
@@ -1459,21 +1450,17 @@ function log_likelihood(mk::MLPKriging)
 end
 
 function log_likelihood_fun(mk::MLPKriging, theta::Vector{Float64};
-                             return_grad::Bool=false,
-                             return_hess::Bool=false)
+                             return_grad::Bool=false)
     n = length(theta)
     ll = Ref{Float64}(0.0)
     grad = return_grad ? Vector{Float64}(undef, n) : Float64[]
-    hess = return_hess ? Matrix{Float64}(undef, n, n) : Matrix{Float64}(undef, 0, 0)
     ret = ccall(dlsym(_lk(), :lk_mlp_kriging_log_likelihood_fun), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint,
-                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-                mk.ptr, theta, n, return_grad ? 1 : 0, return_hess ? 1 : 0,
-                ll, return_grad ? grad : C_NULL, return_hess ? hess : C_NULL)
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
+                 Ptr{Float64}, Ptr{Float64}),
+                mk.ptr, theta, n, return_grad ? 1 : 0,
+                ll, return_grad ? grad : C_NULL)
     _check_error(ret)
-    return (ll=ll[],
-            grad=return_grad ? grad : nothing,
-            hess=return_hess ? hess : nothing)
+    return (ll=ll[], grad=return_grad ? grad : nothing)
 end
 
 kernel(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_kernel), Cstring, (Ptr{Nothing},), mk.ptr))

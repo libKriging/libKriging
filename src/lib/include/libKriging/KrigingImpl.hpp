@@ -395,14 +395,7 @@ class KrigingImpl {
   /// Print a bench timing map in the standard "| key | value |" format.
   static void print_bench(const std::map<std::string, double>& bench);
 
-  /// Hessian of an objective at x, by central differences of its analytic
-  /// gradient `grad(x)`, symmetrized: column i is (grad(x + h_i e_i) -
-  /// grad(x - h_i e_i)) / (2 h_i), with h_i = 1e-4 |x_i| (1e-6 at 0), which
-  /// keeps positive parameters positive. Costs 2 dim(x) gradients.
-  static arma::mat hessian_from_gradient(const arma::vec& x, const std::function<arma::vec(const arma::vec&)>& grad);
-
-  /// Dispatch an objective function (scalar + gradient; hessian: see
-  /// hessian_from_gradient) with
+  /// Dispatch an objective function (scalar + gradient) with
   /// optional benchmark timing.  `fn(grad_out, bench_out)` must return the
   /// objective value and write the gradient into *grad_out when non-null.
   template <typename Fn>

@@ -123,9 +123,8 @@ class MLPKriging {
 
   LIBKRIGING_EXPORT double logLikelihood() const;
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta,
-                                                                              bool return_grad = true,
-                                                                              bool return_hess = false) const;
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta,
+                                                                   bool return_grad = true) const;
 
   // -----------------------------------------------------------------------
   //  Accessors
