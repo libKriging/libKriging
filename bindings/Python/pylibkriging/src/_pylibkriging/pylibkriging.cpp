@@ -357,7 +357,9 @@ needs "exact" or "vecchia"
       .def("optim", &PyKriging::optim)
       .def("objective", &PyKriging::objective)
       .def("chol_jitter", &PyKriging::chol_jitter, "Diagonal jitter of the fit (logLikelihood).")
-      .def("model_chol_jitter", &PyKriging::model_chol_jitter, "Diagonal jitter of the committed model (predict / simulate / update).")
+      .def("model_chol_jitter",
+           &PyKriging::model_chol_jitter,
+           "Diagonal jitter of the committed model (predict / simulate / update).")
       .def("method", &PyKriging::method, "Fit method: \"exact\", \"vecchia(m)\" or \"nystrom(k)\".")
       .def("nystrom_rank", &PyKriging::nystrom_rank)
       .def("vecchia_neighbors", &PyKriging::vecchia_neighbors)
@@ -537,7 +539,9 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def("optim", &PyWarpKriging::optim)
       .def("objective", &PyWarpKriging::objective)
       .def("chol_jitter", &PyWarpKriging::chol_jitter, "Diagonal jitter of the fit (logLikelihood).")
-      .def("model_chol_jitter", &PyWarpKriging::model_chol_jitter, "Diagonal jitter of the committed model (predict / simulate / update).")
+      .def("model_chol_jitter",
+           &PyWarpKriging::model_chol_jitter,
+           "Diagonal jitter of the committed model (predict / simulate / update).")
       .def("method", &PyWarpKriging::method)
       .def("noise", &PyWarpKriging::noise)
       .def("warp_params", &PyWarpKriging::warp_params)
@@ -629,7 +633,9 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def("kernel", &PyMLPKriging::kernel)
       .def("objective", &PyMLPKriging::objective)
       .def("chol_jitter", &PyMLPKriging::chol_jitter, "Diagonal jitter of the fit (logLikelihood).")
-      .def("model_chol_jitter", &PyMLPKriging::model_chol_jitter, "Diagonal jitter of the committed model (predict / simulate / update).")
+      .def("model_chol_jitter",
+           &PyMLPKriging::model_chol_jitter,
+           "Diagonal jitter of the committed model (predict / simulate / update).")
       .def("method", &PyMLPKriging::method)
       .def("X", &PyMLPKriging::X)
       .def("centerX", &PyMLPKriging::centerX)
