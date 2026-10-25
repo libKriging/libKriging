@@ -119,7 +119,8 @@ def test_arguments_as_in_r_julia():
     assert wk.simulate(nsim=2, seed=1, X=X[:3]).shape == (3, 2)
 
     # nugget model: simulate includes the nugget by default, as in R / Julia
-    kn = lk.Kriging(y, X, "gauss", noise="nugget")
+    # nugget fixed > 0: estimated on these noise-free data, it can be 0 (Windows)
+    kn = lk.Kriging(y, X, "gauss", noise="nugget", parameters={"nugget": 0.01, "is_nugget_estim": False})
     Xn = np.array([[0.25], [0.75]])
     assert np.array_equal(kn.simulate(3, 7, Xn), kn.simulate(3, 7, Xn, with_noise=True))
     assert not np.array_equal(kn.simulate(3, 7, Xn), kn.simulate(3, 7, Xn, with_noise=False))
