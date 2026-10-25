@@ -32,6 +32,7 @@ env:
 
 jobs:
   probe:
+    if: false # diagnosis done (#429), see the commit message
     name: "probe (${{ matrix.os }} #${{ matrix.replica }})"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 75
@@ -202,6 +203,7 @@ jobs:
   # Sapphire Rapids. Discriminates an OpenBLAS 0.3.20 kernel-selection bug
   # (reproduced under emulation) from a hardware / hypervisor one (not).
   sde:
+    if: false # diagnosis done (#429)
     name: "sde (ubuntu-22.04, OpenBLAS 0.3.20)"
     runs-on: ubuntu-22.04
     timeout-minutes: 120
