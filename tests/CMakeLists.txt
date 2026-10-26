@@ -67,7 +67,11 @@ set_tests_properties(CholJitterTest/LK_CHOL_JITTER PROPERTIES ENVIRONMENT "LK_CH
 add_executable(LongRangeRestartTest LongRangeRestartTest.cpp)
 target_link_libraries(LongRangeRestartTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries LongRangeRestartTest)
-catch_discover_tests(LongRangeRestartTest)
+if(DEFINED ENV{GITHUB_ACTIONS})
+    set(AdditionalCatchParameters "~[intensive]")
+endif()
+catch_discover_tests(LongRangeRestartTest EXTRA_ARGS ${AdditionalCatchParameters})
+unset(AdditionalCatchParameters)
 
 add_executable(KrigingFitTest KrigingFitTest.cpp)
 target_link_libraries(KrigingFitTest LINK_PUBLIC Kriging Catch2)
