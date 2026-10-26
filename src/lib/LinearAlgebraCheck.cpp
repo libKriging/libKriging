@@ -6,6 +6,8 @@
 
 #include "libKriging/LinearAlgebra.hpp"
 
+#include "ThreadBudget.hpp"
+
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -277,6 +279,12 @@ double ratio(const arma::mat& a, const arma::mat& x, const arma::mat& t, double 
 
 using Results = std::map<std::string, double>;
 
+// LK_LINEARALGEBRA_CHECK_TRACE: stderr lines per check and per worker, to locate a BLAS crash or stall
+bool trace_enabled() {
+  static const bool trace = std::getenv("LK_LINEARALGEBRA_CHECK_TRACE") != nullptr;
+  return trace;
+}
+
 void keep_worst(Results& into, const std::string& name, double r) {
   auto it = into.find(name);
   if (it == into.end() || !(r <= it->second))
@@ -292,9 +300,8 @@ Results run_checks(std::uint64_t seed, bool concurrent) {
   Results res;
   std::mt19937_64 g(seed);
   const arma::uword n = 150;
-  // LK_LINEARALGEBRA_CHECK_TRACE: one stderr line per check, to locate a BLAS crash
-  static const bool trace = std::getenv("LK_LINEARALGEBRA_CHECK_TRACE") != nullptr;
-  auto guarded = [&res, seed](const std::string& name, const std::function<double()>& f) {
+  const bool trace = trace_enabled();
+  auto guarded = [&res, seed, trace](const std::string& name, const std::function<double()>& f) {
     if (trace) {
       std::fprintf(stderr, "LinearAlgebra::check[%llu] %s\n", static_cast<unsigned long long>(seed), name.c_str());
       std::fflush(stderr);
@@ -467,21 +474,37 @@ LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads)
   // not run where it would crash (MKL 2020, Intel threading layer)
   const bool skip = is_mkl_2020_unsafe(out.backend);
 
+  // the thread budget of the public methods (OpenBLAS count included)
+  libKriging::detail::BudgetScope budget;
+
   const Results single = skip ? Results{} : run_checks(1, false);
   const auto t2 = std::chrono::steady_clock::now();
 
-  // the same checks from concurrent threads, as the multistart fits do
+  // the same checks from concurrent threads, in the conditions of the task
+  // pool of the multistart fits: each worker marked as such, with its share
+  // of the budget for the BLAS (OpenBLAS count set once for all of them)
   std::vector<Results> per_thread(skip ? 0 : n_threads);
   if (!skip) {
+    const int share = std::max(1, libKriging::detail::budget_total() / n_threads);
+    libKriging::detail::ScopedBlasThreads blas_share(libKriging::detail::blas_threads_for(share));
     std::vector<std::thread> threads;
     for (int t = 0; t < n_threads; ++t)
-      threads.emplace_back([t, &per_thread] {
+      threads.emplace_back([t, share, &per_thread] {
+        libKriging::detail::ScopedShare worker_share(share);
         for (int rep = 0; rep < 2; ++rep)
           for (const auto& kv : run_checks(1000 + 100 * t + rep, true))
             keep_worst(per_thread[t], kv.first, kv.second);
+        if (trace_enabled()) {
+          std::fprintf(stderr, "LinearAlgebra::check worker %d done\n", t);
+          std::fflush(stderr);
+        }
       });
     for (auto& th : threads)
       th.join();
+    if (trace_enabled()) {
+      std::fprintf(stderr, "LinearAlgebra::check workers joined\n");
+      std::fflush(stderr);
+    }
   }
   Results concurrent;
   for (const auto& r : per_thread)
