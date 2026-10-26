@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -34,6 +35,9 @@
 #include <windows.h>
 #else
 #include <dlfcn.h>
+#if defined(__linux__)
+#include <link.h>
+#endif
 #endif
 
 namespace {
@@ -126,6 +130,45 @@ void bound_module(BlasModule& m) {
       break;
     p = q;
   }
+#if defined(__linux__)
+  // Armadillo's wrapper linked into a non-PIE executable (static libKriging,
+  // e.g. the Octave builds): wrapper2_dgemm_ is in the executable, whose path
+  // dlopen does not reopen; the first shared object of the load order
+  // defining dgemm_ is the one the wrapper calls
+  char* exe = realpath("/proc/self/exe", nullptr);
+  const bool in_exe = exe && m.path == exe;
+  std::free(exe);
+  if (in_exe) {
+    struct Found {
+      std::string path;
+    } found;
+    dl_iterate_phdr(
+        [](struct dl_phdr_info* info, size_t, void* data) -> int {
+          if (!info->dlpi_name || !info->dlpi_name[0])
+            return 0;  // the executable
+          void* h = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
+          if (!h)
+            return 0;
+          void* q = dlsym(h, "dgemm_");
+          Dl_info qi;
+          const bool own = q && dladdr(q, &qi) && qi.dli_fname && std::string(qi.dli_fname) == info->dlpi_name;
+          dlclose(h);
+          if (!own)
+            return 0;
+          static_cast<Found*>(data)->path = info->dlpi_name;
+          return 1;
+        },
+        &found);
+    if (!found.path.empty()) {
+      if (m.handle)
+        dlclose(m.handle);
+      char* real = realpath(found.path.c_str(), nullptr);
+      m.path = real ? real : found.path;
+      std::free(real);
+      m.handle = dlopen(found.path.c_str(), RTLD_LAZY | RTLD_NOLOAD);
+    }
+  }
+#endif
 #endif
 #else
   (void)m;
@@ -285,6 +328,24 @@ bool trace_enabled() {
   return trace;
 }
 
+// one trace line, stamped with the time since the first one: the stamps of a
+// captured output (e.g. ctest) are those of its flushes, not of the events
+void trace_line(const char* fmt, ...) {
+  if (!trace_enabled())
+    return;
+  static const auto start = std::chrono::steady_clock::now();
+  char msg[512];
+  va_list args;
+  va_start(args, fmt);
+  std::vsnprintf(msg, sizeof msg, fmt, args);
+  va_end(args);
+  std::fprintf(stderr,
+               "LinearAlgebra::check +%.3f s %s\n",
+               std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(),
+               msg);
+  std::fflush(stderr);
+}
+
 void keep_worst(Results& into, const std::string& name, double r) {
   auto it = into.find(name);
   if (it == into.end() || !(r <= it->second))
@@ -300,40 +361,28 @@ Results run_checks(std::uint64_t seed, bool concurrent) {
   Results res;
   std::mt19937_64 g(seed);
   const arma::uword n = 150;
-  const bool trace = trace_enabled();
-  auto guarded = [&res, seed, trace](const std::string& name, const std::function<double()>& f) {
-    if (trace) {
-      std::fprintf(stderr, "LinearAlgebra::check[%llu] %s\n", static_cast<unsigned long long>(seed), name.c_str());
-      std::fflush(stderr);
-    }
-    const auto t0 = std::chrono::steady_clock::now();
+  const unsigned long long sd = seed;
+  trace_line("[%llu] start", sd);
+  auto guarded = [&res, sd](const std::string& name, const std::function<double()>& f) {
+    trace_line("[%llu] %s", sd, name.c_str());
     double r;
     try {
       r = f();
     } catch (const std::exception&) {
       r = std::numeric_limits<double>::infinity();
     }
-    if (trace) {
-      std::fprintf(stderr,
-                   "LinearAlgebra::check[%llu] %s done in %.3f s\n",
-                   static_cast<unsigned long long>(seed),
-                   name.c_str(),
-                   std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count());
-      std::fflush(stderr);
-    }
+    trace_line("[%llu] %s done", sd, name.c_str());
     keep_worst(res, name, r);
   };
   const arma::mat R = spd_mat(g, n);
   const arma::mat B = random_mat(g, n, 7);
   arma::mat L;
+  trace_line("[%llu] matrices drawn; safe_chol_lower", sd);
   try {
-    if (trace) {
-      std::fprintf(stderr, "LinearAlgebra::check[%llu] safe_chol_lower\n", static_cast<unsigned long long>(seed));
-      std::fflush(stderr);
-    }
     L = LinearAlgebra::safe_chol_lower(R);
   } catch (const std::exception&) {
   }
+  trace_line("[%llu] safe_chol_lower done", sd);
 
   // each check: one public LinearAlgebra call, against an oracle computed
   // here in long double without the BLAS
@@ -487,24 +536,21 @@ LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads)
   if (!skip) {
     const int share = std::max(1, libKriging::detail::budget_total() / n_threads);
     libKriging::detail::ScopedBlasThreads blas_share(libKriging::detail::blas_threads_for(share));
+    trace_line("concurrent pass: %d workers, BLAS share %d", n_threads, share);
     std::vector<std::thread> threads;
     for (int t = 0; t < n_threads; ++t)
       threads.emplace_back([t, share, &per_thread] {
+        trace_line("worker %d started", t);
         libKriging::detail::ScopedShare worker_share(share);
         for (int rep = 0; rep < 2; ++rep)
           for (const auto& kv : run_checks(1000 + 100 * t + rep, true))
             keep_worst(per_thread[t], kv.first, kv.second);
-        if (trace_enabled()) {
-          std::fprintf(stderr, "LinearAlgebra::check worker %d done\n", t);
-          std::fflush(stderr);
-        }
+        trace_line("worker %d done", t);
       });
+    trace_line("workers created");
     for (auto& th : threads)
       th.join();
-    if (trace_enabled()) {
-      std::fprintf(stderr, "LinearAlgebra::check workers joined\n");
-      std::fflush(stderr);
-    }
+    trace_line("workers joined");
   }
   Results concurrent;
   for (const auto& r : per_thread)
