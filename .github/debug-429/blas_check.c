@@ -13,21 +13,65 @@
 #include <string.h>
 
 typedef int blasint;
-extern void dgemm_(const char*, const char*, const blasint*, const blasint*, const blasint*, const double*,
-                   const double*, const blasint*, const double*, const blasint*, const double*, double*,
+extern void dgemm_(const char*,
+                   const char*,
+                   const blasint*,
+                   const blasint*,
+                   const blasint*,
+                   const double*,
+                   const double*,
+                   const blasint*,
+                   const double*,
+                   const blasint*,
+                   const double*,
+                   double*,
                    const blasint*);
-extern void dgemv_(const char*, const blasint*, const blasint*, const double*, const double*, const blasint*,
-                   const double*, const blasint*, const double*, double*, const blasint*);
-extern void dsyrk_(const char*, const char*, const blasint*, const blasint*, const double*, const double*,
-                   const blasint*, const double*, double*, const blasint*);
-extern void dtrsm_(const char*, const char*, const char*, const char*, const blasint*, const blasint*,
-                   const double*, const double*, const blasint*, double*, const blasint*);
-extern void dsymv_(const char*, const blasint*, const double*, const double*, const blasint*, const double*,
-                   const blasint*, const double*, double*, const blasint*);
+extern void dgemv_(const char*,
+                   const blasint*,
+                   const blasint*,
+                   const double*,
+                   const double*,
+                   const blasint*,
+                   const double*,
+                   const blasint*,
+                   const double*,
+                   double*,
+                   const blasint*);
+extern void dsyrk_(const char*,
+                   const char*,
+                   const blasint*,
+                   const blasint*,
+                   const double*,
+                   const double*,
+                   const blasint*,
+                   const double*,
+                   double*,
+                   const blasint*);
+extern void dtrsm_(const char*,
+                   const char*,
+                   const char*,
+                   const char*,
+                   const blasint*,
+                   const blasint*,
+                   const double*,
+                   const double*,
+                   const blasint*,
+                   double*,
+                   const blasint*);
+extern void dsymv_(const char*,
+                   const blasint*,
+                   const double*,
+                   const double*,
+                   const blasint*,
+                   const double*,
+                   const blasint*,
+                   const double*,
+                   double*,
+                   const blasint*);
 extern double ddot_(const blasint*, const double*, const blasint*, const double*, const blasint*);
 extern void dpotrf_(const char*, const blasint*, double*, const blasint*, blasint*);
-extern void dgesv_(const blasint*, const blasint*, double*, const blasint*, blasint*, double*, const blasint*,
-                   blasint*);
+extern void
+dgesv_(const blasint*, const blasint*, double*, const blasint*, blasint*, double*, const blasint*, blasint*);
 
 #define TOL 50.0
 #define EPS 2.220446049250313e-16
@@ -36,7 +80,9 @@ static int n_cases = 0, n_fails = 0;
 static double worst_ratio = 0;
 static char worst_case[128] = "none";
 
-static double urand(void) { return 2.0 * rand() / (double)RAND_MAX - 1.0; }
+static double urand(void) {
+  return 2.0 * rand() / (double)RAND_MAX - 1.0;
+}
 static double* rmat(int m, int n) {
   double* a = malloc(sizeof(double) * (size_t)(m > 0 ? m : 1) * (n > 0 ? n : 1));
   for (long i = 0; i < (long)m * n; i++)
@@ -56,7 +102,9 @@ static void record(const char* name, double ratio) {
 }
 
 /* op(X)(i,j) for a column-major X with leading dimension ld */
-static double op(const double* x, int ld, char t, int i, int j) { return t == 'N' ? x[i + (long)j * ld] : x[j + (long)i * ld]; }
+static double op(const double* x, int ld, char t, int i, int j) {
+  return t == 'N' ? x[i + (long)j * ld] : x[j + (long)i * ld];
+}
 
 static void check_gemm(int m, int n, int k, char ta, char tb, double beta) {
   int lda = ta == 'N' ? m : k, ldb = tb == 'N' ? k : n;
@@ -79,7 +127,8 @@ static void check_gemm(int m, int n, int k, char ta, char tb, double beta) {
       long double ref = alpha * s + beta * c0[i + (long)j * m];
       long double bound = (fabsl(alpha) * sa + fabs(beta * c0[i + (long)j * m])) * (k + 2) * EPS + 1e-300;
       double r = (double)(fabsl(c[i + (long)j * m] - ref) / bound);
-      if (!(r <= ratio)) ratio = r;
+      if (!(r <= ratio))
+        ratio = r;
     }
   char name[128];
   snprintf(name, sizeof name, "dgemm_%c%c_m%d_n%d_k%d_beta%g", ta, tb, m, n, k, beta);
@@ -102,7 +151,8 @@ static void check_gemv(int m, int n, char t) {
     }
     long double ref = alpha * s + beta * y0[i];
     double r = (double)(fabsl(y[i] - ref) / ((alpha * sa + fabs(beta * y0[i])) * (lx + 2) * EPS + 1e-300));
-    if (!(r <= ratio)) ratio = r;
+    if (!(r <= ratio))
+      ratio = r;
   }
   char name[128];
   snprintf(name, sizeof name, "dgemv_%c_m%d_n%d", t, m, n);
@@ -139,8 +189,10 @@ static void check_syrk(int n, int k, char uplo, char t) {
         s += p, sa += fabsl(p);
       }
       long double ref = alpha * s + beta * c0[i + (long)j * n];
-      double r = (double)(fabsl(c[i + (long)j * n] - ref) / ((sa + fabs(beta * c0[i + (long)j * n])) * (k + 2) * EPS + 1e-300));
-      if (!(r <= ratio)) ratio = r;
+      double r = (double)(fabsl(c[i + (long)j * n] - ref)
+                          / ((sa + fabs(beta * c0[i + (long)j * n])) * (k + 2) * EPS + 1e-300));
+      if (!(r <= ratio))
+        ratio = r;
     }
   char name[128];
   snprintf(name, sizeof name, "dsyrk_%c%c_n%d_k%d", uplo, t, n, k);
@@ -160,7 +212,8 @@ static void check_symv(int n) {
       s += p, sa += fabsl(p);
     }
     double r = (double)(fabsl(y[i] - s) / (sa * (n + 2) * EPS + 1e-300));
-    if (!(r <= ratio)) ratio = r;
+    if (!(r <= ratio))
+      ratio = r;
   }
   char name[128];
   snprintf(name, sizeof name, "dsymv_L_n%d", n);
@@ -187,9 +240,12 @@ static void check_trsm(int m, int n, char side, char uplo, char t) {
   double* a = rmat(na, na);
   for (int j = 0; j < na; j++)
     for (int i = 0; i < na; i++) {
-      if ((uplo == 'L' && i < j) || (uplo == 'U' && i > j)) a[i + (long)j * na] = 0;
-      if (i == j) a[i + (long)j * na] = 2.0 + fabs(a[i + (long)j * na]);
-      else a[i + (long)j * na] /= na;
+      if ((uplo == 'L' && i < j) || (uplo == 'U' && i > j))
+        a[i + (long)j * na] = 0;
+      if (i == j)
+        a[i + (long)j * na] = 2.0 + fabs(a[i + (long)j * na]);
+      else
+        a[i + (long)j * na] /= na;
     }
   double *b = rmat(m, n), *x = malloc(sizeof(double) * (size_t)m * n);
   memcpy(x, b, sizeof(double) * (size_t)m * n);
@@ -203,8 +259,10 @@ static void check_trsm(int m, int n, char side, char uplo, char t) {
                                     : (long double)x[i + (long)l * m] * op(a, na, t, l, j);
         s += p, sa += fabsl(p);
       }
-      double r = (double)(fabsl(s - alpha * b[i + (long)j * m]) / ((sa + fabs(alpha * b[i + (long)j * m])) * (na + 2) * EPS * 4 + 1e-300));
-      if (!(r <= ratio)) ratio = r;
+      double r = (double)(fabsl(s - alpha * b[i + (long)j * m])
+                          / ((sa + fabs(alpha * b[i + (long)j * m])) * (na + 2) * EPS * 4 + 1e-300));
+      if (!(r <= ratio))
+        ratio = r;
     }
   char name[128];
   snprintf(name, sizeof name, "dtrsm_%c%c%c_m%d_n%d", side, uplo, t, m, n);
@@ -218,7 +276,8 @@ static void check_potrf(int n, char uplo) {
   blasint info = 0;
   dpotrf_(&uplo, &n, l, &n, &info);
   double ratio = 0;
-  if (info != 0) ratio = INFINITY;
+  if (info != 0)
+    ratio = INFINITY;
   else
     for (int j = 0; j < n; j++)
       for (int i = j; i < n; i++) { /* (L L^T)(i,j), or (U^T U)(j,i) */
@@ -229,7 +288,8 @@ static void check_potrf(int n, char uplo) {
           s += p, sa += fabsl(p);
         }
         double r = (double)(fabsl(s - a[i + (long)j * n]) / (sa * (n + 2) * EPS * 4 + 1e-300));
-        if (!(r <= ratio)) ratio = r;
+        if (!(r <= ratio))
+          ratio = r;
       }
   char name[128];
   snprintf(name, sizeof name, "dpotrf_%c_n%d_info%d", uplo, n, (int)info);
@@ -238,7 +298,8 @@ static void check_potrf(int n, char uplo) {
 }
 
 static void check_gesv(int n, int nrhs) {
-  double *a = spd(n), *lu = malloc(sizeof(double) * (size_t)n * n), *b = rmat(n, nrhs), *x = malloc(sizeof(double) * (size_t)n * nrhs);
+  double *a = spd(n), *lu = malloc(sizeof(double) * (size_t)n * n), *b = rmat(n, nrhs),
+         *x = malloc(sizeof(double) * (size_t)n * nrhs);
   for (int i = 0; i < n * n; i++)
     a[i] += 0.1 * urand(); /* not symmetric */
   memcpy(lu, a, sizeof(double) * (size_t)n * n);
@@ -247,7 +308,8 @@ static void check_gesv(int n, int nrhs) {
   blasint info = 0;
   dgesv_(&n, &nrhs, lu, &n, ipiv, x, &n, &info);
   double ratio = 0;
-  if (info != 0) ratio = INFINITY;
+  if (info != 0)
+    ratio = INFINITY;
   else
     for (int j = 0; j < nrhs; j++)
       for (int i = 0; i < n; i++) {
@@ -257,8 +319,10 @@ static void check_gesv(int n, int nrhs) {
           s += p, sa += fabsl(p);
         }
         /* backward-stable solve: residual ~ n eps |A||x|, with some growth margin */
-        double r = (double)(fabsl(s - b[i + (long)j * n]) / ((sa + fabs(b[i + (long)j * n])) * (n + 2) * EPS * 16 + 1e-300));
-        if (!(r <= ratio)) ratio = r;
+        double r
+            = (double)(fabsl(s - b[i + (long)j * n]) / ((sa + fabs(b[i + (long)j * n])) * (n + 2) * EPS * 16 + 1e-300));
+        if (!(r <= ratio))
+          ratio = r;
       }
   char name[128];
   snprintf(name, sizeof name, "dgesv_n%d_nrhs%d_info%d", n, nrhs, (int)info);
@@ -267,24 +331,75 @@ static void check_gesv(int n, int nrhs) {
 }
 
 /* LAPACK routines armadillo / libKriging call besides the ones above */
-extern void dpotrs_(const char*, const blasint*, const blasint*, const double*, const blasint*, double*, const blasint*,
+extern void
+dpotrs_(const char*, const blasint*, const blasint*, const double*, const blasint*, double*, const blasint*, blasint*);
+extern void dtrtrs_(const char*,
+                    const char*,
+                    const char*,
+                    const blasint*,
+                    const blasint*,
+                    const double*,
+                    const blasint*,
+                    double*,
+                    const blasint*,
                     blasint*);
-extern void dtrtrs_(const char*, const char*, const char*, const blasint*, const blasint*, const double*,
-                    const blasint*, double*, const blasint*, blasint*);
-extern void dposv_(const char*, const blasint*, const blasint*, double*, const blasint*, double*, const blasint*,
-                   blasint*);
-extern void dsyevd_(const char*, const char*, const blasint*, double*, const blasint*, double*, double*,
-                    const blasint*, blasint*, const blasint*, blasint*);
-extern void dgeqrf_(const blasint*, const blasint*, double*, const blasint*, double*, double*, const blasint*,
+extern void
+dposv_(const char*, const blasint*, const blasint*, double*, const blasint*, double*, const blasint*, blasint*);
+extern void dsyevd_(const char*,
+                    const char*,
+                    const blasint*,
+                    double*,
+                    const blasint*,
+                    double*,
+                    double*,
+                    const blasint*,
+                    blasint*,
+                    const blasint*,
                     blasint*);
-extern void dorgqr_(const blasint*, const blasint*, const blasint*, double*, const blasint*, const double*, double*,
-                    const blasint*, blasint*);
-extern void dgesdd_(const char*, const blasint*, const blasint*, double*, const blasint*, double*, double*,
-                    const blasint*, double*, const blasint*, double*, const blasint*, blasint*, blasint*);
-extern void dtrcon_(const char*, const char*, const char*, const blasint*, const double*, const blasint*, double*,
-                    double*, blasint*, blasint*);
-extern void dpocon_(const char*, const blasint*, const double*, const blasint*, const double*, double*, double*,
-                    blasint*, blasint*);
+extern void
+dgeqrf_(const blasint*, const blasint*, double*, const blasint*, double*, double*, const blasint*, blasint*);
+extern void dorgqr_(const blasint*,
+                    const blasint*,
+                    const blasint*,
+                    double*,
+                    const blasint*,
+                    const double*,
+                    double*,
+                    const blasint*,
+                    blasint*);
+extern void dgesdd_(const char*,
+                    const blasint*,
+                    const blasint*,
+                    double*,
+                    const blasint*,
+                    double*,
+                    double*,
+                    const blasint*,
+                    double*,
+                    const blasint*,
+                    double*,
+                    const blasint*,
+                    blasint*,
+                    blasint*);
+extern void dtrcon_(const char*,
+                    const char*,
+                    const char*,
+                    const blasint*,
+                    const double*,
+                    const blasint*,
+                    double*,
+                    double*,
+                    blasint*,
+                    blasint*);
+extern void dpocon_(const char*,
+                    const blasint*,
+                    const double*,
+                    const blasint*,
+                    const double*,
+                    double*,
+                    double*,
+                    blasint*,
+                    blasint*);
 
 /* max_ij |(A X)_ij - B_ij| / ((|A||X| + |B|)_ij n eps 16) for n x n A, n x k X, B */
 static double residual(int n, int k, const double* a, const double* x, const double* b) {
@@ -296,15 +411,18 @@ static double residual(int n, int k, const double* a, const double* x, const dou
         long double p = (long double)a[i + (long)l * n] * x[l + (long)j * n];
         s += p, sa += fabsl(p);
       }
-      double r = (double)(fabsl(s - b[i + (long)j * n]) / ((sa + fabs(b[i + (long)j * n])) * (n + 2) * EPS * 16 + 1e-300));
-      if (!(r <= ratio)) ratio = r;
+      double r
+          = (double)(fabsl(s - b[i + (long)j * n]) / ((sa + fabs(b[i + (long)j * n])) * (n + 2) * EPS * 16 + 1e-300));
+      if (!(r <= ratio))
+        ratio = r;
     }
   return ratio;
 }
 
 static void check_lapack_spd(int n, int nrhs) {
   char name[128];
-  double *a = spd(n), *f = malloc(sizeof(double) * (size_t)n * n), *b = rmat(n, nrhs), *x = malloc(sizeof(double) * (size_t)n * nrhs);
+  double *a = spd(n), *f = malloc(sizeof(double) * (size_t)n * n), *b = rmat(n, nrhs),
+         *x = malloc(sizeof(double) * (size_t)n * nrhs);
   blasint info = 0, one = 1;
   /* dposv */
   memcpy(f, a, sizeof(double) * (size_t)n * n), memcpy(x, b, sizeof(double) * (size_t)n * nrhs);
@@ -314,7 +432,8 @@ static void check_lapack_spd(int n, int nrhs) {
   /* dpotrs on the dpotrf factor */
   memcpy(f, a, sizeof(double) * (size_t)n * n), memcpy(x, b, sizeof(double) * (size_t)n * nrhs);
   dpotrf_("U", &n, f, &n, &info);
-  if (!info) dpotrs_("U", &n, &nrhs, f, &n, x, &n, &info);
+  if (!info)
+    dpotrs_("U", &n, &nrhs, f, &n, x, &n, &info);
   snprintf(name, sizeof name, "dpotrs_U_n%d_nrhs%d_info%d", n, nrhs, (int)info);
   record(name, info ? INFINITY : residual(n, nrhs, a, x, b));
   /* dpocon (from the U factor) and dtrcon (on L = U^T) against the exact 1-norm rcond */
@@ -323,35 +442,43 @@ static void check_lapack_spd(int n, int nrhs) {
     double s = 0;
     for (int i = 0; i < n; i++)
       s += fabs(a[i + (long)j * n]);
-    if (s > anorm) anorm = s;
+    if (s > anorm)
+      anorm = s;
   }
   double *inv = malloc(sizeof(double) * (size_t)n * n), *e = calloc((size_t)n * n, sizeof(double));
   for (int i = 0; i < n; i++)
     e[i + (long)i * n] = 1;
   memcpy(inv, e, sizeof(double) * (size_t)n * n);
-  if (!info) dpotrs_("U", &n, &n, f, &n, inv, &n, &info);
+  if (!info)
+    dpotrs_("U", &n, &n, f, &n, inv, &n, &info);
   double inorm = 0;
   for (int j = 0; j < n; j++) {
     double s = 0;
     for (int i = 0; i < n; i++)
       s += fabs(inv[i + (long)j * n]);
-    if (s > inorm) inorm = s;
+    if (s > inorm)
+      inorm = s;
   }
   double rc_exact = 1.0 / (anorm * inorm), rc = -1, *work = malloc(sizeof(double) * 3 * (size_t)n);
   blasint* iwork = malloc(sizeof(blasint) * (size_t)n);
-  if (!info) dpocon_("U", &n, f, &n, &anorm, &rc, work, iwork, &info);
+  if (!info)
+    dpocon_("U", &n, f, &n, &anorm, &rc, work, iwork, &info);
   /* LAPACK underestimates ||A^-1||_1: the estimate is >= the exact rcond, within a factor ~n */
   double rr = rc / rc_exact;
   snprintf(name, sizeof name, "dpocon_U_n%d", n);
   record(name, (info || !(rr > 1.0 - 1e-6 && rr < 10.0 * n)) ? INFINITY : 0.0);
-  if (info || !(rr > 1.0 - 1e-6 && rr < 10.0 * n)) printf("  dpocon n=%d rcond %.3g exact %.3g\n", n, rc, rc_exact);
-  if (!info) dtrcon_("1", "U", "N", &n, f, &n, &rc, work, iwork, &info);
+  if (info || !(rr > 1.0 - 1e-6 && rr < 10.0 * n))
+    printf("  dpocon n=%d rcond %.3g exact %.3g\n", n, rc, rc_exact);
+  if (!info)
+    dtrcon_("1", "U", "N", &n, f, &n, &rc, work, iwork, &info);
   snprintf(name, sizeof name, "dtrcon_1UN_n%d", n);
   record(name, (info || !(rc > 0 && rc <= 1.0 + 1e-12)) ? INFINITY : 0.0);
   /* dtrtrs with the factor: U^T U x = b */
   memcpy(x, b, sizeof(double) * (size_t)n * nrhs);
-  if (!info) dtrtrs_("U", "T", "N", &n, &nrhs, f, &n, x, &n, &info);
-  if (!info) dtrtrs_("U", "N", "N", &n, &nrhs, f, &n, x, &n, &info);
+  if (!info)
+    dtrtrs_("U", "T", "N", &n, &nrhs, f, &n, x, &n, &info);
+  if (!info)
+    dtrtrs_("U", "N", "N", &n, &nrhs, f, &n, x, &n, &info);
   snprintf(name, sizeof name, "dtrtrs_U_TN_n%d_nrhs%d_info%d", n, nrhs, (int)info);
   record(name, info ? INFINITY : residual(n, nrhs, a, x, b));
   /* dsyevd: A V = V diag(w), V^T V = I */
@@ -365,7 +492,8 @@ static void check_lapack_spd(int n, int nrhs) {
   blasint* iwk = malloc(sizeof(blasint) * (size_t)(liwork > 1 ? liwork : 1));
   dsyevd_("V", "L", &n, f, &n, w, wk, &lwork, iwk, &liwork, &info);
   double ratio = 0;
-  if (info) ratio = INFINITY;
+  if (info)
+    ratio = INFINITY;
   else
     for (int j = 0; j < n; j++)
       for (int i = 0; i < n; i++) {
@@ -375,10 +503,13 @@ static void check_lapack_spd(int n, int nrhs) {
           s += p, sa += fabsl(p);
           q += (long double)f[l + (long)i * n] * f[l + (long)j * n];
         }
-        double r1 = (double)(fabsl(s - w[j] * f[i + (long)j * n]) / ((sa + fabs(w[j] * f[i + (long)j * n])) * (n + 2) * EPS * 64 + 1e-300));
+        double r1 = (double)(fabsl(s - w[j] * f[i + (long)j * n])
+                             / ((sa + fabs(w[j] * f[i + (long)j * n])) * (n + 2) * EPS * 64 + 1e-300));
         double r2 = (double)(fabsl(q - (i == j)) / ((n + 2) * EPS * 64));
-        if (!(r1 <= ratio)) ratio = r1;
-        if (!(r2 <= ratio)) ratio = r2;
+        if (!(r1 <= ratio))
+          ratio = r1;
+        if (!(r2 <= ratio))
+          ratio = r2;
       }
   snprintf(name, sizeof name, "dsyevd_VL_n%d_info%d", n, (int)info);
   record(name, ratio);
@@ -407,7 +538,8 @@ static void check_qr_svd(int m, int n) {
     dorgqr_(&m, &n, &n, f, &m, tau, &w0, &lwork, &info);
     lwork = (blasint)w0;
     wk = realloc(wk, sizeof(double) * (size_t)(lwork > 1 ? lwork : 1));
-    if (!info) dorgqr_(&m, &n, &n, f, &m, tau, wk, &lwork, &info);
+    if (!info)
+      dorgqr_(&m, &n, &n, f, &m, tau, wk, &lwork, &info);
     double ratio = info ? INFINITY : 0;
     for (int j = 0; j < n && !info; j++)
       for (int i = 0; i < m; i++) {
@@ -416,8 +548,10 @@ static void check_qr_svd(int m, int n) {
           long double p = (long double)f[i + (long)l * m] * r[l + (long)j * n];
           s += p, sa += fabsl(p);
         }
-        double rr = (double)(fabsl(s - a[i + (long)j * m]) / ((sa + fabs(a[i + (long)j * m])) * (m + 2) * EPS * 64 + 1e-300));
-        if (!(rr <= ratio)) ratio = rr;
+        double rr
+            = (double)(fabsl(s - a[i + (long)j * m]) / ((sa + fabs(a[i + (long)j * m])) * (m + 2) * EPS * 64 + 1e-300));
+        if (!(rr <= ratio))
+          ratio = rr;
       }
     snprintf(name, sizeof name, "dgeqrf_dorgqr_m%d_n%d_info%d", m, n, (int)info);
     record(name, ratio);
@@ -425,7 +559,8 @@ static void check_qr_svd(int m, int n) {
   }
   /* dgesdd ("S"): U diag(s) V^T = A */
   memcpy(f, a, sizeof(double) * (size_t)m * n);
-  double *s = malloc(sizeof(double) * (size_t)k), *u = malloc(sizeof(double) * (size_t)m * k), *vt = malloc(sizeof(double) * (size_t)k * n);
+  double *s = malloc(sizeof(double) * (size_t)k), *u = malloc(sizeof(double) * (size_t)m * k),
+         *vt = malloc(sizeof(double) * (size_t)k * n);
   blasint* iw = malloc(sizeof(blasint) * 8 * (size_t)k);
   lwork = -1;
   dgesdd_("S", &m, &n, f, &m, s, u, &m, vt, &k, &w0, &lwork, iw, &info);
@@ -440,8 +575,10 @@ static void check_qr_svd(int m, int n) {
         long double p = (long double)u[i + (long)l * m] * s[l] * vt[l + (long)j * k];
         t += p, ta += fabsl(p);
       }
-      double rr = (double)(fabsl(t - a[i + (long)j * m]) / ((ta + fabs(a[i + (long)j * m])) * (m + n + 2) * EPS * 64 + 1e-300));
-      if (!(rr <= ratio)) ratio = rr;
+      double rr = (double)(fabsl(t - a[i + (long)j * m])
+                           / ((ta + fabs(a[i + (long)j * m])) * (m + n + 2) * EPS * 64 + 1e-300));
+      if (!(rr <= ratio))
+        ratio = rr;
     }
   snprintf(name, sizeof name, "dgesdd_S_m%d_n%d_info%d", m, n, (int)info);
   record(name, ratio);
@@ -456,8 +593,10 @@ int main(void) {
   char* (*corename)(void) = h ? (char* (*)(void))dlsym(h, "openblas_get_corename") : NULL;
   char* (*config)(void) = h ? (char* (*)(void))dlsym(h, "openblas_get_config") : NULL;
   int (*nthreads)(void) = h ? (int (*)(void))dlsym(h, "openblas_get_num_threads") : NULL;
-  if (corename) core = corename();
-  if (nthreads) threads = nthreads();
+  if (corename)
+    core = corename();
+  if (nthreads)
+    threads = nthreads();
   char other[256] = "";
   void (*mkl_version)(char*, int) = h ? (void (*)(char*, int))dlsym(h, "mkl_get_version_string") : NULL;
   int (*mkl_threads)(void) = h ? (int (*)(void))dlsym(h, "MKL_Get_Max_Threads") : NULL;
@@ -469,7 +608,8 @@ int main(void) {
     mkl_version(v, (int)sizeof v - 1);
     snprintf(other, sizeof other, "MKL %s", v);
     core = "mkl";
-    if (mkl_threads) threads = mkl_threads();
+    if (mkl_threads)
+      threads = mkl_threads();
   } else if (bli_version) {
     const char* arch = (bli_arch_id && bli_arch_str) ? bli_arch_str(bli_arch_id()) : "?";
     snprintf(other, sizeof other, "BLIS %s arch %s", bli_version(), arch);
@@ -479,9 +619,20 @@ int main(void) {
   }
   printf("BLAS: %s | core: %s | threads: %d\n", config ? config() : (other[0] ? other : "not OpenBLAS"), core, threads);
 
-  static const int sq[] = {1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 23, 24, 31, 32, 33, 47, 48, 63, 64, 65, 96, 100, 127, 128, 129, 200, 256, 257};
-  static const int shapes[][3] = {{100, 1, 100}, {1, 100, 100}, {100, 100, 1}, {37, 211, 19}, {211, 37, 19}, {19, 37, 211},
-                                  {500, 4, 500}, {4, 500, 500}, {500, 500, 4}, {300, 300, 300}, {450, 10, 3}, {10, 450, 3}};
+  static const int sq[] = {1,  2,  3,  4,  5,  7,  8,  9,   15,  16,  17,  23,  24,  31, 32,
+                           33, 47, 48, 63, 64, 65, 96, 100, 127, 128, 129, 200, 256, 257};
+  static const int shapes[][3] = {{100, 1, 100},
+                                  {1, 100, 100},
+                                  {100, 100, 1},
+                                  {37, 211, 19},
+                                  {211, 37, 19},
+                                  {19, 37, 211},
+                                  {500, 4, 500},
+                                  {4, 500, 500},
+                                  {500, 500, 4},
+                                  {300, 300, 300},
+                                  {450, 10, 3},
+                                  {10, 450, 3}};
   const char tr[] = {'N', 'T'};
   for (unsigned s = 0; s < sizeof sq / sizeof *sq; s++)
     for (int a = 0; a < 2; a++)
@@ -518,7 +669,12 @@ int main(void) {
   for (unsigned s = 0; s < sizeof qs / sizeof *qs; s++)
     check_qr_svd(qs[s][0], qs[s][1]);
 
-  printf("SUMMARY core=%s threads=%d cases=%d fails=%d worst=%s ratio=%.3g\n", core, threads, n_cases, n_fails, worst_case,
+  printf("SUMMARY core=%s threads=%d cases=%d fails=%d worst=%s ratio=%.3g\n",
+         core,
+         threads,
+         n_cases,
+         n_fails,
+         worst_case,
          worst_ratio);
   return 0;
 }

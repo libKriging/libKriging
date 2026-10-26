@@ -27,18 +27,39 @@ int main(void) {
   int osxsave = (c >> 27) & 1, avx = (c >> 28) & 1, fma = (c >> 12) & 1, hypervisor = (c >> 31) & 1;
   printf("vendor=%s brand=\"%s\"\n", vendor, brand);
   printf("family=%u model=%u exfamily=%u exmodel=%u stepping=%u (display family=0x%x model=0x%x) hypervisor=%d\n",
-         family, model, exfamily, exmodel, stepping, family == 0xf ? family + exfamily : family,
-         (family == 6 || family == 0xf) ? (exmodel << 4) | model : model, hypervisor);
+         family,
+         model,
+         exfamily,
+         exmodel,
+         stepping,
+         family == 0xf ? family + exfamily : family,
+         (family == 6 || family == 0xf) ? (exmodel << 4) | model : model,
+         hypervisor);
   unsigned long long xcr0 = osxsave ? xgetbv0() : 0;
   printf("osxsave=%d xcr0=0x%llx (sse/avx state 0x6: %s, avx512 opmask/zmm state 0xe0: %s, amx tile 0x60000: %s)\n",
-         osxsave, xcr0, (xcr0 & 6) == 6 ? "on" : "off", (xcr0 & 0xe0) == 0xe0 ? "on" : "off",
+         osxsave,
+         xcr0,
+         (xcr0 & 6) == 6 ? "on" : "off",
+         (xcr0 & 0xe0) == 0xe0 ? "on" : "off",
          (xcr0 & 0x60000) == 0x60000 ? "on" : "off");
   if (maxleaf >= 7) {
     __cpuid_count(7, 0, a, b, c, d);
-    printf("leaf7.0: avx=%d fma=%d avx2=%d avx512f=%d avx512dq=%d avx512cd=%d avx512bw=%d avx512vl=%d avx512vnni=%d "
-           "avx512_fp16=%d amx_bf16=%d amx_tile=%d amx_int8=%d\n",
-           avx, fma, (b >> 5) & 1, (b >> 16) & 1, (b >> 17) & 1, (b >> 28) & 1, (b >> 30) & 1, (b >> 31) & 1,
-           (c >> 11) & 1, (d >> 23) & 1, (d >> 22) & 1, (d >> 24) & 1, (d >> 25) & 1);
+    printf(
+        "leaf7.0: avx=%d fma=%d avx2=%d avx512f=%d avx512dq=%d avx512cd=%d avx512bw=%d avx512vl=%d avx512vnni=%d "
+        "avx512_fp16=%d amx_bf16=%d amx_tile=%d amx_int8=%d\n",
+        avx,
+        fma,
+        (b >> 5) & 1,
+        (b >> 16) & 1,
+        (b >> 17) & 1,
+        (b >> 28) & 1,
+        (b >> 30) & 1,
+        (b >> 31) & 1,
+        (c >> 11) & 1,
+        (d >> 23) & 1,
+        (d >> 22) & 1,
+        (d >> 24) & 1,
+        (d >> 25) & 1);
     __cpuid_count(7, 1, a, b, c, d);
     printf("leaf7.1: avx_vnni=%d avx512_bf16=%d\n", (a >> 4) & 1, (a >> 5) & 1);
   }
