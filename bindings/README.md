@@ -6,7 +6,10 @@ The workflow `.github/workflows/binding-api.yml` (Linux, one job per binding)
 lists the methods each built binding exposes and compares them across
 bindings, names being matched up to each language's convention
 (`leaveOneOut` / `leave_one_out`, `fit` / `fit!`): a method missing from
-some bindings fails the job (table in the job summary). To compare locally after
+some bindings fails the job. The arguments of the methods (Python, R, Julia; the
+Octave methods take `varargin`) are compared as warnings only: argument missing
+from some bindings, required in some and optional in others. The log and the
+job summary end with a synthesis table of all the compared methods. To compare locally after
 building, e.g. Python against Julia:
 
 ```
@@ -38,12 +41,12 @@ python3 tools/checks/binding_api/compare.py python.txt julia.txt
 | Fit | `kriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `kriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `kriging_predict(obj,x,…,method)` | `obj$predict(x,…,method=)` | `obj.predict(x,…,method=)` | `predict(obj,x,stdev,cov,deriv[,method])` | `predict(obj,X;…,method=)` |
-| Simulate | `kriging_simulate(obj,nsim,seed,x,…,method)` | `obj$simulate(nsim,seed,x,…,method=)` | `obj.simulate(nsim,seed,x,…,method=)` | `simulate(obj,nsim,seed,x,will_update[,method])` | `simulate(obj,nsim,seed,X;…,method=)` |
+| Simulate | `kriging_simulate(obj,nsim,seed,x,…,method)` | `obj$simulate(nsim,seed,x,…,method=)` | `obj.simulate(nsim,seed,x,…,method=)` | `simulate(obj,nsim,seed,x,will_update[,method])` | `simulate(obj,nsim,seed,X;…,method=)` / `simulate(obj,X;nsim=1,seed=123,…)` |
 | Update | `kriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u;…)` |
 | Update simulate | `kriging_update_simulate(obj,y_u,noise_u,X_u)` | `obj$update_simulate(y_u,X_u)` / `obj$update_simulate(y_u,noise_u,X_u)` | `obj.update_simulate(y_u,X_u,noise_u=)` | `update_simulate(obj,y_u,X_u)` / `update_simulate(obj,y_u,noise_u,X_u)` | `update_simulate(obj,y_u,X_u;noise_u=)` |
 | Save | `kriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
 | Load | `kriging_load(file)` | `load.Kriging(file)` / `load(file)` | `Kriging.load(file)` / `pylibkriging.load(file)` | `Kriging.load(file)` / `load_kriging(file)` | `load_kriging(file)` / `load(file)` |
-| Summary | `kriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
+| Summary | `kriging_summary(obj)` | `print(obj)` / `summary(obj)` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
 | Covariance matrix | `kriging_covMat(obj,x1,x2)` | `obj$covMat(x1,x2)` | `obj.covMat(x1,x2)` | `covMat(obj,x1,x2)` | `cov_mat(obj,X1,X2)` |
 | Log-likelihood | `kriging_logLikelihood(obj,method)` | `obj$logLikelihood(method=)` | `obj.logLikelihood(method=)` | `logLikelihood(obj[,method])` | `log_likelihood(obj;method=)` |
 | Log-likelihood function | `kriging_logLikelihoodFun(obj,theta,…)` | `obj$logLikelihoodFun(theta,…)` | `obj.logLikelihoodFun(theta,…)` | `logLikelihoodFun(obj,theta,…)` | `log_likelihood_fun(obj,theta;…)` |
@@ -52,11 +55,12 @@ python3 tools/checks/binding_api/compare.py python.txt julia.txt
 | Leave-one-out vec | `kriging_leaveOneOutVec(obj,theta,method)` | `obj$leaveOneOutVec(theta,method=)` | `obj.leaveOneOutVec(theta,method=)` | `leaveOneOutVec(obj,theta[,method])` | `leave_one_out_vec(obj,theta;method=)` |
 | Log-marginal-post | `kriging_logMargPost(obj,method)` | `obj$logMargPost(method=)` | `obj.logMargPost(method=)` | `logMargPost(obj[,method])` | `log_marg_post(obj;method=)` |
 | Log-marginal-post function | `kriging_logMargPostFun(obj,theta,…)` | `obj$logMargPostFun(theta,…)` | `obj.logMargPostFun(theta,…)` | `logMargPostFun(obj,theta,…)` | `log_marg_post_fun(obj,theta;…)` |
-| Model info | `kriging_model(obj)` | `obj$kernel()`, `obj$theta()`, … | `obj.model()` | `model(obj)` | `kernel(obj)`, `optim(obj)`, … |
+| Model info | `kriging_model(obj)` | `obj$kernel()`, `obj$theta()`, … | `obj.model()` | `model(obj)` | `model(obj)` (`Dict`) |
 | **Parameters** | | | | | |
 | `kernel` | `kriging_kernel(obj)` | `obj$kernel()` | `obj.kernel()` | `kernel(obj)` | `kernel(obj)` |
 | `optim` | `kriging_optim(obj)` | `obj$optim()` | `obj.optim()` | `optim(obj)` | `optim(obj)` |
 | `objective` | `kriging_objective(obj)` | `obj$objective()` | `obj.objective()` | `objective(obj)` | `objective(obj)` |
+| `chol_jitter` / `model_chol_jitter` (fit / committed model) | `kriging_chol_jitter(obj)` / `kriging_model_chol_jitter(obj)` | `obj$chol_jitter()` / `obj$model_chol_jitter()` | `obj.chol_jitter()` / `obj.model_chol_jitter()` | `chol_jitter(obj)` / `model_chol_jitter(obj)` | `chol_jitter(obj)` / `model_chol_jitter(obj)` |
 | `X` | `kriging_X(obj)` | `obj$X()` | `obj.X()` | `X(obj)` | `X(obj)` |
 | `centerX` / `scaleX` | `kriging_centerX(obj)` / `kriging_scaleX(obj)` | `obj$centerX()` / `obj$scaleX()` | `obj.centerX()` / `obj.scaleX()` | `centerX(obj)` / `scaleX(obj)` | `centerX(obj)` / `scaleX(obj)` |
 | `y` | `kriging_y(obj)` | `obj$y()` | `obj.y()` | `y(obj)` | `y(obj)` |
@@ -159,12 +163,12 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 | Fit | `warpKriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `warpKriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `warpKriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
-| Simulate | `warpKriging_simulate(obj,nsim,seed,x,will_update,with_noise)` | `obj$simulate(nsim,seed,x,will_update,with_noise)` | `obj.simulate(nsim,seed,x,will_update,with_noise)` | `simulate(obj,nsim,seed,x[,will_update[,with_noise]])` | `simulate(obj,nsim,seed,X;will_update,with_noise)` |
+| Simulate | `warpKriging_simulate(obj,nsim,seed,x,will_update,with_noise)` | `obj$simulate(nsim,seed,x,will_update,with_noise)` | `obj.simulate(nsim,seed,x,will_update,with_noise)` | `simulate(obj,nsim,seed,x[,will_update[,with_noise]])` | `simulate(obj,nsim,seed,X;will_update,with_noise)` / `simulate(obj,X;nsim=1,seed=123,…)` |
 | Update | `warpKriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u)` |
 | Update simulate | `warpKriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
 | Save | `warpKriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
 | Load | `warpkriging_load(file)` | `load.WarpKriging(file)` / `load(file)` | `WarpKriging.load(file)` / `pylibkriging.load(file)` | `WarpKriging.load(file)` / `load_kriging(file)` | `load_warp_kriging(file)` / `load(file)` |
-| Summary | `warpKriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
+| Summary | `warpKriging_summary(obj)` | `print(obj)` / `summary(obj)` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
 | Log-likelihood | `warpKriging_logLikelihood(obj)` | `obj$logLikelihood()` | `obj.logLikelihood()` | `logLikelihood(obj)` | `log_likelihood(obj)` |
 | Log-likelihood function | `warpKriging_logLikelihoodFun(obj,theta,…)` | `obj$logLikelihoodFun(theta,…)` | `obj.logLikelihoodFun(theta,…)` | `logLikelihoodFun(obj,theta,…)` | `log_likelihood_fun(obj,theta;…)` |
 | `kernel` | `warpKriging_kernel(obj)` | `obj$kernel()` | `obj.kernel()` | `kernel(obj)` | `kernel(obj)` |
@@ -172,6 +176,7 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 | `feature_dim` | `warpKriging_featureDim(obj)` | `obj$feature_dim()` | `obj.feature_dim()` | `feature_dim(obj)` | `feature_dim(obj)` |
 | `is_fitted` | `warpKriging_isFitted(obj)` | `obj$is_fitted()` | `obj.is_fitted()` | `is_fitted(obj)` | `is_fitted(obj)` |
 | `optim` / `objective` | `warpKriging_optim(obj)` / `warpKriging_objective(obj)` | `obj$optim()` / `obj$objective()` | `obj.optim()` / `obj.objective()` | `optim(obj)` / `objective(obj)` | `optim(obj)` / `objective(obj)` |
+| `chol_jitter` / `model_chol_jitter` (fit / committed model) | `warpKriging_chol_jitter(obj)` / `warpKriging_model_chol_jitter(obj)` | `obj$chol_jitter()` / `obj$model_chol_jitter()` | `obj.chol_jitter()` / `obj.model_chol_jitter()` | `chol_jitter(obj)` / `model_chol_jitter(obj)` | `chol_jitter(obj)` / `model_chol_jitter(obj)` |
 | `noise` | `warpKriging_noise(obj)` | `obj$noise()` | `obj.noise()` | `noise(obj)` | `noise(obj)` |
 | `warp_params` | `warpKriging_warpParams(obj)` | `obj$warp_params()` | `obj.warp_params()` | `warp_params(obj)` | `warp_params(obj)` |
 | Covariance matrix | `warpKriging_covMat(obj,X1,X2)` | `obj$covMat(X1,X2)` | `obj.covMat(X1,X2)` | `covMat(obj,X1,X2)` | `cov_mat(obj,X1,X2)` |
@@ -204,18 +209,20 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 | Fit | `mlpKriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `mlpKriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `mlpKriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
-| Simulate | `mlpKriging_simulate(obj,nsim,seed,x,will_update,with_noise)` | `obj$simulate(nsim,seed,x,will_update,with_noise)` | `obj.simulate(nsim,seed,x,will_update,with_noise)` | `simulate(obj,nsim,seed,x[,will_update[,with_noise]])` | `simulate(obj,nsim,seed,X;will_update,with_noise)` |
+| Simulate | `mlpKriging_simulate(obj,nsim,seed,x,will_update,with_noise)` | `obj$simulate(nsim,seed,x,will_update,with_noise)` | `obj.simulate(nsim,seed,x,will_update,with_noise)` | `simulate(obj,nsim,seed,x[,will_update[,with_noise]])` | `simulate(obj,nsim,seed,X;will_update,with_noise)` / `simulate(obj,X;nsim=1,seed=123,…)` |
 | Update | `mlpKriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u)` |
 | Update simulate | `mlpKriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
 | Save | `mlpKriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
 | Load | `mlpkriging_load(file)` | `load.MLPKriging(file)` / `load(file)` | `MLPKriging.load(file)` / `pylibkriging.load(file)` | `MLPKriging.load(file)` / `load_kriging(file)` | `load_mlp_kriging(file)` / `load(file)` |
-| Summary | `mlpKriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
+| Summary | `mlpKriging_summary(obj)` | `print(obj)` / `summary(obj)` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
 | Log-likelihood | `mlpKriging_logLikelihood(obj)` | `obj$logLikelihood()` | `obj.logLikelihood()` | `logLikelihood(obj)` | `log_likelihood(obj)` |
 | Log-likelihood function | `mlpKriging_logLikelihoodFun(obj,theta,…)` | `obj$logLikelihoodFun(theta,…)` | `obj.logLikelihoodFun(theta,…)` | `logLikelihoodFun(obj,theta,…)` | `log_likelihood_fun(obj,theta;…)` |
 | `kernel` | `mlpKriging_kernel(obj)` | `obj$kernel()` | `obj.kernel()` | `kernel(obj)` | `kernel(obj)` |
 | `feature_dim` | `mlpKriging_featureDim(obj)` | `obj$feature_dim()` | `obj.feature_dim()` | `feature_dim(obj)` | `feature_dim(obj)` |
 | `hidden_dims` | `mlpKriging_hiddenDims(obj)` | `obj$hidden_dims()` | `obj.hidden_dims()` | `hidden_dims(obj)` | `hidden_dims(obj)` |
 | `activation` | `mlpKriging_activation(obj)` | `obj$activation()` | `obj.activation()` | `activation(obj)` | `activation(obj)` |
+| `objective` | `mlpKriging_objective(obj)` | `obj$objective()` | `obj.objective()` | `objective(obj)` | `objective(obj)` |
+| `chol_jitter` / `model_chol_jitter` (fit / committed model) | `mlpKriging_chol_jitter(obj)` / `mlpKriging_model_chol_jitter(obj)` | `obj$chol_jitter()` / `obj$model_chol_jitter()` | `obj.chol_jitter()` / `obj.model_chol_jitter()` | `chol_jitter(obj)` / `model_chol_jitter(obj)` | `chol_jitter(obj)` / `model_chol_jitter(obj)` |
 | `is_fitted` | `mlpKriging_isFitted(obj)` | `obj$is_fitted()` | `obj.is_fitted()` | `is_fitted(obj)` | `is_fitted(obj)` |
 | `X` / `y` | `mlpKriging_X(obj)` / `mlpKriging_y(obj)` | `obj$X()` / `obj$y()` | `obj.X()` / `obj.y()` | `X(obj)` / `y(obj)` | `X(obj)` / `y(obj)` |
 | `centerX` / `scaleX` | `mlpKriging_centerX(obj)` / `mlpKriging_scaleX(obj)` | `obj$centerX()` / `obj$scaleX()` | `obj.centerX()` / `obj.scaleX()` | `centerX(obj)` / `scaleX(obj)` | `centerX(obj)` / `scaleX(obj)` |
@@ -234,7 +241,7 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 | Constructor + fit | `new_NestedKrigingFit(y,X,kernel,nb_groups,…)` | — | `NestedKriging(y,X,kernel,nb_groups=…,…)` | `NestedKriging(y,X,kernel,nb_groups,…)` | `NestedKriging(y,X,kernel,nb_groups;…)` |
 | Fit (refit) | `nestedkriging_fit(obj,y,X,nb_groups,…)` | `obj$fit(y,X,nb_groups,…)` | `obj.fit(y,X,nb_groups,…)` | `obj.fit(y,X,nb_groups,…)` | `fit!(obj,y,X,nb_groups;…)` |
 | Predict | `nestedkriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
-| Summary | `nestedkriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
+| Summary | `nestedkriging_summary(obj)` | `print(obj)` / `summary(obj)` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
 | Save / Load | `nestedkriging_save(obj,f)` / `nestedkriging_load(f)` | `save(obj,f)` / `load(f)` | `obj.save(f)` / `NestedKriging.load(f)` | `obj.save(f)` / `NestedKriging.load(f)` | `save(obj,f)` / `load_nested_kriging(f)` |
 | `kernel` | `nestedkriging_kernel(obj)` | `obj$kernel()` | `obj.kernel()` | `kernel(obj)` | `kernel(obj)` |
 | `aggregation` | `nestedkriging_aggregation(obj)` | `obj$aggregation()` | `obj.aggregation()` | `aggregation(obj)` | `aggregation(obj)` |
@@ -285,6 +292,17 @@ See [bindings/Python/README.md](Python/README.md#scikit-learn-compatible-estimat
 | Load MLPKriging | `mlpkriging_load(file)` / `load.MLPKriging(file)` | `load_mlp_kriging(file)` | `MLPKriging.load(file)` | `load_mlp_kriging(file)` |
 
 ---
+
+## Global settings
+
+Static settings of the library, same names as in C++ (`Optim::`, `LinearAlgebra::`).
+
+| Settings | R | Python | Octave/Matlab | Julia |
+|---|---|---|---|---|
+| Optimizer (`set_max_iteration`, tolerances, `set_log_level`, theta bounds, threads…) | `rlibkriging:::optim_<name>(…)` | `Optim.<name>(…)` | `Optim.<name>(…)` | `jlibkriging.Optim.<name>(…)` |
+| Cholesky (`set_chol_jitter`, `set_num_nugget`, `set_chol_warning`, `check_chol_rcond`…) | `rlibkriging:::linalg_<name>(…)` | `LinearAlgebra.<name>(…)` | `LinearAlgebra.<name>(…)` | `<name>(…)` |
+
+`jlibkriging.Optim` is not exported, not to clash with the Optim.jl package.
 
 ---
 

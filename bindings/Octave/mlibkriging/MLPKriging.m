@@ -149,6 +149,20 @@ classdef MLPKriging < handle
             [varargout{1:nargout}] = mLibKriging("MLPKriging::activation", obj.ref, varargin{:});
         end
 
+        function varargout = objective(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::objective", obj.ref, varargin{:});
+        end
+
+        % diagonal jitter of the fit (logLikelihood) / of the committed model
+        % (predict, simulate, update), docs/dev/CholJitter.md
+        function varargout = chol_jitter(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::chol_jitter", obj.ref, varargin{:});
+        end
+
+        function varargout = model_chol_jitter(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::model_chol_jitter", obj.ref, varargin{:});
+        end
+
         function k2 = copy(obj)
             ref_copy = mLibKriging("MLPKriging::copy", obj.ref);
             k2 = MLPKriging('__ref__', ref_copy);

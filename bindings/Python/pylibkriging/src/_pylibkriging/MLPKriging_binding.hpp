@@ -63,12 +63,12 @@ class PyMLPKriging {
 
   double logLikelihood();
 
-  std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta,
-                                                                                const bool return_grad,
-                                                                                const bool return_hess);
+  std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad);
 
   std::string kernel();
   std::string objective();
+  double chol_jitter();
+  double model_chol_jitter();
   std::string method();
   py::array_t<double> X();
   py::array_t<double> centerX();

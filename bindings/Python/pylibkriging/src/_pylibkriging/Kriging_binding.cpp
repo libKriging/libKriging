@@ -176,8 +176,14 @@ py::array_t<double> PyKriging::simulate(const int nsim,
                                         const std::string& method) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
 
+  // nugget model: with_noise=None includes the nugget, as in R / Julia,
+  // except with "nystrom" (latent process only)
+  if (with_noise.is_none() && m_internal->noise_model() == Kriging::NoiseModel::Nugget
+      && method.rfind("nystrom", 0) != 0)
+    return simulate(nsim, seed, X_n, will_update, py::bool_(true), method);
+
   if (with_noise.is_none()) {
-    // Plain simulate (latent process for noise models); method: "exact",
+    // Plain simulate (latent process: heterogeneous model, or "nystrom"); method: "exact",
     // "vecchia", "vecchia(m)" or "nystrom" (the noise-model overloads below
     // raise with "nystrom" for with_nugget=True / a non-zero with_noise:
     // Nystrom simulates the latent process only)
@@ -264,9 +270,10 @@ PyKriging PyKriging::load(const std::string filename) {
 }
 
 std::tuple<double, py::array_t<double>> PyKriging::leaveOneOutFun(const py::array_t<double>& theta,
-                                                                  const bool return_grad) {
+                                                                  const bool return_grad,
+                                                                  const bool bench) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [llo, grad] = m_internal->leaveOneOutFun(vec_theta, return_grad, false);
+  auto [llo, grad] = m_internal->leaveOneOutFun(vec_theta, return_grad, bench);
   return {llo, vec_to_arr(grad)};
 }
 
@@ -281,11 +288,12 @@ double PyKriging::leaveOneOut(const std::string& method) {
   return m_internal->leaveOneOut(method);
 }
 
-std::tuple<double, py::array_t<double>, py::array_t<double>>
-PyKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool /*want_hess*/) {
+std::tuple<double, py::array_t<double>> PyKriging::logLikelihoodFun(const py::array_t<double>& theta,
+                                                                    const bool return_grad,
+                                                                    const bool bench) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta, return_grad, false);
-  return {llo, vec_to_arr(grad), {}};
+  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta, return_grad, bench);
+  return {llo, vec_to_arr(grad)};
 }
 
 double PyKriging::logLikelihood(const std::string& method) {
@@ -293,9 +301,10 @@ double PyKriging::logLikelihood(const std::string& method) {
 }
 
 std::tuple<double, py::array_t<double>> PyKriging::logMargPostFun(const py::array_t<double>& theta,
-                                                                  const bool return_grad) {
+                                                                  const bool return_grad,
+                                                                  const bool bench) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta, return_grad, false);
+  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta, return_grad, bench);
   return {lmp, vec_to_arr(grad)};
 }
 
@@ -315,6 +324,14 @@ std::string PyKriging::optim() {
 
 std::string PyKriging::objective() {
   return m_internal->objective();
+}
+
+double PyKriging::chol_jitter() {
+  return m_internal->chol_jitter();
+}
+
+double PyKriging::model_chol_jitter() {
+  return m_internal->model_chol_jitter();
 }
 
 int PyKriging::nystrom_rank() {

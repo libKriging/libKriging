@@ -34,6 +34,9 @@ void get_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void set_chol_jitter(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void get_num_nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void set_num_nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_chol_warning(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void check_chol_rcond(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void chol_rcond_checked(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void check(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace LinearAlgebraBinding
 

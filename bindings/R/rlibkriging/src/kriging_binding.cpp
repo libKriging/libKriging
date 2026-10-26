@@ -503,7 +503,6 @@ arma::mat kriging_covMat(Rcpp::List k, arma::mat X1, arma::mat X2) {
 Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
                                     arma::vec theta,
                                     bool return_grad = false,
-                                    bool return_hess = false,
                                     bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
@@ -517,14 +516,11 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
     Rcpp::stop("Length of arg data should be " + std::to_string(d)
                + (is_noise_model ? " or " + std::to_string(d + 1) : "") + ")");
 
-  std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta, return_grad, bench);
+  auto [ll, grad] = impl_ptr->logLikelihoodFun(theta, return_grad, bench);
 
-  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = ll);
   if (return_grad) {
-    ret.push_back(std::get<1>(ll), "logLikelihoodGrad");
-  }
-  if (return_hess) {
-    ret.push_back(arma::mat(), "logLikelihoodHess");
+    ret.push_back(grad, "logLikelihoodGrad");
   }
 
   return ret;
@@ -672,6 +668,26 @@ std::string kriging_method(Rcpp::List k) {
   SEXP impl = lk_xptr(k.attr("object"));
   Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->method();
+}
+
+// Diagonal jitter of the fit (logLikelihood) and of the committed model
+// (predict / simulate / update), docs/dev/CholJitter.md
+// [[Rcpp::export]]
+double kriging_chol_jitter(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = lk_xptr(k.attr("object"));
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->chol_jitter();
+}
+
+// [[Rcpp::export]]
+double kriging_model_chol_jitter(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = lk_xptr(k.attr("object"));
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->model_chol_jitter();
 }
 
 // [[Rcpp::export]]

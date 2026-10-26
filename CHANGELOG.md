@@ -30,13 +30,58 @@ past release, see the corresponding entry on the
   get the budget first, each start's BLAS / OpenMP the rest; an explicit `OMP_NUM_THREADS` or
   `OPENBLAS_NUM_THREADS` is never exceeded. Bindings: Python / Octave
   `Optim.set_num_threads_percent`, `get_num_threads_percent`, `get_num_threads`; R
-  `rlibkriging:::optim_set_num_threads_percent` (and `_get_`), `optim_get_num_threads`
-  (Julia: not exposed, like `set_thread_pool_size`). See
-  [docs/dev/parallel.md](docs/dev/parallel.md).
+  `rlibkriging:::optim_set_num_threads_percent` (and `_get_`), `optim_get_num_threads`;
+  Julia `jlibkriging.Optim.<same name>`. See [docs/dev/parallel.md](docs/dev/parallel.md).
 - **CI**: workflow `binding-api.yml` (Linux, one job per binding): the methods exposed by the
   Python, R, Octave and Julia bindings are extracted and compared across bindings, up to each
   language's naming convention; a method missing from some bindings fails the job
-  ([#419](https://github.com/libKriging/libKriging/issues/419)).
+  ([#419](https://github.com/libKriging/libKriging/issues/419)). The lists include the
+  `LinearAlgebra` settings, Julia's free functions and R's S3 methods; R's test wrappers of
+  C++ internals (`random_*`, Cholesky numerics) are left out. The arguments of the methods
+  (Python, R, Julia; Octave's methods take `varargin`) are compared too, as warnings only:
+  argument missing from some bindings, required in some and optional in others. The log and
+  the job summary end with a synthesis table of all the compared methods.
+- **Bindings**, argument differences found by that comparison:
+  - **Julia**: `fit!(::Kriging, …; parameters=)` and `fit!(::NestedKriging, …; parameters=)`
+    (a dict with the keys `sigma2`, `theta`, `beta`, `nugget`, `is_<name>_estim`, as in Python / R;
+    C API `lk_kriging_fit` takes the parameters); `simulate(model, X; nsim=1, seed=123, …)` for
+    `Kriging`, `WarpKriging`, `MLPKriging` (the defaults of Python / R; `simulate(model, nsim, seed, X)`
+    unchanged); `simulate(::Kriging, …; with_noise=true/false)` = `with_nugget` (as in Python / R);
+    `bench=` of `log_likelihood_fun`, `leave_one_out_fun`, `log_marg_post_fun` (`Kriging`).
+  - **Python**: `Kriging.logLikelihoodFun`, `leaveOneOutFun`, `logMargPostFun` take `theta`,
+    `return_grad`, `bench` by name; `WarpKriging.logLikelihoodFun(theta, return_grad)` (was `**kw`);
+    `WarpKriging.simulate` without `X` raises `TypeError` (passed `None` down).
+  - **R**: `update()` / `update_simulate()` of a `Kriging`: `X_u` has no default in the
+    signature (it was `NULL`, then an error); calls unchanged.
+- **Log-likelihood Hessian removed** (breaking): `logLikelihoodFun` has no `return_hess` argument
+  nor Hessian output any more, in C++ and every binding; it was never computed (an empty matrix,
+  since the analytic Hessian of the former Newton optimizer was dropped).
+  - C++: `WarpKriging::logLikelihoodFun(theta, return_grad)` and `MLPKriging::logLikelihoodFun`
+    return `(ll, grad)` (was `(ll, grad, hess)`); `Kriging::logLikelihoodFun(theta, return_grad,
+    bench)` unchanged; the unused `Optim::reparam_from_deriv2` is removed.
+  - Python: `logLikelihoodFun` returns `(ll, grad)` (was `(ll, grad, hess)`), arguments
+    `(theta, return_grad=False, bench=False)` for `Kriging` (`want_hess` removed: a third positional
+    argument is now `bench`), `(theta, return_grad=False)` for `WarpKriging` / `MLPKriging`.
+  - R: no `return_hess` (`logLikelihoodHess` / `hessian` no longer returned).
+  - Octave: `[ll, llgrad] = logLikelihoodFun(theta, return_grad[, bench])` (`Kriging`),
+    `logLikelihoodFun(theta, return_grad)` (`WarpKriging` / `MLPKriging`); a third output raises.
+  - Julia: no `return_hess`; `log_likelihood_fun` returns `(ll=, grad=)`; C API
+    `lk_*_log_likelihood_fun` without `return_hess` / `hess_out`.
+- **Python `Kriging.simulate` on a nugget model**: without `with_noise`, the draws include the nugget
+  (as in R / Julia; Octave takes `with_nugget` explicitly), except with `method="nystrom"` (latent
+  process only). Before, Python simulated the latent process: pass `with_noise=False` for it.
+- **Bindings**, gaps found by that comparison:
+  - **Julia**: the `Optim` settings, as `jlibkriging.Optim.<name>` (not exported, not to clash
+    with Optim.jl): iterations, tolerances, log level, reparametrization, theta bounds,
+    threads ([#423](https://github.com/libKriging/libKriging/issues/423)); `model(k)` of a
+    `Kriging` (a `Dict`, as `model()` in Python / Octave); `objective` of an `MLPKriging`.
+  - **Octave**: `objective` of an `MLPKriging`.
+  - **R**: `summary()` of a `Kriging` / `NestedKriging` (their description, as printed).
+  - **Python, Octave, Julia**: `LinearAlgebra` `set_chol_warning`, `check_chol_rcond`,
+    `chol_rcond_checked`, as in R.
+  - **All four**: `chol_jitter()` / `model_chol_jitter()` of a fitted `Kriging`, `WarpKriging`,
+    `MLPKriging` (jitter of the fit / of the committed model, saved with it; C++ `WarpKriging` /
+    `MLPKriging` getters made public) ([#424](https://github.com/libKriging/libKriging/issues/424)).
 - **R**: `Kriging`, `NestedKriging`, `WarpKriging` and `MLPKriging` objects survive R
   serialization: `saveRDS()` / `readRDS()`, `save()` / `load()` of a workspace,
   `serialize()`, and shipping to PSOCK / `future` workers. The current model is stored as its

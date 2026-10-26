@@ -254,6 +254,33 @@ void set_num_nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   LinearAlgebra::set_num_nugget(input.get<double>(0, "num_nugget"));
 }
 
+void set_chol_warning(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  LinearAlgebra::set_chol_warning(input.get<bool>(0, "warn"));
+}
+
+void check_chol_rcond(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  LinearAlgebra::check_chol_rcond(input.get<bool>(0, "check"));
+}
+
+void chol_rcond_checked(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{0}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  output.set(0, LinearAlgebra::chol_rcond_checked(), "chol_rcond_checked");
+}
+
 // Self-test of the detected BLAS / LAPACK backend (#429):
 // [ok, backend, report] = linearalgebra_check(int32 n_threads)
 void check(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

@@ -123,9 +123,8 @@ class MLPKriging {
 
   LIBKRIGING_EXPORT double logLikelihood() const;
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta,
-                                                                              bool return_grad = true,
-                                                                              bool return_hess = false) const;
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta,
+                                                                   bool return_grad = true) const;
 
   // -----------------------------------------------------------------------
   //  Accessors
@@ -150,6 +149,8 @@ class MLPKriging {
   const std::string& optim() const { return m_impl.optim(); }
   const std::string& objective() const { return m_impl.objective(); }
   const std::string& method() const { return m_impl.method(); }
+  double chol_jitter() const { return m_impl.chol_jitter(); }
+  double model_chol_jitter() const { return m_impl.model_chol_jitter(); }
   arma::vec theta() const { return m_impl.theta(); }
   double sigma2() const { return m_impl.sigma2(); }
   /// Calibration factor of the predictive variance (see WarpKriging::var_scale).

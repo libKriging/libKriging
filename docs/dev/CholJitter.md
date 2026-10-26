@@ -115,16 +115,90 @@ Decided 2026-10-24: decays for every warp optimised by Adam (the cost is bounded
 `max_iter_adam`); kumaraswamy and ordinal pay +30 % for no gain. Left: mlp f1, seed 3 (1136
 against master's 1365), a local optimum of that path.
 
+## Jitter growing with n (#426)
+
+Measured 2026-10-25 (`jitter_n_study.cpp`, `run_jitter_n.sh`, `summarize_jitter_n.py`; gauss,
+single-start BFGS, Branin, sin d 2 / 4 / 8, Hartmann6, n 50–2000: 20 sets up to n = 200, 10 at
+500, 6 at 1000, 2 at 2000, 386 in all). Rules anchored at J(100) = 1e-9: `lin` 1e-9 n / 100
+(J / lambda_max constant, lambda_max <= n), `sqrt` 1e-9 sqrt(n / 100), `quad` 1e-9 (n / 100)^2
+(Cholesky backward error n eps cond, cond <= n / J), against the constants 0, 1e-10, 1e-9, 1e-8.
+4-core machine: budgets 100 and 200 % gave the same BLAS thread count, so the divergence is
+1 thread against 4. "Material" divergence: the LL differs by > 1 or the test RMSE by > 10 %
+across the budgets; the other theta divergences (> 1e-3) end at equivalent points of a flat
+objective (sin d 4, n 200: |dLL| < 0.2, same RMSE to 3 digits).
+
+| rule | material divergence, n 50 / 100 / 200 / 500 / 1000 / 2000, all | fits > 3 x the best RMSE of the set, all |
+|---|---|---|
+| 0 | 0 / 6 / 5 / 2 / 3.3 / 17, **3.6 %** | 6.7 % |
+| 1e-10 | 0 / 3 / 0 / 2 / 3.3 / 33, 1.8 % | 7.5 % |
+| **1e-9** (current) | 0 / 1 / 0 / 2 / 3.3 / 33, **1.3 %** | 7.3 % |
+| 1e-8 | 0 / 0 / 1 / 0 / 3.3 / 0, 0.5 % | 13.5 % |
+| lin | 0 / 1 / 1 / 0 / 3.3 / 0, 0.8 % | 8.8 % |
+| sqrt | 0 / 1 / 0 / 2 / 0 / 0, 0.5 % | 7.0 % |
+| quad | 0 / 1 / 1 / 2 / 0 / 0, 0.8 % | 7.8 % |
+
+Median per-set RMSE ratio to 1e-9 (pct 100), where the rules differ:
+
+| data | n | lin | sqrt | quad | 1e-8 |
+|---|---|---|---|---|---|
+| Branin | 200 / 500 | 1.08 / 1.04 | 1.02 / 1.01 | 1.17 / 1.08 | 1.50 / 1.06 |
+| sin d 2 | 500 / 1000 | 1.06 / 1.02 | 1.03 / 1.01 | 1.14 / 1.04 | 1.09 / 1.02 |
+| sin d 4 | 500 | 1.12 | 1.01 | 1.24 | 1.18 |
+| Hartmann6 | 2000 (2 sets) | 2.05 | 1.84 | 2.56 | 2.06 |
+
+- **No rule J(n) is better than the constant.** The material divergence of 1e-9 is 1.3 % (5 sets
+  of 386) against 0.5–0.8 % for the rules: 2 to 3 sets, within the sampling noise; at n = 2000 one
+  set is 17 %. A growing J costs accuracy where n is large (Hartmann6 n 2000 x 2, sin d 4 n 500
+  x 1.1–1.2), the opposite of the issue's constraint; Branin's cost does not grow with n (ratios
+  <= 1.08 from n = 500).
+- **The premise does not hold at the measured n.** lambda_max of R at the fitted theta grows as
+  n^0.7 (Branin: 10^1.58 at n 50, 10^2.47 at n 1000), so cond(R + J I) <= lambda_max / J stays
+  <= 1e12 with J = 1e-9 (sin d 4 n 1000: lambda_max 10^2.88), far from 1 / eps; R itself is numerically singular (lambda_min <=
+  1e-12 lambda_max) at every n from 100 on for the smooth cases, and the jitter fixes the
+  conditioning alone, whatever n.
+- **The remaining failure at large n is a long-range local optimum, not the rounding.** sin d 4 n
+  1000 / 2000 and Hartmann6 n 1000 / 2000: single-start fits end with a long-range theta (up to the
+  upper bound 10; not a plateau, see the traces below),
+  1000–7500 LL units below the optimum, RMSE x 1.7–270, at every J and not monotonically in J
+  (which J escapes depends on the path); a larger J makes the long-range optima more attractive (Hartmann6
+  n 2000: both sets on it from J = 1e-8, one of two at 4.5e-9, none at 1e-9 and below). sin d 4 n 2000 with 1e-9: 1 thread
+  found LL 2209 (RMSE 0.017), 4 threads a long-range optimum (−2800, RMSE 0.52): the divergence counted at
+  n = 2000 is that, and 1e-8 / lin remove it by putting both budgets on the same path, the long-range optimum for that set.
+- **Multi-start removes both.** BFGS10, J 0 / 1e-9 / 1e-8, sin d 4 and Hartmann6, n 500 (10 sets)
+  and 1000 (6): no divergence at all (theta), no long-range optimum, J without effect (median
+  RMSE sin d 4 n 1000: 0.00471 / 0.00483 / 0.00494); single-start 1e-9 against BFGS10: sin d 4
+  0.176 → 0.080 (n 500), 0.057 → 0.0048 (n 1000); time x 2.8–8.3.
+
+### Plateau or local optimum
+
+The traces of the single-start fits (every objective evaluation printed by a temporary probe, not
+kept, sin d 4 n 500 / 1000, Hartmann6 n 1000, J 1e-9, 22 fits) show no plateau:
+the failed fits (LL 400–2150 below BFGS10) converge normally (gradient falling geometrically,
+`REL_REDUCTION_OF_F`) to sharp local optima with a long-range component (theta_max / maxdX 3.6–10;
+one fit stuck at the upper corner after the first iteration, already restarted by
+`num_iters <= 2`, then back at the bound). A plateau criterion does not separate them: the span
+in log theta of the evaluations with a gradient < 1 % (5 %) of the first one is 0–0.05 for 11 of
+the 12 failed fits and up to 3.6 (6.2) for the good ones; pairs of successive evaluations with
+|d log theta| > 0.3 and |df| < 10 occur in both. What separates them is the range:
+max_j theta_j / maxdX_j >= 3.6 for 11 of the 12 failed fits, <= 1.3 for every good one.
+
+Decision: keep the constant per kernel. The robustness at large n belongs to the starts (#418):
+a multistart, or a restart criterion on the range of the single start's solution (the measure that
+separates the failed fits above). Not measured: matern5_2, n > 2000, more than 2 sets at n 2000,
+a machine with more cores (budgets 100 / 200 % distinct).
+
 ## Open items
 
 - Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;
   matern5_2 ≈ 1 (#425).
-- A jitter growing with n (conditioning grows with n), not measured (#426).
+- A jitter growing with n (#426): measured, no gain over the constant (above); the large-n failures
+  are long-range local optima of the single start, not plateaus (#418).
 - A fixed floor for the `simulate` conditional covariance instead of the retry (inconsistency 2,
   #427).
 - A floor on the predicted variance, then an exact committed WarpKriging model (#428).
-- Single-start robustness on the plateau (#418); bindings consistency checks (#419); getters
-  `chol_jitter()` / `model_chol_jitter()` not exposed in the bindings (#424).
+- Single-start robustness at large n (#418); bindings consistency checks (#419).
+- Done: getters `chol_jitter()` / `model_chol_jitter()` of `Kriging`, `WarpKriging`,
+  `MLPKriging` in the four bindings, kept by `save` / `load` (#424).
 
 # Jitter of each class and method
 

@@ -303,7 +303,7 @@ static void check_loglik_grad_vs_fd(const std::string& warp_spec) {
   REQUIRE(theta0.is_finite());
 
   // Compute analytical gradient
-  auto [ll0, grad, hess] = wk.logLikelihoodFun(theta0, /*return_grad=*/true, false);
+  auto [ll0, grad] = wk.logLikelihoodFun(theta0, /*return_grad=*/true);
   REQUIRE(grad.n_elem == theta0.n_elem);
   REQUIRE(grad.is_finite());
 
@@ -320,8 +320,8 @@ static void check_loglik_grad_vs_fd(const std::string& warp_spec) {
     tp(k) += h;
     tm(k) -= h;
 
-    double llp = std::get<0>(wk.logLikelihoodFun(tp, false, false));
-    double llm = std::get<0>(wk.logLikelihoodFun(tm, false, false));
+    double llp = std::get<0>(wk.logLikelihoodFun(tp, false));
+    double llm = std::get<0>(wk.logLikelihoodFun(tm, false));
     double fd = (llp - llm) / (2.0 * h);
 
     double tol = std::max(abs_floor, rel_tol * std::max(std::abs(fd), std::abs(grad(k))));

@@ -292,3 +292,55 @@ test_that("All classes have as.list/model", {
   expect_true('nugget' %in% names(m3))
   expect_true('is_nugget_estim' %in% names(m3))
 })
+
+test_that("summary() of Kriging and NestedKriging is their description", {
+  set.seed(123)
+  X <- matrix(runif(20), ncol = 1)
+  y <- sin(6 * X[, 1])
+  k <- Kriging(y, X, kernel = "matern3_2")
+  expect_true(is.character(summary(k)) && nchar(summary(k)) > 0)
+  invisible(capture.output(p <- print(k)))  # print() returns the description
+  expect_equal(summary(k), p)
+  nk <- NestedKriging(y, X, "matern3_2", nb_groups = 2)
+  expect_true(is.character(summary(nk)) && nchar(summary(nk)) > 0)
+})
+
+test_that("jitters of a fitted model are kept by save / load", {
+  X <- matrix(seq(0, 1, length.out = 10), ncol = 1)
+  y <- sin(6 * X[, 1])
+  models <- list(
+    Kriging(y, X, kernel = "gauss"),
+    WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss"),
+    MLPKriging(y, X, hidden_dims = 4, d_out = 1, kernel = "gauss",
+               parameters = list(max_iter_adam = "20"))
+  )
+  for (k in models) {
+    expect_gt(k$chol_jitter(), 0)  # gauss, noise-free
+    expect_true(k$model_chol_jitter() >= 0 && k$model_chol_jitter() <= k$chol_jitter())
+    f <- tempfile(fileext = ".json")
+    save(k, f)
+    k2 <- load(f)
+    expect_equal(k2$chol_jitter(), k$chol_jitter())
+    expect_equal(k2$model_chol_jitter(), k$model_chol_jitter())
+    unlink(f)
+  }
+  expect_equal(models[[1]]$model_chol_jitter(), 0)  # Kriging: exact committed model
+})
+
+
+test_that("update / update_simulate: X_u required, by name or position", {
+  set.seed(1)
+  X <- matrix(runif(10), ncol = 1)
+  y <- sin(6 * X[, 1])
+  Xu <- matrix(c(0.33, 0.66), ncol = 1)
+  yu <- sin(6 * Xu[, 1])
+  k1 <- Kriging(y, X, "gauss")
+  k2 <- Kriging(y, X, "gauss")
+  update(k1, yu, Xu, refit = FALSE)
+  update(k2, yu, X_u = Xu, refit = FALSE)
+  expect_equal(k1$X(), k2$X())
+  expect_equal(nrow(k1$X()), 12)
+  expect_error(update(k1, yu), "X_u")
+  expect_false("X_u" %in% names(Filter(function(d) !identical(d, quote(expr = )),
+                                       formals(rlibkriging:::update.Kriging))))
+})

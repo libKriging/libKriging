@@ -267,7 +267,7 @@ try
 
     % Evaluate at a fixed benign theta (not the optimum) so FD is well-conditioned.
     th = 0.3 * ones(size(k.theta()));
-    [ll, grad] = k.logLikelihoodFun(th, true, false);
+    [ll, grad] = k.logLikelihoodFun(th, true);
     assert(isfinite(ll));
     assert(all(isfinite(grad)));
 
@@ -277,8 +277,8 @@ try
         tp = th; tm = th;
         tp(i) = tp(i) + h;
         tm(i) = tm(i) - h;
-        [lp, ~] = k.logLikelihoodFun(tp, false, false);
-        [lm, ~] = k.logLikelihoodFun(tm, false, false);
+        [lp, ~] = k.logLikelihoodFun(tp, false);
+        [lm, ~] = k.logLikelihoodFun(tm, false);
         grad_num(i) = (lp - lm) / (2 * h);
     end
     rel = norm(grad(:) - grad_num(:)) / (norm(grad_num(:)) + 1e-12);

@@ -745,7 +745,7 @@ static void test_loglikelihood_fun() {
   // check is well-conditioned (avoids truncation-noise at large-theta plateaus
   // where a stochastic optimizer may stop).
   arma::vec theta = {0.3};
-  auto [ll, grad, hess] = model.logLikelihoodFun(theta, true, false);
+  auto [ll, grad] = model.logLikelihoodFun(theta, true);
 
   std::cout << "  LL at theta=0.3:        " << ll << std::endl;
   std::cout << "  Gradient norm:          " << arma::norm(grad) << std::endl;
@@ -758,8 +758,8 @@ static void test_loglikelihood_fun() {
     arma::vec tp = theta, tm = theta;
     tp(k) += h;
     tm(k) -= h;
-    auto [llp, _a, _b] = model.logLikelihoodFun(tp, false, false);
-    auto [llm, _c, _d] = model.logLikelihoodFun(tm, false, false);
+    auto [llp, _a] = model.logLikelihoodFun(tp, false);
+    auto [llm, _c] = model.logLikelihoodFun(tm, false);
     grad_num(k) = (llp - llm) / (2.0 * h);
   }
   double rel = arma::norm(grad - grad_num) / (arma::norm(grad_num) + 1e-12);
@@ -1405,7 +1405,7 @@ static void test_none_warp_vs_kriging_ll() {
 
     for (double tv : theta_vals) {
       arma::vec th = arma::ones<arma::vec>(tc.d) * tv;
-      auto [wk_ll, wk_grad, wk_hess] = wk.logLikelihoodFun(th, true, false);
+      auto [wk_ll, wk_grad] = wk.logLikelihoodFun(th, true);
       auto [kr_ll, kr_grad] = kr.logLikelihoodFun(th, true, false);
 
       double ll_diff = std::abs(wk_ll - kr_ll);
@@ -1495,7 +1495,7 @@ static void test_none_warp_with_noise_vs_noise_kriging_ll() {
     nk_ts.head(nk_th.n_elem) = nk_th;
     nk_ts(nk_th.n_elem) = nk_s2;
     auto [nk_ll_at_nk, nk_g_at_nk] = nk.logLikelihoodFun(nk_ts, false, false);
-    auto [wk_ll_at_nk, wk_g_at_nk, wk_h_at_nk] = wk.logLikelihoodFun(nk_th, false, false);
+    auto [wk_ll_at_nk, wk_g_at_nk] = wk.logLikelihoodFun(nk_th, false);
     // Note: WK's logLikelihoodFun re-does inner Brent, so it returns the
     // concentrated-σ² LL — which should be ≥ NK's LL at the given (θ, σ²=s2_fix).
     // Stricter check: WK at (θ, σ²_MLE(θ)) ≥ NK at (θ, any σ²).

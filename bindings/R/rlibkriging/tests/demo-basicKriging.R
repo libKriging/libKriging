@@ -87,14 +87,6 @@ for (.t in t) {
       arrows(.t, ll_dk(.t), .t+0.1, ll_dk(.t) + gll_dk(.t)*0.1, length = 0.1, angle = 15, code = 3, col = "blue")
 }
 
-if (lk$kernel() == "gauss") { #: do not work for matern*
-hll = function(theta) lk$logLikelihoodFun(theta, return_hess=TRUE)$logLikelihoodHess
-hll_approx = function(theta) (gll(theta+0.000001)-gll(theta))/0.000001
-plot(t, hll(t), type = 'l',col='red')
-lines(t, hll_approx(t), col = 'blue')
-}
-#hll(0.5); hll_approx(0.5)
-#plot(t, drop(hll(t))-hll_approx(t), type = 'l',col='red')
 
 #### LeaveOneOut
 
