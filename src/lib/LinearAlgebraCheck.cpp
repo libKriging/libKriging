@@ -524,7 +524,9 @@ LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads)
   const bool skip = is_mkl_2020_unsafe(out.backend);
 
   // the thread budget of the public methods (OpenBLAS count included)
+  trace_line("budget scope");
   libKriging::detail::BudgetScope budget;
+  trace_line("budget scope set");
 
   const Results single = skip ? Results{} : run_checks(1, false);
   const auto t2 = std::chrono::steady_clock::now();
@@ -535,8 +537,12 @@ LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads)
   std::vector<Results> per_thread(skip ? 0 : n_threads);
   if (!skip) {
     const int share = std::max(1, libKriging::detail::budget_total() / n_threads);
+    trace_line("concurrent pass: %d workers, BLAS share %d, OpenBLAS count %d",
+               n_threads,
+               share,
+               libKriging::detail::blas_threads_for(share));
     libKriging::detail::ScopedBlasThreads blas_share(libKriging::detail::blas_threads_for(share));
-    trace_line("concurrent pass: %d workers, BLAS share %d", n_threads, share);
+    trace_line("OpenBLAS count set");
     std::vector<std::thread> threads;
     for (int t = 0; t < n_threads; ++t)
       threads.emplace_back([t, share, &per_thread] {
@@ -550,8 +556,9 @@ LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads)
     trace_line("workers created");
     for (auto& th : threads)
       th.join();
-    trace_line("workers joined");
+    trace_line("workers joined; OpenBLAS count restored next");
   }
+  trace_line("concurrent pass closed");
   Results concurrent;
   for (const auto& r : per_thread)
     for (const auto& kv : r)
