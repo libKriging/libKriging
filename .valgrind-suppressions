@@ -35,6 +35,16 @@
    fun:_dl_open
    fun:do_dlopen
 }
+# glibc 2.35 (Ubuntu 22.04): every dlopen, RTLD_NOLOAD included, leaves a
+# 0-byte block of _dl_find_object_update (LinearAlgebra::check backend detection)
+{
+   glibc-2.35-dlopen-dl_find_object_update-zero-byte-block
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:_dl_find_object_update
+}
 # Octave suppressions
 # Generated using (prefer Matlab which has less leaks)
 # * --gen-suppressions=all in main CMakeLists.txt to generate targets
