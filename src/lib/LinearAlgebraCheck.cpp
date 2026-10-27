@@ -20,7 +20,6 @@
 #include <limits>
 #include <map>
 #include <random>
-#include <regex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -249,11 +248,31 @@ bool is_mkl_2020_unsafe(const std::string& library) {
 }
 
 // Configurations known to give wrong results (#429), with their workaround.
+bool is_word_char(char ch) {
+  return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_';
+}
+
 std::string known_issues(const std::string& library) {
-  std::smatch m;
+  // plain string search, no std::regex: under the global locale of a host
+  // (Octave on Windows, mingw libstdc++) a regex search took ~80 s
   std::string advice;
-  if (std::regex_search(library, m, std::regex(R"(OpenBLAS 0\.3\.(19|20)\b.*\| core (\w+))"))) {
-    const std::string version = m[1], core = m[2];
+  std::string version, core;
+  const std::string tag = "OpenBLAS 0.3.";
+  const std::size_t v = library.find(tag);
+  if (v != std::string::npos) {
+    std::size_t e = v + tag.size();
+    while (e < library.size() && library[e] >= '0' && library[e] <= '9')
+      ++e;
+    version = library.substr(v + tag.size(), e - v - tag.size());
+    const std::size_t c = library.find("| core ", e);
+    if (c != std::string::npos) {
+      std::size_t f = c + 7;
+      while (f < library.size() && is_word_char(library[f]))
+        ++f;
+      core = library.substr(c + 7, f - c - 7);
+    }
+  }
+  if (version == "19" || version == "20") {
     if (core == "Cooperlake" || (version == "19" && core == "SkylakeX"))
       advice = "OpenBLAS 0.3." + version + " " + core
                + " kernels give wrong DGEMM / TRSM results (#429): set OPENBLAS_CORETYPE="
@@ -590,7 +609,9 @@ LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads)
     section(line, concurrent);
   }
 
+  trace_line("report");
   const std::string advice = known_issues(out.backend);
+  trace_line("known issues looked up");
   if (!advice.empty())
     rep += "known issue: " + advice + "\n";
   const auto t3 = std::chrono::steady_clock::now();
