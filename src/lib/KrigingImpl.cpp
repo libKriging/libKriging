@@ -498,7 +498,20 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
   arma::mat Sigma_nKo = SigmaNoTrend_nKo + Ecirc_n * trans(Ecirc_n);
   t0 = Bench::toc(nullptr, "Sigma_nKo     ", t0);
 
-  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_nKo / Sigma_divisor);
+  // Fixed floor on the eigenvalues of the conditional covariance instead of
+  // safe_chol_lower's stepwise nugget retry: which retry level fires depends on
+  // which Cholesky fails, i.e. on rounding (BLAS threads, CPU). Eigenvalues
+  // below num_nugget (rounding noise is ~1e-16) are raised to num_nugget, as
+  // simulateNystrom does; the Cholesky factor of the result is unique, so the
+  // sample paths do not depend on the eigenvector signs/order.
+  arma::mat Sigma_cond = arma::symmatu(Sigma_nKo / Sigma_divisor);
+  arma::vec eigval_cond;
+  arma::mat eigvec_cond;
+  if (arma::eig_sym(eigval_cond, eigvec_cond, Sigma_cond)) {
+    eigval_cond = arma::clamp(eigval_cond, LinearAlgebra::num_nugget, arma::datum::inf);
+    Sigma_cond = arma::symmatu(eigvec_cond * arma::diagmat(eigval_cond) * eigvec_cond.t());
+  }
+  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_cond);
   t0 = Bench::toc(nullptr, "LSigma_nKo     ", t0);
 
   arma::mat y_n = arma::mat(n_n, nsim, arma::fill::none);

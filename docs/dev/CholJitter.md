@@ -251,8 +251,8 @@ n > 2000, more than 2 sets at n 2000, a machine with more cores (budgets 100 / 2
 - A jitter growing with n (#426): measured, no gain over the constant (above); the large-n failures
   are long-range local optima of the single start, not plateaus; the long-range restart (default
   c = 2) fixes most of them; many inactive inputs still need a multistart (#418).
-- A fixed floor for the `simulate` conditional covariance instead of the retry (inconsistency 2,
-  #427).
+- Done: fixed eigenvalue floor for the `simulate` conditional covariance instead of the retry
+  (inconsistency 2, #427).
 - A floor on the predicted variance, then an exact committed WarpKriging model (#428).
 - Single-start robustness at large n (#418); bindings consistency checks (#419).
 - Done: getters `chol_jitter()` / `model_chol_jitter()` of `Kriging`, `WarpKriging`,
@@ -284,7 +284,7 @@ called directly (noted "no retry").
 | `logLikelihood()`, `logLikelihoodFun`, `leaveOneOut()`, `leaveOneOutFun/Vec`, `logMargPost(Fun)` | `make_Model` (objective) | 1 + `J` |
 | committed model `m_T` (after BFGS, `optim = "none"`, warm restart) | `commit_model_chol_jitter` / `make_committed_Model` | 1 (exact) |
 | `predict` (mean, stdev, cov, deriv) | `m_T` | 1 (exact): interpolates the data |
-| `simulate` | `m_T`, then `safe_chol_lower` of the conditional covariance at `X_n` | 1 (exact); conditional covariance: 0 + retry |
+| `simulate` | `m_T`, then Cholesky of the conditional covariance at `X_n` | 1 (exact); conditional covariance: eigenvalues floored at `N` |
 | `update(refit = false)` | `update_cholCov` extends `m_T` | 1 (exact) |
 | `update(refit = true)` (warm restart) | search on 1 + `J`, then commit | 1 + `J`, then 1 |
 | `update_simulate` | `R_uu` exact, eigen-decomposition clamped at 0 | 1 (exact), consistent with `update` |
@@ -322,7 +322,7 @@ optimizing). Observation noise adds to either.
 | `logLikelihood()` | the optimized objective (saved as `objective_ll`); after `update(refit = false)`, the committed model's own |
 | committed model (`commit_model_chol_jitter`), `predict`, `simulate`, `update(refit = false)` | 1 + min(`m_chol_jitter`, `N`): gauss 1e-10 |
 | `update_simulate` | `R_uu` exact (1, or 1 + noise / sigma2) |
-| `simulate` conditional covariance | 0 + retry (`simulate_impl`, as Kriging) |
+| `simulate` conditional covariance | eigenvalues floored at `N` (`simulate_impl`, as Kriging) |
 | `load` of a file without `model_chol_jitter` | `m_chol_jitter` (one jitter for both, as saved) |
 
 Not exact, unlike Kriging: an exact factorization lost the predictive variance where warps bring
@@ -347,16 +347,9 @@ No `simulate` / `update`.
 1. **WarpKriging / MLPKriging** commit with `N` instead of exactly (see above; a deliberate
    difference, decided 2026-10-23), and their `update_simulate` is exact while `update` keeps `N` (a 1e-10 relative
    difference).
-2. **`simulate` conditional covariance** (Kriging and WarpKriging, exact method) still relies on the
-   stepwise retry: at points close to the design (or close to each other) the covariance is singular
-   and the added nugget, `N`·10^k, could depend on which Cholesky fails, so on rounding. Measured
-   (2026-10-22, `bench/thread-budget/sim_retry_probe.cpp`, 5 configurations x 10 data sets, budgets
-   10 / 100 / 200 %, 50 simulations at 200 random points, optionally + design points / a 1e-7
-   cluster): the retry fires in nearly every gauss case (the conditional covariance of 200 smooth
-   points is numerically singular) and in matern5_2 only with design points or clusters, always
-   at the first level (`N`), never at a different level across budgets; simulations differ by at
-   most 4e-11 relative across budgets. In practice the retry acts as a fixed `N` here. A fixed floor
-   (as `simulateNystrom`'s eigenvalue floor) would remove the residual risk: rcond values of 2e-18,
-   next to the 1e-18 threshold of the rcond check, were seen (gauss n = 10). Not changed.
+2. ~~**`simulate` conditional covariance**~~ (#427, fixed): the stepwise retry made the added
+   nugget depend on which Cholesky failed, so on rounding (rcond values of 2e-18 were seen next to
+   the 1e-18 threshold). `simulate_impl` (Kriging, WarpKriging, exact method) now floors the
+   eigenvalues of the conditional covariance at `N` before the Cholesky, as `simulateNystrom` does.
 3. **NestedKriging NK aggregation** adds `N` to `K_M` regardless of the kernel (no `J`, no retry, `pinv`
    fallback): fine for stability, noted for completeness.
