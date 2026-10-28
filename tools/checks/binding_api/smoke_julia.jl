@@ -69,12 +69,12 @@ for (label, m) in sort(collect(models); by=first)
         (f isa Function && name ∉ NOT_GETTERS && hasmethod(f, Tuple{typeof(m)})) || continue
         check("$label.$name()", () -> f(m))
     end
-    check("$label.summary", () -> summary(m))
+    check("$label.summary", () -> jlibkriging.summary(m))
     check("$label.predict", () -> predict(m, Xn))
     label == "NestedKriging" && continue
     check("$label.simulate", () -> simulate(m, 2, 123, Xn))
     check("$label.update!", () -> update!(copy(m), yu, Xu))
-    check("$label.update_simulate", () -> update_simulate(copy(m), yu, Xu))
+    check("$label.update_simulate", () -> (c = copy(m); simulate(c, 2, 123, Xn; will_update=true); update_simulate(c, yu, Xu)))
     path = joinpath(tmp, label * ".h5")
     check("$label.save/load", () -> (save(m, path); load(path)))
 end

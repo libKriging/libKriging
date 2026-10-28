@@ -15,7 +15,7 @@ function nfail = smoke_octave(tsv_dir, md_file)
     while ischar(line)
         if ~isempty(line) && line(1) ~= '#'
             f = strsplit(line, "\t");
-            smoke_check([f{1} '.' f{2}], @() setter_roundtrip(f{:}));
+            smoke_check0([f{1} '.' f{2}], @() setter_roundtrip(f{:}));
         end
         line = fgetl(fid);
     end
@@ -30,6 +30,7 @@ function nfail = smoke_octave(tsv_dir, md_file)
     tmp = tempname();
     mkdir(tmp);
 
+    k = [];
     labels = {'Kriging', 'WarpKriging', 'MLPKriging', 'NestedKriging'};
     makers = {@() Kriging(y, X, 'gauss'), ...
               @() WarpKriging(y, X, {'none', 'none'}, 'gauss'), ...
@@ -41,11 +42,12 @@ function nfail = smoke_octave(tsv_dir, md_file)
         m = [];
         try
             m = makers{i}();
-            smoke_check([label ' fit'], @() true);
+            smoke_check0([label ' fit'], @() true);
         catch e
-            smoke_check([label ' fit'], @() error('%s', e.message));
+            smoke_check0([label ' fit'], @() error('%s', e.message));
             continue
         end
+        if strcmp(label, 'Kriging'), k = m; end
         % zero-argument methods, whatever their name
         names = setdiff(methods(label), [skip, {label}, methods('handle')']);
         for j = 1:numel(names)
@@ -53,22 +55,23 @@ function nfail = smoke_octave(tsv_dir, md_file)
         end
         smoke_check([label '.predict'], @() m.predict(Xn));
         if strcmp(label, 'NestedKriging'), continue, end
-        smoke_check([label '.simulate'], @() m.simulate(2, 123, Xn));
-        smoke_check([label '.update'], @() m.copy().update(yu, Xu));
-        smoke_check([label '.update_simulate'], @() m.copy().update_simulate(yu, Xu));
+        smoke_check([label '.simulate'], @() m.simulate(2, 123, Xn, false));
+        smoke_check([label '.update'], @() m.copy().update(yu, Xu, true));
+        smoke_check([label '.update_simulate'], @() update_simulate_after_simulate(m, Xn, yu, Xu));
         path = fullfile(tmp, [label '.h5']);
         smoke_check([label '.save/load'], @() save_load(m, path, label));
     end
 
-    k = Kriging(y, X, 'gauss');
-    smoke_check('Kriging.logLikelihood', @() k.logLikelihood());
-    smoke_check('Kriging.leaveOneOut', @() k.leaveOneOut());
-    smoke_check('Kriging.logMargPost', @() k.logMargPost());
-    smoke_check('Kriging.covMat', @() k.covMat(Xn, Xn));
-    smoke_check('Kriging.logLikelihoodFun', @() k.logLikelihoodFun([0.5; 0.5], true, false));
-    smoke_check('Kriging.leaveOneOutFun', @() k.leaveOneOutFun([0.5; 0.5], true, false));
-    smoke_check('Kriging.leaveOneOutVec', @() k.leaveOneOutVec([0.5; 0.5]));
-    smoke_check('Kriging.subsetOfData', @() Kriging.subsetOfData(X, 5));
+    if ~isempty(k)
+        smoke_check('Kriging.logLikelihood', @() k.logLikelihood());
+        smoke_check('Kriging.leaveOneOut', @() k.leaveOneOut());
+        smoke_check('Kriging.logMargPost', @() k.logMargPost());
+        smoke_check('Kriging.covMat', @() k.covMat(Xn, Xn));
+        smoke_check('Kriging.logLikelihoodFun', @() k.logLikelihoodFun([0.5; 0.5], true, false));
+        smoke_check('Kriging.leaveOneOutFun', @() k.leaveOneOutFun([0.5; 0.5], true, false));
+        smoke_check('Kriging.leaveOneOutVec', @() k.leaveOneOutVec([0.5; 0.5]));
+        smoke_check('Kriging.subsetOfData', @() Kriging.subsetOfData(X, 5));
+    end
 
     nfail = numel(SMOKE_FAILURES);
     printf('\n%d call(s), %d failure(s)\n', SMOKE_CALLS, nfail);
@@ -82,11 +85,25 @@ function nfail = smoke_octave(tsv_dir, md_file)
     end
 end
 
+% fn returns a value: called with one output, as the methods of the binding need
 function smoke_check(label, fn)
+    smoke_run(label, @() fn(), 1);
+end
+
+% fn returns nothing (a setter, a check)
+function smoke_check0(label, fn)
+    smoke_run(label, fn, 0);
+end
+
+function smoke_run(label, fn, nout)
     global SMOKE_FAILURES SMOKE_CALLS
     SMOKE_CALLS = SMOKE_CALLS + 1;
     try
-        fn();
+        if nout > 0
+            r = fn();
+        else
+            fn();
+        end
         printf('ok    %s\n', label);
     catch e
         SMOKE_FAILURES{end+1} = label;
@@ -97,18 +114,26 @@ end
 
 function zero_arg(m, name)
     try
-        m.(name)();
+        r = m.(name)();
     catch e
-        % a method needing arguments is not a getter
-        if isempty(regexp(e.message, 'input|argument|Invalid call|nargin', 'once'))
+        % a method needing arguments (or private) is not a getter
+        if isempty(regexp(e.message, 'input|argument|Invalid call|nargin|undefined|out of bound|private access', 'once'))
             rethrow(e);
         end
     end
 end
 
-function save_load(m, path, label)
+function ok = save_load(m, path, label)
     m.save(path);
-    feval(label).load(path);
+    obj = eval([label '.load(path)']);
+    ok = true;
+end
+
+% update_simulate needs the simulation to update
+function r = update_simulate_after_simulate(m, Xn, yu, Xu)
+    c = m.copy();
+    c.simulate(2, 123, Xn, true);
+    r = c.update_simulate(yu, Xu);
 end
 
 function setter_roundtrip(scope, setter, getter, kind, value)

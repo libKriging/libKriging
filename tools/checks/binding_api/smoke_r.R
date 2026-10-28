@@ -80,7 +80,11 @@ for (label in names(models)) {
   if (label == "NestedKriging") next
   check(paste0(label, ".simulate"), simulate(m, nsim = 2L, seed = 123L, x = Xn))
   check(paste0(label, ".update"), update(copy(m), yu, Xu))
-  check(paste0(label, ".update_simulate"), update_simulate(copy(m), yu, Xu))
+  check(paste0(label, ".update_simulate"), {
+    c <- copy(m)  # update_simulate needs the simulation to update
+    simulate(c, nsim = 2L, seed = 123L, x = Xn, will_update = TRUE)
+    update_simulate(c, yu, Xu)
+  })
   path <- file.path(tmp, paste0(label, ".h5"))
   check(paste0(label, ".save/load"), { save(m, path); rlibkriging::load(path) })
 }
