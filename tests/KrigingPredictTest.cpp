@@ -185,3 +185,19 @@ TEST_CASE("KrigingPredictTest - Check gradient vs finite differences with normal
     }
   }
 }
+
+TEST_CASE("KrigingPredictTest - predicted variance is floored, not 0", "[predict][kriging][floor]") {
+  arma::arma_rng::set_seed(123);
+  const arma::uword n = 15;
+  arma::mat X(n, 2, arma::fill::randu);
+  arma::colvec y = arma::sin(3.0 * X.col(0)) + arma::cos(5.0 * X.col(1));
+  Kriging kr("gauss");
+  kr.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+
+  // at the design points the variance is rounding: floored, so stdev > 0 and its derivative is defined
+  auto [mean, stdev, cov, mean_deriv, stdev_deriv] = kr.predict(X, true, false, true);
+  CHECK(stdev.min() > 0.0);
+  CHECK(stdev.is_finite());
+  CHECK(stdev_deriv.is_finite());
+  CHECK(arma::max(arma::abs(mean - y)) < 1e-4);
+}

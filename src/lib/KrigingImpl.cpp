@@ -268,6 +268,10 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
   arma::mat Sigma_n = arma::mat(n_n, n_n, arma::fill::zeros);
   arma::mat Dyhat_n = arma::mat(n_n, d_input, arma::fill::zeros);
   arma::mat Dysd2_n = arma::mat(n_n, d_input, arma::fill::zeros);
+  // Floor of the predicted variance (units of sigma2): the variance is 1 - r'R^-1 r + ..., computed from terms
+  // of order 1, so its rounding is a few eps
+  const double predict_var_floor = 4.0 * arma::datum::eps;
+  arma::uvec ysd2_at_floor(n_n, arma::fill::zeros);
 
   arma::mat Xn_o = trans(m_X);  // already in feature space (normalized)
   arma::mat Xn_n = X_n;
@@ -339,7 +343,11 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
 
   if (return_stdev) {
     ysd2_n = 1.0 - sum(Rstar_on % Rstar_on, 0).as_col() + sum(Ecirc_n % Ecirc_n, 1).as_col();
-    ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
+    // Floor instead of 0: at (or, for warped inputs, near) a training point the variance is a difference of
+    // nearly equal terms, i.e. rounding of order eps and often negative. A zero stdev would give NaN
+    // NLPD / stdev derivative, so it is floored at the rounding level (in units of sigma2).
+    ysd2_n.transform([&](double val) { return (std::isnan(val) || val < predict_var_floor ? predict_var_floor : val); });
+    ysd2_at_floor = ysd2_n <= predict_var_floor;
     ysd2_n *= var_scale * m_scaleY * m_scaleY;
     t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
   }
@@ -382,7 +390,9 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
 
       if (return_stdev) {
         arma::mat DEcirc_n_i = LinearAlgebra::solve_lower(m_circ.t(), trans(DF_n_i - W_i.t() * m_M));
-        Dysd2_n.row(i) = -2 * Rstar_on.col(i).t() * W_i + 2 * Ecirc_n.row(i) * DEcirc_n_i;
+        // the floored variance is rounding: its derivative is defined as 0
+        if (!ysd2_at_floor.at(i))
+          Dysd2_n.row(i) = -2 * Rstar_on.col(i).t() * W_i + 2 * Ecirc_n.row(i) * DEcirc_n_i;
         t0 = Bench::toc(nullptr, "Dysd2_n    ", t0);
       }
     }

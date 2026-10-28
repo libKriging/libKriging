@@ -1973,7 +1973,7 @@ void WarpKriging::populate_Model(WKModel& m, const arma::vec& theta, double sigm
   // derivative during the search: m_chol_jitter, the kernel's fixed jitter
   // (LinearAlgebra::kernel_chol_jitter, same as Kriging) when it has one, else
   // LinearAlgebra::num_nugget (default 1e-10, set_num_nugget()). The
-  // committed model keeps at most num_nugget (committed_chol_jitter).
+  // committed model is exact (committed_chol_jitter).
   //
   // When m_noise is non-empty, the normalized covariance becomes
   //   C̃ = R_off-diag + diag(1 + nug + noise_i/σ²)
@@ -2088,12 +2088,11 @@ double WarpKriging::logLikelihood() const {
 }
 
 double WarpKriging::committed_chol_jitter() const {
-  // At most num_nugget (1e-10), not 0 as Kriging: warps can bring training
-  // rows together in Phi (Kumaraswamy, saturated MLP, categorical levels), and
-  // an exact factorization then leaves no predictive variance there (stdev 0,
-  // NaN stdev derivative / NLPD: WarpKrigingPerWarpTest, WarpKrigingCollapseTest).
+  // Exact committed model, as Kriging (0; num_nugget is added only if the Cholesky
+  // fails). The predictive variance is floored in predict_impl, so warps bringing
+  // training rows together in Phi no longer give stdev 0 / NaN derivative.
   // docs/dev/CholJitter.md.
-  return std::min(m_chol_jitter, LinearAlgebra::num_nugget);
+  return LinearAlgebra::model_chol_jitter(m_chol_jitter);
 }
 
 void WarpKriging::commit_model_chol_jitter() {
