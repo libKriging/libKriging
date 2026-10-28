@@ -7,8 +7,14 @@ name: Binding API
 # conventions of each language (tools/checks/binding_api/compare.py), and
 # fails on any method missing from some bindings (errors; --report-only on
 # compare.py makes them warnings). The arguments of the methods (Python, R,
-# Julia) are compared too, as warnings only. The log and the job summary end
-# with a synthesis table of all the compared methods.
+# Julia) are compared too, as warnings only (default values included, when
+# two bindings tell them). The methods are also compared with the public C++
+# API (dump_cpp.py; the methods deliberately not exposed are listed with their
+# reason in cpp_exceptions.txt, #435): a C++ method exposed by no binding and
+# not excepted is an error, as is an exception which is not needed any more.
+# Each binding is called once on a tiny model (smoke_*); the smoke failures
+# only warn for now. The log and the job summary end with a synthesis table of
+# all the compared methods.
 
 on:
   push:
@@ -158,8 +164,7 @@ jobs:
         shell: bash
         run: |
           # the public methods of the C++ API: each one is exposed by a binding
-          # or excepted with a reason (--cpp-report-only until the exception
-          # list is confirmed by a run on the four bindings)
+          # or excepted with a reason in cpp_exceptions.txt, otherwise it fails
           python3 tools/checks/binding_api/dump_cpp.py cpp.txt
-          python3 tools/checks/binding_api/compare.py --cpp cpp.txt --cpp-report-only \
+          python3 tools/checks/binding_api/compare.py --cpp cpp.txt \
             --markdown "$GITHUB_STEP_SUMMARY" dumps/*.txt

@@ -118,7 +118,7 @@ function ok = zero_arg(m, name)
         eval(sprintf('r = m.%s();', name));
     catch e
         % a method needing arguments (or private) is not a getter
-        if isempty(regexp(e.message, 'input|argument|Invalid call|nargin|undefined|out of bound|private access', 'once'))
+        if isempty(regexp(e.message, 'input|argument|Invalid call|nargin|undefined|out of bound|private access|too many outputs', 'once'))
             rethrow(e);
         end
     end

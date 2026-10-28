@@ -152,8 +152,9 @@ argument, no `normalize` support. `nk.save("nk.json")` /
 - Getting positional argument order wrong — these bindings have **no**
   name-based argument matching; double-check against the signatures above
   rather than assuming Python/R-style keyword calls translate directly.
-- Passing `nsim`/`seed` as plain doubles instead of `int32(...)` in
-  `simulate(...)`.
+- Passing `nsim`/`seed` as non-integer doubles (`10.5`) in `simulate(...)`:
+  plain integer-valued doubles are accepted, but releases before that
+  change need `int32(...)`.
 - `NestedKriging(..., "NK", ...)` (5th positional arg) combined with a
   non-`"constant"` `regmodel` (8th positional arg).
 

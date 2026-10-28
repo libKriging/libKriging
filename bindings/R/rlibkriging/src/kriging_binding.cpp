@@ -705,7 +705,7 @@ arma::vec kriging_centerX(Rcpp::List k) {
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = lk_xptr(k.attr("object"));
   Rcpp::XPtr<Kriging> impl_ptr(impl);
-  return impl_ptr->centerX();
+  return arma::vec(impl_ptr->centerX().t());  // a row vector: no direct conversion to arma::vec
 }
 
 // [[Rcpp::export]]
@@ -714,7 +714,7 @@ arma::vec kriging_scaleX(Rcpp::List k) {
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = lk_xptr(k.attr("object"));
   Rcpp::XPtr<Kriging> impl_ptr(impl);
-  return impl_ptr->scaleX();
+  return arma::vec(impl_ptr->scaleX().t());
 }
 
 // [[Rcpp::export]]
