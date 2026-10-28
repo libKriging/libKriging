@@ -12,6 +12,17 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- **Linear algebra self-test**: `LinearAlgebra::check(n_threads = 0)` calls the `LinearAlgebra`
+  routines libKriging relies on (crossprod, diagABA, Cholesky, triangular / general solves,
+  inverse, rcond, QR, Woodbury solve, symmetric eigen) and compares each result with a long
+  double oracle computed without the BLAS, whatever the BLAS (OpenBLAS, MKL, Accelerate, BLIS,
+  FlexiBLAS, reference), from one thread then from `n_threads` concurrent threads, and returns
+  `ok`, the BLAS identification (library libKriging's `dgemm` is bound to, and vendor details) and a report with
+  the workaround of a known faulty BLAS (OpenBLAS 0.3.19 / 0.3.20 `Cooperlake` kernels, MKL 2020 with its Intel
+  threading layer); the backend is detected, not chosen. Bindings: `linearalgebra_check()`
+  (Python `pylibkriging.linearalgebra_check` dict, R exported `linearalgebra_check` list,
+  Octave `[ok, backend, report] = linearalgebra_check()`, Julia named tuple). See
+  [docs/dev/FAQ.md](docs/dev/FAQ.md) ([#429](https://github.com/libKriging/libKriging/issues/429)).
 - **Long-range restart**: a noise-free LL fit with a single BFGS start (`"BFGS"`) is
   restarted when it converges with max_j theta_j / maxdX_j > `Optim::set_long_range_restart(c)`
   (default 2, `LK_LONG_RANGE_RESTART`, 0 off), at most `Optim::set_max_long_range_restart(m)`

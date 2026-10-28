@@ -9,6 +9,7 @@ classdef LinearAlgebra
     %   chol_warning: warn when the fallback adds a numerical nugget
     %   check_chol_rcond: check the reciprocal condition number of the
     %     factorizations
+    % Self-test of the linear algebra backend: see linearalgebra_check.
 
     methods (Static)
         function val = get_chol_jitter()

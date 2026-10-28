@@ -100,5 +100,16 @@ for scope, obj in SCOPES.items():
         else:
             lines.append("%s\t%s" % (scope, n))
 
+# module functions standing for a static method: linearalgebra_check is
+# LinearAlgebra::check (a free function in every binding)
+FREE = {"linearalgebra_check": ("LinearAlgebra", "check")}
+for fn, (scope, n) in FREE.items():
+    if hasattr(lk, fn):
+        sigs = pybind_signatures(fn, getattr(getattr(lk, fn), "__doc__", None))
+        if sigs:
+            lines.extend("%s\t%s\t%s" % (scope, n, ",".join(args)) for args in sigs)
+        else:
+            lines.append("%s\t%s" % (scope, n))
+
 with open(sys.argv[1], "w") as f:
     f.write("".join(line + "\n" for line in lines))

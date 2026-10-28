@@ -2325,6 +2325,19 @@ int lk_linalg_set_num_nugget(double nugget) {
   CATCH_RETURN
 }
 
+int lk_linearalgebra_check(int n_threads, const char** backend, const char** report) {
+  try {
+    static thread_local std::string be, rep;
+    const LinearAlgebra::CheckResult c = LinearAlgebra::check(n_threads);
+    be = c.backend;
+    rep = c.report;
+    *backend = be.c_str();
+    *report = rep.c_str();
+    return c.ok ? 1 : 0;
+  }
+  CATCH_RETURN
+}
+
 int lk_linalg_set_chol_warning(int warn) {
   try {
     LinearAlgebra::set_chol_warning(warn != 0);
