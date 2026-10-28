@@ -12,6 +12,16 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- **Long-range restart**: a noise-free LL fit with a single BFGS start (`"BFGS"`) is
+  restarted when it converges with max_j theta_j / maxdX_j > `Optim::set_long_range_restart(c)`
+  (default 2, `LK_LONG_RANGE_RESTART`, 0 off), at most `Optim::set_max_long_range_restart(m)`
+  times per start (default 2, `LK_MAX_LONG_RANGE_RESTART`), the best solution kept. The failed
+  single starts at n 500-1000 are long-range local optima: sin d 4 n 1000, 67 % → 0 % misses
+  at x 1.8 the time (BFGS10: x 8); x 2-3 the time with inactive inputs. Single-start fits can
+  therefore return a different (never lower) LL than before. Bindings: not exposed (the
+  environment variables apply). See [docs/dev/CholJitter.md](docs/dev/CholJitter.md)
+  ([#426](https://github.com/libKriging/libKriging/issues/426),
+  [#418](https://github.com/libKriging/libKriging/issues/418)).
 - **Thread budget**: one setting bounds the threads of the multistart pool, the OpenMP loops
   and the BLAS together: `Optim::set_num_threads_percent(x)` (x <= 1 a ratio, x > 1 a
   percentage of the physical cores, 0 = 100 %) or `LK_NUM_THREADS_PERCENT`;

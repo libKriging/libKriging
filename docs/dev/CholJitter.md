@@ -169,7 +169,7 @@ Median per-set RMSE ratio to 1e-9 (pct 100), where the rules differ:
   RMSE sin d 4 n 1000: 0.00471 / 0.00483 / 0.00494); single-start 1e-9 against BFGS10: sin d 4
   0.176 → 0.080 (n 500), 0.057 → 0.0048 (n 1000); time x 2.8–8.3.
 
-### Plateau or local optimum
+### Plateau or local optimum: long-range restart
 
 The traces of the single-start fits (every objective evaluation printed by a temporary probe, not
 kept, sin d 4 n 500 / 1000, Hartmann6 n 1000, J 1e-9, 22 fits) show no plateau:
@@ -182,17 +182,75 @@ the 12 failed fits and up to 3.6 (6.2) for the good ones; pairs of successive ev
 |d log theta| > 0.3 and |df| < 10 occur in both. What separates them is the range:
 max_j theta_j / maxdX_j >= 3.6 for 11 of the 12 failed fits, <= 1.3 for every good one.
 
+Restart criterion, implemented (`Optim::set_long_range_restart(c)` / `LK_LONG_RANGE_RESTART`,
+default 2, 0 off; `Optim::set_max_long_range_restart` / `LK_MAX_LONG_RANGE_RESTART`, default 2):
+one more condition of the existing restart test of a single-start (`BFGS`) noise-free LL fit,
+max_j theta_j / maxdX_j > c, at most 2 times per start, same restart point (contracted toward the
+lower bound), best kept (`tests/LongRangeRestartTest.cpp`). J 1e-9, budgets 10 / 100 / 200 %;
+miss: LL > 10 below the best of the variants of the set:
+
+| data | n (sets) | BFGS miss / RMSE / time | c = 2 | c = 3 | BFGS10 |
+|---|---|---|---|---|---|
+| sin d 4 | 200 (20) | 20 % / 0.546 / 0.33 s | 0 % / 0.521 / 0.46 s | 5 % / 0.521 / 0.40 s | |
+| sin d 4 | 500 (10) | 50 % / 0.176 / 0.76 s | 20 % / 0.0797 / 1.5 s | 20 % / 0.0797 / 1.3 s | 0 % / 0.0797 / 4.1 s |
+| sin d 4 | 1000 (6) | 67 % / 0.0566 / 2.3 s | 0 % / 0.00483 / 4.2 s | 0 % / 0.00483 / 4.0 s | 0 % / 0.00483 / 19 s |
+| Hartmann6 | 200 (20) | 5 % / 0.488 / 0.24 s | 0 % / 0.476 / 0.37 s | | |
+| Hartmann6 | 500 (10) | 10 % / 0.312 / 1.7 s | 0 % / 0.312 / 1.8 s | | 0 % / 0.317 / 4.7 s |
+| Hartmann6 | 1000 (6) | 33 % / 0.198 / 5.8 s | 0 % / 0.187 / 7.7 s | 0 % / 0.187 / 6.7 s | 0 % / 0.187 / 19 s |
+| Branin | 100 (20) / 500 (10) | 10 / 0 %, same RMSE | 0 / 0 %, x 1.1 time | | |
+| sin d 2 / d 8 | 500 (10) | 0 % | 0 %, same RMSE, x 0.85 / 1.4 time | | |
+
+No material divergence across budgets with the criterion (0 of 122 sets, BFGS 4). A maximum of
+4 restarts instead of 2: identical results. The 2 misses left on sin d 4 n 500 are a short-range local
+optimum (theta_min 0.07, LL −736 against −341) and a near tie (14 LL units): out of the
+criterion's reach.
+
+Inactive inputs (their theta is genuinely long range, so the criterion fires on nearly every fit):
+`sinhalf` (sin on the first half of the inputs), Branin and Hartmann6 with 2 more inputs than
+they use; c = 2 against 0, J 1e-9:
+
+| data | d (active) | n (sets) | BFGS miss / RMSE / time | c = 2 | time c = 2 / BFGS | BFGS10 |
+|---|---|---|---|---|---|---|
+| sinhalf | 4 (2) | 200 (20) | 15 % / 0.00175 / 0.24 s | 5 % / 0.00175 / 0.69 s | 2.5 | 0 % / 0.00175 / 0.35 s |
+| sinhalf | 4 (2) | 500 (10) | 10 % / 8.0e-5 / 0.40 s | 0 % / 6.4e-5 / 1.1 s | 3.2 | 0 % / 6.4e-5 / 1.9 s |
+| sinhalf | 4 (2) | 1000 (6) | 0 % / 1.0e-5 / 1.5 s | 0 % / 1.0e-5 / 3.1 s | 2.5 | 0 % / 1.0e-5 / 11 s |
+| sinhalf | 8 (4) | 200 (20) | 60 % / 0.727 / 0.22 s | 55 % / 0.685 / 0.64 s | 2.7 | 0 % / 0.522 / 0.40 s |
+| sinhalf | 8 (4) | 500 (10) | 70 % / 0.401 / 0.76 s | 50 % / 0.380 / 1.5 s | 1.8 | 0 % / 0.0772 / 3.1 s |
+| sinhalf | 8 (4) | 1000 (6) | 83 % / 0.617 / 3.3 s | 83 % / 0.617 / 3.4 s | 1.1 | 0 % / 0.122 / 19 s |
+| Branin | 4 (2) | 200 (20) | 30 % / 4.7e-4 / 0.21 s | 10 % / 3.4e-4 / 0.44 s | 2.3 | 0 % / 3.1e-4 / 0.27 s |
+| Branin | 4 (2) | 500 / 1000 | 0 % | 0 %, same RMSE | 3.1 / 2.8 | 0 % |
+| Hartmann6 | 8 (6) | 200 (20) | 10 % / 0.489 / 0.26 s | 0 % / 0.485 / 0.63 s | 2.7 | 0 % / 0.485 / 0.41 s |
+| Hartmann6 | 8 (6) | 500 (10) | 20 % / 0.333 / 0.97 s | 10 % / 0.318 / 1.7 s | 2.1 | 0 % / 0.318 / 3.2 s |
+| Hartmann6 | 8 (6) | 1000 (6) | 0 % / 0.187 / 2.4 s | 0 % / 0.187 / 5.7 s | 2.6 | 0 % / 0.187 / 16 s |
+
+- LL never lower (best kept), misses fewer or equal everywhere, no material divergence (BFGS: 4
+  of 144 sets, c = 2: 1).
+- The cost of an inactive input is the two restarts: x 1.8–3.2 the single-start time. At n = 200
+  BFGS10 (its starts in parallel) is faster than the restarted single start and finds the
+  optimum every time; from n = 500 on BFGS10 costs x 3–8.
+- Not enough with 4 inactive inputs of 8 (sinhalf d 8): 50–83 % misses against 0 % for BFGS10.
+  The restart point contracts every theta toward the lower bound, the inactive ones too, and the
+  restarted runs end in the same basins; restarting from the solution with only the long-range
+  active components contracted is not measured (an inactive and an active long-range component
+  cannot be told apart from theta alone).
+
+Not measured: matern5_2; nugget / noise models (the criterion is off there); LOO / LMP objectives
+(off); the R / Octave / Julia binding tests (not runnable on the machine of the measurements; the
+C++ suite, 220 tests, and the Python tests pass with and without the criterion).
+
 Decision: keep the constant per kernel. The robustness at large n belongs to the starts (#418):
-a multistart, or a restart criterion on the range of the single start's solution (the measure that
-separates the failed fits above). Not measured: matern5_2, n > 2000, more than 2 sets at n 2000,
-a machine with more cores (budgets 100 / 200 % distinct).
+the long-range restart above (c = 2, on by default for a single start) gives BFGS10's optimum on
+120 of 122 sets at 1.1–2 x the single-start time (BFGS10: 3–8 x), x 2–3 with inactive inputs; a
+multistart remains the only reliable choice with many inactive inputs. Not measured: matern5_2,
+n > 2000, more than 2 sets at n 2000, a machine with more cores (budgets 100 / 200 % distinct).
 
 ## Open items
 
 - Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;
   matern5_2 ≈ 1 (#425).
 - A jitter growing with n (#426): measured, no gain over the constant (above); the large-n failures
-  are long-range local optima of the single start, not plateaus (#418).
+  are long-range local optima of the single start, not plateaus; the long-range restart (default
+  c = 2) fixes most of them; many inactive inputs still need a multistart (#418).
 - A fixed floor for the `simulate` conditional covariance instead of the retry (inconsistency 2,
   #427).
 - A floor on the predicted variance, then an exact committed WarpKriging model (#428).
