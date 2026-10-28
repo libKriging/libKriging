@@ -170,8 +170,14 @@ def compare(dumps):
 def normalize_default(value):
     """a default value spelled as the bindings do: quotes, brackets, case and
     spaces ignored, null values and booleans unified, numbers as floats"""
-    v = re.sub(r"[\s'\"()\[\]{}]|^c(?=[(\[])", "", value.strip()).lower()
-    v = {"t": "true", "f": "false", "none": "null", "nothing": "null", "na": "null", "nullptr": "null"}.get(v, v)
+    value = value.strip()
+    # R's match.arg convention: c("LL", "LOO") lists the choices, the first is the default
+    m = re.match(r"^c\(\s*(\"[^\"]*\"|'[^']*')\s*(,\s*(\"[^\"]*\"|'[^']*')\s*)*\)$", value)
+    if m:
+        value = m.group(1)
+    v = re.sub(r"[\s'\"()\[\]{}]|^c(?=[(\[])", "", value).lower()
+    v = {"": "null", "t": "true", "f": "false", "none": "null", "nothing": "null", "na": "null",
+         "nullptr": "null"}.get(v, v)
     v = re.sub(r"^c", "", v)
     try:
         return repr(float(v.rstrip("l")))

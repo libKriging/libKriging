@@ -37,6 +37,7 @@ Kriging	logLikelihoodNystromFun	PENDING (#435): approximation entry points, reac
 Kriging	logMargPostVecchiaFun	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
 Kriging	logMargPostNystromFun	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
 LinearAlgebra	chol_block	internal numerical kernel, wrapped for the R tests only
+LinearAlgebra	eig_sym	internal numerical kernel, checked through LinearAlgebra.check()
 LinearAlgebra	qr_econ	internal numerical kernel, wrapped for the R tests only
 LinearAlgebra	rcond_chol	internal numerical kernel, wrapped for the R tests only
 LinearAlgebra	rcond_approx_chol	internal numerical kernel, wrapped for the R tests only
