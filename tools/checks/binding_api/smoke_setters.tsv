@@ -1,0 +1,20 @@
+# Settings of Optim / LinearAlgebra for the get / set / get round trip of the smoke tests
+# (smoke_*): <scope>\t<setter>\t<getter>\t<kind>\t<value>. kind: int, float or bool (value:
+# the negation of the current one). The value is given as a user would type it (an Octave
+# plain double, an R numeric...); a setter without getter is only called with its value.
+# The getter is restored to its initial value at the end.
+Optim	set_log_level	get_log_level	int	3
+Optim	set_max_iteration	get_max_iteration	int	57
+Optim	set_gradient_tolerance	get_gradient_tolerance	float	0.0125
+Optim	set_objective_rel_tolerance	get_objective_rel_tolerance	float	0.0025
+Optim	set_theta_lower_factor	get_theta_lower_factor	float	0.25
+Optim	set_theta_upper_factor	get_theta_upper_factor	float	4.5
+Optim	set_thread_start_delay_ms	get_thread_start_delay_ms	int	7
+Optim	set_thread_pool_size	get_thread_pool_size	int	2
+Optim	set_num_threads_percent	get_num_threads_percent	float	0.5
+Optim	use_reparametrize	is_reparametrized	bool	-
+Optim	use_variogram_bounds_heuristic	variogram_bounds_heuristic_used	bool	-
+LinearAlgebra	set_chol_jitter	get_chol_jitter	float	1e-7
+LinearAlgebra	set_num_nugget	get_num_nugget	float	1e-8
+LinearAlgebra	check_chol_rcond	chol_rcond_checked	bool	-
+LinearAlgebra	set_chol_warning	-	bool	false

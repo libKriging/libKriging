@@ -114,6 +114,26 @@ jobs:
           esac
           cat "${DUMP}"
 
+      # smoke calls with the argument types a user passes (non blocking: the
+      # failures are warnings and listed in the job summary)
+      - name: Smoke calls of the binding
+        shell: bash
+        run: |
+          SMOKE_DIR=tools/checks/binding_api
+          case "${{ matrix.binding }}" in
+            python)
+              PYTHONPATH=build/bindings/Python/pylibkriging:bindings/Python/pylibkriging/src \
+                python3 ${SMOKE_DIR}/smoke_python.py "${GITHUB_STEP_SUMMARY}" ;;
+            r)
+              R_LIBS=bindings/R/Rlibs Rscript ${SMOKE_DIR}/smoke_r.R "${GITHUB_STEP_SUMMARY}" ;;
+            octave)
+              octave-cli --path build/bindings/Octave/mlibkriging --path bindings/Octave/mlibkriging \
+                --path ${SMOKE_DIR} --eval "n = smoke_octave('${SMOKE_DIR}', '${GITHUB_STEP_SUMMARY}'); exit(n > 0)" ;;
+            julia)
+              JLIBKRIGING_LIB_PATH=${PWD}/build/bindings/Julia/jlibkriging/libkriging_c.so \
+                julia --project=bindings/Julia/jlibkriging ${SMOKE_DIR}/smoke_julia.jl "${GITHUB_STEP_SUMMARY}" ;;
+          esac || echo "::warning::${{ matrix.binding }}: some smoke calls failed (see the log and the job summary)"
+
       - uses: actions/upload-artifact@v4
         with:
           name: binding-api-${{ matrix.binding }}
@@ -136,4 +156,10 @@ jobs:
 
       - name: Compare the methods of the bindings
         shell: bash
-        run: python3 tools/checks/binding_api/compare.py --markdown "$GITHUB_STEP_SUMMARY" dumps/*.txt
+        run: |
+          # the public methods of the C++ API: each one is exposed by a binding
+          # or excepted with a reason (--cpp-report-only until the exception
+          # list is confirmed by a run on the four bindings)
+          python3 tools/checks/binding_api/dump_cpp.py cpp.txt
+          python3 tools/checks/binding_api/compare.py --cpp cpp.txt --cpp-report-only \
+            --markdown "$GITHUB_STEP_SUMMARY" dumps/*.txt

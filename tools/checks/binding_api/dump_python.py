@@ -1,7 +1,8 @@
 # Lists the names exposed by pylibkriging, one "<scope>\t<name>[\t<args>]"
 # line each (one per overload), for compare.py, which compares the bindings
 # with each other. <args>: the arguments, self excluded, "name" (required) or
-# "name=" (with a default) separated by ",", "*" for *args / **kwargs.
+# "name=" (with a default) or "name=value" (value: repr of the default, "," and
+# "%" written %2C and %25) separated by ",", "*" for *args / **kwargs.
 # Usage: python3 dump_python.py <output file>
 import inspect
 import re
@@ -44,6 +45,11 @@ def split_top(s):
     return [p.strip() for p in parts if p.strip()]
 
 
+def encode(value):
+    """a default value, without the separators of the dump"""
+    return value.replace("%", "%25").replace(",", "%2C").replace("\t", " ").replace("\n", " ")
+
+
 def pybind_signatures(name, doc):
     """the argument lists of the pybind11 signature lines "name(a: T = v, ...) -> R" of doc"""
     sigs = []
@@ -59,7 +65,7 @@ def pybind_signatures(name, doc):
             arg = p.split(":")[0].split("=")[0].strip()
             if arg == "self":
                 continue
-            args.append(arg + ("=" if "=" in p else ""))
+            args.append(arg + ("=" + encode(p.split("=", 1)[1].strip()) if "=" in p else ""))
         sigs.append(args)
     return sigs
 
@@ -76,7 +82,7 @@ def python_signature(f):
         if p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD):
             args.append("*")
         else:
-            args.append(p.name + ("" if p.default is p.empty else "="))
+            args.append(p.name + ("" if p.default is p.empty else "=" + encode(repr(p.default))))
     return args
 
 

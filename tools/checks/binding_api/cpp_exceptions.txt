@@ -1,0 +1,92 @@
+# Public C++ methods deliberately not exposed by the bindings, one
+# "<scope>\t<method>\t<reason>" per line (compare.py, issue #435). The method
+# is the C++ name (case and "_" ignored as in the bindings), "*" for a whole
+# scope. A gap is thus a decision, not an oversight: a method is either
+# exposed in at least one binding or listed here with the reason.
+# "PENDING" lines are gaps not decided yet; an entry exposed by a binding is
+# reported as obsolete.
+libKriging	*	build metadata (version, build tag), not part of the model API
+Covariance	*	internal kernels, selected by the kernel name
+Trend	*	internal parsing of the regression model, given as a string
+KrigingLoader	*	internal: load() dispatches on the file
+Random	init	internal random engine; seeds are arguments of simulate()
+Random	randu	internal random engine; seeds are arguments of simulate()
+Random	randu_vec	internal random engine; seeds are arguments of simulate()
+Random	randu_mat	internal random engine; seeds are arguments of simulate()
+Random	randn_mat	internal random engine; seeds are arguments of simulate()
+Random	reset_seed	internal random engine; seeds are arguments of simulate()
+Kriging	make_Model	internal construction of the factorized model
+Kriging	make_committed_Model	internal construction of the factorized model
+Kriging	populate_Model	internal construction of the factorized model
+Kriging	populate_Model_jitter	internal construction of the factorized model
+Kriging	fit_objective_method	internal parsing of the objective argument of fit()
+Kriging	deprecated_objective_message	internal parsing of the objective argument of fit()
+Kriging	alpha	internal Nugget parameter, alpha = sigma2 / (sigma2 + nugget)
+Kriging	set_vecchia_exact_commit	deprecated no-op, fit with method="exact"
+Kriging	vecchia_exact_commit	deprecated no-op, fit with method="exact"
+Kriging	is_vecchia_light	PENDING (#435): inspection of light fits, to expose or to decide
+Kriging	is_nystrom_light	PENDING (#435): inspection of light fits, to expose or to decide
+Kriging	predictVecchia	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
+Kriging	simulateVecchia	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
+Kriging	predictNystrom	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
+Kriging	simulateNystrom	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
+Kriging	leaveOneOutVecchiaFun	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
+Kriging	leaveOneOutNystromFun	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
+Kriging	logLikelihoodVecchiaFun	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
+Kriging	logLikelihoodNystromFun	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
+Kriging	logMargPostVecchiaFun	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
+Kriging	logMargPostNystromFun	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
+LinearAlgebra	chol_block	internal numerical kernel, wrapped for the R tests only
+LinearAlgebra	qr_econ	internal numerical kernel, wrapped for the R tests only
+LinearAlgebra	rcond_chol	internal numerical kernel, wrapped for the R tests only
+LinearAlgebra	rcond_approx_chol	internal numerical kernel, wrapped for the R tests only
+LinearAlgebra	safe_chol_lower	internal numerical kernel, wrapped for the R tests only
+LinearAlgebra	solve	internal numerical kernel, wrapped for the R tests only
+LinearAlgebra	model_chol_jitter	internal: jitter of the committed model, see chol_jitter() of the models
+LinearAlgebra	cholCov	internal numerical kernels, not user API
+LinearAlgebra	update_cholCov	internal numerical kernels, not user API
+LinearAlgebra	chol_upper	internal numerical kernels, not user API
+LinearAlgebra	compute_dX	internal numerical kernels, not user API
+LinearAlgebra	covMat_rect	internal numerical kernels, not user API
+LinearAlgebra	covMat_sym_X	internal numerical kernels, not user API
+LinearAlgebra	covMat_sym_dX	internal numerical kernels, not user API
+LinearAlgebra	crossprod	internal numerical kernels, not user API
+LinearAlgebra	tcrossprod	internal numerical kernels, not user API
+LinearAlgebra	diagABA	internal numerical kernels, not user API
+LinearAlgebra	diagcrossprod	internal numerical kernels, not user API
+LinearAlgebra	inv_sympd	internal numerical kernels, not user API
+LinearAlgebra	kernel_chol_jitter	internal numerical kernels, not user API
+LinearAlgebra	nystromFactor	internal numerical kernels, not user API
+LinearAlgebra	rsolve	internal numerical kernels, not user API
+LinearAlgebra	rsolve_upper	internal numerical kernels, not user API
+LinearAlgebra	safe_chol_lower_retry	internal numerical kernels, not user API
+LinearAlgebra	solve_lower	internal numerical kernels, not user API
+LinearAlgebra	solve_upper	internal numerical kernels, not user API
+LinearAlgebra	trace_prod	internal numerical kernels, not user API
+LinearAlgebra	woodbury_logdet	internal numerical kernels, not user API
+LinearAlgebra	woodbury_solve	internal numerical kernels, not user API
+Optim	parse_method	internal helpers of the optimizer
+Optim	theta_bounds	internal helpers of the optimizer
+Optim	get_long_range_restart	PENDING (#435): optimizer settings, to expose or to decide
+Optim	set_long_range_restart	PENDING (#435): optimizer settings, to expose or to decide
+Optim	get_max_long_range_restart	PENDING (#435): optimizer settings, to expose or to decide
+Optim	set_max_long_range_restart	PENDING (#435): optimizer settings, to expose or to decide
+MLPKriging	var_scale	PENDING (#435): variance calibration factor, to expose or to decide
+WarpKriging	var_scale	PENDING (#435): variance calibration factor, to expose or to decide
+WarpKriging	joint_warp	internal access to the warp object
+WarpKriging	recalibrate_warps	internal: called by NestedKriging
+NestedKriging	warp_subsample	PENDING (#435): warped-path accessors, to expose or to decide
+NestedKriging	wsubmodel	PENDING (#435): warped-path accessors, to expose or to decide
+Kriging	set_deprecation_handler	internal hook for the messages of deprecated objectives
+WarpKriging	clone_for_thread	internal: copy of the model for the multistart workers
+WarpKriging	make_Model	internal construction of the factorized model
+WarpKriging	populate_Model	internal construction of the factorized model
+NestedKriging	aggregationFromString	internal conversion of the aggregation argument
+NestedKriging	aggregationToString	internal conversion of the aggregation argument
+MLPKriging	d_out	PENDING (#435): accessor of the architecture, to expose or to decide
+MLPKriging	optim	PENDING (#435): accessor of the fit arguments, to expose or to decide
+MLPKriging	warp	PENDING (#435): accessor of the warp object, to expose or to decide
+WarpKriging	warp	PENDING (#435): accessor of the warp object, to expose or to decide
+WarpKriging	warping_strings	PENDING (#435): accessor of the warping, to expose or to decide
+NestedKriging	submodel	PENDING (#435): accessor of the submodels, to expose or to decide
+NestedKriging	warped	PENDING (#435): accessor of the warped path, to expose or to decide
