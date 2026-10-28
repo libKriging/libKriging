@@ -132,9 +132,13 @@ class Optim {
   LIBKRIGING_EXPORT static int get_thread_pool_size();
 
   // Small-problem BLAS rule (OpenBLAS only): fit / predict / update on fewer
-  // than blas_threads_min_n training observations run OpenBLAS on 1 thread
-  // instead of the thread budget (restored after the call). 0 = off (default,
-  // env LK_BLAS_THREADS_MIN_N). See REPORT-blas-threads.md.
+  // training observations than the threshold run OpenBLAS on 1 thread instead
+  // of the thread budget (restored after the call): below a few hundred
+  // observations the OpenBLAS threads mostly spin-wait between calls, and
+  // compete with the OpenMP team for the cores. -1 = automatic (default, env
+  // LK_BLAS_THREADS_MIN_N): threshold 500 when the BLAS threads and the
+  // OpenMP team outnumber the logical CPUs (no SMT headroom: VMs, CI runners),
+  // off otherwise; 0 = off; n > 0 = threshold n. See REPORT-blas-threads.md.
   static int blas_threads_min_n;
   LIBKRIGING_EXPORT static void set_blas_threads_min_n(int min_n);
   LIBKRIGING_EXPORT static int get_blas_threads_min_n();

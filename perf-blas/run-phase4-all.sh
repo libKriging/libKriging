@@ -24,3 +24,10 @@ $P kriging   BFGS10    "1000" 5 $M $R
 $P nugget    BFGS10    "1000" 3 $M $R
 $P warp_kuma BFGS      "1000" 3 $M $R
 $P mlp       BFGS+Adam "1000" 3 $M $R
+# added: n = 200, where the OpenMP loops start (kOmpMinRows) and phase 2 shows the largest gap
+$P kriging   BFGS      "200" 10 $M $R
+$P nugget    BFGS      "200" 10 $M $R
+$P warp_kuma BFGS      "200" 10 $M $R
+$P mlp       BFGS+Adam "200" 10 $M $R
+$P mlp       BFGS      "200" 10 $M $R
+$P warp_mlp  BFGS      "200" 10 $M $R

@@ -1,0 +1,12 @@
+Building benchmarks...
+ninja: no work to do.
+
+Running benchmark: kriging (n=200, d=4, iterations=3)
+Operation filter: fit
+----------------------------------------
+Kriging (no noise) Benchmark (BFGS, LL objective)
+n=200 d=4 iterations=3
+Operation                 |  Mean (ms) |   Std (ms) |   Min (ms) |   Max (ms) | Median (ms)
+fit                       |    644.599 |    259.059 |    295.850 |    916.173 |    721.773
+
+Results saved to: /home/user/libKriging/build/benchmark-results.log
