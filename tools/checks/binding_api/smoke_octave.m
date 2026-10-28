@@ -56,7 +56,7 @@ function nfail = smoke_octave(tsv_dir, md_file)
         smoke_check([label '.predict'], @() m.predict(Xn));
         if strcmp(label, 'NestedKriging'), continue, end
         smoke_check([label '.simulate'], @() m.simulate(2, 123, Xn, false));
-        smoke_check([label '.update'], @() m.copy().update(yu, Xu, true));
+        smoke_check0([label '.update'], @() m.copy().update(yu, Xu, true));
         smoke_check([label '.update_simulate'], @() update_simulate_after_simulate(m, Xn, yu, Xu));
         path = fullfile(tmp, [label '.h5']);
         smoke_check([label '.save/load'], @() save_load(m, path, label));
@@ -67,9 +67,9 @@ function nfail = smoke_octave(tsv_dir, md_file)
         smoke_check('Kriging.leaveOneOut', @() k.leaveOneOut());
         smoke_check('Kriging.logMargPost', @() k.logMargPost());
         smoke_check('Kriging.covMat', @() k.covMat(Xn, Xn));
-        smoke_check('Kriging.logLikelihoodFun', @() k.logLikelihoodFun([0.5; 0.5], true, false));
-        smoke_check('Kriging.leaveOneOutFun', @() k.leaveOneOutFun([0.5; 0.5], true, false));
-        smoke_check('Kriging.leaveOneOutVec', @() k.leaveOneOutVec([0.5; 0.5]));
+        smoke_check('Kriging.logLikelihoodFun', @() two_out(@() k.logLikelihoodFun([0.5; 0.5], true, false)));
+        smoke_check('Kriging.leaveOneOutFun', @() two_out(@() k.leaveOneOutFun([0.5; 0.5], true)));
+        smoke_check('Kriging.leaveOneOutVec', @() two_out(@() k.leaveOneOutVec([0.5; 0.5])));
         smoke_check('Kriging.subsetOfData', @() Kriging.subsetOfData(X, 5));
     end
 
@@ -112,15 +112,22 @@ function smoke_run(label, fn, nout)
     end
 end
 
-function zero_arg(m, name)
+function ok = zero_arg(m, name)
+    ok = true;
     try
-        r = m.(name)();
+        eval(sprintf('r = m.%s();', name));
     catch e
         % a method needing arguments (or private) is not a getter
         if isempty(regexp(e.message, 'input|argument|Invalid call|nargin|undefined|out of bound|private access', 'once'))
             rethrow(e);
         end
     end
+end
+
+% a method with two outputs
+function ok = two_out(fn)
+    [a, b] = fn();
+    ok = true;
 end
 
 function ok = save_load(m, path, label)
@@ -132,7 +139,8 @@ end
 % update_simulate needs the simulation to update
 function r = update_simulate_after_simulate(m, Xn, yu, Xu)
     c = m.copy();
-    c.simulate(2, 123, Xn, true);
+    % int32 here: the plain-double simulate is checked by the .simulate call above
+    s = c.simulate(int32(2), int32(123), Xn, true);
     r = c.update_simulate(yu, Xu);
 end
 
