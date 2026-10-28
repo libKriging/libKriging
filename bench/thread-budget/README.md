@@ -8,6 +8,8 @@ output directory. Machine of the published numbers: `machine.txt`.
   (built by CMake), `summarize.py out.csv`.
 - Jitter versus n (#426): `run_jitter_n.sh <jitter_n_study binary> <out dir>`, then
   `summarize_jitter_n.py <out dir>`; `jitter_n_study` marks each fit on stderr.
+- Long-range restart: `LK_LONG_RANGE_RESTART=0` (off) or `2` (default) on `jitter_n_study`; the
+  families `sinhalf`, `branin` with d > 2 and `hartmann6` with d > 6 have inactive inputs.
 - Study drivers (`*_study.cpp`, `*_probe.cpp`, `unstable_ll_profile.cpp`) are not built by
   CMake: compile them with the flags of `bench-fit-profile` from
   `<build-dir>/compile_commands.json`, then link with

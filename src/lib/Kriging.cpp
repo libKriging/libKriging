@@ -4041,6 +4041,10 @@ void Kriging::fit_impl(const arma::vec& y,
           optimizer.iprint = -1;  // Disable output in parallel mode. was Optim::log_level - 2;
           optimizer.max_iter = Optim::max_iteration;
           const bool loo_objective = objective.rfind("LOO", 0) == 0;  // exact or approximate LOO
+          // single start of a noise-free exact LL fit (measured there only;
+          // a multistart already draws other basins)
+          const bool long_range_restart_on = Optim::long_range_restart > 0.0 && multistart == 1
+                                             && m_noise_model == NoiseModel::None && objective == "LL";
           optimizer.pgtol = loo_objective ? Optim::gradient_tolerance / (n * n)
                                           : Optim::gradient_tolerance;  // scale by: n^2 for LOO vs. LL, and /10
                                                                         // because LOO is usually more smooth
@@ -4062,6 +4066,7 @@ void Kriging::fit_impl(const arma::vec& y,
           }
 
           int retry = 0;
+          int lr_restarts = 0;
           double best_f_opt = std::numeric_limits<double>::infinity();
           arma::vec best_gamma = gamma_tmp;
 
@@ -4109,12 +4114,26 @@ void Kriging::fit_impl(const arma::vec& y,
                                    : arma::min(arma::abs(theta_part(free_dims) - theta_upper(free_dims)));
             double sol_to_b = std::min(sol_to_ub, sol_to_lb);
 
+            // Long-range local optimum: on noise-free data the single start
+            // often converges (a sharp optimum, not a plateau) with a theta
+            // component far above the data scale, 400-2000 LL units below the
+            // multistart optimum at n 500-1000; max theta_j / maxdX_j was >= 3.6
+            // for those fits and <= 1.3 for the good ones (docs/dev/CholJitter.md,
+            // long-range restart). The best solution is kept, so a genuinely
+            // long-range optimum (inactive input) only costs the restarts.
+            bool long_range = false;
+            if (long_range_restart_on && lr_restarts < Optim::max_long_range_restart && !free_dims.is_empty())
+              long_range = arma::max(theta_part(free_dims) / m_maxdX(free_dims)) > Optim::long_range_restart;
+
             // Check abnormal termination or convergence at bounds to decide on restart
             if ((retry < Optim::max_restart)
                 && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)  // Check for abnormal termination
                     || (opt_result.num_iters <= 2)     // Start point is strangely quite optimal...
                     || (sol_to_lb < arma::datum::eps)  // Stuck at lower bound
+                    || long_range                      // Long-range local optimum
                     || worse)) {                       // No improvement
+              if (long_range)
+                lr_restarts++;
 
               if (Optim::log_level > Optim::log_none) {
                 arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << (retry + 1)

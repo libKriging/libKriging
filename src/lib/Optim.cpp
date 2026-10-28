@@ -101,6 +101,26 @@ LIBKRIGING_EXPORT int Optim::get_log_level() {
 
 int Optim::max_restart = get_env_or_default("LK_MAX_RESTART", 10);
 
+double Optim::long_range_restart = get_env_or_default("LK_LONG_RANGE_RESTART", 2.0);
+
+LIBKRIGING_EXPORT void Optim::set_long_range_restart(double c) {
+  Optim::long_range_restart = c;
+};
+
+LIBKRIGING_EXPORT double Optim::get_long_range_restart() {
+  return Optim::long_range_restart;
+};
+
+int Optim::max_long_range_restart = get_env_or_default("LK_MAX_LONG_RANGE_RESTART", 2);
+
+LIBKRIGING_EXPORT void Optim::set_max_long_range_restart(int m) {
+  Optim::max_long_range_restart = m;
+};
+
+LIBKRIGING_EXPORT int Optim::get_max_long_range_restart() {
+  return Optim::max_long_range_restart;
+};
+
 int Optim::max_iteration = get_env_or_default("LK_MAX_ITERATION", 20);
 
 LIBKRIGING_EXPORT void Optim::set_max_iteration(int max_iteration_val) {
