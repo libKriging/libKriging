@@ -346,7 +346,8 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
     // Floor instead of 0: at (or, for warped inputs, near) a training point the variance is a difference of
     // nearly equal terms, i.e. rounding of order eps and often negative. A zero stdev would give NaN
     // NLPD / stdev derivative, so it is floored at the rounding level (in units of sigma2).
-    ysd2_n.transform([&](double val) { return (std::isnan(val) || val < predict_var_floor ? predict_var_floor : val); });
+    ysd2_n.transform(
+        [&](double val) { return (std::isnan(val) || val < predict_var_floor ? predict_var_floor : val); });
     ysd2_at_floor = ysd2_n <= predict_var_floor;
     ysd2_n *= var_scale * m_scaleY * m_scaleY;
     t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
