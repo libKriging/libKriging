@@ -222,7 +222,18 @@ ScopedBlasThreads::~ScopedBlasThreads() {
     set_openblas_threads(saved);
 }
 
-BudgetScope::BudgetScope() : blas(in_pool_worker() ? 0 : blas_threads_for(budget_total())) {}
+namespace {
+int scope_blas_threads(unsigned long long n) {
+  if (in_pool_worker())
+    return 0;
+  const int min_n = Optim::blas_threads_min_n;
+  if (min_n > 0 && n > 0 && n < static_cast<unsigned long long>(min_n))
+    return 1;
+  return blas_threads_for(budget_total());
+}
+}  // namespace
+
+BudgetScope::BudgetScope(unsigned long long n) : blas(scope_blas_threads(n)) {}
 
 }  // namespace detail
 }  // namespace libKriging

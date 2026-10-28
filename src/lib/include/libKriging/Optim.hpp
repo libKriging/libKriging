@@ -130,6 +130,14 @@ class Optim {
   static int thread_pool_size;
   LIBKRIGING_EXPORT static void set_thread_pool_size(int pool_size);
   LIBKRIGING_EXPORT static int get_thread_pool_size();
+
+  // Small-problem BLAS rule (OpenBLAS only): fit / predict / update on fewer
+  // than blas_threads_min_n training observations run OpenBLAS on 1 thread
+  // instead of the thread budget (restored after the call). 0 = off (default,
+  // env LK_BLAS_THREADS_MIN_N). See REPORT-blas-threads.md.
+  static int blas_threads_min_n;
+  LIBKRIGING_EXPORT static void set_blas_threads_min_n(int min_n);
+  LIBKRIGING_EXPORT static int get_blas_threads_min_n();
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINLIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_OPTIM_HPPEARALGEBRA_HPP

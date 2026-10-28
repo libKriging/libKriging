@@ -67,9 +67,11 @@ struct ScopedBlasThreads {
 /// OpenBLAS at blas_threads_for(budget) for the call
 /// (OpenBLAS defaults to the logical CPUs, which costs 1.3-2x on a
 /// hyperthreaded machine), restored after; no-op inside a pool worker (the
-/// pool has set the worker's share).
+/// pool has set the worker's share). With the number n of training
+/// observations, OpenBLAS runs on 1 thread instead when
+/// 0 < n < Optim::blas_threads_min_n (small-problem rule, off by default).
 struct BudgetScope {
-  BudgetScope();
+  explicit BudgetScope(unsigned long long n = 0);
   BudgetScope(const BudgetScope&) = delete;
   BudgetScope& operator=(const BudgetScope&) = delete;
 
