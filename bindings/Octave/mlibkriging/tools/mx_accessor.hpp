@@ -132,10 +132,8 @@ inline auto converter<int32_t>(mxArray* x, const std::string& parameter) {
   if (is_integer_valued_double(x, -2147483648.0, 2147483647.0)) {
     return static_cast<int32_t>(mxGetScalar(x));
   }
-  throw MxException(LOCATION(),
-                    "mLibKriging:badType",
-                    parameter,
-                    " is not a 32bits int (nor an integer-valued double)");
+  throw MxException(
+      LOCATION(), "mLibKriging:badType", parameter, " is not a 32bits int (nor an integer-valued double)");
 }
 
 template <>
