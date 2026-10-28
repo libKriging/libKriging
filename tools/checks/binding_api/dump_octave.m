@@ -18,6 +18,12 @@ function dump_octave(out_file)
         end
     end
 
+    % function files standing for a static method: linearalgebra_check is
+    % LinearAlgebra::check (a free function in every binding)
+    if exist('linearalgebra_check', 'file')
+        lines{end+1} = sprintf('%s\t%s', 'LinearAlgebra', 'check');
+    end
+
     fid = fopen(out_file, 'w');
     fprintf(fid, '%s\n', lines{:});
     fclose(fid);

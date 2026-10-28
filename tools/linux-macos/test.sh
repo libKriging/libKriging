@@ -56,7 +56,17 @@ fi
 if [[ "$ENABLE_COVERAGE" == "on" ]]; then
     cmake --build . --target coverage --config "${MODE}"
 elif [[ "$ENABLE_MEMCHECK" == "on" ]]; then
-    ctest -C "${MODE}" ${CTEST_FLAGS} -T memcheck
+    ctest -C "${MODE}" ${CTEST_FLAGS} -T memcheck || {
+      rc=$?
+      # the "definitely lost" records of the failing tests (the summary only counts them)
+      for f in Testing/Temporary/MemoryChecker.*.log; do
+        if grep -q "definitely lost in" "$f"; then
+          echo "==== $f"
+          grep -B2 -A40 "definitely lost in" "$f"
+        fi
+      done
+      exit $rc
+    }
 else
     CTEST_EXCLUDE_FLAGS=()
     if [[ -n "${CTEST_EXCLUDE}" ]]; then

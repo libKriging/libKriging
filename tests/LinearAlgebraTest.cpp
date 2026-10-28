@@ -818,3 +818,23 @@ TEST_CASE("LinearAlgebra::woodbury_solve/logdet compose end-to-end with nystromF
   double val_wood = LinearAlgebra::woodbury_logdet(U, D);
   REQUIRE(std::abs(val_wood - val_dense) < 1e-6 * std::max(1.0, std::abs(val_dense)));
 }
+
+TEST_CASE("LinearAlgebra::check passes, reports the backend and keeps the RNG state", "[LinearAlgebra][check]") {
+  arma::arma_rng::set_seed(123);
+  const double expected = arma::randu();
+  arma::arma_rng::set_seed(123);
+
+  const LinearAlgebra::CheckResult c = LinearAlgebra::check(3);
+  std::cout << c.report;  // backend identification and results in the CI logs of each platform
+  INFO(c.report);
+  CHECK(c.ok);
+  CHECK(!c.backend.empty());
+  CHECK(c.report.find("backend: ") == 0);
+  CHECK(c.report.find("single thread:") != std::string::npos);
+  CHECK(c.report.find("3 concurrent threads") != std::string::npos);
+  CHECK(c.report.find("safe_chol_lower (dpotrf)") != std::string::npos);
+  CHECK(c.report.find("eig_sym (dsyevd)") != std::string::npos);
+
+  // the checks use their own generator
+  CHECK(arma::randu() == expected);
+}

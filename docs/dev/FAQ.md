@@ -77,3 +77,35 @@ This page collects questions about libKriging development
  To get the same result on several machines, set the same BLAS thread count everywhere (e.g.
  `OPENBLAS_NUM_THREADS=1`, at the cost of speed) and use the same BLAS build; a nugget or noise
  model, or tighter `theta` bounds, also reduce the sensitivity.
+
+# Are my BLAS / LAPACK results correct? (`linearalgebra_check`)
+
+ Some BLAS builds give wrong results on some CPUs, without any error message: fits then fail
+ with "Exceed max numerical nugget", or return NaN or nonsense. `LinearAlgebra::check()` (C++),
+ `linearalgebra_check()` in every binding (Python `pylibkriging.linearalgebra_check()` dict, R
+ `linearalgebra_check()` list, Octave / MATLAB `[ok, backend, report] = linearalgebra_check()`,
+ Julia `linearalgebra_check()` named tuple) calls, in a fraction of a second, the `LinearAlgebra` routines libKriging relies on
+ (`crossprod`, `diagABA`, `safe_chol_lower`, `chol_upper`, `solve_lower` / `solve_upper` /
+ `rsolve_upper`, `solve`, `inv_sympd`, `rcond_chol`, `qr_econ`, `woodbury_solve`, `eig_sym`) and
+ compares each result with an oracle computed in long double without the BLAS, so that it works
+ the same with any BLAS: OpenBLAS, MKL, Apple Accelerate, BLIS, FlexiBLAS, the reference BLAS.
+ The backend is detected, not chosen. It runs once from the calling thread, then from
+ concurrent threads as the multistart fits do (`eig_sym`, used by `simulate` only, from one
+ thread). It returns `ok`, the backend identification (the library libKriging's `dgemm` is bound to, plus OpenBLAS configuration and kernels, MKL
+ version and threading layer, FlexiBLAS backend when available) and a report, with the
+ workaround of a known faulty BLAS.
+
+ Known faulty configurations ([#429](https://github.com/libKriging/libKriging/issues/429)),
+ all fixed by an environment variable set **before** the process starts (it is read when the
+ BLAS is loaded) or by another BLAS:
+
+ | BLAS | Faulty | Workaround |
+ |---|---|---|
+ | OpenBLAS 0.3.20 `DYNAMIC_ARCH` (Ubuntu 22.04) | `Cooperlake` kernels: Intel Sapphire Rapids, Granite Rapids (Xeon 6), Cooper Lake; any CPU with avx512_bf16 when `OPENBLAS_CORETYPE` holds a value 0.3.20 does not know | `OPENBLAS_CORETYPE=SkylakeX`, or OpenBLAS >= 0.3.21 |
+ | OpenBLAS 0.3.19 `DYNAMIC_ARCH` | `Cooperlake` and `SkylakeX` kernels | `OPENBLAS_CORETYPE=Haswell`, or OpenBLAS >= 0.3.21 |
+ | MKL 2020 (Ubuntu 22.04 `intel-mkl`) | default Intel threading layer next to the GNU OpenMP runtime of libKriging: NaN or crashes | `MKL_THREADING_LAYER=GNU` (or `SEQUENTIAL`), or a recent MKL |
+
+ Correct in the same tests: OpenBLAS 0.3.18, 0.3.21, 0.3.26, 0.3.34, the reference BLAS,
+ BLIS 0.8 / 0.9, MKL 2026. Note that the bundled Armadillo picks its BLAS when libKriging is
+ configured (FlexiBLAS, then MKL, then OpenBLAS, then `libblas`): installing MKL before building
+ libKriging makes it use MKL.

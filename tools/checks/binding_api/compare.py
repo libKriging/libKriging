@@ -63,6 +63,8 @@ ALIASES = {
         "load_warp_kriging": "load",
         "load_mlp_kriging": "load",
         "load_nested_kriging": "load",
+        # LinearAlgebra::check, a free function in every binding
+        "linearalgebra_check": "check",
     },
 }
 

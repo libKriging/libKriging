@@ -92,3 +92,14 @@ test_that(desc="Full chol equals incremented chol by block",
 
 rlibkriging:::linalg_check_chol_rcond(default_rcond_checked)
 rlibkriging:::linalg_set_num_nugget(default_num_nugget)
+
+test_that("linearalgebra_check: self-test of the detected backend passes (#429)", {
+  c <- linearalgebra_check(2)
+  expect_setequal(names(c), c("ok", "backend", "report"))
+  expect_true(nchar(c$backend) > 0)
+  expect_true(startsWith(c$report, "backend: "))
+  expect_true(grepl("single thread:", c$report, fixed = TRUE))
+  expect_true(grepl("2 concurrent threads", c$report, fixed = TRUE))
+  if (!c$ok) cat(c$report)
+  expect_true(c$ok)
+})

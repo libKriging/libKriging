@@ -745,3 +745,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_upper(const arma::mat& A) {
 LIBKRIGING_EXPORT void LinearAlgebra::qr_econ(arma::mat& Q, arma::mat& R, const arma::mat& A) {
   arma::qr_econ(Q, R, A);
 }
+
+LIBKRIGING_EXPORT bool LinearAlgebra::eig_sym(arma::vec& eigval, arma::mat& eigvec, const arma::mat& A) {
+  return arma::eig_sym(eigval, eigvec, A);
+}

@@ -703,4 +703,23 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def_static("set_chol_warning", &LinearAlgebra::set_chol_warning, py::arg("warn"))
       .def_static("check_chol_rcond", &LinearAlgebra::check_chol_rcond, py::arg("check"))
       .def_static("chol_rcond_checked", &LinearAlgebra::chol_rcond_checked);
+
+  // Self-test of the detected BLAS / LAPACK backend through LinearAlgebra calls
+  // and an oracle: single thread, then n_threads concurrent threads (0: hardware
+  // concurrency); dict ok / backend / report (#429)
+  m.def(
+      "linearalgebra_check",
+      [](int n_threads) {
+        LinearAlgebra::CheckResult c;
+        {
+          py::gil_scoped_release release;
+          c = LinearAlgebra::check(n_threads);
+        }
+        py::dict d;
+        d["ok"] = c.ok;
+        d["backend"] = c.backend;
+        d["report"] = c.report;
+        return d;
+      },
+      py::arg("n_threads") = 0);
 }

@@ -281,4 +281,18 @@ void chol_rcond_checked(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs
   output.set(0, LinearAlgebra::chol_rcond_checked(), "chol_rcond_checked");
 }
 
+// Self-test of the detected BLAS / LAPACK backend (#429):
+// [ok, backend, report] = linearalgebra_check(int32 n_threads)
+void check(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Range{0, 1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
+  const auto c = LinearAlgebra::check(input.getOptional<int>(0, "n_threads").value_or(0));
+  output.set(0, c.ok, "ok");
+  output.setOptional(1, c.backend, "backend");
+  output.setOptional(2, c.report, "report");
+}
+
 }  // namespace LinearAlgebraBinding

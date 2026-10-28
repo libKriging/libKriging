@@ -560,6 +560,10 @@ double lk_linalg_get_chol_jitter(void);
 int lk_linalg_set_chol_jitter(double jitter);
 double lk_linalg_get_num_nugget(void);
 int lk_linalg_set_num_nugget(double nugget);
+/* Self-test of the detected BLAS / LAPACK backend (#429): 1 ok, 0 failed, -1 error;
+   backend / report point to thread-local strings valid until the next call from the thread */
+int lk_linearalgebra_check(int n_threads, const char** backend, const char** report);
+
 /* warning when the Cholesky fallback adds a numerical nugget; check of the
    reciprocal condition number of the factorizations */
 int lk_linalg_set_chol_warning(int warn);
