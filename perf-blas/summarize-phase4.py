@@ -23,7 +23,7 @@ for k in sorted(G, key=lambda k: (k[0], k[1], k[2])):
         for v, ll in lls.items():
             best[v] = best.get(v, 0) + (abs(ll - m) <= 1e-6 * max(1.0, abs(m)))
     ref = None
-    for v in ["master", "A", "B", "B1000"]:
+    for v in ["master"] + sorted(x for x in V if x != "master"):
         if v not in V:
             continue
         sel = [r for r in V[v] if r["seed"] in seeds]
