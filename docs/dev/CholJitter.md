@@ -284,7 +284,7 @@ called directly (noted "no retry").
 | `logLikelihood()`, `logLikelihoodFun`, `leaveOneOut()`, `leaveOneOutFun/Vec`, `logMargPost(Fun)` | `make_Model` (objective) | 1 + `J` |
 | committed model `m_T` (after BFGS, `optim = "none"`, warm restart) | `commit_model_chol_jitter` / `make_committed_Model` | 1 (exact) |
 | `predict` (mean, stdev, cov, deriv) | `m_T` | 1 (exact): interpolates the data |
-| `simulate` | `m_T`, then Cholesky of the conditional covariance at `X_n` | 1 (exact); conditional covariance: Cholesky, else eigenvalues floored at `N` |
+| `simulate` | `m_T`, then Cholesky of the conditional covariance at `X_n` | 1 (exact); conditional covariance: eigenvalues floored at `N` |
 | `update(refit = false)` | `update_cholCov` extends `m_T` | 1 (exact) |
 | `update(refit = true)` (warm restart) | search on 1 + `J`, then commit | 1 + `J`, then 1 |
 | `update_simulate` | `R_uu` exact, eigen-decomposition clamped at 0 | 1 (exact), consistent with `update` |
@@ -322,7 +322,7 @@ optimizing). Observation noise adds to either.
 | `logLikelihood()` | the optimized objective (saved as `objective_ll`); after `update(refit = false)`, the committed model's own |
 | committed model (`commit_model_chol_jitter`), `predict`, `simulate`, `update(refit = false)` | 1 + min(`m_chol_jitter`, `N`): gauss 1e-10 |
 | `update_simulate` | `R_uu` exact (1, or 1 + noise / sigma2) |
-| `simulate` conditional covariance | Cholesky, else eigenvalues floored at `N` (`simulate_impl`, as Kriging) |
+| `simulate` conditional covariance | eigenvalues floored at `N` (`simulate_impl`, as Kriging) |
 | `load` of a file without `model_chol_jitter` | `m_chol_jitter` (one jitter for both, as saved) |
 
 Not exact, unlike Kriging: an exact factorization lost the predictive variance where warps bring

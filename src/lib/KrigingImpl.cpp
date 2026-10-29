@@ -500,26 +500,18 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
 
   // Fixed floor on the eigenvalues of the conditional covariance instead of
   // safe_chol_lower's stepwise nugget retry: which retry level fires depends on
-  // which Cholesky fails, i.e. on rounding (BLAS threads, CPU). Cholesky is tried
-  // first (cheap); only when it fails or is ill-conditioned (rcond < min_rcond) are
-  // the eigenvalues below num_nugget raised to num_nugget, as simulateNystrom does.
-  // The Cholesky factor is unique, so the sample paths do not depend on the
-  // eigenvector signs/order. A case whose rcond sits at min_rcond may take either
-  // path across BLAS builds; the two differ by the floor only (<= num_nugget).
+  // which Cholesky fails, i.e. on rounding (BLAS threads, CPU). Eigenvalues
+  // below num_nugget (rounding noise is ~1e-16) are raised to num_nugget, as
+  // simulateNystrom does; the Cholesky factor of the result is unique, so the
+  // sample paths do not depend on the eigenvector signs/order.
   arma::mat Sigma_cond = arma::symmatu(Sigma_nKo / Sigma_divisor);
-  arma::mat LSigma_nKo = arma::mat(n_n, n_n, arma::fill::none);
-  bool chol_ok = arma::chol(LSigma_nKo, Sigma_cond, "lower");
-  if (chol_ok && LinearAlgebra::chol_rcond_checked())
-    chol_ok = LinearAlgebra::rcond_chol(LSigma_nKo) >= LinearAlgebra::min_rcond;
-  if (!chol_ok) {
-    arma::vec eigval_cond;
-    arma::mat eigvec_cond;
-    if (arma::eig_sym(eigval_cond, eigvec_cond, Sigma_cond)) {
-      eigval_cond = arma::clamp(eigval_cond, LinearAlgebra::num_nugget, arma::datum::inf);
-      Sigma_cond = arma::symmatu(eigvec_cond * arma::diagmat(eigval_cond) * eigvec_cond.t());
-    }
-    LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_cond);
+  arma::vec eigval_cond;
+  arma::mat eigvec_cond;
+  if (arma::eig_sym(eigval_cond, eigvec_cond, Sigma_cond)) {
+    eigval_cond = arma::clamp(eigval_cond, LinearAlgebra::num_nugget, arma::datum::inf);
+    Sigma_cond = arma::symmatu(eigvec_cond * arma::diagmat(eigval_cond) * eigvec_cond.t());
   }
+  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_cond);
   t0 = Bench::toc(nullptr, "LSigma_nKo     ", t0);
 
   arma::mat y_n = arma::mat(n_n, nsim, arma::fill::none);
