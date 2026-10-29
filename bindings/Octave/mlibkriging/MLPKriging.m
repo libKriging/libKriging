@@ -38,7 +38,7 @@ classdef MLPKriging < handle
         end
 
         % simulate(nsim, seed, X [, will_update [, with_noise]]): nsim / seed
-        % as int32; with_noise: observation-noise VARIANCES (column vector, one
+        % as int32 or integer-valued double; with_noise: observation-noise VARIANCES (column vector, one
         % per row of X, or a scalar; [] / omitted: no noise), negative / NaN
         % values raise
         function varargout = simulate(obj, varargin)

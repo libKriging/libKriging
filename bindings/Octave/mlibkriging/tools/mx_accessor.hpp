@@ -3,6 +3,7 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include <cmath>
 #include <cstring>
 
 #include "ObjectAccessor.hpp"
@@ -98,20 +99,41 @@ inline auto converter<ObjectRef>(mxArray* x, const std::string& /*parameter*/) {
   return getObject(x);
 }
 
+// A real double scalar holding an integer in [lo, hi]: the default numeric type
+// of Octave / MATLAB, so that k.simulate(10, 123, X, false) works as well as
+// k.simulate(int32(10), int32(123), X, false).
+inline bool is_integer_valued_double(mxArray* x, double lo, double hi) {
+  if (!mxIsDouble(x) || mxIsComplex(x) || mxGetNumberOfElements(x) != 1) {
+    return false;
+  }
+  const double v = mxGetScalar(x);
+  return std::isfinite(v) && v == std::floor(v) && v >= lo && v <= hi;
+}
+
 template <>
 inline auto converter<uint64_t>(mxArray* x, const std::string& parameter) {
-  if (!mxIsUint64(x) || mxIsComplex(x) || mxGetNumberOfElements(x) != 1) {
-    throw MxException(LOCATION(), "mLibKriging:badType", parameter, " is not an unsigned 64bits int");
+  if (mxIsUint64(x) && !mxIsComplex(x) && mxGetNumberOfElements(x) == 1) {
+    return *static_cast<uint64_t*>(mxGetData(x));
   }
-  return *static_cast<uint64_t*>(mxGetData(x));
+  if (is_integer_valued_double(x, 0.0, 9007199254740992.0)) {  // 2^53, exact in a double
+    return static_cast<uint64_t>(mxGetScalar(x));
+  }
+  throw MxException(LOCATION(),
+                    "mLibKriging:badType",
+                    parameter,
+                    " is not an unsigned 64bits int (nor a non-negative integer-valued double)");
 }
 
 template <>
 inline auto converter<int32_t>(mxArray* x, const std::string& parameter) {
-  if (!mxIsInt32(x) || mxIsComplex(x) || mxGetNumberOfElements(x) != 1) {
-    throw MxException(LOCATION(), "mLibKriging:badType", parameter, " is not an unsigned 64bits int");
+  if (mxIsInt32(x) && !mxIsComplex(x) && mxGetNumberOfElements(x) == 1) {
+    return *static_cast<int32_t*>(mxGetData(x));
   }
-  return *static_cast<int32_t*>(mxGetData(x));
+  if (is_integer_valued_double(x, -2147483648.0, 2147483647.0)) {
+    return static_cast<int32_t>(mxGetScalar(x));
+  }
+  throw MxException(
+      LOCATION(), "mLibKriging:badType", parameter, " is not a 32bits int (nor an integer-valued double)");
 }
 
 template <>

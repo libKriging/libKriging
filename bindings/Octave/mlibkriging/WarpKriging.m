@@ -151,7 +151,7 @@ classdef WarpKriging < handle
 
         function varargout = simulate(obj, varargin)
             % simulate(obj, nsim, seed, X [, will_update [, with_noise]]):
-            % nsim / seed as int32; with_noise: observation-noise VARIANCES
+            % nsim / seed as int32 or integer-valued double; with_noise: observation-noise VARIANCES
             % (column vector, one per row of X, or a scalar; [] / omitted: no
             % noise), negative / NaN values raise
             if nargin >= 4 && iscell(varargin{3})
