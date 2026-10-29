@@ -349,12 +349,7 @@ No `simulate` / `update`.
    difference).
 2. ~~**`simulate` conditional covariance**~~ (#427, fixed): the stepwise retry made the added
    nugget depend on which Cholesky failed, so on rounding (rcond values of 2e-18 were seen next to
-   the 1e-18 threshold). `simulate_impl` (Kriging, WarpKriging, exact method) now tries a plain
-   Cholesky first; only if it fails or has rcond < 1e-18 are the eigenvalues of the conditional
-   covariance floored at `N` (as `simulateNystrom` does) before the Cholesky. A case at the rcond
-   threshold may take either path across BLAS builds; the two differ by the floor only (<= `N` on
-   the eigenvalues). Probe (`sim_retry_probe`-like, 220 smooth points): the fallback fires every
-   time, so no speed-up there (~20 ms against ~5 ms for the former retry). A diagonal `N` always
-   added was tried and rejected (update points on the simulation design missed by 2e-5 > 1e-6).
+   the 1e-18 threshold). `simulate_impl` (Kriging, WarpKriging, exact method) now floors the
+   eigenvalues of the conditional covariance at `N` before the Cholesky, as `simulateNystrom` does.
 3. **NestedKriging NK aggregation** adds `N` to `K_M` regardless of the kernel (no `J`, no retry, `pinv`
    fallback): fine for stability, noted for completeness.
