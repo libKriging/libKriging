@@ -47,12 +47,15 @@ diverges again (up to 93 %).
 - **Kriging: committed model exact** (`model_chol_jitter()` = 0; `num_nugget` only if the Cholesky
   fails). With 1e-10 the python-sdist check (n 10, gauss, R near singular) missed y by 1e-5; the
   error at the design points is J x |R^-1 (y - F beta)|.
-- **WarpKriging / MLPKriging: committed model with min(J, `num_nugget`)** (1e-10 for gauss, its
-  former diagonal). An exact model lost the predictive variance where warps bring training rows
-  together (Kumaraswamy, saturated tanh MLP: stdev 0, NaN derivative / NLPD in
-  WarpKrigingPerWarpTest, WarpKrigingCollapseTest). Kept as a deliberate difference (decided
-  2026-10-23); aligning would first need a floor on the predicted variance in `predict` (a
-  separate change, which would also cover Kriging at the design points).
+- **WarpKriging / MLPKriging: committed model exact as Kriging's** (#428; it kept min(J, `num_nugget`)
+  = 1e-10 before, #415). An exact model brings the training rows together in Phi where warps
+  collapse (Kumaraswamy, saturated tanh MLP), so the predicted variance there is rounding, often
+  negative. `predict` therefore floors the variance (below) instead of clamping it to 0.
+- **Predicted variance floor** (`KrigingImpl::predict_impl`, all classes): the variance
+  `1 - r'R^-1 r + ...` (units of sigma2) is floored at 4 eps instead of 0 (NaN too), so the stdev
+  is never 0 (no NaN NLPD) and the stdev derivative is defined, 0, where the variance is at the
+  floor (it was NaN, 0/0). At the design points of an exact Kriging model the stdev is then
+  ~sigma x 3e-8 instead of 0 or ~1e-8 at random.
 - `logLikelihood()` returns the optimized objective; both jitters are saved in the JSON (absent →
   former behaviour), so a later `set_chol_jitter` does not change a fitted model.
 - `update_simulate` adds no jitter on the new observations, so that an update point on the

@@ -389,6 +389,8 @@ void check_warp_param_grad_vs_fd(const std::string& warp_spec) {
   arma::arma_rng::set_seed(2024);
   arma::vec wp0 = base_wp + 0.3 * arma::randn(base_wp.n_elem);
   wk.unpack_warp_params(wp0);
+  // the differentiated objective is the search's (fixed jitter); the committed model is exact
+  wk.m_cache_jitter = wk.m_chol_jitter;
   wk.refresh_cache();
 
   arma::vec grad_analytic = wk.warp_gradient();
