@@ -358,5 +358,17 @@ No `simulate` / `update`.
    most 4e-11 relative across budgets. In practice the retry acts as a fixed `N` here. A fixed floor
    (as `simulateNystrom`'s eigenvalue floor) would remove the residual risk: rcond values of 2e-18,
    next to the 1e-18 threshold of the rcond check, were seen (gauss n = 10). Not changed.
+
+   Alternatives tried for #427 (2026-10-29, reference BLAS, 4 cores, so the thread budget changed
+   nothing for any variant: invariance not discriminated) and not kept:
+   - diagonal `N` always added: `update_simulate` points on the design missed by 2e-5 (> 1e-6);
+   - eigenvalue floor at `N` + Cholesky: accurate, continuous (max |dL| 9e-7 against 7e-6 for the
+     retry under 1e-15 perturbations), but 3-5x slower at 220 points and ~6x at n = 2000 (9.8 s
+     against 1.5 s), since gauss fallbacks fire every time; Cholesky first, eigen only on failure:
+     same cost on these cases and the path choice still depends on the rcond test;
+   - Cholesky with floored pivots: unstable (|L| up to inf at n >= 40); with the Gill-Murray bound
+     `d_j >= theta_j^2 / beta^2` and no pivoting: finite but ||LL' - A|| ~ 2e4 at n = 200;
+     pivoted Cholesky would change the sample paths of a given seed when two pivots swap;
+   - open: Matheron's rule (pathwise conditioning), see the proposal in the issue.
 3. **NestedKriging NK aggregation** adds `N` to `K_M` regardless of the kernel (no `J`, no retry, `pinv`
    fallback): fine for stability, noted for completeness.
