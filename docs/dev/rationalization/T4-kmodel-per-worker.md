@@ -98,8 +98,10 @@ outside T4 (gradient code, T1).
 
 ## Tests
 
-Full `ctest` on the modified tree: see the PR description (same pass / fail set as the base
-tree; the multistart tests `KrigingTest` "BFGS20 == best of 20 BFGS1" etc. pass).
+Full `ctest` on the modified tree (Release, OpenBLAS, 4 cores): 226 / 226 passed, including the
+multistart tests (`KrigingTest` BFGS20 vs best of 20 BFGS1, WarpKrigingTest, MLPKrigingTest).
+The base tree's test suite was not run for comparison; the bit-identity check is the driver
+above (theta, LL, predictions).
 
 ## Decisions
 
