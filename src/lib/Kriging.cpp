@@ -30,6 +30,7 @@
 #include <cstdlib>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
+#include <mutex>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -3935,61 +3936,32 @@ void Kriging::fit_impl(const arma::vec& y,
         }
       }
 
-      // Preallocate KModels for each thread to avoid race conditions
-      arma::uword n_data = n;
-      arma::uword p_data = m_F.n_cols;
-      std::vector<Kriging::KModel> preallocated_models(multistart);
-
-      if (Optim::log_level > Optim::log_none) {
-        arma::cout << "Preallocating " << multistart << " KModel structures (n=" << n_data << ", p=" << p_data << ")..."
-                   << arma::endl;
-      }
-
-      // approximate methods never use the dense KModel: no n x n allocation
-      for (int i = 0; i < multistart && build_dX; i++) {
-        auto& m = preallocated_models[i];
-        m.R = arma::mat(n_data, n_data, arma::fill::none);
-        m.L = arma::mat(n_data, n_data, arma::fill::none);
-        m.Linv = arma::mat();  // Empty matrix
-        m.Rinv = arma::mat();  // Empty matrix -- computed lazily on demand, like Linv; must NOT be
-                               // preallocated at the right size (fill::none) the way the other KModel
-                               // fields below are, or the lazy size-check in _logLikelihood would
-                               // mistake this uninitialized block for an already-computed R^-1
-        m.Fstar = arma::mat(n_data, p_data, arma::fill::none);
-        m.ystar = arma::vec(n_data, arma::fill::none);
-        m.Rstar = arma::mat(p_data, p_data, arma::fill::none);
-        m.Qstar = arma::mat(n_data, p_data, arma::fill::none);
-        m.Estar = arma::vec(n_data, arma::fill::none);
-        m.betahat = arma::vec(p_data, arma::fill::none);
-        m.SSEstar = 0.0;
-      }
-
-      // Multi-threading implementation for BFGS multistart
-      // Each thread uses its own preallocated KModel, so no mutex needed
-
-      // Structure to hold optimization results from each thread
+      // n x n buffers per running start, not per start: each start builds
+      // its KModel in its task (so at most min(multistart, pool size) of them
+      // are alive at once, docs/dev/rationalization/T4-kmodel-per-worker.md)
+      // and only the best start's model is kept, moved (not copied) into
+      // best_model as the starts finish. The other starts keep their scalar
+      // results only (below).
       struct OptimizationResult {
         arma::uword start_index;
         double objective_value;
         arma::vec gamma;
         arma::vec theta;
         double extra_param = 0.0;  // alpha (Nugget) or sigma2 (Heterogeneous)
-        arma::mat L;
-        arma::mat R;
-        arma::mat Fstar;
-        arma::mat Rstar;
-        arma::mat Qstar;
-        arma::mat Rinv;
-        arma::vec Estar;
-        arma::vec ystar;
-        double SSEstar;
-        arma::vec betahat;
         bool success;
         std::string error_message;
 
         OptimizationResult()
             : start_index(0), objective_value(std::numeric_limits<double>::infinity()), success(false) {}
       };
+
+      // Model of the best start so far: same choice as a scan of the starts
+      // in index order (lowest objective, then lowest start index), whatever
+      // the order in which the starts finish.
+      Kriging::KModel best_model{};
+      double best_model_objective = min_ofn;
+      int best_model_idx = -1;
+      std::mutex best_model_mutex;
 
       // Worker function for each thread
       auto optimize_worker = [&](arma::uword start_idx) -> OptimizationResult {
@@ -4017,12 +3989,11 @@ void Kriging::fit_impl(const arma::vec& y,
           gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
           gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
 
-          // Use pre-allocated KModel for this thread (thread-safe)
-          if (start_idx >= preallocated_models.size()) {
-            throw std::runtime_error("Preallocated model index out of bounds");
-          }
-
-          Kriging::KModel& m = preallocated_models[start_idx];
+          // This start's own KModel (thread-safe); approximate methods never
+          // use the dense KModel: no n x n allocation
+          Kriging::KModel m{};
+          if (build_dX)
+            m = allocate_KModel();
           // This "warm-up" populate_Model call primes `m` before the BFGS
           // loop; its result is unconditionally overwritten by the first
           // fit_ofn evaluation for objectives that touch km_data (exact
@@ -4185,18 +4156,18 @@ void Kriging::fit_impl(const arma::vec& y,
             result.theta = Optim::reparametrize ? Optim::reparam_from(best_gamma) : best_gamma;
           }
 
-          // Copy (not move) since m is a reference to preallocated memory
-          // Force DEEP copy to avoid any shared memory issues
-          result.L = arma::mat(m.L);          // Force copy constructor
-          result.R = arma::mat(m.R);          // Force copy constructor
-          result.Fstar = arma::mat(m.Fstar);  // Force copy constructor
-          result.Rstar = arma::mat(m.Rstar);  // Force copy constructor
-          result.Qstar = arma::mat(m.Qstar);  // Force copy constructor
-          result.Rinv = arma::mat(m.Rinv);    // Force copy constructor
-          result.Estar = arma::vec(m.Estar);  // Force copy constructor
-          result.ystar = arma::vec(m.ystar);  // Force copy constructor
-          result.SSEstar = m.SSEstar;
-          result.betahat = arma::vec(m.betahat);  // Force copy constructor
+          // Keep the model if this start is the best so far (no copy: the
+          // other starts' models are freed with their task)
+          {
+            std::lock_guard<std::mutex> lock(best_model_mutex);
+            if ((min_ofn_tmp < best_model_objective)
+                || (min_ofn_tmp == best_model_objective && best_model_idx >= 0
+                    && static_cast<int>(start_idx) < best_model_idx)) {
+              best_model = std::move(m);
+              best_model_objective = min_ofn_tmp;
+              best_model_idx = static_cast<int>(start_idx);
+            }
+          }
           result.success = true;
 
         } catch (const std::exception& e) {
@@ -4213,11 +4184,10 @@ void Kriging::fit_impl(const arma::vec& y,
       // Execute optimizations: the starts run concurrently in a thread pool
       // (TaskPool.hpp), which gives the cores to the starts first and the
       // remaining share to each start's BLAS / OpenMP calls; a single start
-      // runs inline with all of them. Each start works on its own
-      // preallocated KModel and the objectives are const. With MKL, BLAS calls
-      // from secondary threads may round differently from the calling
-      // thread's: BFGS20 matches the best of 20 BFGS1 up to that rounding
-      // (KrigingTest checks it to 1e-3 relative).
+      // runs inline with all of them. Each start works on its own KModel
+      // and the objectives are const. With MKL, BLAS calls from secondary
+      // threads may round differently from the calling thread's: BFGS20 matches the best of 20 BFGS1 up to that
+      // rounding (KrigingTest checks it to 1e-3 relative).
       std::vector<OptimizationResult> results(multistart);
       libKriging::detail::run_task_pool(
           multistart,
@@ -4266,29 +4236,34 @@ void Kriging::fit_impl(const arma::vec& y,
         m_est_theta = !theta_fixed;
         commit_approx(/*lmp_dof=*/true, best.extra_param);
       } else if (best_idx >= 0) {
+        if (best_idx != best_model_idx)
+          throw std::logic_error("Kriging::fit: best start " + std::to_string(best_idx) + " but best model from start "
+                                 + std::to_string(best_model_idx));
         const auto& best = results[best_idx];
+        Kriging::KModel& bm = best_model;
         m_theta = best.theta;  // copy
         m_est_theta = !theta_fixed;
         m_is_empty = false;
-        m_T = best.L;  // copy instead of move to avoid issues
-        m_R = best.R;
-        m_M = best.Fstar;
-        m_circ = best.Rstar;
-        m_star = best.Qstar;
-        m_Rinv = best.Rinv;
+        // moved: best_model is not used afterwards
+        m_T = std::move(bm.L);
+        m_R = std::move(bm.R);
+        m_M = std::move(bm.Fstar);
+        m_circ = std::move(bm.Rstar);
+        m_star = std::move(bm.Qstar);
+        m_Rinv = std::move(bm.Rinv);
 
         if (m_est_beta) {
-          m_beta = best.betahat;
-          m_z = best.Estar;
+          m_beta = std::move(bm.betahat);
+          m_z = std::move(bm.Estar);
         } else {
-          m_z = best.ystar - m_M * m_beta;
+          m_z = bm.ystar - m_M * m_beta;
         }
 
         if (m_noise_model == NoiseModel::Nugget) {
           m_alpha = best.extra_param;
           if (m_est_sigma2) {
             if (m_est_nugget) {
-              double total_var = best.SSEstar / n;
+              double total_var = bm.SSEstar / n;
               m_sigma2 = m_alpha * total_var;
               if (m_objective.compare("LMP") == 0)
                 m_sigma2 = m_sigma2 * n / (n - m_F.n_cols - 2);
@@ -4307,9 +4282,9 @@ void Kriging::fit_impl(const arma::vec& y,
             m_sigma2 = best.extra_param;
         } else {
           if (m_est_sigma2) {
-            m_sigma2 = best.SSEstar / n;
+            m_sigma2 = bm.SSEstar / n;
             if (m_objective.compare("LMP") == 0)
-              m_sigma2 = best.SSEstar / (n - m_F.n_cols);
+              m_sigma2 = bm.SSEstar / (n - m_F.n_cols);
           }
         }
 

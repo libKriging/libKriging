@@ -16,6 +16,15 @@ past release, see the corresponding entry on the
   clamping it to 0; the stdev is never 0 (no NaN NLPD) and its derivative is 0 (was NaN) where the
   variance is at the floor. The **WarpKriging / MLPKriging committed model is now exact**, as
   Kriging's (it kept 1e-10 on its diagonal).
+- **Multistart memory** (#444): a `Kriging` BFGS multistart no longer allocates and keeps the
+  n x n model (R, L, R^-1, ...) of every start, nor deep-copies it into a result per start: each
+  start builds its model in its task (at most min(multistart, pool size) alive at once) and only
+  the best start's model is kept, moved (not copied). `WarpKriging` multistart clones no longer
+  carry the GP state (R, Cholesky, R^-1, features, dX) outside their running start, and only the
+  best start's state is kept (moved). Fitted results are bit-identical; peak RSS at n = 2000,
+  BFGS20 (4 cores): 3369 → 1501 MB; n = 1000, BFGS10: 564 → 330 MB; WarpKriging n = 1000,
+  BFGS10: 1112 → 578 MB. See
+  [docs/dev/rationalization/T4-kmodel-per-worker.md](docs/dev/rationalization/T4-kmodel-per-worker.md).
 
 ### Added
 - **Linear algebra self-test**: `LinearAlgebra::check(n_threads = 0)` calls the `LinearAlgebra`
