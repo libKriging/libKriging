@@ -242,7 +242,7 @@ int main(int argc, char** argv) {
                   status = "error";
                   std::fprintf(stderr, "  error: %s\n", e.what());
                 }
-                std::printf("\"%s|%s\",%s,\"%s\",%d,%s,%s,%s,%s,%llu,%llu,%d,%s,%.10g,%.10g,%s,%.6g,%.6g,%.4g,%.4g\n",
+                std::printf("\"%s:%s\",%s,\"%s\",%d,%s,%s,%s,%s,%llu,%llu,%d,%s,%.10g,%.10g,%s,%.6g,%.6g,%.4g,%.4g\n",
                             optim.c_str(),
                             variant_base.c_str(),
                             optim.c_str(),
