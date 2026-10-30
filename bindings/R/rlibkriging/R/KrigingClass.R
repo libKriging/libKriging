@@ -1060,11 +1060,13 @@ leaveOneOutFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FAL
 leaveOneOutVec.Kriging <- function(object, theta, method = "exact", ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
-    if (!is.array(theta)) 
-        stop("Input theta must be 1-dimensional")
+    if (!is.numeric(theta))
+        stop("Input theta must be numeric")
     if (length(theta) != ncol(k$X))
         stop("Input theta must have ", ncol(k$X), " values (instead of ",
              length(theta),")")
+    # a plain vector, a one-column matrix (k$theta() as matrix) or a one-row matrix
+    theta <- matrix(as.numeric(theta), ncol = 1)
     return( kriging_leaveOneOutVec(object, theta, method) )
 }
 

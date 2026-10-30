@@ -1,7 +1,8 @@
 # Lists the names exposed by rlibkriging, one "<scope>\t<name>\t<args>" line
 # each, for compare.py, which compares the bindings with each other.
-# <args>: the arguments, the object excluded, "name" (required) or "name="
-# (with a default) separated by ",", "*" for "...".
+# <args>: the arguments, the object excluded, "name" (required) or
+# "name=value" (with a default, deparsed; "," and "%" written %2C and %25)
+# separated by ",", "*" for "...".
 # Usage: Rscript dump_r.R <output file>
 #  - model classes: the `k$name()` members of a fitted object (arguments of
 #    the S3 method they forward to), the S3 methods `generic.Class` (load(),
@@ -14,6 +15,11 @@ suppressPackageStartupMessages(library(rlibkriging))
 
 ns <- asNamespace("rlibkriging")
 lines <- character(0)
+# a default value, without the separators of the dump
+encode <- function(value) {
+  v <- paste(deparse(value), collapse = " ")
+  gsub("\n|\t", " ", gsub(",", "%2C", gsub("%", "%25", v, fixed = TRUE), fixed = TRUE))
+}
 args_of <- function(f, drop_first = FALSE) {
   fs <- formals(f)
   if (drop_first && length(fs) > 0) fs <- fs[-1]
@@ -21,7 +27,7 @@ args_of <- function(f, drop_first = FALSE) {
   paste(vapply(names(fs), function(a) {
     if (a == "...") return("*")
     # no default: the empty symbol (not assignable to a variable)
-    if (identical(fs[[a]], quote(expr = ))) a else paste0(a, "=")
+    if (identical(fs[[a]], quote(expr = ))) a else paste0(a, "=", encode(fs[[a]]))
   }, ""), collapse = ",")
 }
 add <- function(scope, name, args) {

@@ -7,8 +7,14 @@ name: Binding API
 # conventions of each language (tools/checks/binding_api/compare.py), and
 # fails on any method missing from some bindings (errors; --report-only on
 # compare.py makes them warnings). The arguments of the methods (Python, R,
-# Julia) are compared too, as warnings only. The log and the job summary end
-# with a synthesis table of all the compared methods.
+# Julia) are compared too, as warnings only (default values included, when
+# two bindings tell them). The methods are also compared with the public C++
+# API (dump_cpp.py; the methods deliberately not exposed are listed with their
+# reason in cpp_exceptions.txt, #435): a C++ method exposed by no binding and
+# not excepted is an error, as is an exception which is not needed any more.
+# Each binding is called once on a tiny model (smoke_*); the smoke failures
+# only warn for now. The log and the job summary end with a synthesis table of
+# all the compared methods.
 
 on:
   push:
@@ -114,6 +120,26 @@ jobs:
           esac
           cat "${DUMP}"
 
+      # smoke calls with the argument types a user passes (non blocking: the
+      # failures are warnings and listed in the job summary)
+      - name: Smoke calls of the binding
+        shell: bash
+        run: |
+          SMOKE_DIR=tools/checks/binding_api
+          case "${{ matrix.binding }}" in
+            python)
+              PYTHONPATH=build/bindings/Python/pylibkriging:bindings/Python/pylibkriging/src \
+                python3 ${SMOKE_DIR}/smoke_python.py "${GITHUB_STEP_SUMMARY}" ;;
+            r)
+              R_LIBS=bindings/R/Rlibs Rscript ${SMOKE_DIR}/smoke_r.R "${GITHUB_STEP_SUMMARY}" ;;
+            octave)
+              octave-cli --path build/bindings/Octave/mlibkriging --path bindings/Octave/mlibkriging \
+                --path ${SMOKE_DIR} --eval "n = smoke_octave('${SMOKE_DIR}', '${GITHUB_STEP_SUMMARY}'); exit(n > 0)" ;;
+            julia)
+              JLIBKRIGING_LIB_PATH=${PWD}/build/bindings/Julia/jlibkriging/libkriging_c.so \
+                julia --project=bindings/Julia/jlibkriging ${SMOKE_DIR}/smoke_julia.jl "${GITHUB_STEP_SUMMARY}" ;;
+          esac || echo "::warning::${{ matrix.binding }}: some smoke calls failed (see the log and the job summary)"
+
       - uses: actions/upload-artifact@v4
         with:
           name: binding-api-${{ matrix.binding }}
@@ -136,4 +162,9 @@ jobs:
 
       - name: Compare the methods of the bindings
         shell: bash
-        run: python3 tools/checks/binding_api/compare.py --markdown "$GITHUB_STEP_SUMMARY" dumps/*.txt
+        run: |
+          # the public methods of the C++ API: each one is exposed by a binding
+          # or excepted with a reason in cpp_exceptions.txt, otherwise it fails
+          python3 tools/checks/binding_api/dump_cpp.py cpp.txt
+          python3 tools/checks/binding_api/compare.py --cpp cpp.txt \
+            --markdown "$GITHUB_STEP_SUMMARY" dumps/*.txt

@@ -11,6 +11,12 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Changed
+- **Predicted variance floor** (#428): `predict` floors the variance at 4 eps x sigma2 instead of
+  clamping it to 0; the stdev is never 0 (no NaN NLPD) and its derivative is 0 (was NaN) where the
+  variance is at the floor. The **WarpKriging / MLPKriging committed model is now exact**, as
+  Kriging's (it kept 1e-10 on its diagonal).
+
 ### Added
 - **Small-problem BLAS rule** (OpenBLAS only): `fit`, `predict` and `update` of `Kriging`,
   `WarpKriging` and `MLPKriging` on fewer than 500 training observations run OpenBLAS on

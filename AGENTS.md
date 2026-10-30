@@ -91,9 +91,10 @@ Never run `git push` or any variant that pushes commits to a remote (e.g. `git p
   `Vector{Any}`, or mixed-type columns. Convert explicitly
   (`Float64.(X)`) rather than relying on Julia's usual numeric promotion.
 - **Octave/MATLAB:** integer-typed arguments such as `nsim`/`seed` in
-  `simulate(...)` must be passed as `int32(...)`, not a plain `double` —
-  the mex layer does not coerce them, and a type mismatch raises a
-  low-level error far from the actual mistake.
+  `simulate(...)` accept `int32(...)` and a plain `double` holding an
+  integer value (`10`, not `10.5`). Earlier releases only accepted
+  `int32(...)` and raised a low-level "is not an unsigned 64bits int" error
+  on a plain `double`: keep `int32(...)` for code that must run on them.
 - **Python:** NumPy arrays should be `float64`. The pybind11/carma layer
   converts NumPy's default row-major (`C`-order) layout to Armadillo's
   column-major layout for you, so this is not a correctness issue — but if
