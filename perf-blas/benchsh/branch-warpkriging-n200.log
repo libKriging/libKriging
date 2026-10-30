@@ -1,0 +1,19 @@
+Building benchmarks...
+ninja: no work to do.
+
+Running benchmark: warpkriging (n=200, d=4, iterations=3)
+Operation filter: fit
+----------------------------------------
+WarpKriging Benchmark
+Operation                 |  Mean (ms) |   Std (ms) |   Min (ms) |   Max (ms) | Median (ms)
+fit                       |     57.339 |      5.840 |     50.370 |     64.661 |     56.985
+fit                       |   1504.098 |     89.453 |   1388.640 |   1606.602 |   1517.052
+fit                       |   2928.332 |     42.950 |   2884.685 |   2986.737 |   2913.574
+fit                       |   3089.400 |    141.561 |   2908.542 |   3254.174 |   3105.483
+fit                       |   2931.823 |    364.764 |   2416.159 |   3201.777 |   3177.534
+fit                       |   8831.910 |    248.046 |   8494.895 |   9084.713 |   8916.123
+fit                       |   4869.841 |     59.996 |   4812.973 |   4952.807 |   4843.743
+fit                       |   7180.841 |    241.103 |   6850.523 |   7419.236 |   7272.765
+fit                       |   3218.094 |    158.673 |   3033.834 |   3421.137 |   3199.310
+
+Results saved to: /home/user/libKriging/build/benchmark-results.log

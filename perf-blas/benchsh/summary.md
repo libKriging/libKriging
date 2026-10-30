@@ -1,0 +1,34 @@
+| class | config | n | master median (ms) | branch median (ms) | master / branch |
+|---|---|---:|---:|---:|---:|
+| kriging | Kriging | 200 | 722 | 126 | x5.71 |
+| kriging | Kriging | 400 | 435 | 337 | x1.29 |
+| nuggetkriging | nugget | 200 | 592 | 208 | x2.84 |
+| nuggetkriging | nugget | 400 | 600 | 627 | x0.96 |
+| warpkriging | none | 200 | 104 | 57 | x1.83 |
+| warpkriging | affine | 200 | 3865 | 1517 | x2.55 |
+| warpkriging | boxcox | 200 | 8216 | 2914 | x2.82 |
+| warpkriging | kumaraswamy | 200 | 9554 | 3105 | x3.08 |
+| warpkriging | knots | 200 | 8383 | 3178 | x2.64 |
+| warpkriging | mlp | 200 | 20798 | 8916 | x2.33 |
+| warpkriging | neural_mono | 200 | 13123 | 4844 | x2.71 |
+| warpkriging | categorical | 200 | 17249 | 7273 | x2.37 |
+| warpkriging | ordinal | 200 | 8869 | 3199 | x2.77 |
+| warpkriging | none | 400 | 542 | 363 | x1.49 |
+| warpkriging | affine | 400 | 8300 | 8238 | x1.01 |
+| warpkriging | boxcox | 400 | 13840 | 14394 | x0.96 |
+| warpkriging | kumaraswamy | 400 | 14552 | 13710 | x1.06 |
+| warpkriging | knots | 400 | 20696 | 18851 | x1.10 |
+| warpkriging | mlp | 400 | 54325 | 53761 | x1.01 |
+| warpkriging | neural_mono | 400 | 29465 | 28475 | x1.03 |
+| warpkriging | categorical | 400 | 36523 | 38281 | x0.95 |
+| warpkriging | ordinal | 400 | 14781 | 15161 | x0.97 |
+| mlpkriging | small_selu | 200 | 13292 | 4552 | x2.92 |
+| mlpkriging | medium_selu | 200 | 5708 | 2872 | x1.99 |
+| mlpkriging | large_selu | 200 | 14232 | 5877 | x2.42 |
+| mlpkriging | small_tanh | 200 | 6211 | 1863 | x3.33 |
+| mlpkriging | adam_only | 200 | 14962 | 4231 | x3.54 |
+| mlpkriging | small_selu | 400 | 24885 | 23273 | x1.07 |
+| mlpkriging | medium_selu | 400 | 30495 | 31179 | x0.98 |
+| mlpkriging | large_selu | 400 | 38077 | 36202 | x1.05 |
+| mlpkriging | small_tanh | 400 | 34768 | 33313 | x1.04 |
+| mlpkriging | adam_only | 400 | 24617 | 23137 | x1.06 |

@@ -18,6 +18,17 @@ past release, see the corresponding entry on the
   Kriging's (it kept 1e-10 on its diagonal).
 
 ### Added
+- **Small-problem BLAS rule** (OpenBLAS only): `fit`, `predict` and `update` of `Kriging`,
+  `WarpKriging` and `MLPKriging` on fewer than 500 training observations run OpenBLAS on
+  1 thread instead of the thread budget, restored after the call, when the BLAS threads and the
+  OpenMP team (both at the budget) outnumber the logical CPUs (no SMT headroom: VMs, CI runners).
+  There the idle OpenBLAS threads spin next to the OpenMP team of the covariance / gradient
+  loops: on a 4-vCPU VM, fits at n = 200 are 1.7-3.6x faster (all classes), n = 400 up to 1.8x
+  (MLP warping / MLPKriging), with 1.5-5x less CPU time; from n ~ 500-700 on the BLAS threads pay
+  off again and are kept. `Optim::set_blas_threads_min_n(n)` / `LK_BLAS_THREADS_MIN_N`: -1
+  automatic (default), 0 off, n > 0 explicit threshold. Bindings: not exposed (the environment
+  variable applies). Not measured on a machine with SMT, where the rule stays off. See
+  [REPORT-blas-threads.md](REPORT-blas-threads.md).
 - **Linear algebra self-test**: `LinearAlgebra::check(n_threads = 0)` calls the `LinearAlgebra`
   routines libKriging relies on (crossprod, diagABA, Cholesky, triangular / general solves,
   inverse, rcond, QR, Woodbury solve, symmetric eigen) and compares each result with a long

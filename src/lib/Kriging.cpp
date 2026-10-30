@@ -3462,7 +3462,7 @@ void Kriging::fit_impl(const arma::vec& y,
                        const std::string& objective_in,
                        const Parameters& parameters,
                        const std::string& method) {
-  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
+  libKriging::detail::BudgetScope budget_scope(X.n_rows);  // BLAS at the thread budget for the call
   const arma::uword n = X.n_rows;
   // Heterogeneous noise in the ORIGINAL scale of y: the given one, or (refit
   // without new noise) the current one, read before the normalization
@@ -4354,7 +4354,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
 Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
-  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   // exact prediction only: no implicit switch to an approximate predictor
   check_exact_available("predict", "predict");
   const arma::uword n_o = m_X.n_rows;
@@ -4637,7 +4637,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
  * @param refit is true if we want to re-fit the model
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
-  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows + X_u.n_rows);  // BLAS at the thread budget for the call
   // the noise of the new observations is needed (checked before any state change)
   if (m_noise_model == NoiseModel::Heterogeneous)
     throw std::invalid_argument("heterogeneous noise model: use update(y_u, noise_u, X_u)");
@@ -4851,7 +4851,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u,
                                        const arma::vec& noise_u,
                                        const arma::mat& X_u,
                                        const bool refit) {
-  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows + X_u.n_rows);  // BLAS at the thread budget for the call
   if (m_noise_model != NoiseModel::Heterogeneous)
     throw std::runtime_error("update(y, noise, X) requires NoiseModel::Heterogeneous");
   if (y_u.n_elem != X_u.n_rows)

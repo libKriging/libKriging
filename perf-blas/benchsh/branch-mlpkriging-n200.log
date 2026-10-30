@@ -1,0 +1,15 @@
+Building benchmarks...
+ninja: no work to do.
+
+Running benchmark: mlpkriging (n=200, d=4, iterations=3)
+Operation filter: fit
+----------------------------------------
+MLPKriging Benchmark
+Operation                 |  Mean (ms) |   Std (ms) |   Min (ms) |   Max (ms) | Median (ms)
+fit                       |   4547.296 |     20.975 |   4519.553 |   4570.258 |   4552.077
+fit                       |   2793.100 |    193.348 |   2527.026 |   2980.715 |   2871.558
+fit                       |   5859.942 |     30.171 |   5817.578 |   5885.520 |   5876.730
+fit                       |   1853.263 |     21.700 |   1823.155 |   1873.461 |   1863.173
+fit                       |   4173.191 |    415.899 |   3637.448 |   4651.281 |   4230.843
+
+Results saved to: /home/user/libKriging/build/benchmark-results.log

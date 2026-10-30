@@ -222,7 +222,38 @@ ScopedBlasThreads::~ScopedBlasThreads() {
     set_openblas_threads(saved);
 }
 
-BudgetScope::BudgetScope() : blas(in_pool_worker() ? 0 : blas_threads_for(budget_total())) {}
+namespace {
+// Threshold of the automatic small-problem rule (REPORT-blas-threads.md):
+// below it, on a 4-core VM, one BLAS thread next to the OpenMP team is
+// 1.7-3.6x faster per fit than both teams at the budget; above it, the BLAS
+// threads pay off again.
+constexpr unsigned long long kAutoBlasMinN = 500;
+
+int scope_blas_threads(unsigned long long n) {
+  if (in_pool_worker())
+    return 0;
+  const int budget = budget_total();
+  const int target = blas_threads_for(budget);
+  unsigned long long min_n = 0;
+  if (Optim::blas_threads_min_n > 0) {
+    min_n = static_cast<unsigned long long>(Optim::blas_threads_min_n);
+  } else if (Optim::blas_threads_min_n < 0) {
+    // automatic: only when the BLAS threads and the OpenMP team (both at the
+    // budget) outnumber the logical CPUs, i.e. without SMT headroom (VMs, CI
+    // runners, SMT off). With SMT (budget = physical cores, half the logical
+    // CPUs) the BLAS at the budget is faster at every size
+    // (bench/thread-budget/RESULTS.md, section 9).
+    const int blas = target > 0 ? target : get_openblas_threads();
+    if (blas > 1 && blas + budget > logical_cpus())
+      min_n = kAutoBlasMinN;
+  }
+  if (min_n > 0 && n > 0 && n < min_n)
+    return 1;
+  return target;
+}
+}  // namespace
+
+BudgetScope::BudgetScope(unsigned long long n) : blas(scope_blas_threads(n)) {}
 
 }  // namespace detail
 }  // namespace libKriging
