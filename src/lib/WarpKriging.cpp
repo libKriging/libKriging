@@ -2898,42 +2898,58 @@ void WarpKriging::optimise_joint(const std::string& method) {
   };
 
   // Helper: extract result from a WarpKriging instance after optimization
+  // (moves the matrices out of wk: called on the best start only, whose
+  // clone is not used afterwards)
   auto extract_result = [](WarpKriging& wk, double neg_ll) -> OptimizationResult {
     OptimizationResult r;
     r.neg_ll = neg_ll;
     r.theta = wk.m_theta;
     r.warp_params = wk.pack_warp_params();
     r.sigma2 = wk.m_sigma2;
-    r.beta = wk.m_beta;
-    r.z = wk.m_z;
-    r.M = wk.m_M;
-    r.circ = wk.m_circ;
-    r.C = wk.m_T;
-    r.Rinv = wk.m_Rinv;
-    r.R = wk.m_R;
-    r.Phi = wk.m_X;
-    r.dPhi = wk.m_dX;
+    r.beta = std::move(wk.m_beta);
+    r.z = std::move(wk.m_z);
+    r.M = std::move(wk.m_M);
+    r.circ = std::move(wk.m_circ);
+    r.C = std::move(wk.m_T);
+    r.Rinv = std::move(wk.m_Rinv);
+    r.R = std::move(wk.m_R);
+    r.Phi = std::move(wk.m_X);
+    r.dPhi = std::move(wk.m_dX);
     r.logdet = wk.m_logdet;
     r.success = true;
     return r;
   };
 
-  // Helper: restore best result to `this`
-  auto restore_best = [&](const OptimizationResult& r) {
+  // Helper: restore best result to `this` (moved: r is not used afterwards)
+  auto restore_best = [&](OptimizationResult& r) {
     if (n_warp > 0)
       unpack_warp_params(r.warp_params);
     m_theta = r.theta;
     m_sigma2 = r.sigma2;
-    m_beta = r.beta;
-    m_z = r.z;
-    m_M = r.M;
-    m_circ = r.circ;
-    m_T = r.C;
-    m_Rinv = r.Rinv;
-    m_R = r.R;
-    m_X = r.Phi;
-    m_dX = r.dPhi;
+    m_beta = std::move(r.beta);
+    m_z = std::move(r.z);
+    m_M = std::move(r.M);
+    m_circ = std::move(r.circ);
+    m_T = std::move(r.C);
+    m_Rinv = std::move(r.Rinv);
+    m_R = std::move(r.R);
+    m_X = std::move(r.Phi);
+    m_dX = std::move(r.dPhi);
     m_logdet = r.logdet;
+  };
+
+  // Helper: free the n x n (and n^2 x d for m_dX) state of a clone. A start
+  // rebuilds all of it (refresh_cache) before reading it, so the clones need
+  // not carry it while they wait for their start or once it is done.
+  auto release_gp_state = [](WarpKriging& wk) {
+    wk.m_X.reset();
+    wk.m_dX.reset();
+    wk.m_maxdX.reset();
+    wk.m_R.reset();
+    wk.m_T.reset();
+    wk.m_Rinv.reset();
+    wk.m_M.reset();
+    wk.m_z.reset();
   };
 
   // Helper: run parallel multistart with a given optimizer function
@@ -2967,19 +2983,28 @@ void WarpKriging::optimise_joint(const std::string& method) {
       for (int i = 1; i < multistart; ++i)
         wp_starts[i] = random_warp_params(static_cast<uint64_t>(42 + 1000 * i));
 
-    std::vector<OptimizationResult> results(multistart);
+    // Only the best start's state is kept (moved into `best` as the starts
+    // finish); the others are freed with their clone's state. Same choice as
+    // a scan of the starts in index order (lowest neg_ll, then lowest start
+    // index), whatever the order in which they finish.
+    OptimizationResult best;
+    int best_idx = -1;
     std::mutex results_mutex;
 
-    // Create per-thread WarpKriging clones
+    // Per-start WarpKriging clones, built here since the warp constructors
+    // reseed the RNG, without their GP state: only the running starts (at
+    // most the pool size) hold one (docs/dev/rationalization/T4-kmodel-per-worker.md).
     std::vector<WarpKriging> clones;
     clones.reserve(multistart);
-    for (int i = 0; i < multistart; ++i)
+    for (int i = 0; i < multistart; ++i) {
       clones.push_back(clone_for_thread());
+      release_gp_state(clones.back());
+    }
 
     // Worker function
     auto worker = [&](int task_id) {
+      WarpKriging& wk = clones[task_id];
       try {
-        WarpKriging& wk = clones[task_id];
         // Reset to initial warp params and set starting theta
         if (n_warp > 0)
           wk.unpack_warp_params(wp_starts[task_id]);
@@ -2988,35 +3013,29 @@ void WarpKriging::optimise_joint(const std::string& method) {
 
         double neg_ll = optimizer_fn(wk);
 
-        OptimizationResult r = extract_result(wk, neg_ll);
-        r.start_theta = theta0_rand.row(task_id).t();
-        r.start_warp_params = wp_starts[task_id];
         std::lock_guard<std::mutex> lock(results_mutex);
-        results[task_id] = std::move(r);
+        if ((neg_ll < best.neg_ll) || (neg_ll == best.neg_ll && best_idx >= 0 && task_id < best_idx)) {
+          best = extract_result(wk, neg_ll);
+          best.start_theta = theta0_rand.row(task_id).t();
+          best.start_warp_params = wp_starts[task_id];
+          best_idx = task_id;
+        }
       } catch (const std::exception& e) {
         if (Optim::log_level > Optim::log_none) {
           std::lock_guard<std::mutex> lock(results_mutex);
           arma::cout << "Warning: WarpKriging multistart " << (task_id + 1) << " failed: " << e.what() << arma::endl;
         }
       }
+      release_gp_state(wk);
     };
 
     // Starts run concurrently in a thread pool (see run_task_pool).
     run_task_pool(multistart, worker, "multistart");
 
-    // Find best result
-    int best_idx = -1;
-    double best_neg_ll = std::numeric_limits<double>::infinity();
-    for (int i = 0; i < multistart; ++i) {
-      if (results[i].success && results[i].neg_ll < best_neg_ll) {
-        best_neg_ll = results[i].neg_ll;
-        best_idx = i;
-      }
-    }
     if (best_idx >= 0) {
-      restore_best(results[best_idx]);
-      m_start_theta = results[best_idx].start_theta;
-      m_start_warp_params = results[best_idx].start_warp_params;
+      restore_best(best);
+      m_start_theta = best.start_theta;
+      m_start_warp_params = best.start_warp_params;
     }
   };
 
