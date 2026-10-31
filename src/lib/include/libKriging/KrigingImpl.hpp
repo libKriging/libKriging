@@ -420,10 +420,12 @@ class KrigingImpl {
     return {val, std::move(grad)};
   }
 
-  /// Shared inner loop for ∂LL/∂θ_k.  Accumulates term1_vec[k] and
-  /// term2_vec[k] (k=0..d-1) over upper-triangle (i,j) pairs using m_dX and
-  /// _DlnCovDtheta.  Caller is responsible for pre-sizing both output vectors
-  /// to d and zeroing them.
+  /// Shared inner loop for ∂LL/∂θ_k.  Adds term1_k = xᵀ ∂R/∂θ_k x and
+  /// term2_k = -tr(R⁻¹ ∂R/∂θ_k) (k=0..d-1) to term1_vec / term2_vec, from
+  /// m_dX and the per-dimension factors of the kernel's ∂ln k/∂θ
+  /// (SeparableDln.hpp).  Same summation order whatever the thread count.
+  /// Caller is responsible for pre-sizing both output vectors to d and
+  /// zeroing them.
   void compute_ll_grad_theta_vecs(const arma::mat& R,
                                   const arma::mat& Rinv,
                                   const arma::mat& x,
@@ -431,9 +433,11 @@ class KrigingImpl {
                                   arma::vec& term1_vec,
                                   arma::vec& term2_vec) const;
 
-  /// Shared for-k gradient loop for ∂LMP/∂θ_k (both Kriging and
-  /// NuggetKriging _logMargPost).  Returns the ans vector (length d) from
-  /// the Wb_k accumulation.  Caller appends class-specific prior correction.
+  /// Shared gradient of the log marginal likelihood part of ∂LMP/∂θ_k (both
+  /// Kriging and NuggetKriging _logMargPost): one R⁻¹ (m.Rinv when cached),
+  /// then one O(d n²) pair loop (see compute_ll_grad_theta_vecs).  Returns
+  /// the ans vector (length d).  Caller appends class-specific prior
+  /// correction.
   arma::vec compute_lmp_theta_ans(const KModel& m,
                                   const arma::vec& theta,
                                   double sigma2,
