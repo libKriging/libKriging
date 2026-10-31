@@ -160,16 +160,26 @@ namespace {
 
 libKriging::detail::BlasThreadState atfork_saved;
 
+// The library's mutexes are locked in prepare and unlocked in both processes:
+// a fork() made while another thread holds one would leave it locked forever
+// in the child, where that thread does not exist.
 void libkriging_atfork_prepare() {
+  // locked first: no concurrent scope changes the count between the two lines
+  libKriging::detail::blas_count_fork_prepare();
+  libKriging::detail::rcond_mutex().lock();
   atfork_saved = libKriging::detail::get_blas_threads();
   libKriging::detail::set_blas_threads(1);
 }
 
 void libkriging_atfork_parent() {
   libKriging::detail::restore_blas_threads(atfork_saved);
+  libKriging::detail::rcond_mutex().unlock();
+  libKriging::detail::blas_count_fork_parent();
 }
 
 void libkriging_atfork_child() {
+  libKriging::detail::rcond_mutex().unlock();
+  libKriging::detail::blas_count_fork_child();
   libKriging::detail::set_blas_threads(1);
 }
 

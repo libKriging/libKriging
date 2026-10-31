@@ -5,7 +5,10 @@
 #include "BlasThreads.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <mutex>
+#include <set>
 #include <thread>
 
 #ifdef _OPENMP
@@ -147,6 +150,40 @@ int initial_blas_threads() {
 
 thread_local int tl_share = 0;  // 0: not in a pool worker
 thread_local bool tl_in_pool = false;
+thread_local int tl_call_depth = 0;  // BudgetScopes open in this (non-pool) thread
+
+// Process-global state of the OpenBLAS count, shared by the scopes of every
+// thread (docs/dev/rationalization/T6-thread-safety.md). The count is the
+// smallest one requested by the live ScopedBlasThreads; the first scope saves
+// the count it finds, the last one restores it. Never destroyed (scopes may
+// close during static destruction).
+struct BlasCountState {
+  std::mutex m;
+  std::multiset<int> requests;  // counts requested by the live scopes
+  int saved = 0;                // count before the first live scope, 0: no OpenBLAS
+  int applied = 0;              // count currently set
+  int calls = 0;                // concurrent top-level calls (BudgetScope)
+  unsigned generation = 0;      // bumped in a fork child: drops the parent's scopes
+};
+
+BlasCountState& blas_state() {
+  static BlasCountState* s = new BlasCountState;
+  return *s;
+}
+
+// Lock-free copy of BlasCountState::calls for budget_total().
+std::atomic<int> g_calls{0};
+
+// Sets the count to the smallest live request, or back to the saved count.
+void apply_locked(BlasCountState& s) {
+  if (s.saved <= 0)
+    return;  // no OpenBLAS
+  const int target = s.requests.empty() ? s.saved : *s.requests.begin();
+  if (target != s.applied) {
+    set_openblas_threads(target);
+    s.applied = target;
+  }
+}
 
 }  // namespace
 
@@ -158,7 +195,7 @@ int physical_cores() {
   return n;
 }
 
-int budget_total() {
+int budget_full() {
   double share = Optim::num_threads_percent;
   if (!(share > 0.0))
     share = 1.0;
@@ -174,6 +211,16 @@ int budget_total() {
   // The OpenBLAS count (OPENBLAS_NUM_THREADS) bounds the BLAS only, not the
   // pool and the OpenMP loops: see blas_threads_for().
   return std::max(1, total);
+}
+
+int budget_total() {
+  const int full = budget_full();
+  const int calls = tl_in_pool ? 1 : g_calls.load(std::memory_order_relaxed);
+  return calls > 1 ? std::max(1, full / calls) : full;
+}
+
+int concurrent_calls() {
+  return g_calls.load(std::memory_order_relaxed);
 }
 
 int blas_threads_for(int share) {
@@ -210,19 +257,80 @@ ScopedShare::~ScopedShare() {
 ScopedBlasThreads::ScopedBlasThreads(int n) {
   if (n <= 0)
     return;
-  const int current = get_openblas_threads();
-  if (current > 0 && current != n) {
-    saved = current;
-    set_openblas_threads(n);
+  BlasCountState& s = blas_state();
+  std::lock_guard<std::mutex> lock(s.m);
+  if (s.requests.empty()) {
+    s.saved = get_openblas_threads();
+    s.applied = s.saved;
   }
+  s.requests.insert(n);
+  requested = n;
+  generation = s.generation;
+  apply_locked(s);
 }
 
 ScopedBlasThreads::~ScopedBlasThreads() {
-  if (saved > 0)
-    set_openblas_threads(saved);
+  if (requested <= 0)
+    return;
+  BlasCountState& s = blas_state();
+  std::lock_guard<std::mutex> lock(s.m);
+  if (generation != s.generation)
+    return;  // opened before a fork, in the parent
+  const auto it = s.requests.find(requested);
+  if (it != s.requests.end())
+    s.requests.erase(it);
+  apply_locked(s);
+  if (s.requests.empty())
+    s.saved = s.applied = 0;
+}
+
+CallCount::CallCount() : counted(!tl_in_pool) {
+  if (!counted)
+    return;
+  if (tl_call_depth++ > 0)
+    return;  // nested call of the same thread: counted once
+  BlasCountState& s = blas_state();
+  std::lock_guard<std::mutex> lock(s.m);
+  ++s.calls;
+  g_calls.store(s.calls, std::memory_order_relaxed);
+  generation = s.generation;
+  outermost = true;
+}
+
+CallCount::~CallCount() {
+  if (!counted)
+    return;
+  --tl_call_depth;
+  if (!outermost)
+    return;
+  BlasCountState& s = blas_state();
+  std::lock_guard<std::mutex> lock(s.m);
+  if (generation != s.generation)
+    return;
+  --s.calls;
+  g_calls.store(s.calls, std::memory_order_relaxed);
 }
 
 BudgetScope::BudgetScope() : blas(in_pool_worker() ? 0 : blas_threads_for(budget_total())) {}
+
+void blas_count_fork_prepare() {
+  blas_state().m.lock();
+}
+
+void blas_count_fork_parent() {
+  blas_state().m.unlock();
+}
+
+void blas_count_fork_child() {
+  // Only the forking thread survives: the scopes of the others never close.
+  BlasCountState& s = blas_state();
+  s.requests.clear();
+  s.saved = s.applied = 0;
+  s.calls = 0;
+  g_calls.store(0, std::memory_order_relaxed);
+  ++s.generation;
+  s.m.unlock();
+}
 
 }  // namespace detail
 }  // namespace libKriging

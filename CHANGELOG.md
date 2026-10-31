@@ -12,6 +12,14 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Concurrent calls from user threads** (T6, #446): the save / restore of the process-global
+  OpenBLAS thread count is shared by all threads under a mutex (count in effect = smallest live
+  request, the last scope restores the caller's count); concurrent public calls split the thread
+  budget (budget / running calls) instead of each taking all of it; `Random`'s engine and seed
+  are per thread (`reset_seed` applies to the calling thread; a new thread starts from seed 123);
+  the fork handlers hold the library's mutexes, so a `fork()` made while another thread fits no
+  longer deadlocks the child. `Optim` / `LinearAlgebra` settings are documented as
+  configuration-before-use. See [docs/dev/parallel.md](docs/dev/parallel.md), section 3.1.
 - **Predicted variance floor** (#428): `predict` floors the variance at 4 eps x sigma2 instead of
   clamping it to 0; the stdev is never 0 (no NaN NLPD) and its derivative is 0 (was NaN) where the
   variance is at the floor. The **WarpKriging / MLPKriging committed model is now exact**, as

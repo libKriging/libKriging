@@ -82,6 +82,40 @@ Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
 (`compute_dX`, `covMat_sym_*`); `n_o × n_n >= 40000` (predict / simulate `R_on`,
 `covMat_rect`, Vecchia, NestedKriging).
 
+### 3.1 Concurrent calls from user threads
+
+Public calls (fit / predict / simulate / update / ...) may run at the same time
+from several user threads (Python `ThreadPoolExecutor`, joblib threads,
+`std::thread`), each on its own model object
+([T6](rationalization/T6-thread-safety.md)):
+
+- **Budget split between the calls**: a call's budget is the budget divided by
+  the number of public calls running at that moment in user threads (nested
+  calls of a thread counted once), at least 1. It is read when the call sizes
+  its pool and at each OpenMP loop: a call started alone keeps the pool it
+  sized, its later loops shrink. `Optim::get_num_threads()` returns the
+  undivided budget.
+- **OpenBLAS count**: process-global, so one value for all the calls. The
+  scopes of every thread (`BudgetScope`, the pool's `ScopedBlasThreads`) share
+  one mutex-protected state: the count in effect is the **smallest** live
+  request, the first scope saves the count it finds and the last one restores
+  it, in whatever order the calls end. Concurrent calls thus run with their
+  BLAS at the share of the most constrained one (never more than the budget;
+  no oversubscription from one call restoring the count of another).
+- **Random engine**: `Random`'s engine and seed are per thread
+  (`thread_local`): a multistart fit draws its starts and `simulate()` reseeds
+  in the calling thread, without racing with the other calls. `reset_seed()`
+  applies to the thread that calls it; a new thread starts from seed 123.
+- **Settings** (`Optim::*`, `LinearAlgebra::*`): configuration-before-use. Reads
+  from concurrent calls are safe; setting one while calls run is a data race
+  and a fit reads several settings at different times. Set them first.
+- Results equal the sequential ones, up to the rounding of the BLAS count
+  (4e-14 relative measured on the stress test; bit-identical with one BLAS
+  thread): `ConcurrentCallsTest`.
+- Not covered: two threads using the **same** model object (not supported,
+  as for any non-const object), MKL / Accelerate (their own thread control,
+  section 5).
+
 ## 4. Reproducibility
 
 - Results do not depend on the OpenMP thread count: each loop writes disjoint
@@ -186,7 +220,11 @@ as fast as setting `OPENBLAS_NUM_THREADS` before loading (RESULTS.md, section 9)
 
 `pthread_atfork` handlers (`Kriging.cpp`) set BLAS and OpenMP to 1 thread around
 `fork()` and restore the parent's counts after (R `parallel::mclapply`, #325 /
-#387). The R Linux binary bundles OpenBLAS pthreads for that reason (the OpenMP
+#387). They also hold the library's mutexes across `fork()` (the OpenBLAS count
+state of 3.1 and the `rcond` mutex of `LinearAlgebra::rcond_chol`): a `fork()`
+made while another thread fits no longer leaves one of them locked in the
+child, which deadlocked at its first fit; the child also drops the count
+requests of the parent's other threads. The R Linux binary bundles OpenBLAS pthreads for that reason (the OpenMP
 build deadlocks in forked workers). With `mclapply`, give each worker one thread
 (`Optim::set_num_threads_percent` small, or `OPENBLAS_NUM_THREADS=1`).
 
