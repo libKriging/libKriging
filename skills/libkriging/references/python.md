@@ -16,7 +16,7 @@ model = lk.Kriging(
     y, X, "matern5_2",
     regmodel="constant",       # "none" | "constant" | "linear" | "interactive" | "quadratic"
     normalize=False,
-    optim="BFGS",              # "BFGS", "BFGS10" (10 restarts), "none"
+    optim="BFGS4",             # default: 4 parallel starts; "BFGS" (single start, the default up to 1.2), "BFGS10", "none"
     objective="LL",            # "LL" | "LOO" | "LMP"
     parameters={},
     noise=None,                 # None | "nugget" | per-observation variance vector

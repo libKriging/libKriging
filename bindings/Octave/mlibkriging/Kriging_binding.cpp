@@ -63,7 +63,7 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   }
   const auto regmodel = Trend::fromString(input.getOptional<std::string>(3, "regression model").value_or("constant"));
   const auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
-  const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
+  const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS4");
   const auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
   const auto parameters = makeParameters(input.getOptionalObject<Params>(7, "parameters"));
   const auto noise_model_str = input.getOptional<std::string>(8, "noise_model").value_or("none");
@@ -118,7 +118,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
     // Heterogeneous: fit(ref, y, noise, X, [regmodel], [normalize], [optim], [objective], [parameters], [method])
     const auto regmodel = Trend::fromString(input.getOptional<std::string>(4, "regression model").value_or("constant"));
     const auto normalize = input.getOptional<bool>(5, "normalize").value_or(false);
-    const auto optim = input.getOptional<std::string>(6, "optim").value_or("BFGS");
+    const auto optim = input.getOptional<std::string>(6, "optim").value_or("BFGS4");
     const auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
     const auto parameters = makeParameters(input.getOptionalObject<Params>(8, "parameters"));
     const auto method = input.getOptional<std::string>(9, "method").value_or("exact");
@@ -135,7 +135,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
     // None/Nugget: fit(ref, y, X, [regmodel], [normalize], [optim], [objective], [parameters], [method])
     const auto regmodel = Trend::fromString(input.getOptional<std::string>(3, "regression model").value_or("constant"));
     const auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
-    const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
+    const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS4");
     const auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
     const auto parameters = makeParameters(input.getOptionalObject<Params>(7, "parameters"));
     const auto method = input.getOptional<std::string>(8, "method").value_or("exact");
