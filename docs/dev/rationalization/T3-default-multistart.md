@@ -197,6 +197,12 @@ matern5_2, where the restarted single start is slow) to 3.4 (hartmann6 matern5_2
   (threads) may change the costs, not the miss ordering (the starts and the objective are
   unchanged by them).
 
+## Tests
+
+`ctest` 247 / 247 (C++ suite and Python binding tests); the Python defaults checked (`Kriging`,
+`Kriging(kernel).fit`, `KrigingRegressor` → `"BFGS4"`). R, Octave / MATLAB and Julia not
+installed on the machine: their binding tests are left to the CI.
+
 ## Follow-ups
 
 - T5: single start slower on 4 cores than on 1 at n 200 (x 2.5, CPU x 10), nugget fit (x 2.6); the
