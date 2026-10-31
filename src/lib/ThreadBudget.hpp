@@ -12,7 +12,8 @@ namespace libKriging {
 namespace detail {
 
 /// Physical cores available to the process: the cores of the CPUs in the
-/// affinity mask (Linux: sysfs topology, capped by the cgroup CPU quota; macOS:
+/// affinity mask (Linux: sysfs topology, capped by the cgroup CPU quota, v2
+/// cpu.max or v1 cpu.cfs_quota_us / cpu.cfs_period_us; macOS:
 /// hw.physicalcpu; Windows: GetLogicalProcessorInformationEx), at least 1;
 /// std::thread::hardware_concurrency() when the topology cannot be read.
 /// Computed once.
@@ -29,6 +30,12 @@ int budget_total();
 /// OPENBLAS_NUM_THREADS below the budget is kept); otherwise `share`.
 int blas_threads_for(int share);
 
+/// MKL count for a call with `share` threads, 0 = leave it as it is: no MKL, or
+/// MKL loaded with at most `share` threads (MKL_NUM_THREADS; MKL's default is
+/// the physical cores); otherwise `share`. Apple Accelerate, FlexiBLAS, BLIS:
+/// not driven (docs/dev/parallel.md, section 5).
+int mkl_threads_for(int share);
+
 /// Threads for an OpenMP loop of the calling thread: its pool share inside a
 /// pool worker, budget_total() otherwise. Use as num_threads(omp_threads()).
 int omp_threads();
@@ -36,9 +43,25 @@ int omp_threads();
 /// True in a TaskPool worker.
 bool in_pool_worker();
 
+/// Sets the MKL thread count of the calling thread only to `n` for its lifetime
+/// (MKL_Set_Num_Threads_Local) and restores its previous thread-local count
+/// after; no-op without MKL, when the count is already `n`, or for n <= 0.
+struct ScopedMklThreads {
+  explicit ScopedMklThreads(int n);
+  ~ScopedMklThreads();
+  ScopedMklThreads(const ScopedMklThreads&) = delete;
+  ScopedMklThreads& operator=(const ScopedMklThreads&) = delete;
+
+ private:
+  int saved = 0;
+  bool set = false;
+};
+
 /// Set by the task pool in each worker for its lifetime: marks it as a pool
-/// worker and gives its OpenMP loops `omp` threads. Never touches the OpenMP
-/// ICV of any thread.
+/// worker, gives its OpenMP loops `omp` threads and its MKL calls
+/// mkl_threads_for(omp) (thread-local; the OpenBLAS count is process-global,
+/// set by the pool once for all workers). Never touches the OpenMP ICV of any
+/// thread.
 struct ScopedShare {
   explicit ScopedShare(int omp);
   ~ScopedShare();
@@ -48,6 +71,7 @@ struct ScopedShare {
  private:
   int saved_share;
   bool saved_in_pool;
+  ScopedMklThreads mkl;
 };
 
 /// Sets the (process-global) OpenBLAS thread count to `n` for its lifetime and
@@ -64,7 +88,8 @@ struct ScopedBlasThreads {
 };
 
 /// Entry-point guard of the public fit / predict / simulate / update methods:
-/// OpenBLAS at blas_threads_for(budget) for the call
+/// OpenBLAS at blas_threads_for(budget) and the calling thread's MKL at
+/// mkl_threads_for(budget) for the call
 /// (OpenBLAS defaults to the logical CPUs, which costs 1.3-2x on a
 /// hyperthreaded machine), restored after; no-op inside a pool worker (the
 /// pool has set the worker's share).
@@ -75,6 +100,7 @@ struct BudgetScope {
 
  private:
   ScopedBlasThreads blas;
+  ScopedMklThreads mkl;
 };
 
 }  // namespace detail
