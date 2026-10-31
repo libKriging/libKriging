@@ -119,7 +119,7 @@ class Kriging : public KrigingImpl {
                             const std::string& covType,
                             const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                             bool normalize = false,
-                            const std::string& optim = "BFGS",
+                            const std::string& optim = "BFGS4",
                             const std::string& objective = "LL",
                             const Parameters& parameters = {},
                             const std::string& method = "exact");
@@ -183,7 +183,11 @@ class Kriging : public KrigingImpl {
    * @param y is n length column vector of output
    * @param X is n*d matrix of input
    * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
-   * @param optim is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
+   * @param optim 'BFGSk' (L-BFGS-B from k starting points run in parallel,
+   *        the best kept; default 'BFGS4', 'BFGS' = 'BFGS1': a single start,
+   *        with the long-range restart of Optim::long_range_restart), or
+   *        'none' to keep parameters unchanged. The default was 'BFGS' up to
+   *        1.2 (docs/dev/rationalization/T3-default-multistart.md).
    * @param objective is the criterion: 'LL' (log-likelihood, default), 'LOO'
    *        (leave-one-out; see docs/math/LOO.md) or 'LMP' (log-marginal
    *        posterior; see docs/math/LMP.md). Ignored if optim=='none'.
@@ -213,7 +217,7 @@ class Kriging : public KrigingImpl {
                              const arma::mat& X,
                              const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                              bool normalize = false,
-                             const std::string& optim = "BFGS",
+                             const std::string& optim = "BFGS4",
                              const std::string& objective = "LL",
                              const Parameters& parameters = {},
                              const std::string& method = "exact");
@@ -224,7 +228,7 @@ class Kriging : public KrigingImpl {
                              const arma::mat& X,
                              const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                              bool normalize = false,
-                             const std::string& optim = "BFGS",
+                             const std::string& optim = "BFGS4",
                              const std::string& objective = "LL",
                              const Parameters& parameters = {},
                              const std::string& method = "exact");

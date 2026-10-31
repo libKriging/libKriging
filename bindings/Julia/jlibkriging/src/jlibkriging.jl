@@ -94,7 +94,7 @@ function Kriging(kernel::String; noise::Union{Nothing,String}=nothing)
 end
 
 """
-    Kriging(y, X, kernel; regmodel="constant", optim="BFGS", objective="LL", method="exact", ...)
+    Kriging(y, X, kernel; regmodel="constant", optim="BFGS4", objective="LL", method="exact", ...)
 
 Fit a Kriging model. `objective` selects the fit criterion: `"LL"`
 (log-likelihood, default), `"LOO"` (leave-one-out) or `"LMP"` (log-marginal
@@ -117,7 +117,7 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                  noise::Union{Nothing,String,Float64,Vector{Float64}}=nothing,
                  regmodel::String="constant",
                  normalize::Bool=false,
-                 optim::String="BFGS",
+                 optim::String="BFGS4",
                  objective::String="LL",
                  method::String="exact",
                  parameters::Union{Nothing,AbstractDict}=nothing,
@@ -252,7 +252,7 @@ function _kriging_params(parameters)
 end
 
 """
-    fit!(k::Kriging, y, X; noise=nothing, regmodel="constant", normalize=false, optim="BFGS", objective="LL", parameters=nothing, method="exact")
+    fit!(k::Kriging, y, X; noise=nothing, regmodel="constant", normalize=false, optim="BFGS4", objective="LL", parameters=nothing, method="exact")
 
 Fit `k` on `(X, y)`. `parameters`: initial or fixed hyper-parameters, a dict
 with the keys `sigma2`, `theta`, `beta`, `nugget` and `is_<name>_estim`
@@ -262,7 +262,7 @@ function fit!(k::Kriging, y::Vector{Float64}, X::Matrix{Float64};
               noise::Union{Nothing,Vector{Float64}}=nothing,
               regmodel::String="constant",
               normalize::Bool=false,
-              optim::String="BFGS",
+              optim::String="BFGS4",
               objective::String="LL",
               parameters::Union{Nothing,AbstractDict}=nothing,
               method::String="exact")

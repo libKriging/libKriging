@@ -17,7 +17,7 @@ observations), `y::Vector{Float64}` length `n`.
 k = Kriging(y, X, "matern5_2";
             regmodel="constant",   # "constant" | "linear" | "interactive" | "quadratic" | "none"
             normalize=false,
-            optim="BFGS",          # "BFGS", "BFGS10" (10 restarts), "none"
+            optim="BFGS4",         # default: 4 parallel starts; "BFGS" (single start, the default up to 1.2), "BFGS10", "none"
             objective="LL",        # "LL" | "LOO" | "LMP"
             noise=nothing,         # nothing | "nugget" | Float64 | Vector{Float64}
             method="exact")        # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (noise models: LL only)

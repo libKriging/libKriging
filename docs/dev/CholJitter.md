@@ -237,7 +237,10 @@ they use; c = 2 against 0, J 1e-9:
   active components contracted is not measured (an inactive and an active long-range component
   cannot be told apart from theta alone).
 
-Not measured: matern5_2; nugget / noise models (the criterion is off there); LOO / LMP objectives
+Measured since on 30 sets per configuration (T3, `docs/dev/rationalization/T3-default-multistart.md`):
+matern5_2, nugget (the criterion acts through the noise-free warm start of the nugget fit), LOO /
+LMP (off: bit-identical); the `Kriging` default is now `"BFGS4"`, the criterion is kept for a
+single start. Not measured by the tables above: matern5_2; nugget / noise models; LOO / LMP objectives
 (off); the R / Octave / Julia binding tests (not runnable on the machine of the measurements; the
 C++ suite, 220 tests, and the Python tests pass with and without the criterion).
 

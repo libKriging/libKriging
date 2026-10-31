@@ -12,6 +12,17 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Default optimizer of `Kriging`: `"BFGS4"`** (was `"BFGS"`), in C++ and every binding (Python
+  `Kriging` / `KrigingRegressor`, R `Kriging()` / `fit()`, Octave / MATLAB, Julia): 4 random
+  starts run in parallel, the best kept. On 4080 benchmark data sets (sin, Hartmann6, Branin and
+  sinhalf with inactive inputs; gauss / matern5_2; noise-free / nugget; LL / LOO / LMP; n
+  100–1000; 30 sets per configuration) a single start ends more than 10 units below the best
+  optimum found on 18 % [17, 19] of the sets, `"BFGS4"` on 5 % [4, 6], `"BFGS10"` on 1 % [1, 1]
+  (Wilson 95 %); the cost of `"BFGS4"` is x 1.6–3.8 the single start on one core, x 0.3–2.6 its
+  wall time on 4 cores (`docs/dev/rationalization/T3-default-multistart.md`). Results of fits
+  that relied on the default change; pass `optim = "BFGS"` for the previous behaviour.
+  `WarpKriging`, `MLPKriging` and `NestedKriging` keep `"BFGS"`. The long-range restart of a
+  single start is kept (it never added a miss on noise-free LL, 113 sets fewer of 960).
 - **Predicted variance floor** (#428): `predict` floors the variance at 4 eps x sigma2 instead of
   clamping it to 0; the stdev is never 0 (no NaN NLPD) and its derivative is 0 (was NaN) where the
   variance is at the floor. The **WarpKriging / MLPKriging committed model is now exact**, as
