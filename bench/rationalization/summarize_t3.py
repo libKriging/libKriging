@@ -94,10 +94,12 @@ def main():
     print(f'# T3 study, pass {prefix}, miss threshold {thr:g}\n')
     print('| objective | noise | data | kernel | n | sets | ' + ' | '.join(f'{v} miss' for v in VARIANTS)
           + ' | RMSE ratio BFGS / BFGS4 / BFGS10 (median, q90) | CPU s BFGS / nolr / 4 / 10 (median) |'
+          + ' wall s (median) |'
           + ' nolr == BFGS |')
-    print('|' + '---|' * (6 + len(VARIANTS) + 3))
+    print('|' + '---|' * (6 + len(VARIANTS) + 4))
     pooled = defaultdict(lambda: defaultdict(lambda: [0, 0]))
     cpu_sum = defaultdict(lambda: defaultdict(float))
+    wall_sum = defaultdict(lambda: defaultdict(float))
     pair_tot = defaultdict(lambda: defaultdict(int))
     for key in keys:
         fam, ker, nz, obj, n, d, pct = key
@@ -113,11 +115,13 @@ def main():
             pooled[('all', 'all')][v][1] += a['tot']
             if a['tot']:
                 cpu_sum[(obj, nz, n)][v] += sum(a['cpu'])
+                wall_sum[(obj, nz, n)][v] += sum(a['wall'])
         for pk, c in pairs.items():
             pair_tot[(obj, nz)][pk] += c
         rr = ' / '.join(f"{st.median(res[v]['rr']):.3g}, {q(res[v]['rr'], 0.9):.3g}" if res[v]['rr'] else '-'
                         for v in ('BFGS', 'BFGS4', 'BFGS10'))
         cpu = ' / '.join(f"{st.median(res[v]['cpu']) / 1e3:.3g}" if res[v]['cpu'] else '-' for v in VARIANTS)
+        cpu += ' | ' + ' / '.join(f"{st.median(res[v]['wall']) / 1e3:.3g}" if res[v]['wall'] else '-' for v in VARIANTS)
         tot = res['BFGS']['tot']
         tie = f'{ties} / {tot}' if res['BFGS-nolr']['tot'] else '-'
         print(f'| {obj} | {nz} | {fam} d{d} | {ker} | {n} | {tot} | ' + ' | '.join(cells) + f' | {rr} | {cpu} | {tie} |')
@@ -141,13 +145,14 @@ def main():
             print(f'| {g[0]} | {g[1]} | {b} | {p[(b, True, False)]} | {p[(b, False, True)]} | '
                   f'{p[(b, True, True)]} | {p[(b, False, False)]} |')
 
-    print('\n## Summed CPU time relative to BFGS (all data sets of the (objective, noise, n) cell)\n')
-    print('| objective | noise | n | ' + ' | '.join(VARIANTS) + ' |')
-    print('|' + '---|' * (3 + len(VARIANTS)))
-    for c in sorted(cpu_sum):
-        b = cpu_sum[c]['BFGS']
-        print(f'| {c[0]} | {c[1]} | {c[2]} | ' + ' | '.join(
-            f'{cpu_sum[c][v] / b:.2f}' if cpu_sum[c][v] else '-' for v in VARIANTS) + f' (BFGS {b / 1e3:.0f} s) |')
+    for name, tsum in (('CPU', cpu_sum), ('wall', wall_sum)):
+        print(f'\n## Summed {name} time relative to BFGS (all data sets of the (objective, noise, n) cell)\n')
+        print('| objective | noise | n | ' + ' | '.join(VARIANTS) + ' | BFGS total |')
+        print('|' + '---|' * (4 + len(VARIANTS)))
+        for c in sorted(tsum):
+            b = tsum[c]['BFGS']
+            print(f'| {c[0]} | {c[1]} | {c[2]} | ' + ' | '.join(
+                f'{tsum[c][v] / b:.2f}' if tsum[c][v] else '-' for v in VARIANTS) + f' | {b / 1e3:.0f} s |')
 
 
 main()
