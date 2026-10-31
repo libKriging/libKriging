@@ -12,8 +12,7 @@ compared to the best of them:
     miss if (n / 2) log(e / e_best) > --tol;
   - a fit that failed (status error) is a miss.
 Columns: sets compared, misses, miss rate and Wilson 95 % interval, median
-test RMSE (over sd(y_test)), median of RMSE / RMSE of the best fit of the set,
-median wall and CPU time per fit, total wall time. Only stdlib (no pandas).
+test RMSE (over sd(y_test)), median and 90 % quantile of RMSE / RMSE of the best fit of the set, median wall and CPU time per fit, total wall time. Only stdlib (no pandas).
 """
 import argparse
 import csv
@@ -55,6 +54,15 @@ def wilson(k, n, z=1.959964):
     c = (p + z * z / (2 * n)) / (1 + z * z / n)
     h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
     return max(0.0, c - h), min(1.0, c + h)
+
+
+def quantile(v, q):
+    v = sorted(x for x in v if not math.isnan(x))
+    if not v:
+        return float("nan")
+    h = (len(v) - 1) * q
+    i = int(math.floor(h))
+    return v[i] if i + 1 >= len(v) else v[i] + (h - i) * (v[i + 1] - v[i])
 
 
 def median(v):
@@ -119,7 +127,7 @@ def table(recs, by, title):
     for r in sorted(recs, key=lambda r: ([col_key(r[k]) for k in by], variant_key(r["variant"]))):
         groups.setdefault(tuple(r[k] for k in by), OrderedDict()).setdefault(r["variant"], []).append(r)
     lines = ["### " + title, "",
-             "| " + " | ".join(by) + " | variant | sets | miss | miss % [95 % CI] | RMSE | RMSE / best | wall s | CPU s | wall total s |",
+             "| " + " | ".join(by) + " | variant | sets | miss | miss % [95 % CI] | RMSE | RMSE / best, median / p90 | wall s | CPU s | wall total s |",
              "|" + "---|" * (len(by) + 9)]
     for g, variants in groups.items():
         for v, rs in variants.items():
@@ -128,7 +136,7 @@ def table(recs, by, title):
             err = sum(r["status"] != "ok" for r in rs)
             lines.append("| " + " | ".join(g) + " | %s | %d | %d%s | %.0f [%.0f, %.0f] | %s | %s | %s | %s | %s |" % (
                 v, n, k, " (%d err)" % err if err else "", 100 * k / n, 100 * lo, 100 * hi,
-                fmt(median(r["rmse_v"] for r in rs)), fmt(median(r["rmse_ratio"] for r in rs)),
+                fmt(median(r["rmse_v"] for r in rs)), "%s / %s" % (fmt(median(r["rmse_ratio"] for r in rs)), fmt(quantile([r["rmse_ratio"] for r in rs], 0.9))),
                 fmt(median(r["wall"] for r in rs)), fmt(median(r["cpu"] for r in rs)),
                 fmt(sum(r["wall"] for r in rs if not math.isnan(r["wall"])))))
     return "\n".join(lines) + "\n"
