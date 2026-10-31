@@ -1,13 +1,14 @@
 """Paired test RMSE of the T3 study (run_t3.sh): per (objective, noise) and
 variant, against BFGS10 on the same data set: geometric mean of RMSE / RMSE_BFGS10,
 share of sets more than 10 % worse / better than BFGS10.
-   rmse_t3.py <out dir> [pass prefix, default A]"""
-import csv, glob, math, sys
+   rmse_t3.py <out dir | results/t3-A.csv.gz> [pass, default A]"""
+import math, sys
+import t3_rows
 from collections import defaultdict
 out, prefix = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else 'A')
 sets = defaultdict(dict)
-for fn in glob.glob(f'{out}/{prefix}-*.csv'):
-    for r in csv.DictReader(open(fn)):
+for _, r in t3_rows.rows(out, prefix):
+    if True:
         sets[(r['objective'], r['noise'], r['family'], r['kernel'], r['n'], r['set'])][r['variant']] = float(r['rmse'])
 acc = defaultdict(lambda: [0, 0.0, 0, 0])
 for k, v in sets.items():

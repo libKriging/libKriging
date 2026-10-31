@@ -1,5 +1,5 @@
 """Summary of the T3 study CSVs (run_t3.sh, t3_multistart_study.cpp):
-   summarize_t3.py <out dir> [pass prefix, default A] [threshold, default 10]
+   summarize_t3.py <out dir | results/t3-*.csv.gz> [pass, default A] [threshold, default 10]
 
 miss: the optimized objective of a variant more than <threshold> below the best
 of the variants on the same data set (LL, LMP: log densities). LOO
@@ -9,7 +9,8 @@ exceeds the threshold. A failed fit (nan) counts as a miss.
 Intervals: Wilson 95 %. RMSE ratio: test RMSE / test RMSE of the best variant of
 the set, median and 90 % quantile. Times: median per fit, and the ratio of the
 summed CPU times to the single start's (BFGS)."""
-import csv, glob, math, statistics as st, sys
+import math, statistics as st, sys
+import t3_rows
 from collections import defaultdict
 
 out = sys.argv[1]
@@ -39,8 +40,8 @@ def q(v, p):
 
 # sets[(family, kernel, noise, objective, n, d, pct)][set][variant] = row
 sets = defaultdict(lambda: defaultdict(dict))
-for fn in sorted(glob.glob(f'{out}/{prefix}-*.csv')):
-    for r in csv.DictReader(open(fn)):
+for _, r in t3_rows.rows(out, prefix):
+    if True:
         key = (r['family'], r['kernel'], r['noise'], r['objective'], int(r['n']), int(r['d']), r['pct'])
         sets[key][int(r['set'])][r['variant']] = r
 
