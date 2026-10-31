@@ -243,7 +243,7 @@ LIBKRIGING_EXPORT double Optim::get_num_threads_percent() {
 }
 
 LIBKRIGING_EXPORT int Optim::get_num_threads() {
-  return libKriging::detail::budget_total();
+  return libKriging::detail::budget_full();
 }
 
 int Optim::thread_pool_size = get_env_or_default("LK_THREAD_POOL_SIZE", 0);  // 0: the thread budget

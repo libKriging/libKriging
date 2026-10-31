@@ -7,11 +7,16 @@
 
 #include "libKriging/libKriging_exports.h"
 
+// The engine and its seed are per thread: concurrent calls from user threads
+// (a multistart fit draws its starts, simulate() reseeds then draws) do not
+// race on them and give the results of the same calls run one after the
+// other. reset_seed() applies to the calls of the thread that made it; a new
+// thread starts from seed 123.
 class Random {
  public:
-  static std::mt19937 engine;  // Mersenne twister random number engine
+  static thread_local std::mt19937 engine;  // Mersenne twister random number engine
 
-  static unsigned int seed;
+  static thread_local unsigned int seed;
 
  public:
   LIBKRIGING_EXPORT static void reset_seed(unsigned int seed);

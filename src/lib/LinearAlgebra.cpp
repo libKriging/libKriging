@@ -145,11 +145,15 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
 double LinearAlgebra::min_rcond = 1e-18;
 
 // MKL's dgecon (called by arma::rcond) is not thread-safe when invoked from
-// multiple std::threads concurrently. Serialize all rcond calls with a mutex.
-static std::mutex s_rcond_mutex;
+// multiple std::threads concurrently. Serialize all rcond calls with a mutex
+// (also held by the fork handlers, Kriging.cpp).
+std::mutex& libKriging::detail::rcond_mutex() {
+  static std::mutex m;
+  return m;
+}
 
 LIBKRIGING_EXPORT double LinearAlgebra::rcond_chol(arma::mat chol) {
-  std::lock_guard<std::mutex> lock(s_rcond_mutex);
+  std::lock_guard<std::mutex> lock(libKriging::detail::rcond_mutex());
   double rcond = arma::rcond(chol);
   rcond *= rcond;
   if (warn_chol)

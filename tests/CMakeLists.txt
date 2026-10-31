@@ -379,6 +379,14 @@ catch_discover_tests(BlasThreadsTest)
 add_test(NAME BlasThreadsTest/OPENBLAS_NUM_THREADS COMMAND BlasThreadsTest "[.openblas_env]")
 set_tests_properties(BlasThreadsTest/OPENBLAS_NUM_THREADS PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
 
+add_executable(ConcurrentCallsTest ConcurrentCallsTest.cpp)
+target_link_libraries(ConcurrentCallsTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries ConcurrentCallsTest)
+catch_discover_tests(ConcurrentCallsTest)
+# bit-identical to the sequential results when the OpenBLAS count cannot change
+add_test(NAME ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1 COMMAND ConcurrentCallsTest "[concurrent]")
+set_tests_properties(ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1 PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
+
 add_executable(SimulateStateResetTest SimulateStateResetTest.cpp)
 target_link_libraries(SimulateStateResetTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries SimulateStateResetTest)

@@ -6,6 +6,8 @@
 
 #include "libKriging/libKriging_exports.h"
 
+// Settings (num_nugget, chol_jitter, ...): process-wide, configuration-before-use
+// as Optim's (Optim.hpp).
 class LinearAlgebra {
  public:
   static arma::solve_opts::opts default_solve_opts;

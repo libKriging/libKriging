@@ -5,6 +5,11 @@
 
 #include "libKriging/libKriging_exports.h"
 
+// Process-wide settings, configuration-before-use: set them before starting
+// fits from several threads, not while calls run. Reads from concurrent calls
+// are safe; a set concurrent with a running call is a data race, and a fit
+// reads several of them at different times, so it could mix two
+// configurations (docs/dev/rationalization/T6-thread-safety.md).
 class Optim {
  public:
   static bool reparametrize;
