@@ -374,6 +374,10 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
   (runners are too noisy for pass / fail on timings) (#421).
 - Other BLAS (MKL `mkl_set_num_threads_local`, FlexiBLAS, BLIS): sections 5 and 8
   (#422).
+- Concurrent calls (3.1): Armadillo's RNG (WarpKriging warp initialization,
+  subset-of-data selection) is global where Armadillo disables `thread_local`
+  (MinGW, GCC on macOS); MKL / Accelerate counts not driven
+  ([T6](rationalization/T6-thread-safety.md)).
 - macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then).
 - Linux CI on Xeon 6973P (OpenBLAS 0.3.20 `Cooperlake`, section 4): the Octave,
   R (`main.yml`) and coverage (`analysis.yml`) jobs failed the same way; every
