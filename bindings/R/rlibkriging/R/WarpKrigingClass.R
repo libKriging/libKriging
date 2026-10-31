@@ -263,7 +263,7 @@ warp_knots <- function(n_knots = 3, knot_positions = NULL) {
 #'       optimiser knobs, numeric or string.
 #'     \item \code{calibration_folds}: number of folds of the K-fold
 #'       calibration of the predictive variance of a joint MLP warp
-#'       (default 5, 0 disables).
+#'       (default 3, 0 disables).
 #'   }
 #' @param noise numeric vector of per-observation noise variances (length n),
 #'   or \code{NULL} (default) for noise-free interpolation. When set, the GP

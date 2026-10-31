@@ -2470,10 +2470,15 @@ std::pair<double, arma::vec> WarpKriging::collapse_penalty() const {
 //  cannot see it: only refitting without the held-out points does. Each fold
 //  is refitted from the starting point of the optimiser start that gave the
 //  fit (not from the fit itself, which already knows the held-out points: a
-//  warm start barely moves away from it), and σ² is scaled for
-//  predict/simulate by the mean squared standardised held-out residual, if
-//  above 1: the calibration only corrects overconfidence (that start was
-//  picked on all the data, so the folds are slightly optimistic).
+//  warm start barely moves away from it: 95% coverage 0.92 instead of 0.96,
+//  T8), and σ² is scaled for predict/simulate by the mean squared
+//  standardised held-out residual, the maximum-likelihood scale of the
+//  held-out residuals. It is not clamped to >= 1: on 135 fits of 15 test
+//  functions it was always > 1.29 (median 60-90), and a value below 1 is as
+//  much an estimate as one above. Robust estimates (median, trimmed mean)
+//  under-cover: the heavy tail of the held-out residuals is the signal.
+//  K = 3 by default: same test coverage and NLPD as K = 5, the calibrated
+//  fit 0.6 times as long (docs/dev/rationalization/T8-mlp-calibration-cost.md).
 // -------------------------------------------------------------------------
 void WarpKriging::calibrate_variance() {
   m_var_scale = 1.0;
@@ -2552,7 +2557,7 @@ void WarpKriging::calibrate_variance() {
   if (2 * n_z < n)  // too few held-out residuals to calibrate on
     return;
   const double factor = sum_z2 / static_cast<double>(n_z);
-  if (std::isfinite(factor) && factor > 1.0)
+  if (std::isfinite(factor) && factor > 0.0)
     m_var_scale = factor;
 }
 
