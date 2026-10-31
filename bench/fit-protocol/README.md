@@ -25,7 +25,7 @@ python3 bench/fit-protocol/summarize.py bench/fit-protocol/results/reference.csv
 # smoke run (about 2 min on 4 cores: n 100, 5 data sets, every kernel / noise / objective / function)
 python3 bench/fit-protocol/run.py --bin <build>/bench/bench-fit-protocol --out /tmp/fp-smoke --profile smoke --summary
 
-# the reference run (about 5 h on 4 cores), then its tables
+# the reference run (about 4 h on 4 cores), then its tables
 python3 bench/fit-protocol/run.py --bin <build>/bench/bench-fit-protocol --out /tmp/fp-ref --profile reference \
     --merge /tmp/fp-ref.csv.gz --summary
 
