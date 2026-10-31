@@ -176,9 +176,10 @@ kink at `z=0` can make the likelihood surface locally jagged for a
 gradient-based optimizer — the analytic gradient is still correct, this is
 an optimization-landscape issue, not a bug.
 
-`MLPKriging`'s predictive stdev is calibrated by a 5-fold cross-validation
+`MLPKriging`'s predictive stdev is calibrated by a 3-fold cross-validation
 after the fit (`var_scale()`, shown in `summary()`; the mean and
-`logLikelihood()` are unchanged): without it, the many network weights
+`logLikelihood()` are unchanged; ~2.2x the CPU time of the single-start fit
+alone): without it, the many network weights
 overfit the training points and the 95 % intervals can cover ~1 % of new
 points (#407). Pass `calibration_folds = "0"` in `parameters` to skip it
 (e.g. when only the mean matters and fit time is critical). In higher

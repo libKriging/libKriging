@@ -77,12 +77,12 @@ at fixed features sees it, since the features were fitted to the left-out
 point too.
 
 After the fit, the predictive variance is therefore calibrated by K-fold
-cross-validation (K = 5): the model is refitted on each K−1 folds from
+cross-validation (K = 3): the model is refitted on each K−1 folds from
 the starting point (θ₀, W₀) of the optimiser start that gave the fit,
 with the same single-start optimiser and budget, and predicts the held-out
 fold. With eᵢ the held-out residuals and sᵢ² their predictive variances,
 
-  c = max(1, mean(eᵢ² / sᵢ²))
+  c = mean(eᵢ² / sᵢ²)
 
 and `predict` / `simulate` / `update_simulate` use the variance c · σ² · (…)
 instead of σ² · (…). The mean, σ̂² (`sigma2()`) and `logLikelihood()` are

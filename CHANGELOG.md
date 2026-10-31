@@ -12,6 +12,13 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **MLPKriging variance calibration** (T8): `calibration_folds` defaults to 3 instead of 5, and the
+  factor is no longer clamped to >= 1 (`var_scale()` = mean squared standardised held-out
+  residual). On 15 test functions (single-start fits): CPU time of the default fit x2.2 the
+  uncalibrated fit instead of x4.0 on 1 core (wall x1.8 instead of x2.4 on 4 cores); on 135 fits,
+  95 % coverage 0.965 instead of 0.957 (0.61 uncalibrated), test NLPD unchanged (paired mean
+  difference +0.08, 95 % CI [-0.30, 0.45]); the clamp was never active. Models saved before keep
+  their number of folds. See `docs/dev/rationalization/T8-mlp-calibration-cost.md`.
 - **Predicted variance floor** (#428): `predict` floors the variance at 4 eps x sigma2 instead of
   clamping it to 0; the stdev is never 0 (no NaN NLPD) and its derivative is 0 (was NaN) where the
   variance is at the floor. The **WarpKriging / MLPKriging committed model is now exact**, as

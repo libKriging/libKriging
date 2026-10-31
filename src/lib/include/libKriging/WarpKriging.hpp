@@ -969,7 +969,7 @@ class WarpKriging : protected KrigingImpl {
   // K-fold calibration of the predictive variance of a joint MLP warp (#407):
   // number of folds (0 disables, other warpings are never calibrated), and
   // the resulting factor applied to σ² by predict/simulate.
-  arma::uword m_calibration_folds = 5;
+  arma::uword m_calibration_folds = 3;
   double m_var_scale = 1.0;
   // Starting point (θ, warp params) of the optimiser start that gave the fit:
   // the calibration refits each fold from there.
