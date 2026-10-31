@@ -33,7 +33,13 @@ This page collects questions about libKriging development
  | Octave | `Optim.set_num_threads_percent(50)` | `Optim.get_num_threads()` |
 
  An explicit limit is never exceeded: `OMP_NUM_THREADS` (or `omp_set_num_threads` in the calling
- thread) caps the whole budget, `OPENBLAS_NUM_THREADS` the BLAS only. If you run several fits at
+ thread) caps the whole budget, `OPENBLAS_NUM_THREADS` (or `MKL_NUM_THREADS`) the BLAS only.
+ The BLAS thread count is driven for OpenBLAS (process-wide) and Intel MKL / oneMKL (per thread,
+ `mkl_set_num_threads_local`): each start of a multistart then uses its share of the budget for
+ its BLAS calls. Apple Accelerate, FlexiBLAS and BLIS are not driven: with them each start of a
+ multistart keeps the BLAS's own thread count (oversubscription when the BLAS is
+ multithreaded); set `VECLIB_MAXIMUM_THREADS=1` (Accelerate), `FLEXIBLAS_NUM_THREADS=1` or
+ `BLIS_NUM_THREADS=1` before loading the library for multistart fits. If you run several fits at
  once yourself (Python `multiprocessing`, R PSOCK / `future` workers, MPI, a job array on one
  node), each process uses the whole machine by default: give each one its part, e.g.
  `set_num_threads_percent(1 / k)` for k concurrent processes, or `OPENBLAS_NUM_THREADS=1
@@ -52,8 +58,11 @@ This page collects questions about libKriging development
  its gradient changes, by ~1e-15 relative. The OpenMP thread count has no effect: the
  OpenMP loops (covariance matrix, log-likelihood gradient) write independent entries or sum in
  a fixed order. Note that OpenBLAS also reads `OMP_NUM_THREADS` when `OPENBLAS_NUM_THREADS` is
- not set, so that this variable may still change the BLAS thread count. A build without
- OpenMP sums the gradient in another order (from n = 800 on), with the same consequences.
+ not set, so that this variable may still change the BLAS thread count. The parallel and
+ sequential paths of the gradient sum in the same order, so a build without OpenMP, a
+ ThreadSanitizer build and every OS (whatever its threshold of parallel loops) give the same
+ result for the same BLAS (since #445; before, the order changed at n = 200 on Linux, 800
+ elsewhere and without OpenMP).
 
  These rounding differences stay at that level on a well-conditioned covariance matrix, but
  are amplified by its condition number: on noise-free, smooth data the optimum often lies
