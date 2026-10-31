@@ -12,6 +12,17 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Single L-BFGS-B restart policy** (T2, [docs/dev/rationalization/T2-restart-policy.md](docs/dev/rationalization/T2-restart-policy.md)):
+  the restart criteria (abnormal stop, <= 2 iterations, at the lower bound, long-range optimum,
+  worse than the best run beyond factr x epsmch) and the contracted restart point, copied in
+  `Kriging::fit`, the WarpKriging joint BFGS and `AdamBFGS`, are now one private component
+  (`src/lib/RestartPolicy.hpp`). The **"worse" criterion no longer cascades**: a restart started
+  only because the previous run was worse does not trigger another one by being worse again
+  (before: up to `max_restart` = 10 restarts, each from a point closer to the lower bound). Kriging
+  and WarpKriging (joint BFGS) fits that went through such a cascade end with fewer restarts and
+  may end at a slightly different point (4 of 1728 measured Kriging fits, |ΔLL| <= 1.1e-5, 12 %
+  fewer restarts; 216 WarpKriging fits unchanged). `AdamBFGS::inner_restart` now decides the restart itself
+  (it receives the run's result, end and start points; `AdamBFGS::max_restart` is removed).
 - **Predicted variance floor** (#428): `predict` floors the variance at 4 eps x sigma2 instead of
   clamping it to 0; the stdev is never 0 (no NaN NLPD) and its derivative is 0 (was NaN) where the
   variance is at the floor. The **WarpKriging / MLPKriging committed model is now exact**, as

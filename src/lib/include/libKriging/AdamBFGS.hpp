@@ -85,11 +85,13 @@ class AdamBFGS {
   double bfgs_pgtol = 1e-6;
   double bfgs_factr = 1e7;
 
-  /// Restart of the first inner L-BFGS-B (bounded case only): returns the
-  /// x_inner to restart from, given the start point and the retry number;
-  /// at most max_restart restarts. Empty: no restart.
-  std::function<arma::vec(const arma::vec& x_inner0, int retry)> inner_restart;
-  int max_restart = 0;
+  /// Restart of the first inner L-BFGS-B (bounded case only), decided by the
+  /// caller (WarpKriging: the restart policy shared with Kriging): called after
+  /// each run of it with the run's result (f_opt minimized: -f if maximize),
+  /// the point it reached and its start point; returns the x_inner to restart
+  /// from, or an empty vector to stop. Empty function: no restart.
+  std::function<arma::vec(const lbfgsb::OptimizeResult& res, const arma::vec& x_inner_end, const arma::vec& x_inner0)>
+      inner_restart;
 
   /// If true, maximize the objective (Adam does gradient ascent, BFGS minimizes -f).
   bool maximize = false;
@@ -159,19 +161,19 @@ class AdamBFGS {
           auto res
               = optimizer.minimize(bfgs_fn, x_inner, inner_lower.memptr(), inner_upper.memptr(), bounds_type.memptr());
           total_bfgs_evals += res.num_fun_calls;
-          // First inner run (from the start point): restart as Kriging does
-          // when it ended abnormally, in <= 2 iterations or at the lower
-          // bound. A start where the gradient points out of the box in every
-          // direction otherwise stops at that corner of the bounds (KKT
-          // point), and the later warm-started runs never leave it.
+          // First inner run (from the start point): restarted as the caller
+          // decides (e.g. when it ended abnormally, in <= 2 iterations or at
+          // the lower bound). A start where the gradient points out of the box
+          // in every direction otherwise stops at that corner of the bounds
+          // (KKT point), and the later warm-started runs never leave it.
           if (t == 1 && inner_restart) {
             double best_res_f = res.f_opt;
             arma::vec best_res_x = x_inner;
-            for (int retry = 0; retry < max_restart; ++retry) {
-              const bool at_lower = arma::min(arma::abs(x_inner - inner_lower)) < arma::datum::eps;
-              if (!(res.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0 || res.num_iters <= 2 || at_lower))
+            while (true) {
+              arma::vec x_restart = inner_restart(res, x_inner, x_inner_start);
+              if (x_restart.is_empty())
                 break;
-              x_inner = inner_restart(x_inner_start, retry);
+              x_inner = std::move(x_restart);
               res = optimizer.minimize(
                   bfgs_fn, x_inner, inner_lower.memptr(), inner_upper.memptr(), bounds_type.memptr());
               total_bfgs_evals += res.num_fun_calls;

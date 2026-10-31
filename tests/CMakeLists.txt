@@ -403,6 +403,12 @@ target_link_libraries(AdamBFGSTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries AdamBFGSTest)
 catch_discover_tests(AdamBFGSTest)
 
+add_executable(RestartPolicyTest RestartPolicyTest.cpp)
+target_link_libraries(RestartPolicyTest LINK_PUBLIC Kriging Catch2)
+target_include_directories(RestartPolicyTest PRIVATE ${PROJECT_SOURCE_DIR}/src/lib)  # private header
+add_dependencies(all_test_binaries RestartPolicyTest)
+catch_discover_tests(RestartPolicyTest)
+
 add_executable(WarpKrigingCollapseTest WarpKrigingCollapseTest.cpp)
 target_link_libraries(WarpKrigingCollapseTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries WarpKrigingCollapseTest)
