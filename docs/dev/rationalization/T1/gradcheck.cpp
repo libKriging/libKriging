@@ -1,15 +1,15 @@
 // T1 harness: gradcheck <n> <d> <kernel> check|time [reps]
 //  check: prints LL and LMP theta gradients (%.17g), one value per line
 //  time : median ms of logLikelihoodFun / logMargPostFun with and without gradient
-#include "libKriging/Covariance.hpp"
-#include "libKriging/Kriging.hpp"
-#include "libKriging/utils/lk_armadillo.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include "libKriging/Covariance.hpp"
+#include "libKriging/Kriging.hpp"
+#include "libKriging/utils/lk_armadillo.hpp"
 template <typename F>
 double median_ms(int reps, F&& f) {
   std::vector<double> t(reps);
@@ -49,8 +49,10 @@ int main(int argc, char** argv) {
           R(i, j) = cov(arma::vec((X.row(i) - X.row(j)).t()), theta);
       std::printf("COND %.6g\n", arma::cond(R));
     }
-    for (auto v : gll) std::printf("LL %.17g\n", v);
-    for (auto v : glmp) std::printf("LMP %.17g\n", v);
+    for (auto v : gll)
+      std::printf("LL %.17g\n", v);
+    for (auto v : glmp)
+      std::printf("LMP %.17g\n", v);
   } else if (mode == "nugget") {
     // Nugget model, LMP and LL gradients at gamma = (theta, alpha = 0.8), plus a central FD check
     Kriging kn(kernel, Kriging::NoiseModel::Nugget);
