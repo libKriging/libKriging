@@ -8,11 +8,14 @@ resolved by keeping both sides, unbuilt.
 
 ## Status
 
-Done. CI run 41304855128 (commit e30acf5, same code as the final one): both Linux jobs green
-(OpenBLAS alone; oneMKL preloaded and linked, GNU and INTEL threading layers; AMD EPYC 9V74
-runners, 2 cores); macOS 15 arm64 (Accelerate): every test passes except
-`MLPKriging predictive variance is calibrated (#407)`, a known limitation of macOS Release not
-related to the backends (section 5), reported in a non-blocking step from commit 66faf8f on.
+Done. Last runs:
+- self-hosted (run 41332870292, commit 31f81f69): both Linux jobs green on the i9-10900K
+  (`alien-runner`): OpenBLAS alone; oneMKL preloaded and linked, GNU and INTEL threading
+  layers. The macOS job waits for the self-hosted Mac, which passed the previous run
+  (41329668504, commit 0f52b15f: 234 / 234 apart from the known MLPKriging limitation);
+- GitHub-hosted (run 41304855128, commit e30acf5): both Linux jobs green (AMD EPYC, 2 cores),
+  macOS 15 arm64 green apart from the same MLPKriging limitation.
+
 Two known limitations: MKL's fast memory manager after `fork()` with concurrent MKL work
 (2.1), the single-start MLPKriging calibration case on macOS Release (5). Fixes to port to T5 /
 T6 / master: sections 2.1–2.6.
