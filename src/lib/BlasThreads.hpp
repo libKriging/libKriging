@@ -4,6 +4,8 @@
 // Private (not installed): OpenBLAS / MKL / OpenMP thread-count access, defined
 // in Kriging.cpp (fork handlers, ThreadBudget.cpp).
 
+#include <mutex>
+
 namespace libKriging {
 namespace detail {
 
@@ -41,6 +43,10 @@ int get_mkl_threads();
 /// each pool worker sets its own, without touching the other threads.
 /// Defined in Kriging.cpp.
 int set_mkl_threads_local(int n);
+/// Serializes arma::rcond (LinearAlgebra::rcond_chol). Also held by the fork
+/// handlers, so that the child of a fork() made while another thread is in
+/// rcond_chol does not inherit it locked. Defined in LinearAlgebra.cpp.
+std::mutex& rcond_mutex();
 
 }  // namespace detail
 }  // namespace libKriging
