@@ -11,8 +11,9 @@ name: BLAS backends
 # (LK_EXPECT_BLAS makes a backend that failed to load an error, not a skip).
 #
 # Runners: the repository's self-hosted runners (dedicated to long runs and to
-# parallelism / heavy BLAS backends; ephemeral, sudo available, any Linux
-# distribution) for branches of this repository and manual runs; GitHub-hosted
+# parallelism / heavy BLAS backends; any Linux distribution; the workspace
+# may persist between jobs and sudo may need a password: only `sudo -n` is
+# tried) for branches of this repository and manual runs; GitHub-hosted
 # runners for pull requests from forks, which must not run code on the
 # self-hosted machines. Labels: GitHub's automatic ones (self-hosted + OS),
 # overridable with the repository variables LK_SELF_HOSTED_LINUX /
@@ -63,7 +64,9 @@ jobs:
       - name: Tools, OpenBLAS and oneMKL (looked for first, installed if missing)
         shell: bash
         run: |
-          SUDO=""; [ "$(id -u)" != "0" ] && SUDO=sudo
+          # sudo without a password only (-n): a runner on a workstation may
+          # need one, and a prompt would hang / fail the job
+          SUDO=""; [ "$(id -u)" != "0" ] && SUDO="sudo -n"
           ARCH=$(uname -m)
           if command -v apt-get >/dev/null; then PM=apt
           elif command -v dnf >/dev/null; then PM=dnf
@@ -72,15 +75,30 @@ jobs:
           echo "arch $ARCH, package manager $PM"
           # unversioned .so (link time); no pipe into grep -q: with pipefail
           # (GitHub's bash) the SIGPIPE of the writer fails the test
-          has_lib() { for f in /usr/lib*/$1 /usr/lib*/*/$1 /usr/lib*/*/*/$1 /usr/local/lib*/$1; do [ -e "$f" ] && return 0; done; return 1; }
+          # Directories of Armadillo's find_library (system and multiarch ones),
+          # not the subdirectories of the Debian alternatives (openblas-pthread/)
+          LIBDIRS="/usr/lib /usr/lib64 /lib /lib64 /usr/local/lib /usr/local/lib64 /usr/lib/$(uname -m)-linux-gnu /lib/$(uname -m)-linux-gnu"
+          has_lib() { for d in $LIBDIRS; do [ -e "$d/$1" ] && return 0; done; return 1; }
           missing=()
           command -v cmake >/dev/null || missing+=(cmake)
           command -v ninja >/dev/null || missing+=(ninja)
           command -v g++ >/dev/null || missing+=(g++)
           python3 -m pip --version >/dev/null 2>&1 || missing+=(pip)
-          has_lib libopenblas.so || missing+=(openblas)
           has_lib liblapack.so || missing+=(lapack)
+          # OpenBLAS: the development link (libopenblas.so), else the runtime
+          # library given to Armadillo's find_library (openblas_LIBRARY)
+          if ! has_lib libopenblas.so; then
+            for f in $(for d in $LIBDIRS; do echo $d/libopenblas.so.0; done) /usr/lib/$(uname -m)-linux-gnu/openblas-pthread/libopenblas.so.0; do
+              if [ -e "$f" ]; then echo "OPENBLAS_LIB=$f" >> $GITHUB_ENV; echo "OpenBLAS runtime only: $f"; break; fi
+            done
+            # only the OpenBLAS build needs it (the MKL-linked one does not)
+            grep -q "^OPENBLAS_LIB=" $GITHUB_ENV || [ "${{ matrix.link }}" != "openblas" ] || missing+=(openblas)
+          fi
           echo "missing: ${missing[*]:-none}"
+          if [ ${#missing[@]} -gt 0 ] && [ -n "$SUDO" ] && ! $SUDO true 2>/dev/null; then
+            echo "::error::missing ${missing[*]} and no password-less sudo on runner ${RUNNER_NAME}: install them on the runner (Debian / Ubuntu: cmake ninja-build g++ python3-pip libopenblas-pthread-dev liblapack-dev)"
+            exit 1
+          fi
           if [ ${#missing[@]} -gt 0 ]; then
             case "$PM" in
               apt) $SUDO apt-get update -q
@@ -139,12 +157,16 @@ jobs:
           nproc
 
       - name: Configure and build (Release, C++ only)
+        id: build
         if: matrix.link == 'openblas' || env.MKL_AVAILABLE == '1'
         shell: bash
         run: |
+          # a self-hosted runner may keep the workspace between jobs
+          rm -rf build
           # FlexiBLAS (Fedora / RHEL default BLAS) would be found first by
           # Armadillo: the jobs test OpenBLAS and MKL themselves
           EXTRA=(-DALLOW_FLEXIBLAS_LINUX=OFF)
+          if [ -n "${OPENBLAS_LIB:-}" ]; then EXTRA+=(-Dopenblas_LIBRARY="$OPENBLAS_LIB"); fi
           if [ "${{ matrix.link }}" == "mkl" ]; then
             # ARMA_FindMKL looks for mkl_rt (find_library): give it the wheel's
             EXTRA+=(-Dmkl_rt_LIBRARY="$MKL_LIB/libmkl_rt.so.2")
@@ -153,12 +175,13 @@ jobs:
             -DENABLE_PYTHON_BINDING=off -DENABLE_OCTAVE_BINDING=off -DENABLE_MATLAB_BINDING=off \
             -DCMAKE_INSTALL_LIBDIR=lib "${EXTRA[@]}" | tee cmake.log
           grep -E "MKL_FOUND|OpenBLAS_FOUND|Found MKL" cmake.log || true
-          if [ "${{ matrix.link }}" == "mkl" ]; then grep -q "MKL_FOUND = YES" cmake.log; fi
+          # Armadillo falls back to the reference BLAS without failing: check
+          if [ "${{ matrix.link }}" == "mkl" ]; then grep -q "MKL_FOUND = YES" cmake.log; else grep -q "OpenBLAS_FOUND = YES" cmake.log; fi
           cmake --build build -j "$(nproc)"
           ldd build/src/lib/libKriging.so | grep -E "mkl|openblas|lapack|blas|gomp|iomp" || true
 
       - name: Tests, OpenBLAS alone
-        if: matrix.link == 'openblas'
+        if: matrix.link == 'openblas' && steps.build.outcome == 'success'
         shell: bash
         run: |
           cd build
@@ -170,7 +193,7 @@ jobs:
           ctest --output-on-failure
 
       - name: Tests, oneMKL GNU threading layer
-        if: always() && env.MKL_AVAILABLE == '1'
+        if: always() && steps.build.outcome == 'success' && env.MKL_AVAILABLE == '1'
         shell: bash
         run: |
           cd build
@@ -186,7 +209,7 @@ jobs:
           exit $rc
 
       - name: Tests, oneMKL INTEL threading layer
-        if: always() && env.MKL_AVAILABLE == '1'
+        if: always() && steps.build.outcome == 'success' && env.MKL_AVAILABLE == '1'
         shell: bash
         run: |
           cd build
@@ -202,7 +225,7 @@ jobs:
           exit $rc
 
       - name: MKL_VERBOSE thread counts of a BFGS4 fit
-        if: always() && env.MKL_AVAILABLE == '1'
+        if: always() && steps.build.outcome == 'success' && env.MKL_AVAILABLE == '1'
         continue-on-error: true
         shell: bash
         run: |
@@ -215,7 +238,7 @@ jobs:
           grep -o "NThr:[0-9]*" verbose.log | sort | uniq -c || true
 
       - name: Multistart timing
-        if: always() && (matrix.link == 'openblas' || env.MKL_AVAILABLE == '1')
+        if: always() && steps.build.outcome == 'success'
         continue-on-error: true
         shell: bash
         run: |
@@ -251,8 +274,10 @@ jobs:
           sysctl -n machdep.cpu.brand_string hw.physicalcpu hw.logicalcpu hw.perflevel0.physicalcpu 2>/dev/null || true
 
       - name: Configure and build (Release, C++ only)
+        id: build
         shell: bash
         run: |
+          rm -rf build  # a self-hosted runner may keep the workspace between jobs
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
             -DENABLE_PYTHON_BINDING=off -DENABLE_OCTAVE_BINDING=off -DENABLE_MATLAB_BINDING=off \
             -DCMAKE_INSTALL_LIBDIR=lib | tee cmake.log
@@ -274,7 +299,7 @@ jobs:
           ctest --output-on-failure -E "MLPKriging predictive variance is calibrated"
 
       - name: Known limitation, reported (MLPKriging calibration, single start, macOS Release)
-        if: always()
+        if: always() && steps.build.outcome == 'success'
         continue-on-error: true
         shell: bash
         run: |
@@ -282,7 +307,7 @@ jobs:
           ctest --output-on-failure -R "MLPKriging predictive variance is calibrated"
 
       - name: Multistart timing (Accelerate, BLASSetThreading, VECLIB_MAXIMUM_THREADS)
-        if: always()
+        if: always() && steps.build.outcome == 'success'
         continue-on-error: true
         shell: bash
         run: |

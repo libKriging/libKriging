@@ -194,13 +194,19 @@ Release, C++ only, `OPENBLAS_CORETYPE=Haswell` as the other Linux jobs (#429).
 every backend case.
 
 **Runners.** The repository's self-hosted runners (dedicated to long runs and to parallelism /
-heavy BLAS backends; ephemeral, `sudo` available, any Linux distribution) run the workflow for
+heavy BLAS backends; any Linux distribution) run the workflow for
 branches of this repository and manual runs; pull requests from forks run on GitHub-hosted
 runners (`ubuntu-24.04`, `macos-15`), so that no outside code runs on the self-hosted machines.
 Labels: GitHub's automatic `[self-hosted, Linux]` / `[self-hosted, macOS]`, overridable with
 the repository variables `LK_SELF_HOSTED_LINUX` / `LK_SELF_HOSTED_MACOS` (JSON arrays). As the
 runners start empty, the first step looks for cmake, ninja, g++, pip, OpenBLAS and LAPACK and
-installs only what is missing (apt, dnf or zypper); oneMKL: an installed oneAPI MKL first
+installs only what is missing (apt, dnf or zypper, through `sudo -n` only: on the first run,
+2026-11-01, the Linux runner `alien-runner` asked sudo for a password and lacked the OpenBLAS
+development link; its runtime `libopenblas.so.0` is then given to Armadillo as
+`openblas_LIBRARY`, and the configure step fails if Armadillo does not report
+`OpenBLAS_FOUND = YES` / `MKL_FOUND = YES`, instead of silently building against the
+reference BLAS); the workspace persists between jobs on these runners (`build/` is removed
+first); oneMKL: an installed oneAPI MKL first
 (`$MKLROOT`, `/opt/intel/oneapi`), else the pinned wheels; no MKL steps on non-x86_64 runners.
 `-DALLOW_FLEXIBLAS_LINUX=OFF`: on Fedora / RHEL, FlexiBLAS would be found before OpenBLAS / MKL.
 The runner's OS, CPU and name are printed: results of section 4 are attributed per machine. The fork case runs with `MKL_DISABLE_FAST_MM=1` under MKL (2.1).
