@@ -208,7 +208,7 @@ y = sin(6 x1) + cos(4 x2) x3 + 0.5 sin(5 x3). Largest gaps over n = 250, 500, 75
 | OpenBLAS, 4 threads | 3.2e-13 / 2.3e-12 | 3.5e-5 / 1.6e-8 | 2.2e-9 / 3.2e-8 | 3.2e-8 / 2.4e-9 |
 | MKL, 4 threads (GNU = INTEL) | 1.5e-13 / 4.0e-12 | 1.5e-4 / 2.2e-8 | 1.4e-9 / 2.9e-8 | 5.3e-8 / 1.5e-9 |
 | MKL, 1 thread | (same order) | 2.2e-5 / 1.2e-8 | | 1.0e-7 / 2.2e-9 |
-| Accelerate (macOS CI) | section 5 | | | |
+| Accelerate (macOS 15 arm64, CI) | 4.2e-14 / 1.8e-12 | 1.0e-4 / 1.4e-8 | 8.6e-10 / 2.5e-8 | 5.4e-8 / 2.5e-9 |
 
 Tolerances (about 10–50 x these): fixed-theta LL 1e-11 (matern5_2) / 1e-8 (gauss), gradient
 1e-10 / 1e-6; fitted LL 1e-7, theta 1e-3 / 1e-5.
@@ -223,7 +223,48 @@ optimum, a kernel / libm / summation bug), not last-digit ones.
 
 ## 5. macOS arm64, Accelerate
 
-(CI results: see the update at the end of this log.)
+CI run 41300138594, job "macOS arm64 Accelerate" (macos-15, 3 cores: budget 3, AppleClang,
+Release). `dgemm_` from `Accelerate.framework/.../vecLib.framework/.../libBLAS.dylib`.
+
+- `BlasBackendTest`: all `[backend]` cases pass (29 assertions; the MKL / OpenBLAS cases skip).
+  BFGS4 with a pool of 1 or 4: **bit-identical** (the library does not change Accelerate's count,
+  so nothing differs between the two runs but the order of the starts). Shared reference
+  (Linux OpenBLAS): every gap within the tolerances, of the same order as between Linux
+  backends (table in section 4: theta 1.0e-4 at most, matern5_2 n = 250).
+- `ConcurrentCallsTest` (T6 stress test, including `fork()` during concurrent fits) and
+  `BlasThreadsTest`: pass.
+- Full `ctest`: 233 / 234; `MLPKriging predictive variance is calibrated (#407)` fails, see
+  below.
+
+### BFGS4 vs BFGS, `BLASSetThreading` (macOS 15 `vecLib/thread_api.h`), `VECLIB_MAXIMUM_THREADS`
+
+`[.timing]`, medians of 3, matern5_2, d = 3, budget 3 (pool of 3 workers x 1 for BFGS4):
+
+| n | BFGS | BFGS4 | BFGS, `BLASSetThreading(single)` | BFGS4, single | BFGS4 multi / single |
+|---|---|---|---|---|---|
+| 200 | 0.098 s | 0.069 s | 0.104 s | 0.069 s | 0.99 |
+| 400 | 0.435 s | 0.329 s | 0.524 s | 0.317 s | 1.04 |
+| 800 | 1.981 s | 1.491 s | 2.698 s | 1.487 s | 1.00 |
+| `VECLIB_MAXIMUM_THREADS=1` at load: 800 | 2.621 s | 1.667 s | | | |
+
+- Single-threaded Accelerate during a multistart: no measurable gain (0.99–1.04, within
+  the run-to-run noise); `VECLIB_MAXIMUM_THREADS=1` is slower for BFGS4 at n = 800 (1.67 vs
+  1.49 s). On a single start it costs 20–36 % at n = 400–800.
+- **Decision**: the library does not call `BLASSetThreading` around multistarts. It is
+  process-wide (it would also slow every concurrent call of other threads), and it gave nothing
+  here; the oversubscription that T5 documented for multithreaded BLAS in pool workers does not
+  show with Accelerate on this 3-core runner. The FAQ / `parallel.md` advice
+  (`VECLIB_MAXIMUM_THREADS=1` for multistart fits) is not supported by these numbers on 3 cores;
+  it is kept as an option, not a recommendation, until measured on a larger Mac (more cores
+  than starts is where it could matter).
+
+### `MLPKriging predictive variance is calibrated (#407)` on macOS Release
+
+`optim=BFGS` case: coverage 0.72 (required > 0.8); uncalibrated Q2 -0.68 (the single start
+stopped at a poor mean, which the test's own comment allows for, #407 point 4). Passes on Linux
+Release (OpenBLAS, MKL). Not in a code path changed by T9; whether it fails in the macOS Debug
+job of `main.yml` on this branch (passes on master) decides between a T5 / T6 regression on
+macOS and an optimizer-path sensitivity of the single-start case: see the update below.
 
 ## 6. Timings (local, informative; `[.timing]`, median of 3, matern5_2, budget 4)
 

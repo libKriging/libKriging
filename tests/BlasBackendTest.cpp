@@ -159,6 +159,7 @@ std::vector<Record> probe(F run) {
 }
 #endif
 
+#if defined(LK_BACKEND_PROBE)
 // Pool size and worker share of a multistart fit with `starts` starts at
 // budget B (TaskPool.cpp)
 void pool_of(int B, int starts, int& pool, int& share) {
@@ -171,6 +172,7 @@ void pool_of(int B, int starts, int& pool, int& share) {
 int lowered(int b0, int share) {
   return b0 > share ? share : b0;
 }
+#endif
 
 }  // namespace
 
