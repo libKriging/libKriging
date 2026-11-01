@@ -37,6 +37,14 @@ int openblas_get_num_threads() __attribute__((weak));
 #define LK_TEST_OPENBLAS 1
 #endif
 
+#if defined(__ELF__)
+// Intel MKL / oneMKL, C entry points (absent without MKL)
+extern "C" {
+int MKL_Get_Max_Threads() __attribute__((weak));
+}
+#define LK_TEST_MKL 1
+#endif
+
 namespace {
 
 struct Threads {
@@ -323,6 +331,28 @@ TEST_CASE("Objective, gradient and update do not depend on the thread budget", "
     CHECK(arma::norm(grad - grad0) <= 1e-12 * arma::norm(grad0));
     CHECK(std::abs(llu - llu0) <= 1e-12 * std::abs(llu0));
   }
+}
+
+// With MKL, the library lowers the MKL count of the calling thread to the
+// budget for a call and of each pool worker to its share (thread-local,
+// MKL_Set_Num_Threads_Local); the caller's count is restored after.
+TEST_CASE("A fit leaves the caller's MKL thread count unchanged", "[threads]") {
+#ifdef LK_TEST_MKL
+  if (!MKL_Get_Max_Threads) {
+    WARN("no MKL in this process");
+    return;
+  }
+  BudgetGuard guard;
+  Optim::set_num_threads_percent(1e-6);  // budget 1: below MKL's count when it has more than 1
+  const int before = MKL_Get_Max_Threads();
+  arma::vec y;
+  arma::mat X;
+  data(y, X, 60);
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS4");
+  CHECK(MKL_Get_Max_Threads() == before);
+#else
+  WARN("no MKL weak symbols on this platform");
+#endif
 }
 
 // Hidden: run by the BlasThreadsTest/OPENBLAS_NUM_THREADS test with

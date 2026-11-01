@@ -1,8 +1,8 @@
 #ifndef LIBKRIGING_SRC_LIB_BLASTHREADS_HPP
 #define LIBKRIGING_SRC_LIB_BLASTHREADS_HPP
 
-// Private (not installed): OpenBLAS / OpenMP thread-count access, defined in
-// Kriging.cpp (fork handlers, ThreadBudget.cpp).
+// Private (not installed): OpenBLAS / MKL / OpenMP thread-count access, defined
+// in Kriging.cpp (fork handlers, ThreadBudget.cpp).
 
 namespace libKriging {
 namespace detail {
@@ -29,6 +29,18 @@ void restore_blas_threads(const BlasThreadState& s);
 /// OpenMP ICV is left untouched. Defined in Kriging.cpp.
 int get_openblas_threads();
 void set_openblas_threads(int n);
+
+/// Intel MKL / oneMKL thread count of the calling thread (MKL_Get_Max_Threads:
+/// its thread-local count if set, else the global one, MKL_NUM_THREADS or the
+/// physical cores), 0 without MKL. Defined in Kriging.cpp.
+int get_mkl_threads();
+
+/// Set the MKL thread count of the calling thread only
+/// (MKL_Set_Num_Threads_Local; 0 = back to the global count) and return the
+/// previous thread-local count (0: none was set); -1 without MKL. Thread-local:
+/// each pool worker sets its own, without touching the other threads.
+/// Defined in Kriging.cpp.
+int set_mkl_threads_local(int n);
 
 }  // namespace detail
 }  // namespace libKriging

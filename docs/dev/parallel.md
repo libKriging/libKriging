@@ -29,7 +29,9 @@ share  = Optim::set_num_threads_percent(x) / LK_NUM_THREADS_PERCENT=x
 
 - **Physical cores**, not logical CPUs: on a hyperthreaded machine, BLAS / OpenMP
   teams on the logical CPUs are 1.3–2× slower (section 6). Counted from the cores
-  of the CPUs in the affinity mask, capped by the cgroup CPU quota (Linux sysfs);
+  of the CPUs in the affinity mask, capped by the cgroup CPU quota (Linux sysfs;
+  cgroup v2 `cpu.max` or v1 `cpu.cfs_quota_us` / `cpu.cfs_period_us`, the smallest
+  quota of the process's cgroup and of its visible ancestors);
   `hw.physicalcpu` (macOS); `GetLogicalProcessorInformationEx` (Windows);
   `std::thread::hardware_concurrency()` if unreadable.
 - Never more than the calling thread's OpenMP limit (`OMP_NUM_THREADS`,
@@ -72,13 +74,17 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
 - BLAS: the OpenBLAS count is process-global. Each public fit / predict /
   simulate / update sets it to the budget for the call, the pool to the share
   for its lifetime, and both restore it; an OpenBLAS loaded with fewer threads
-  (`OPENBLAS_NUM_THREADS`) is left as it is.
+  (`OPENBLAS_NUM_THREADS`) is left as it is. The MKL count is set per thread
+  (`MKL_Set_Num_Threads_Local`): in the calling thread for the call, in each
+  pool worker to its share, restored after; an MKL loaded with fewer threads
+  (`MKL_NUM_THREADS`; its default is the physical cores) is left as it is.
 - No nested pools: a pool started from a worker runs its tasks inline.
 - No start stagger for the Kriging multistart (it cost 2× at n = 100 with 20
   workers); kept for WarpKriging (`Optim::thread_start_delay_ms`).
 
 Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
-= 200 on Linux, 800 elsewhere until measured (`src/lib/OmpLoops.hpp`); `n >= 200`
+= 200 on Linux, 800 elsewhere until measured (`src/lib/OmpLoops.hpp`), a
+performance setting only (section 4); `n >= 200`
 (`compute_dX`, `covMat_sym_*`); `n_o × n_n >= 40000` (predict / simulate `R_on`,
 `covMat_rect`, Vecchia, NestedKriging).
 
@@ -86,6 +92,11 @@ Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
 
 - Results do not depend on the OpenMP thread count: each loop writes disjoint
   entries or sums per-row partial results in a fixed order (`BlasThreadsTest`).
+  The sequential path (below `kOmpMinRows`, without OpenMP, under TSan) sums in
+  the same order, so results do not depend on the threshold either, hence not
+  on the OS (bit-identical gradients and fitted theta for thresholds 200, 800,
+  never and a build without OpenMP:
+  [T5 log](rationalization/T5-omp-threshold-blas.md)).
 - They may depend on the BLAS thread count and build (FAQ), by rounding, and on
   the CPU: on an Intel Xeon Platinum 8573C CI runner, Ubuntu 22.04's OpenBLAS
   0.3.20 `DYNAMIC_ARCH` falls back to its `Prescott` (SSE3) kernels (reproduce
@@ -108,16 +119,24 @@ Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
 
 ## 5. BLAS backends
 
-The library drives **OpenBLAS only** (`openblas_set_num_threads` /
-`openblas_get_num_threads`, weak symbols; `GetProcAddress` on Windows). With any
-other BLAS only the OpenMP and pool parts of the budget apply.
+The library drives **OpenBLAS** (`openblas_set_num_threads` /
+`openblas_get_num_threads`, process-global) and **Intel MKL / oneMKL**
+(`MKL_Get_Max_Threads` / `MKL_Set_Num_Threads_Local`, per thread: the C entry
+points, the lower-case `mkl_set_num_threads_local` exported by `libmkl_rt` is the
+Fortran one, by reference), weak symbols on ELF, `dlsym` on macOS,
+`GetProcAddress` on Windows (`mkl_rt*.dll`). With any other BLAS only the OpenMP
+and pool parts of the budget apply: each worker of a multistart keeps the BLAS's
+own thread count (oversubscription when the BLAS is multithreaded; set its
+environment variable, e.g. `VECLIB_MAXIMUM_THREADS=1`, for multistart fits).
+The MKL path was not run in CI nor on the T5 machine (no MKL available to
+execute there): verify it with `LD_PRELOAD=libmkl_rt.so.2` (see the T5 log).
 
 | BLAS | Where | Threads | Run-time control | Driven by libKriging |
 |---|---|---|---|---|
 | OpenBLAS pthreads | Linux distributions, R Linux binary (bundled), Windows (conda / bundled `openblas.dll`), macOS Intel (brew) | own pool, spins after each call and for ~100 ms after loading (6.2) | `openblas_set_num_threads` (global) | yes |
 | OpenBLAS OpenMP | Linux (`libopenblas0-openmp`) | libgomp team of the caller | follows `OMP_NUM_THREADS` | yes |
-| Intel MKL / oneMKL | Linux / Windows x86, MATLAB | Intel OpenMP / GNU OpenMP / TBB / sequential | `mkl_set_num_threads`, **`mkl_set_num_threads_local` (per thread)** | no (candidate) |
-| Apple Accelerate | macOS arm64 | GCD | `VECLIB_MAXIMUM_THREADS` at load; `BLASSetThreading` (macOS 15+, single / multi only) | no (#416) |
+| Intel MKL / oneMKL | Linux / Windows x86, MATLAB | Intel OpenMP / GNU OpenMP / TBB / sequential | `mkl_set_num_threads`, **`mkl_set_num_threads_local` (per thread)** | yes, per thread (#445; MATLAB's own MKL only if it exports the C entry points) |
+| Apple Accelerate | macOS arm64 | GCD | `VECLIB_MAXIMUM_THREADS` at load; `BLASSetThreading` (macOS 15+, single / multi only, process-wide) | no: no per-thread count, `VECLIB_MAXIMUM_THREADS=1` for multistart fits (#416) |
 | FlexiBLAS | Fedora / RHEL / openSUSE; found first by Armadillo on Linux | the selected backend's | `flexiblas_set_num_threads` | no (`openblas_*` probably not visible through it) |
 | BLIS / AMD AOCL | Linux, Windows | pthreads / OpenMP | `bli_thread_set_num_threads` | no |
 | Reference (Netlib, R's Rblas) | fallback | sequential | — | nothing to drive |
@@ -310,8 +329,10 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
    only remove the start-up transient of 6.2; documented instead
    (`OPENBLAS_NUM_THREADS` = physical cores or `OPENBLAS_THREAD_TIMEOUT=4` for short
    programs).
-5. **Other BLAS**: MKL (`mkl_set_num_threads_local` gives a real per-worker
-   share), FlexiBLAS, BLIS — not driven yet.
+5. **Other BLAS**: MKL driven per thread since #445 (`mkl_set_num_threads_local`
+   gives a real per-worker share); Accelerate (no per-thread count, only
+   single / multi process-wide from macOS 15), FlexiBLAS, BLIS — not driven,
+   documented (FAQ).
 
 ## 9. Environment variables
 
@@ -325,7 +346,8 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 | `OMP_NUM_THREADS` | OpenMP runtime | caps the budget |
 | `OPENBLAS_NUM_THREADS` | OpenBLAS at load | size of its thread pool; below the budget, kept by libKriging |
 | `OPENBLAS_THREAD_TIMEOUT` | OpenBLAS at load | spin time of its idle threads |
-| `MKL_NUM_THREADS`, `VECLIB_MAXIMUM_THREADS`, `BLIS_NUM_THREADS` | other BLAS | their own thread counts |
+| `MKL_NUM_THREADS` | MKL at load | its global count; below the budget, kept by libKriging |
+| `VECLIB_MAXIMUM_THREADS`, `BLIS_NUM_THREADS`, `FLEXIBLAS_NUM_THREADS` | other BLAS | their own thread counts (not driven by libKriging) |
 | `GOMP_SPINCOUNT`, `KMP_BLOCKTIME` | libgomp / libomp | spin of idle OpenMP threads |
 
 ## 10. Open items
@@ -334,9 +356,10 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
   fork-safety test does not check the children's budget (#420).
 - Optional CI job running `bench-threads.sh` on a small grid, no threshold
   (runners are too noisy for pass / fail on timings) (#421).
-- Other BLAS (MKL `mkl_set_num_threads_local`, FlexiBLAS, BLIS): sections 5 and 8
-  (#422).
-- macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then).
+- Other BLAS (FlexiBLAS, BLIS; Accelerate): sections 5 and 8 (#422). MKL driven
+  since #445, not yet run against a real MKL.
+- macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then;
+  performance only since #445).
 - Linux CI on Xeon 6973P (OpenBLAS 0.3.20 `Cooperlake`, section 4): the Octave,
   R (`main.yml`) and coverage (`analysis.yml`) jobs failed the same way; every
   Linux job of these workflows now sets `OPENBLAS_CORETYPE=Haswell`; drop it with

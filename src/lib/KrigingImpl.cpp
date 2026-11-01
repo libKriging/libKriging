@@ -997,31 +997,28 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
       }
     }
   };
+  // Per-row partial sums, then summed over rows in a fixed order, on every
+  // path (parallel from n = kOmpMinRows on, sequential below, without OpenMP or
+  // under TSan): the result depends neither on the number of threads nor on
+  // the threshold, hence not on the OS (OmpLoops.hpp). On an ill-conditioned R
+  // the trace term cancels heavily, so a different order may change the
+  // optimum reached noticeably.
+  arma::mat term1_rows(d, n, arma::fill::zeros);
+  arma::mat term2_rows(d, n, arma::fill::zeros);
 #ifdef LK_OMP_LOOPS
-  if (n >= libKriging::detail::kOmpMinRows) {
-    // Per-row partial sums, then summed over rows in a fixed order: the result
-    // does not depend on the number of threads. It differs from the sequential
-    // order kept below kOmpMinRows (and without OpenMP or under TSan): on an
-    // ill-conditioned R the trace term cancels heavily, so the gradient, hence
-    // the optimum reached, may change noticeably between the two orders.
-    arma::mat term1_rows(d, n, arma::fill::zeros);
-    arma::mat term2_rows(d, n, arma::fill::zeros);
-#pragma omp parallel for schedule(dynamic, 8) num_threads(libKriging::detail::omp_threads())
-    for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
-      const arma::uword i = static_cast<arma::uword>(si);
-      add_row(i, term1_rows.colptr(i), term2_rows.colptr(i));
-    }
-    for (arma::uword i = 0; i < n; i++) {
-      for (arma::uword k = 0; k < d; k++) {
-        term1_vec.at(k) += term1_rows.at(k, i);
-        term2_vec.at(k) += term2_rows.at(k, i);
-      }
-    }
-    return;
-  }
+#pragma omp parallel for schedule(dynamic, 8) \
+    num_threads(libKriging::detail::omp_threads()) if (n >= libKriging::detail::kOmpMinRows)
 #endif
-  for (arma::uword i = 0; i < n; i++)
-    add_row(i, term1_vec.memptr(), term2_vec.memptr());
+  for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
+    const arma::uword i = static_cast<arma::uword>(si);
+    add_row(i, term1_rows.colptr(i), term2_rows.colptr(i));
+  }
+  for (arma::uword i = 0; i < n; i++) {
+    for (arma::uword k = 0; k < d; k++) {
+      term1_vec.at(k) += term1_rows.at(k, i);
+      term2_vec.at(k) += term2_rows.at(k, i);
+    }
+  }
 }
 
 arma::vec KrigingImpl::compute_lmp_theta_ans(const KModel& m,
