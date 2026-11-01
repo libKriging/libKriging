@@ -1,0 +1,53 @@
+name: self-hosted runner test
+
+# Pas de déclenchement sur pull_request : un runner auto-hébergé ne doit pas
+# exécuter du code venant de forks.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/self-hosted.yml'
+
+concurrency:
+  group: self-hosted-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runner-info:
+    runs-on: [self-hosted, linux, libkriging]
+    steps:
+      - name: Runner environment
+        run: |
+          echo "runner: $RUNNER_NAME ($RUNNER_OS/$RUNNER_ARCH)"
+          echo "user:   $(id -un)  host: $(hostname)"
+          uname -a
+          nproc
+          free -h
+          df -h "$GITHUB_WORKSPACE"
+          for t in git cmake gcc g++ gfortran python3 R julia octave docker; do
+            printf '%-8s ' "$t"; command -v "$t" >/dev/null && "$t" --version 2>&1 | head -1 || echo "absent"
+          done
+
+  build-cpp:
+    needs: runner-info
+    runs-on: [self-hosted, linux, libkriging]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_PYTHON_BINDING=OFF \
+            -DENABLE_OCTAVE_BINDING=OFF \
+            -DENABLE_MATLAB_BINDING=OFF \
+            -DENABLE_JULIA_BINDING=OFF
+
+      - name: Build
+        run: cmake --build build --parallel "$(nproc)"
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --parallel "$(nproc)"
