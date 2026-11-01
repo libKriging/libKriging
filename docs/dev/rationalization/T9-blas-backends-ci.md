@@ -191,7 +191,19 @@ Release, C++ only, `OPENBLAS_CORETYPE=Haswell` as the other Linux jobs (#429).
   `BLASSetThreading(single)` (macOS 15+) and `VECLIB_MAXIMUM_THREADS=1`.
 
 `LK_EXPECT_BLAS` makes a backend that silently failed to load an error instead of a skip of
-every backend case. The fork case runs with `MKL_DISABLE_FAST_MM=1` under MKL (2.1).
+every backend case.
+
+**Runners.** The repository's self-hosted runners (dedicated to long runs and to parallelism /
+heavy BLAS backends; ephemeral, `sudo` available, any Linux distribution) run the workflow for
+branches of this repository and manual runs; pull requests from forks run on GitHub-hosted
+runners (`ubuntu-24.04`, `macos-15`), so that no outside code runs on the self-hosted machines.
+Labels: GitHub's automatic `[self-hosted, Linux]` / `[self-hosted, macOS]`, overridable with
+the repository variables `LK_SELF_HOSTED_LINUX` / `LK_SELF_HOSTED_MACOS` (JSON arrays). As the
+runners start empty, the first step looks for cmake, ninja, g++, pip, OpenBLAS and LAPACK and
+installs only what is missing (apt, dnf or zypper); oneMKL: an installed oneAPI MKL first
+(`$MKLROOT`, `/opt/intel/oneapi`), else the pinned wheels; no MKL steps on non-x86_64 runners.
+`-DALLOW_FLEXIBLAS_LINUX=OFF`: on Fedora / RHEL, FlexiBLAS would be found before OpenBLAS / MKL.
+The runner's OS, CPU and name are printed: results of section 4 are attributed per machine. The fork case runs with `MKL_DISABLE_FAST_MM=1` under MKL (2.1).
 
 ### 3.1 CI results (run 41300138594, commit e1fbae9)
 
