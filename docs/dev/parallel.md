@@ -162,8 +162,13 @@ Fortran one, by reference), weak symbols on ELF, `dlsym` on macOS,
 and pool parts of the budget apply: each worker of a multistart keeps the BLAS's
 own thread count (oversubscription when the BLAS is multithreaded; set its
 environment variable, e.g. `VECLIB_MAXIMUM_THREADS=1`, for multistart fits).
-The MKL path was not run in CI nor on the T5 machine (no MKL available to
-execute there): verify it with `LD_PRELOAD=libmkl_rt.so.2` (see the T5 log).
+The MKL path is checked in CI (`.github/workflows/blas-backends.yml`: oneMKL
+preloaded on an OpenBLAS build and linked, GNU and INTEL threading layers):
+each multistart worker's LAPACK calls run at its share (`NThr:1` for BFGS4 on 4
+cores), the caller's count is restored after every public method
+([T9](rationalization/T9-blas-backends-ci.md)). MKL's results depend on its
+thread count (rounding, ~1e-11–1e-9 relative on n = 900); OpenBLAS's did not on
+the same test. Accelerate is run by the macOS arm64 job of the same workflow.
 
 | BLAS | Where | Threads | Run-time control | Driven by libKriging |
 |---|---|---|---|---|
@@ -243,7 +248,16 @@ as fast as setting `OPENBLAS_NUM_THREADS` before loading (RESULTS.md, section 9)
 state of 3.1 and the `rcond` mutex of `LinearAlgebra::rcond_chol`): a `fork()`
 made while another thread fits no longer leaves one of them locked in the
 child, which deadlocked at its first fit; the child also drops the count
-requests of the parent's other threads. The R Linux binary bundles OpenBLAS pthreads for that reason (the OpenMP
+requests of the parent's other threads. The prepare handler first initializes
+the function-local statics every public call reads (cores, initial OpenBLAS /
+MKL counts): a `fork()` during another thread's first call (MKL's first
+`MKL_Get_Max_Threads` initializes MKL for milliseconds) left their guard taken
+in the child, which blocked at its first call (T9). The child also sets MKL's
+global count to 1. **MKL limitation**: a `fork()` while other threads run MKL
+calls can leave MKL's fast memory manager locked in the child (deadlock in
+`mkl_serv_allocate` / at thread exit); set `MKL_DISABLE_FAST_MM=1` in that case
+(not needed when forking from a thread with no concurrent MKL work, e.g. R's
+`mclapply`). The R Linux binary bundles OpenBLAS pthreads for that reason (the OpenMP
 build deadlocks in forked workers). With `mclapply`, give each worker one thread
 (`Optim::set_num_threads_percent` small, or `OPENBLAS_NUM_THREADS=1`).
 
@@ -395,16 +409,14 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 - Optional CI job running `bench-threads.sh` on a small grid, no threshold
   (runners are too noisy for pass / fail on timings) (#421).
 - Other BLAS (FlexiBLAS, BLIS; Accelerate): sections 5 and 8 (#422). MKL driven
-  since #445, not yet run against a real MKL.
+  since #445, checked in CI since T9.
 - macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then;
   performance only since #445).
-- Other BLAS (MKL `mkl_set_num_threads_local`, FlexiBLAS, BLIS): sections 5 and 8
-  (#422).
 - Concurrent calls (3.1): Armadillo's RNG (WarpKriging warp initialization,
   subset-of-data selection) is global where Armadillo disables `thread_local`
-  (MinGW, GCC on macOS); MKL / Accelerate counts not driven
+  (MinGW, GCC on macOS); Accelerate's count not driven
   ([T6](rationalization/T6-thread-safety.md)).
-- macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then).
+- MKL after `fork()` with concurrent MKL work: `MKL_DISABLE_FAST_MM=1` (section 7, T9).
 - Linux CI on Xeon 6973P (OpenBLAS 0.3.20 `Cooperlake`, section 4): the Octave,
   R (`main.yml`) and coverage (`analysis.yml`) jobs failed the same way; every
   Linux job of these workflows now sets `OPENBLAS_CORETYPE=Haswell`; drop it with

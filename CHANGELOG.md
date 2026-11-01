@@ -32,6 +32,16 @@ past release, see the corresponding entry on the
   the fork handlers hold the library's mutexes, so a `fork()` made while another thread fits no
   longer deadlocks the child. `Optim` / `LinearAlgebra` settings are documented as
   configuration-before-use. See [docs/dev/parallel.md](docs/dev/parallel.md), section 3.1.
+- **BLAS backends in CI, fork fixes** (T9, #449): new workflow `blas-backends.yml` (Linux with
+  oneMKL preloaded on OpenBLAS and linked, GNU and INTEL threading layers; macOS arm64
+  Accelerate) and `[backend]` tests (`BlasBackendTest`: per-worker MKL / OpenBLAS counts read in
+  the thread of each LAPACK call, caller's MKL count restored, BFGS4 with 1 or 4 workers, shared
+  reference values for 200 <= n < 800). Fixes found by running MKL: the fork prepare handler
+  initializes the lazy statics of the call path (a `fork()` during another thread's first call
+  deadlocked the child with MKL), the fork child sets MKL to 1 thread, and a fit on data in the
+  span of the trend now gives sigma2 = nugget = 0 exactly (MKL left ~1e-32). Known limitation:
+  with MKL, `fork()` while other threads run MKL needs `MKL_DISABLE_FAST_MM=1`
+  ([docs/dev/parallel.md](docs/dev/parallel.md), section 7).
 - **Predicted variance floor** (#428): `predict` floors the variance at 4 eps x sigma2 instead of
   clamping it to 0; the stdev is never 0 (no NaN NLPD) and its derivative is 0 (was NaN) where the
   variance is at the floor. The **WarpKriging / MLPKriging committed model is now exact**, as
