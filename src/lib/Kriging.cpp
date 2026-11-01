@@ -98,15 +98,20 @@ openblas_get_num_threads_t get_openblas_get_num_threads() {
 extern "C" {
 int MKL_Get_Max_Threads() __attribute__((weak));
 int MKL_Set_Num_Threads_Local(int nth) __attribute__((weak));
+void MKL_Set_Num_Threads(int nth) __attribute__((weak));
 }
 namespace {
 typedef int (*mkl_get_max_threads_t)();
 typedef int (*mkl_set_num_threads_local_t)(int);
+typedef void (*mkl_set_num_threads_t)(int);
 mkl_get_max_threads_t get_mkl_get_max_threads() {
   return MKL_Get_Max_Threads;
 }
 mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
   return MKL_Set_Num_Threads_Local;
+}
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  return MKL_Set_Num_Threads;
 }
 }  // namespace
 #elif defined(_WIN32)
@@ -134,6 +139,11 @@ mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
       = reinterpret_cast<mkl_set_num_threads_local_t>(get_mkl_proc("MKL_Set_Num_Threads_Local"));
   return func;
 }
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  static mkl_set_num_threads_t func = reinterpret_cast<mkl_set_num_threads_t>(get_mkl_proc("MKL_Set_Num_Threads"));
+  return func;
+}
 }  // namespace
 #elif defined(__APPLE__) || defined(__unix__)
 #include <dlfcn.h>
@@ -150,6 +160,12 @@ mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
       = reinterpret_cast<mkl_set_num_threads_local_t>(dlsym(RTLD_DEFAULT, "MKL_Set_Num_Threads_Local"));
   return func;
 }
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  static mkl_set_num_threads_t func
+      = reinterpret_cast<mkl_set_num_threads_t>(dlsym(RTLD_DEFAULT, "MKL_Set_Num_Threads"));
+  return func;
+}
 }  // namespace
 #else
 namespace {
@@ -159,6 +175,10 @@ mkl_get_max_threads_t get_mkl_get_max_threads() {
   return nullptr;
 }
 mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
+  return nullptr;
+}
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
   return nullptr;
 }
 }  // namespace
@@ -217,6 +237,18 @@ int set_mkl_threads_local(int n) {
   return fn ? fn(n) : -1;
 }
 
+void set_mkl_threads_global(int n) {
+  auto fn = get_mkl_set_num_threads();
+  if (fn && n > 0)
+    fn(n);
+}
+
+void touch_mkl_entry_points() {
+  get_mkl_get_max_threads();
+  get_mkl_set_num_threads_local();
+  get_mkl_set_num_threads();
+}
+
 void restore_blas_threads(const BlasThreadState& s) {
 #if !defined(__APPLE__) || !defined(__arm64__)
   auto fn = get_openblas_set_num_threads();
@@ -268,6 +300,11 @@ void libkriging_atfork_child() {
   libKriging::detail::rcond_mutex().unlock();
   libKriging::detail::blas_count_fork_child();
   libKriging::detail::set_blas_threads(1);
+  // MKL's global count too (threads without a thread-local count, i.e. the
+  // child's later threads and the forking thread unless it set its own): with
+  // the GNU threading layer an MKL call at more than 1 thread starts an OpenMP
+  // team in the child. The parent's MKL count is not changed.
+  libKriging::detail::set_mkl_threads_global(1);
 }
 
 struct ForkSafeRegistrar {
@@ -3836,6 +3873,16 @@ void Kriging::fit_impl(const arma::vec& y,
       m_sigma2 = m.SSEstar / n;
     } else {
       m_sigma2 = sigma2;
+    }
+    if (degenerate) {
+      // y in the span of the trend: SSE is 0 up to the rounding of the BLAS
+      // (constant y, gauss, nugget: 0 with OpenBLAS, 2.4e-32 with MKL; no
+      // noise: 2.4e-32 with both: T9 log); the estimated variances are 0, as
+      // documented above
+      if (m_est_sigma2)
+        m_sigma2 = 0.0;
+      if (m_noise_model == NoiseModel::Nugget && m_est_nugget)
+        m_nugget = 0.0;
     }
 
   } else {

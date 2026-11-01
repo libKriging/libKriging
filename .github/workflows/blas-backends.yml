@@ -1,0 +1,198 @@
+name: BLAS backends
+
+# The thread-count control of the library per BLAS backend
+# (docs/dev/parallel.md 5, docs/dev/rationalization/T9-blas-backends-ci.md):
+# - Linux, oneMKL: an OpenBLAS build with the oneMKL wheel preloaded
+#   (LD_PRELOAD), and a build linked to oneMKL (Armadillo's ARMA_FindMKL finds
+#   mkl_rt), each run with the GNU (libgomp) and INTEL (libiomp5) threading
+#   layers, and the OpenBLAS build alone;
+# - macOS arm64: Apple Accelerate (Armadillo's default there).
+# The [backend] cases of BlasBackendTest check the backend that is loaded
+# (LK_EXPECT_BLAS makes a backend that failed to load an error, not a skip).
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/blas-backends.yml'
+  workflow_dispatch:
+
+env:
+  # cmake >= 4 rejects dependencies declaring cmake_minimum_required < 3.5
+  # (pinned pybind11 submodule), as in main.yml
+  CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+  MKL_VERSION: "2024.2.2"
+  INTEL_OPENMP_VERSION: "2024.2.1"
+  TBB_VERSION: "2021.13.1"
+
+jobs:
+  linux-mkl:
+    name: "Linux ${{ matrix.name }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "OpenBLAS build, oneMKL preloaded"
+            link: openblas
+          - name: "oneMKL linked"
+            link: mkl
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install OpenBLAS and the oneMKL wheels
+        shell: bash
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -qy libopenblas-pthread-dev liblapack-dev ninja-build
+          # Ubuntu's OpenBLAS Cooperlake kernels gave wrong results on Xeon
+          # 6973P-C runners (main.yml, #429): its AVX2 kernels, as the other
+          # Linux jobs. No effect on MKL.
+          echo "OPENBLAS_CORETYPE=Haswell" >> $GITHUB_ENV
+          mkdir -p "$RUNNER_TEMP/mkl" && cd "$RUNNER_TEMP/mkl"
+          python3 -m pip download --no-deps --only-binary=:all: \
+            mkl==${MKL_VERSION} intel-openmp==${INTEL_OPENMP_VERSION} tbb==${TBB_VERSION}
+          for w in *.whl; do python3 -m zipfile -e "$w" x/; done
+          MKL_LIB="$RUNNER_TEMP/mkl/x/mkl-${MKL_VERSION}.data/data/lib"
+          IOMP_LIB="$RUNNER_TEMP/mkl/x/intel_openmp-${INTEL_OPENMP_VERSION}.data/data/lib"
+          TBB_LIB="$RUNNER_TEMP/mkl/x/tbb-${TBB_VERSION}.data/data/lib"
+          ls "$MKL_LIB"/libmkl_rt.so.2 "$IOMP_LIB"/libiomp5.so
+          echo "MKL_LIB=$MKL_LIB" >> $GITHUB_ENV
+          echo "MKL_LD_LIBRARY_PATH=$MKL_LIB:$IOMP_LIB:$TBB_LIB" >> $GITHUB_ENV
+          rm -f *.whl
+
+      - name: Runner
+        shell: bash
+        run: |
+          LC_ALL=C lscpu | grep -E "^(Model name|Vendor ID|CPU\(s\)|Thread|Core|Socket)" || true
+          nproc
+
+      - name: Configure and build (Release, C++ only)
+        shell: bash
+        run: |
+          EXTRA=()
+          if [ "${{ matrix.link }}" == "mkl" ]; then
+            # ARMA_FindMKL looks for mkl_rt (find_library): give it the wheel's
+            EXTRA+=(-Dmkl_rt_LIBRARY="$MKL_LIB/libmkl_rt.so.2")
+          fi
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_PYTHON_BINDING=off -DENABLE_OCTAVE_BINDING=off -DENABLE_MATLAB_BINDING=off \
+            -DCMAKE_INSTALL_LIBDIR=lib "${EXTRA[@]}" | tee cmake.log
+          grep -E "MKL_FOUND|OpenBLAS_FOUND|Found MKL" cmake.log || true
+          if [ "${{ matrix.link }}" == "mkl" ]; then grep -q "MKL_FOUND = YES" cmake.log; fi
+          cmake --build build -j "$(nproc)"
+          ldd build/src/lib/libKriging.so | grep -E "mkl|openblas|lapack|blas|gomp|iomp" || true
+
+      - name: Tests, OpenBLAS alone
+        if: matrix.link == 'openblas'
+        shell: bash
+        run: |
+          cd build
+          export LK_EXPECT_BLAS=openblas
+          ./tests/BlasBackendTest
+          # serial, as tools/linux-macos/test.sh: timing assertions
+          # (KrigingWarmRestartTest) and BLAS thread teams of two tests would
+          # compete for the cores
+          ctest --output-on-failure
+
+      - name: Tests, oneMKL GNU threading layer
+        if: always()
+        shell: bash
+        run: |
+          cd build
+          export LK_EXPECT_BLAS=mkl MKL_THREADING_LAYER=GNU LD_LIBRARY_PATH="$MKL_LD_LIBRARY_PATH"
+          if [ "${{ matrix.link }}" == "openblas" ]; then export LD_PRELOAD="$MKL_LIB/libmkl_rt.so.2"; fi
+          ./tests/BlasBackendTest
+          # Known limitation (T9 log, parallel.md 5): a fork() while other
+          # threads run MKL can leave MKL's fast memory manager locked in the
+          # child; that case runs below with MKL's documented workaround.
+          rc=0
+          ctest --output-on-failure -E "fork\(\) during concurrent fits" || rc=1
+          MKL_DISABLE_FAST_MM=1 ctest --output-on-failure -R "fork\(\) during concurrent fits" || rc=1
+          exit $rc
+
+      - name: Tests, oneMKL INTEL threading layer
+        if: always()
+        shell: bash
+        run: |
+          cd build
+          export LK_EXPECT_BLAS=mkl MKL_THREADING_LAYER=INTEL LD_LIBRARY_PATH="$MKL_LD_LIBRARY_PATH"
+          if [ "${{ matrix.link }}" == "openblas" ]; then export LD_PRELOAD="$MKL_LIB/libmkl_rt.so.2"; fi
+          ./tests/BlasBackendTest
+          # Known limitation (T9 log, parallel.md 5): a fork() while other
+          # threads run MKL can leave MKL's fast memory manager locked in the
+          # child; that case runs below with MKL's documented workaround.
+          rc=0
+          ctest --output-on-failure -E "fork\(\) during concurrent fits" || rc=1
+          MKL_DISABLE_FAST_MM=1 ctest --output-on-failure -R "fork\(\) during concurrent fits" || rc=1
+          exit $rc
+
+      - name: MKL_VERBOSE thread counts of a BFGS4 fit
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          cd build
+          export MKL_THREADING_LAYER=GNU LD_LIBRARY_PATH="$MKL_LD_LIBRARY_PATH" MKL_VERBOSE=1
+          if [ "${{ matrix.link }}" == "openblas" ]; then export LD_PRELOAD="$MKL_LIB/libmkl_rt.so.2"; fi
+          ./tests/BlasBackendTest "MKL: each multistart worker runs its BLAS at its share" > verbose.log 2>&1 || true
+          grep "^\[backend\]" verbose.log || true
+          echo "MKL_VERBOSE calls per NThr (callers: workers and calling thread):"
+          grep -o "NThr:[0-9]*" verbose.log | sort | uniq -c || true
+
+      - name: Multistart timing
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          cd build
+          echo "== OpenBLAS / linked BLAS"; ./tests/BlasBackendTest "[.timing]"
+          export LD_LIBRARY_PATH="$MKL_LD_LIBRARY_PATH"
+          if [ "${{ matrix.link }}" == "openblas" ]; then export LD_PRELOAD="$MKL_LIB/libmkl_rt.so.2"; fi
+          echo "== oneMKL GNU"; MKL_THREADING_LAYER=GNU ./tests/BlasBackendTest "[.timing]"
+
+  macos-accelerate:
+    name: "macOS arm64 Accelerate"
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Runner
+        shell: bash
+        run: |
+          sw_vers
+          sysctl -n machdep.cpu.brand_string hw.physicalcpu hw.logicalcpu hw.perflevel0.physicalcpu 2>/dev/null || true
+
+      - name: Configure and build (Release, C++ only)
+        shell: bash
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_PYTHON_BINDING=off -DENABLE_OCTAVE_BINDING=off -DENABLE_MATLAB_BINDING=off \
+            -DCMAKE_INSTALL_LIBDIR=lib | tee cmake.log
+          grep -i "accelerate" cmake.log || true
+          cmake --build build -j "$(sysctl -n hw.logicalcpu)"
+          otool -L build/src/lib/libKriging.dylib
+
+      - name: Tests
+        shell: bash
+        run: |
+          cd build
+          export LK_EXPECT_BLAS=accelerate
+          ./tests/BlasBackendTest
+          ctest --output-on-failure
+
+      - name: Multistart timing (Accelerate, BLASSetThreading, VECLIB_MAXIMUM_THREADS)
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          cd build
+          echo "== default"; ./tests/BlasBackendTest "[.timing]"
+          echo "== VECLIB_MAXIMUM_THREADS=1"; VECLIB_MAXIMUM_THREADS=1 ./tests/BlasBackendTest "[.timing]"

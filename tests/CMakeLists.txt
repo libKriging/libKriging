@@ -378,6 +378,10 @@ catch_discover_tests(BlasThreadsTest)
 # the hidden [.openblas_env] case needs OPENBLAS_NUM_THREADS at load time
 add_test(NAME BlasThreadsTest/OPENBLAS_NUM_THREADS COMMAND BlasThreadsTest "[.openblas_env]")
 set_tests_properties(BlasThreadsTest/OPENBLAS_NUM_THREADS PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
+# bit-identical objective / gradient / update whatever the OpenMP count when the
+# BLAS count cannot change (MKL's results depend on its count: T9)
+add_test(NAME BlasThreadsTest/BLAS_NUM_THREADS=1 COMMAND BlasThreadsTest "*do not depend on the OpenMP thread count")
+set_tests_properties(BlasThreadsTest/BLAS_NUM_THREADS=1 PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1;MKL_NUM_THREADS=1")
 
 add_executable(ConcurrentCallsTest ConcurrentCallsTest.cpp)
 target_link_libraries(ConcurrentCallsTest LINK_PUBLIC Kriging Catch2)
@@ -386,6 +390,20 @@ catch_discover_tests(ConcurrentCallsTest)
 # bit-identical to the sequential results when the OpenBLAS count cannot change
 add_test(NAME ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1 COMMAND ConcurrentCallsTest "[concurrent]")
 set_tests_properties(ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1 PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
+
+# BLAS backends (T9): [backend] cases check the backend actually loaded (OpenBLAS,
+# MKL linked or preloaded, Accelerate) and skip the others. On Linux the probe
+# (backend_probe.c, C: not compiled against Armadillo's prototypes) interposes
+# dpotrf_ to read the BLAS counts in the thread of each call.
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_executable(BlasBackendTest BlasBackendTest.cpp backend_probe.c)
+    target_compile_definitions(BlasBackendTest PRIVATE LK_BACKEND_PROBE)
+else ()
+    add_executable(BlasBackendTest BlasBackendTest.cpp)
+endif ()
+target_link_libraries(BlasBackendTest LINK_PUBLIC Kriging Catch2 ${CMAKE_DL_LIBS})
+add_dependencies(all_test_binaries BlasBackendTest)
+catch_discover_tests(BlasBackendTest)
 
 add_executable(SimulateStateResetTest SimulateStateResetTest.cpp)
 target_link_libraries(SimulateStateResetTest LINK_PUBLIC Kriging Catch2)

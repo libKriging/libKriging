@@ -43,6 +43,17 @@ int get_mkl_threads();
 /// each pool worker sets its own, without touching the other threads.
 /// Defined in Kriging.cpp.
 int set_mkl_threads_local(int n);
+
+/// Set the global MKL thread count (MKL_Set_Num_Threads; threads without a
+/// thread-local count), no-op without MKL or for n <= 0. Used by the fork child
+/// handler only. Defined in Kriging.cpp.
+void set_mkl_threads_global(int n);
+
+/// Resolve the MKL entry points once (function-local statics on macOS /
+/// Windows), so that the fork prepare handler never forks while another thread
+/// initializes them. Defined in Kriging.cpp.
+void touch_mkl_entry_points();
+
 /// Serializes arma::rcond (LinearAlgebra::rcond_chol). Also held by the fork
 /// handlers, so that the child of a fork() made while another thread is in
 /// rcond_chol does not inherit it locked. Defined in LinearAlgebra.cpp.
