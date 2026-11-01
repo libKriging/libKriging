@@ -259,15 +259,17 @@ TEST_CASE("Concurrent fit / predict / simulate from user threads", "[threads][co
   // Concurrent calls share the budget, so their BLAS count is lower than the
   // one of the sequential calls, which changes the rounding of the BLAS sums
   // (FAQ, reproducibility); a fit amplifies it through the optimizer's
-  // stopping point. Bit-identical results when no count can change (no
-  // OpenBLAS / MKL, or loaded with 1 thread: the ctest variant
-  // ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1), else to 1e-5: measured
-  // 4e-14 (Intel Xeon, 4 cores, OpenBLAS) and 6.6e-7 (AMD EPYC 9V74, 2 cores,
-  // OpenBLAS Haswell kernels 2 vs 1 thread: gauss single-start fit; T9 log).
-  // Races (RNG, shared state) would give differences of order 1 (other
-  // starts): those are checked bit for bit by the budget-1 case above.
+  // stopping point in the flat part of the likelihood. Bit-identical results
+  // when no count can change (no OpenBLAS / MKL, or loaded with 1 thread: the
+  // ctest variant ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1), else to 1e-3,
+  // the tolerance of the fitted theta between BLAS counts in BlasBackendTest:
+  // measured here 4e-14 (Intel Xeon 4 cores), 6.6e-7 (AMD EPYC 9V74 2 cores,
+  // gauss single start), 7.2e-5 (i9-10900K 10 cores, matern5_2 BFGS4); BFGS4
+  // with 1 or 4 workers differs by up to 8.8e-5 for the same reason (T9 log).
+  // Races (RNG, shared state) give differences of order 1 (other starts), and
+  // are checked bit for bit by the budget-1 case above.
   const bool count_can_change = blas_count() > 1 || mkl_count() > 1;
-  concurrent_vs_sequential(100, count_can_change ? 1e-5 : 0.0);
+  concurrent_vs_sequential(100, count_can_change ? 1e-3 : 0.0);
 }
 
 TEST_CASE("Optim::get_num_threads is not divided between concurrent calls", "[threads][concurrent]") {

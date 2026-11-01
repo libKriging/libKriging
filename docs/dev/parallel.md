@@ -175,7 +175,7 @@ the same test. Accelerate is run by the macOS arm64 job of the same workflow.
 | OpenBLAS pthreads | Linux distributions, R Linux binary (bundled), Windows (conda / bundled `openblas.dll`), macOS Intel (brew) | own pool, spins after each call and for ~100 ms after loading (6.2) | `openblas_set_num_threads` (global) | yes |
 | OpenBLAS OpenMP | Linux (`libopenblas0-openmp`) | libgomp team of the caller | follows `OMP_NUM_THREADS` | yes |
 | Intel MKL / oneMKL | Linux / Windows x86, MATLAB | Intel OpenMP / GNU OpenMP / TBB / sequential | `mkl_set_num_threads`, **`mkl_set_num_threads_local` (per thread)** | yes, per thread (#445; MATLAB's own MKL only if it exports the C entry points) |
-| Apple Accelerate | macOS arm64 | GCD | `VECLIB_MAXIMUM_THREADS` at load; `BLASSetThreading` (macOS 15+, single / multi only, process-wide) | no: no per-thread count; measured on 3 cores (T9): BFGS4 not faster with `BLASSetThreading(single)` (x0.99–1.04) nor `VECLIB_MAXIMUM_THREADS=1` (slower at n = 800), so not set by the library (#416) |
+| Apple Accelerate | macOS arm64 | GCD | `VECLIB_MAXIMUM_THREADS` at load; `BLASSetThreading` (macOS 15+, single / multi only, process-wide) | no: no per-thread count; measured on 3 and 10 cores (T9): BFGS4 not faster with `BLASSetThreading(single)` (x0.95–1.15) nor `VECLIB_MAXIMUM_THREADS=1`, so not set by the library (#416) |
 | FlexiBLAS | Fedora / RHEL / openSUSE; found first by Armadillo on Linux | the selected backend's | `flexiblas_set_num_threads` | no (`openblas_*` probably not visible through it) |
 | BLIS / AMD AOCL | Linux, Windows | pthreads / OpenMP | `bli_thread_set_num_threads` | no |
 | Reference (Netlib, R's Rblas) | fallback | sequential | — | nothing to drive |

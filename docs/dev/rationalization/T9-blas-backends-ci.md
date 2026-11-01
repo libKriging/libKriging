@@ -155,8 +155,14 @@ Change (`tests/ConcurrentCallsTest.cpp`):
   and 6 x 3 concurrent runs all at 1 BLAS / OpenMP thread, **bit-identical required on every
   backend** — what the concurrency itself can break (RNG, shared state, count save / restore)
   is checked at full strength, independently of the BLAS;
-- full-budget case: bit-identical when neither OpenBLAS nor MKL can change count, else 1e-5
-  (15 x the largest gap measured; a race or a shared RNG gives differences of order 1).
+- full-budget case: bit-identical when neither OpenBLAS nor MKL can change count, else 1e-3.
+  A first value, 1e-5, was set from the gauss observation alone (6.6e-7) and failed on the
+  self-hosted i9-10900K (10 cores, OpenBLAS): matern5_2 BFGS4 at 7.2e-5, identical in every
+  thread and round (BLAS-count rounding, not a race; the `OPENBLAS_NUM_THREADS=1` variant is
+  bit-identical on the same machine). That scale had already been measured (BFGS4 pool 1 vs 4:
+  8.8e-5, section 4); 1e-3 is the tolerance of the fitted theta between BLAS counts used in
+  `BlasBackendTest`. A race or a shared RNG gives differences of order 1, and the budget-1 case
+  checks the concurrency bit for bit.
 
 Port to: T6.
 
@@ -228,6 +234,16 @@ Timing on the Linux runner (`[.timing]`, budget 2, informative): OpenBLAS BFGS /
 0.100 s (n = 200), 0.43 / 0.40 s (400), 1.72 / 4.62 s (800); MKL GNU 0.086 / 0.104, 0.39 / 0.42,
 1.75 / 2.26 s. With 2 cores, BFGS4 runs 4 starts on 2 workers: twice a single start's work per
 worker.
+
+### 3.2 Self-hosted runners (run 41331286043, commit 2d9932dd; macOS: run 41329668504)
+
+| Runner | Machine | Result |
+|---|---|---|
+| `alien-runner` (Linux) | Intel i9-10900K, 10 cores / 20 threads, Ubuntu 24.04; OpenBLAS runtime only (`libopenblas.so.0`), sudo with a password; oneMKL wheel | `[backend]`: all pass with OpenBLAS (budget 10, OpenBLAS loaded with 20) and MKL (loaded with 10: BFGS4 pool 4 x 2, **workers NThr 2** in all 130 calls, caller NThr 10; `MKL_VERBOSE` 1447 calls `NThr:2`, 21 `NThr:10`); ctest: INTEL layer 251 / 251 in both builds; two failures, fixed in the next commit: `ConcurrentCallsTest` full-budget tolerance (2.6), and the `OPENBLAS_NUM_THREADS=1` variant, which also runs the fork case, run without `MKL_DISABLE_FAST_MM=1` under the GNU layer (children killed by their alarm: the MKL limitation of 2.1); the workflow now treats the variant as the fork case |
+| `MacBook-Air-de-violette` (macOS) | Apple silicon, budget 10 | 234 / 234 except the MLPKriging calibration case (coverage 0.707, the known limitation of section 5) |
+
+Shared reference on the i9 (OpenBLAS / MKL): largest gaps theta 1.0e-4, LL 1.5e-8, gradient at
+fixed theta 3.1e-8: within the tolerances, same order as on the other machines.
 
 ## 4. Tests `[backend]` (`tests/BlasBackendTest.cpp`)
 
@@ -321,13 +337,15 @@ Release). `dgemm_` from `Accelerate.framework/.../vecLib.framework/.../libBLAS.d
 - Single-threaded Accelerate during a multistart: no measurable gain (0.99–1.04, within
   the run-to-run noise); `VECLIB_MAXIMUM_THREADS=1` is slower for BFGS4 at n = 800 (1.67 vs
   1.49 s). On a single start it costs 20–36 % at n = 400–800.
+- Self-hosted Mac, budget 10 (more cores than the 4 starts, the case left open on 3 cores):
+  BFGS4 multi / single 1.00, 0.99, 0.97 (n = 200, 400, 800); with `VECLIB_MAXIMUM_THREADS=1`
+  at load 1.11, 0.99, 1.01; BFGS4 / BFGS 0.54, 0.43, 0.55. No gain either.
 - **Decision**: the library does not call `BLASSetThreading` around multistarts. It is
   process-wide (it would also slow every concurrent call of other threads), and it gave nothing
   here; the oversubscription that T5 documented for multithreaded BLAS in pool workers does not
   show with Accelerate on this 3-core runner. The FAQ / `parallel.md` advice
   (`VECLIB_MAXIMUM_THREADS=1` for multistart fits) is not supported by these numbers on 3 cores;
-  it is kept as an option, not a recommendation, until measured on a larger Mac (more cores
-  than starts is where it could matter).
+  it is kept as an option, not a recommendation: on 10 cores it brings nothing either.
 
 ### `MLPKriging predictive variance is calibrated (#407)` on macOS Release — known limitation
 

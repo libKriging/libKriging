@@ -203,9 +203,12 @@ jobs:
           # Known limitation (T9 log, parallel.md 5): a fork() while other
           # threads run MKL can leave MKL's fast memory manager locked in the
           # child; that case runs below with MKL's documented workaround.
+          # The ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1 variant runs every
+          # [concurrent] case, the fork one included.
+          FORK_TESTS="fork\(\) during concurrent fits|ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1"
           rc=0
-          ctest --output-on-failure -E "fork\(\) during concurrent fits" || rc=1
-          MKL_DISABLE_FAST_MM=1 ctest --output-on-failure -R "fork\(\) during concurrent fits" || rc=1
+          ctest --output-on-failure -E "$FORK_TESTS" || rc=1
+          MKL_DISABLE_FAST_MM=1 ctest --output-on-failure -R "$FORK_TESTS" || rc=1
           exit $rc
 
       - name: Tests, oneMKL INTEL threading layer
@@ -219,9 +222,12 @@ jobs:
           # Known limitation (T9 log, parallel.md 5): a fork() while other
           # threads run MKL can leave MKL's fast memory manager locked in the
           # child; that case runs below with MKL's documented workaround.
+          # The ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1 variant runs every
+          # [concurrent] case, the fork one included.
+          FORK_TESTS="fork\(\) during concurrent fits|ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1"
           rc=0
-          ctest --output-on-failure -E "fork\(\) during concurrent fits" || rc=1
-          MKL_DISABLE_FAST_MM=1 ctest --output-on-failure -R "fork\(\) during concurrent fits" || rc=1
+          ctest --output-on-failure -E "$FORK_TESTS" || rc=1
+          MKL_DISABLE_FAST_MM=1 ctest --output-on-failure -R "$FORK_TESTS" || rc=1
           exit $rc
 
       - name: MKL_VERBOSE thread counts of a BFGS4 fit
