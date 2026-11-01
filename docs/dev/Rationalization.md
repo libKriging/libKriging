@@ -84,6 +84,7 @@ mandatory; measurements go in the task's log `docs/dev/rationalization/T<n>-*.md
 | T6 | Thread safety of thread-count scopes and `Optim` settings | `-t6-thread-safety` | |
 | T7 | Statistical benchmark base for the thresholds | `-t7-benchmark-base` | |
 | T8 | MLPKriging calibration cost | `-t8-mlp-calibration-cost` | |
+| T9 | CI of the BLAS backends (MKL, Accelerate) | `-t9-blas-backends-ci` | T5, T6 (branch built on both) |
 
 ### T1. Vectorized LL / LMP theta gradients
 
@@ -152,3 +153,22 @@ mandatory; measurements go in the task's log `docs/dev/rationalization/T<n>-*.md
 - Acceptance: CPU time of the default MLPKriging fit measured on 1 and 4 cores before / after;
   calibration quality (coverage of 95 % intervals) measured on the `MLPKrigingCalibrationTest`
   cases and >= 10 more data sets.
+
+### T9. CI of the BLAS backends (MKL, Accelerate)
+
+- No CI job runs MKL: the per-thread MKL control of T5 (`MKL_Set_Num_Threads_Local`, weak
+  symbols / `dlsym`) has never been executed. The macOS jobs already run Accelerate (Armadillo
+  default on arm64) but check nothing about threads.
+- New workflow (e.g. `.github/workflows/blas-backends.yml`):
+  - Linux + oneMKL (pip wheel preloaded with `LD_PRELOAD`, and if affordable a build linked to
+    MKL), GNU and Intel threading layers;
+  - macOS arm64 (Accelerate) step or job.
+- C++ tests tagged `[backend]`: with MKL, `MKL_VERBOSE` shows each multistart worker's calls at
+  its share (BFGS4 on 4 cores: `NThr:1`), the caller's MKL count is restored after fit /
+  predict / update; T6 stress test passes on MKL and Accelerate; BFGS4 with 1 or 4 workers
+  reaches the same optimum within tolerance; fitted theta for 200 <= n < 800 equal on Linux
+  and macOS (shared reference values); BFGS4 vs BFGS1 timing on Accelerate recorded to document
+  the oversubscription (measure whether `BLASSetThreading` single-thread during a multistart
+  helps).
+- Acceptance: the workflow runs green on the PR; any failing assertion is either fixed (in the
+  T5 / T6 code carried by this branch) or documented as a known limitation.
