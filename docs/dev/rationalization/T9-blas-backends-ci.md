@@ -9,10 +9,10 @@ resolved by keeping both sides, unbuilt.
 ## Status
 
 Done. Last runs:
-- self-hosted (run 41332870292, commit 31f81f69): both Linux jobs green on the i9-10900K
-  (`alien-runner`): OpenBLAS alone; oneMKL preloaded and linked, GNU and INTEL threading
-  layers. The macOS job waits for the self-hosted Mac, which passed the previous run
-  (41329668504, commit 0f52b15f: 234 / 234 apart from the known MLPKriging limitation);
+- self-hosted (run 41332870292, commit 31f81f69): **all three jobs green** — both Linux jobs on
+  the i9-10900K (`alien-runner`: OpenBLAS alone; oneMKL preloaded and linked, GNU and INTEL
+  threading layers) and the macOS job on the Apple silicon Mac (budget 10; the MLPKriging
+  limitation reported in its non-blocking step);
 - GitHub-hosted (run 41304855128, commit e30acf5): both Linux jobs green (AMD EPYC, 2 cores),
   macOS 15 arm64 green apart from the same MLPKriging limitation.
 
