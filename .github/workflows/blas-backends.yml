@@ -18,6 +18,12 @@ on:
       - '.github/workflows/blas-backends.yml'
   workflow_dispatch:
 
+# A new push to the PR cancels the run of the previous one (runners are shared
+# with main.yml; obsolete runs only delay the current one)
+concurrency:
+  group: blas-backends-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   # cmake >= 4 rejects dependencies declaring cmake_minimum_required < 3.5
   # (pinned pybind11 submodule), as in main.yml
