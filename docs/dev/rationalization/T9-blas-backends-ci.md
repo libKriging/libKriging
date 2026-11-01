@@ -8,8 +8,14 @@ resolved by keeping both sides, unbuilt.
 
 ## Status
 
-Done on Linux (OpenBLAS, oneMKL preloaded and linked, GNU and INTEL threading layers: run
-locally and in CI). macOS arm64 (Accelerate): see section 5 (CI only, no Mac here).
+Done. CI run 41304855128 (commit e30acf5, same code as the final one): both Linux jobs green
+(OpenBLAS alone; oneMKL preloaded and linked, GNU and INTEL threading layers; AMD EPYC 9V74
+runners, 2 cores); macOS 15 arm64 (Accelerate): every test passes except
+`MLPKriging predictive variance is calibrated (#407)`, a known limitation of macOS Release not
+related to the backends (section 5), reported in a non-blocking step from commit 66faf8f on.
+Two known limitations: MKL's fast memory manager after `fork()` with concurrent MKL work
+(2.1), the single-start MLPKriging calibration case on macOS Release (5). Fixes to port to T5 /
+T6 / master: sections 2.1–2.6.
 
 Local machine: Intel Xeon @ 2.80 GHz, 4 vCPUs (`physical_cores()` = 4), Ubuntu 24.04, GCC 13,
 OpenBLAS 0.3.26 pthreads (`libopenblas-pthread-dev`), oneMKL 2024.2.2 (pip wheel, with
@@ -276,8 +282,12 @@ Release). `dgemm_` from `Accelerate.framework/.../vecLib.framework/.../libBLAS.d
   backends (table in section 4: theta 1.0e-4 at most, matern5_2 n = 250).
 - `ConcurrentCallsTest` (T6 stress test, including `fork()` during concurrent fits) and
   `BlasThreadsTest`: pass.
-- Full `ctest`: 233 / 234; `MLPKriging predictive variance is calibrated (#407)` fails, see
-  below.
+- Full `ctest`: 233 / 234 (run 41300138594) and 234 / 235 (run 41304855128, with the new
+  budget-1 case of `ConcurrentCallsTest`: passes, bit-identical);
+  `MLPKriging predictive variance is calibrated (#407)` fails, see below.
+- Second timing sample (run 41304855128): BFGS4 multi / single 0.97, 1.02, 0.95 (n = 200,
+  400, 800); with `VECLIB_MAXIMUM_THREADS=1` at load 1.05, 1.15, 1.03: run-to-run noise of
+  about ±15 %, no consistent gain from single-threaded Accelerate; the decision below stands.
 
 ### BFGS4 vs BFGS, `BLASSetThreading` (macOS 15 `vecLib/thread_api.h`), `VECLIB_MAXIMUM_THREADS`
 
