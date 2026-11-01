@@ -36,6 +36,12 @@ int openblas_get_num_threads() __attribute__((weak));
 #define LK_TEST_OPENBLAS 1
 #endif
 
+#if defined(__ELF__)
+extern "C" {
+int MKL_Get_Max_Threads() __attribute__((weak));
+}
+#endif
+
 // Public fit / predict / simulate calls from several user threads at once
 // (Python ThreadPoolExecutor, joblib threads, std::thread): no crash, the
 // results of the same calls run one after the other, and the caller's
@@ -47,6 +53,16 @@ int blas_count() {
 #ifdef LK_TEST_OPENBLAS
   if (openblas_get_num_threads)
     return openblas_get_num_threads();
+#endif
+  return 0;
+}
+
+// MKL count of the calling thread, 0 without MKL (or where weak symbols are
+// not available: no MKL run in CI there)
+int mkl_count() {
+#if defined(__ELF__)
+  if (MKL_Get_Max_Threads)
+    return MKL_Get_Max_Threads();
 #endif
   return 0;
 }
@@ -145,7 +161,14 @@ double rel_diff(const Result& a, const Result& b) {
 
 }  // namespace
 
-TEST_CASE("Concurrent fit / predict / simulate from user threads", "[threads][concurrent]") {
+namespace {
+
+// Runs every job sequentially (reference), then from 6 user threads x 3 rounds,
+// at the given thread budget; returns the largest relative difference to the
+// reference and checks it against `tol`.
+double concurrent_vs_sequential(double budget_percent, double tol) {
+  const double saved_percent = Optim::get_num_threads_percent();
+  Optim::set_num_threads_percent(budget_percent);
   const int initial = blas_count();
   // the caller's own count: a known value, restored by the library at the end
   const int caller = std::max(1, std::min(3, initial));
@@ -199,30 +222,52 @@ TEST_CASE("Concurrent fit / predict / simulate from user threads", "[threads][co
 
   for (int t = 0; t < n_threads; ++t)
     CHECK(errors[t].empty());
-  // Concurrent calls share the budget, so their OpenBLAS count is lower than
-  // the one of the sequential calls, which changes the rounding of the BLAS
-  // sums (FAQ, reproducibility): bit-identical results when the count cannot
-  // change (no OpenBLAS, or loaded with 1 thread: the ctest variant
-  // ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1), else up to rounding (4e-14
-  // measured).
-  const double tol = initial > 1 ? 1e-10 : 0.0;
   double worst = 0;
   for (int t = 0; t < n_threads; ++t)
     for (int r = 0; r < n_rounds; ++r)
       for (size_t i = 0; i < jobs.size(); ++i) {
         const double d = rel_diff(got[t][r * jobs.size() + i], ref[i]);
-        INFO("thread " << t << ", round " << r << ", job " << i << " (" << jobs[i].kernel << " " << jobs[i].optim << " "
-                       << jobs[i].objective << "): relative difference " << d);
+        INFO("budget " << budget_percent << " %, thread " << t << ", round " << r << ", job " << i << " ("
+                       << jobs[i].kernel << " " << jobs[i].optim << " " << jobs[i].objective
+                       << "): relative difference " << d);
         CHECK(d <= tol);
         worst = std::max(worst, d);
       }
-  WARN("largest relative difference to the sequential results: " << worst << " (tolerance " << tol << ")");
+  WARN("budget " << budget_percent << " %: largest relative difference to the sequential results: " << worst
+                 << " (tolerance " << tol << ")");
   // the count the library sets is a share of the budget, never more than the
   // count OpenBLAS had when the library first used it
   INFO("OpenBLAS count: caller " << caller << ", max seen " << max_seen.load() << ", initial " << initial);
   CHECK(max_seen.load() <= std::max(initial, caller));
   CHECK(blas_count() == (initial > 0 ? caller : 0));
   set_blas_count(initial);
+  Optim::set_num_threads_percent(saved_percent);
+  return worst;
+}
+
+}  // namespace
+
+// Budget of 1 thread: the sequential and the concurrent calls all run their
+// BLAS (OpenBLAS, MKL; Accelerate is never changed) and OpenMP loops at 1
+// thread, so the results must be bit-identical on every backend: what remains
+// is the concurrency itself (shared state, RNG, count save / restore).
+TEST_CASE("Concurrent calls at a budget of 1 thread give the sequential results", "[threads][concurrent]") {
+  concurrent_vs_sequential(1e-6, 0.0);
+}
+
+TEST_CASE("Concurrent fit / predict / simulate from user threads", "[threads][concurrent]") {
+  // Concurrent calls share the budget, so their BLAS count is lower than the
+  // one of the sequential calls, which changes the rounding of the BLAS sums
+  // (FAQ, reproducibility); a fit amplifies it through the optimizer's
+  // stopping point. Bit-identical results when no count can change (no
+  // OpenBLAS / MKL, or loaded with 1 thread: the ctest variant
+  // ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1), else to 1e-5: measured
+  // 4e-14 (Intel Xeon, 4 cores, OpenBLAS) and 6.6e-7 (AMD EPYC 9V74, 2 cores,
+  // OpenBLAS Haswell kernels 2 vs 1 thread: gauss single-start fit; T9 log).
+  // Races (RNG, shared state) would give differences of order 1 (other
+  // starts): those are checked bit for bit by the budget-1 case above.
+  const bool count_can_change = blas_count() > 1 || mkl_count() > 1;
+  concurrent_vs_sequential(100, count_can_change ? 1e-5 : 0.0);
 }
 
 TEST_CASE("Optim::get_num_threads is not divided between concurrent calls", "[threads][concurrent]") {

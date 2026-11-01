@@ -129,7 +129,32 @@ the test takes the best of 3 runs (each from a new fit) for both times, the asse
 unchanged; the workflow runs `ctest` serially, as `tools/linux-macos/test.sh` does. After:
 8 / 8 isolated runs pass (both layers), full serial suites pass.
 
-### 2.6 After the fixes
+### 2.6 `Concurrent fit / predict / simulate from user threads` (ConcurrentCallsTest) on the CI runner — T6 test, fixed
+
+Not seen locally (Intel, 4 cores: 6e-14; restricted to 2 cores with `taskset`: 0). On the CI
+runner (AMD EPYC 9V74, 2 cores / 4 threads, budget 2, OpenBLAS with `OPENBLAS_CORETYPE=Haswell`)
+every concurrent result of job 0 (gauss, single-start `BFGS`, LL) differed from the sequential
+one by 6.6e-7 relative (identical in every thread and round), other jobs up to 9.5e-9; with MKL
+preloaded 3.0e-7. Tolerance: 1e-10 (T6, "4e-14 measured"); and 0 in the
+`OPENBLAS_NUM_THREADS=1` variant, which under MKL failed too.
+
+Cause: 6 concurrent calls on a budget of 2 run their BLAS at 1 thread, the sequential reference
+at 2; the OpenBLAS `OPENBLAS_NUM_THREADS=1` variant passed bit for bit on the same runner, so the
+gap is the BLAS count's rounding, amplified by the optimizer's stopping point of a single-start
+gauss fit (same mechanism as the BFGS4 pool 1 vs 4 gaps of section 4). T6's 1e-10 was the
+rounding of one machine; the variant's premise ("the count cannot change") ignored MKL.
+
+Change (`tests/ConcurrentCallsTest.cpp`):
+- new case "Concurrent calls at a budget of 1 thread give the sequential results": sequential
+  and 6 x 3 concurrent runs all at 1 BLAS / OpenMP thread, **bit-identical required on every
+  backend** — what the concurrency itself can break (RNG, shared state, count save / restore)
+  is checked at full strength, independently of the BLAS;
+- full-budget case: bit-identical when neither OpenBLAS nor MKL can change count, else 1e-5
+  (15 x the largest gap measured; a race or a shared RNG gives differences of order 1).
+
+Port to: T6.
+
+### 2.7 After the fixes
 
 | Build / BLAS | ctest | fork case |
 |---|---|---|
@@ -161,6 +186,24 @@ Release, C++ only, `OPENBLAS_CORETYPE=Haswell` as the other Linux jobs (#429).
 
 `LK_EXPECT_BLAS` makes a backend that silently failed to load an error instead of a skip of
 every backend case. The fork case runs with `MKL_DISABLE_FAST_MM=1` under MKL (2.1).
+
+### 3.1 CI results (run 41300138594, commit e1fbae9)
+
+Linux runners: AMD EPYC 9V74, 4 vCPUs = 2 cores x 2 threads: budget 2, MKL loaded with 2.
+
+| Job / step | `[backend]` | ctest |
+|---|---|---|
+| OpenBLAS build, OpenBLAS | pass (34 assertions) | 250 / 251: ConcurrentCallsTest (2.6) |
+| OpenBLAS build, MKL preloaded, GNU / INTEL | pass (53); workers NThr 1 (130 calls), caller NThr 2 (2 calls) | 248 / 250: ConcurrentCallsTest and its `OPENBLAS_NUM_THREADS=1` variant (2.6); fork case with `MKL_DISABLE_FAST_MM=1`: pass |
+| MKL linked, GNU / INTEL | pass | same as preloaded |
+| macOS 15 arm64, Accelerate | pass (29) | 233 / 234: MLPKriging calibration (section 5) |
+
+`MKL_VERBOSE` (BFGS4, 2 workers x 1): 1447 calls `NThr:1`, 21 calls `NThr:2`.
+
+Timing on the Linux runner (`[.timing]`, budget 2, informative): OpenBLAS BFGS / BFGS4 0.095 /
+0.100 s (n = 200), 0.43 / 0.40 s (400), 1.72 / 4.62 s (800); MKL GNU 0.086 / 0.104, 0.39 / 0.42,
+1.75 / 2.26 s. With 2 cores, BFGS4 runs 4 starts on 2 workers: twice a single start's work per
+worker.
 
 ## 4. Tests `[backend]` (`tests/BlasBackendTest.cpp`)
 
