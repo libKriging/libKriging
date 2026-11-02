@@ -218,7 +218,28 @@ reference BLAS); the workspace persists between jobs on these runners (`build/` 
 first); oneMKL: an installed oneAPI MKL first
 (`$MKLROOT`, `/opt/intel/oneapi`), else the pinned wheels; no MKL steps on non-x86_64 runners.
 `-DALLOW_FLEXIBLAS_LINUX=OFF`: on Fedora / RHEL, FlexiBLAS would be found before OpenBLAS / MKL.
-The runner's OS, CPU and name are printed: results of section 4 are attributed per machine. The fork case runs with `MKL_DISABLE_FAST_MM=1` under MKL (2.1).
+The runner's OS, CPU and name are printed: results of section 4 are attributed per machine.
+
+**Security of the self-hosted runners.** The `runs-on` condition sends fork pull requests to
+GitHub-hosted runners (a fork PR has `head.repo.full_name != github.repository`; a deleted
+fork gives null, also hosted), and the workflow has no `push` / `pull_request_target` trigger.
+This only routes *this* workflow and is **not a security boundary**: for `pull_request`
+events, GitHub runs the workflow files of the pull request's merge commit, so a fork can edit
+`blas-backends.yml` or add a workflow with `runs-on: [self-hosted, Linux]`, and the runners,
+registered on a public repository, would accept it. What protects them:
+1. the repository / organization setting *Actions → General → Approval for running fork pull
+   request workflows from contributors* = **Require approval for all external contributors**
+   (a maintainer then reads the diff, workflows included, before approving); not readable
+   from this session: to be checked by an administrator;
+2. on the runner side: a dedicated unprivileged user (the Linux runner runs as a personal
+   account with its home directory; its sudo asks for a password, which limits but does not
+   remove the exposure), ephemeral / just-in-time registration, no credentials in the
+   environment;
+3. in this workflow: `permissions: contents: read` and `persist-credentials: false`, so that
+   the token of a same-repository run is read-only and not left in `.git/config` of the
+   persistent workspace.
+Same-repository branches are trusted by design: this includes branches pushed by agents
+(Claude Code sessions, Copilot) of people with write access. The fork case runs with `MKL_DISABLE_FAST_MM=1` under MKL (2.1).
 
 ### 3.1 CI results (run 41300138594, commit e1fbae9)
 

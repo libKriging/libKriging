@@ -15,7 +15,12 @@ name: BLAS backends
 # may persist between jobs and sudo may need a password: only `sudo -n` is
 # tried) for branches of this repository and manual runs; GitHub-hosted
 # runners for pull requests from forks, which must not run code on the
-# self-hosted machines. Labels: GitHub's automatic ones (self-hosted + OS),
+# self-hosted machines. This condition only routes this workflow: it is not a
+# security boundary, since the workflow file of a pull_request run is taken
+# from the pull request itself (a fork can edit it, or add another workflow
+# targeting self-hosted labels). The boundary is the repository setting
+# requiring approval of workflow runs for pull requests from outside
+# contributors (T9 log, section 3). Labels: GitHub's automatic ones (self-hosted + OS),
 # overridable with the repository variables LK_SELF_HOSTED_LINUX /
 # LK_SELF_HOSTED_MACOS (JSON array, e.g. ["self-hosted.linux"]).
 # Ephemeral runners start empty: every tool and MKL are looked for first and
@@ -34,6 +39,10 @@ on:
 concurrency:
   group: blas-backends-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
+# Least privilege for the token handed to the (self-hosted, persistent) runners
+permissions:
+  contents: read
 
 env:
   # cmake >= 4 rejects dependencies declaring cmake_minimum_required < 3.5
@@ -60,6 +69,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          # no token left in .git/config of a workspace that persists
+          persist-credentials: false
 
       - name: Tools, OpenBLAS and oneMKL (looked for first, installed if missing)
         shell: bash
@@ -263,6 +274,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          # no token left in .git/config of a workspace that persists
+          persist-credentials: false
 
       - name: Tools (looked for first, installed if missing)
         shell: bash
