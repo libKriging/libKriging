@@ -208,13 +208,32 @@ TEST_CASE("Objective, gradient and update do not depend on the OpenMP thread cou
     k.update(y.tail(300), X.tail_rows(300), false);
     return std::make_tuple(ll, arma::vec(grad), k.logLikelihood());
   };
+  // The budget follows the OpenMP limit, and so does the BLAS count the library
+  // sets (blas_threads_for / mkl_threads_for). OpenBLAS's results did not
+  // change with its count here; MKL's do (n = 900, relative: ll 1.5e-11,
+  // gradient 1.1e-9, updated ll 3.7e-10; T9 log):
+  // with an MKL loaded with more than 1 thread only the rounding is compared,
+  // bit-identity is required by BlasThreadsTest/BLAS_NUM_THREADS=1 (MKL and
+  // OpenBLAS loaded with 1 thread: the BLAS count cannot change).
+#ifdef LK_TEST_MKL
+  const bool blas_count_changes = MKL_Get_Max_Threads && MKL_Get_Max_Threads() > 1;
+#else
+  const bool blas_count_changes = false;
+#endif
   const auto [ll1, grad1, llu1] = run(1);
   const auto [ll4, grad4, llu4] = run(4);
   omp_set_num_threads(initial);
 
-  CHECK(ll1 == ll4);
-  CHECK(arma::all(grad1 == grad4));
-  CHECK(llu1 == llu4);
+  if (blas_count_changes) {
+    WARN("MKL loaded with more than 1 thread: its results depend on its thread count, compared to 1e-8");
+    CHECK(std::abs(ll1 - ll4) <= 1e-8 * std::abs(ll4));
+    CHECK(arma::norm(grad1 - grad4, "inf") <= 1e-8 * arma::norm(grad4, "inf"));
+    CHECK(std::abs(llu1 - llu4) <= 1e-8 * std::abs(llu4));
+  } else {
+    CHECK(ll1 == ll4);
+    CHECK(arma::all(grad1 == grad4));
+    CHECK(llu1 == llu4);
+  }
 }
 #endif
 

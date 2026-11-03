@@ -98,6 +98,7 @@ openblas_get_num_threads_t get_openblas_get_num_threads() {
 extern "C" {
 int MKL_Get_Max_Threads() __attribute__((weak));
 int MKL_Set_Num_Threads_Local(int nth) __attribute__((weak));
+void MKL_Set_Num_Threads(int nth) __attribute__((weak));
 }
 namespace {
 typedef int (*mkl_get_max_threads_t)();
@@ -107,6 +108,10 @@ mkl_get_max_threads_t get_mkl_get_max_threads() {
 }
 mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
   return MKL_Set_Num_Threads_Local;
+}
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  return MKL_Set_Num_Threads;
 }
 }  // namespace
 #elif defined(_WIN32)
@@ -134,6 +139,11 @@ mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
       = reinterpret_cast<mkl_set_num_threads_local_t>(get_mkl_proc("MKL_Set_Num_Threads_Local"));
   return func;
 }
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  static mkl_set_num_threads_t func = reinterpret_cast<mkl_set_num_threads_t>(get_mkl_proc("MKL_Set_Num_Threads"));
+  return func;
+}
 }  // namespace
 #elif defined(__APPLE__) || defined(__unix__)
 #include <dlfcn.h>
@@ -150,6 +160,12 @@ mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
       = reinterpret_cast<mkl_set_num_threads_local_t>(dlsym(RTLD_DEFAULT, "MKL_Set_Num_Threads_Local"));
   return func;
 }
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  static mkl_set_num_threads_t func
+      = reinterpret_cast<mkl_set_num_threads_t>(dlsym(RTLD_DEFAULT, "MKL_Set_Num_Threads"));
+  return func;
+}
 }  // namespace
 #else
 namespace {
@@ -159,6 +175,10 @@ mkl_get_max_threads_t get_mkl_get_max_threads() {
   return nullptr;
 }
 mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
+  return nullptr;
+}
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
   return nullptr;
 }
 }  // namespace
@@ -215,6 +235,18 @@ int get_mkl_threads() {
 int set_mkl_threads_local(int n) {
   auto fn = get_mkl_set_num_threads_local();
   return fn ? fn(n) : -1;
+}
+
+void set_mkl_threads_global(int n) {
+  auto fn = get_mkl_set_num_threads();
+  if (fn && n > 0)
+    fn(n);
+}
+
+void touch_mkl_entry_points() {
+  get_mkl_get_max_threads();
+  get_mkl_set_num_threads_local();
+  get_mkl_set_num_threads();
 }
 
 void restore_blas_threads(const BlasThreadState& s) {

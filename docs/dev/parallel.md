@@ -84,7 +84,7 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
 
 Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
 = 200 on Linux, 800 elsewhere until measured (`src/lib/OmpLoops.hpp`), a
-performance setting only (section 4); `n >= 200`
+performance setting only once #441 is merged (section 4); `n >= 200`
 (`compute_dX`, `covMat_sym_*`); `n_o × n_n >= 40000` (predict / simulate `R_on`,
 `covMat_rect`, Vecchia, NestedKriging).
 
@@ -92,10 +92,11 @@ performance setting only (section 4); `n >= 200`
 
 - Results do not depend on the OpenMP thread count: each loop writes disjoint
   entries or sums per-row partial results in a fixed order (`BlasThreadsTest`).
-  The sequential path (below `kOmpMinRows`, without OpenMP, under TSan) sums in
-  the same order, so results do not depend on the threshold either, hence not
-  on the OS (bit-identical gradients and fitted theta for thresholds 200, 800,
-  never and a build without OpenMP:
+  With the vectorized gradients (#441, T1) the sequential path (below
+  `kOmpMinRows`, without OpenMP, under TSan) sums in the same order, so results
+  do not depend on the threshold either, hence not on the OS; before #441 the
+  gradient order switched at `kOmpMinRows` (fitted theta up to 4e-4 relative
+  apart between thresholds 200 and 800:
   [T5 log](rationalization/T5-omp-threshold-blas.md)).
 - They may depend on the BLAS thread count and build (FAQ), by rounding, and on
   the CPU: on an Intel Xeon Platinum 8573C CI runner, Ubuntu 22.04's OpenBLAS
@@ -128,8 +129,8 @@ Fortran one, by reference), weak symbols on ELF, `dlsym` on macOS,
 and pool parts of the budget apply: each worker of a multistart keeps the BLAS's
 own thread count (oversubscription when the BLAS is multithreaded; set its
 environment variable, e.g. `VECLIB_MAXIMUM_THREADS=1`, for multistart fits).
-The MKL path was not run in CI nor on the T5 machine (no MKL available to
-execute there): verify it with `LD_PRELOAD=libmkl_rt.so.2` (see the T5 log).
+The MKL path was run against oneMKL (preloaded and linked, GNU / INTEL threading
+layers) in T9 (`docs/dev/rationalization/T9-blas-backends-ci.md`).
 
 | BLAS | Where | Threads | Run-time control | Driven by libKriging |
 |---|---|---|---|---|
@@ -357,9 +358,9 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 - Optional CI job running `bench-threads.sh` on a small grid, no threshold
   (runners are too noisy for pass / fail on timings) (#421).
 - Other BLAS (FlexiBLAS, BLIS; Accelerate): sections 5 and 8 (#422). MKL driven
-  since #445, not yet run against a real MKL.
+  since #445 (run against oneMKL in T9).
 - macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then;
-  performance only since #445).
+  performance only with #441).
 - Linux CI on Xeon 6973P (OpenBLAS 0.3.20 `Cooperlake`, section 4): the Octave,
   R (`main.yml`) and coverage (`analysis.yml`) jobs failed the same way; every
   Linux job of these workflows now sets `OPENBLAS_CORETYPE=Haswell`; drop it with

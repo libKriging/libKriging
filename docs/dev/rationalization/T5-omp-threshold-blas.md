@@ -4,8 +4,9 @@ Task specification: `docs/dev/Rationalization.md`, section T5.
 
 ## Status
 
-Done, apart from the MKL run-time check: implemented but not executed against a real MKL
-(see "MKL" below). PR #445.
+Done. PR #445. The gradient-order part was moved to T1 (#441, section 1). The MKL path was
+run against a real oneMKL in T9 (`docs/dev/rationalization/T9-blas-backends-ci.md`); its
+T5-side fixes are ported here (section 6).
 
 Machine for every measurement below: Intel Xeon @ 2.80 GHz, 4 cores / 4 threads (VM, cgroup v1
 hybrid), Ubuntu 24.04, GCC 13, OpenBLAS 0.3.26 pthreads (`libopenblas-pthread-dev`), libgomp,
@@ -39,17 +40,24 @@ theta = (0.3, 0.5, 0.7) and single-start `BFGS` fit:
 So for 200 <= n < 800 the fitted model depended on the OS (the gauss gradient differs from the
 8th–9th digit: ill-conditioned R, the trace term cancels).
 
-### Change
+### Change — moved to T1 (#441)
 
-`compute_ll_grad_theta_vecs` now uses the per-row partial sums on every path: one loop,
-`#pragma omp parallel for ... if (n >= kOmpMinRows)`, the same code without OpenMP / under TSan.
-Rows are summed in index order after the loop. Memory: 2·d·n doubles (as before above the
-threshold). The function body is otherwise unchanged (T1 will replace it; the T1 rewrite should
-keep one summation order for every thread count and threshold, which its spec already requires).
+T5 first made `compute_ll_grad_theta_vecs` use the per-row partial sums on every path (one loop,
+`#pragma omp parallel for ... if (n >= kOmpMinRows)`, the same code without OpenMP / under TSan;
+commit beb266e0). T1 (#441) rewrites the same function (vectorized gradients) with one summation
+order for every n, thread count and OS. Decision of the orchestrating session (2026-11-03): T1's
+version is kept; the gradient hunk of T5 was reverted on this branch, so that #441 and #445
+merge without conflict in `src/lib/KrigingImpl.cpp`. **The OS / threshold independence of the
+gradient is T1's responsibility** (T1 log, "Summation order").
 
-`kOmpMinRows` stays 200 on Linux / 800 elsewhere: it is now a performance setting only.
+On this branch alone the gradient is therefore back to the pre-T5 behaviour (order switching at
+`kOmpMinRows`). `kOmpMinRows` stays 200 on Linux / 800 elsewhere: a performance setting once T1
+is merged.
 
-### Result: identical on every path
+The measurements below were made with T5's version; they remain the reference showing that a
+single order makes every path bit-identical (T1 reports the same property for its version).
+
+### Result with T5's version (reverted, superseded by T1): identical on every path
 
 Same probe, d = 3, n = 150, 300, 500, 700, gauss and matern5_2; outputs printed with `%a`
 (exact) and compared byte for byte:
@@ -66,7 +74,7 @@ The last row is the BLAS thread count (OpenBLAS 1 vs 4 threads; `OPENBLAS_NUM_TH
 a 100 % budget gives the same fit as the 25 % budget): the known, documented dependence
 (`parallel.md` 4, FAQ), outside T5's scope.
 
-For n < 200 the gradient now sums in the per-row order instead of the pair order: last-bit
+With that version, for n < 200 the gradient summed in the per-row order instead of the pair order: last-bit
 changes of the gradient (n = 150: 5e-10 relative for gauss, 5e-14 for matern5_2) and of the
 fitted theta (n = 150: 6e-9 gauss, 1.1e-4 matern5_2). The full `ctest` passes unchanged (226 / 226).
 
@@ -121,8 +129,8 @@ after (threshold 200), `t800` = after with threshold 800, `seq` = after, never p
 - Where: `ScopedShare` (each pool worker, thread-local: no race between workers, unlike the
   process-global OpenBLAS count, cf. T6) and `BudgetScope` (the calling thread of each public
   method). Restored with the previous thread-local value (0 = back to the global count).
-- Not run here: executing the downloaded MKL binaries was not permitted in the session, and no
-  MKL is in CI. To verify (Linux, OpenBLAS build, MKL preloaded so that `dgemm_` etc. and the
+- Not run in this session: executing the downloaded MKL binaries was not permitted. Run since
+  in T9 (oneMKL preloaded and linked, GNU / INTEL layers): see the T9 log, section 2. To verify (Linux, OpenBLAS build, MKL preloaded so that `dgemm_` etc. and the
   `MKL_*` weak symbols bind to it):
 
   ```
@@ -175,10 +183,31 @@ at 100 % in a child cgroup:
   returns without MKL, i.e. in CI).
 - `clang-format` (18) on the changed C++ files.
 
+## 6. Fixes ported from T9 (2026-11-03)
+
+From `docs/dev/rationalization/T9-blas-backends-ci.md`, re-applied (the T9 branch is not
+merged):
+
+- 2.3, test premise: "Objective, gradient and update do not depend on the OpenMP thread count"
+  lowers the budget, hence the BLAS count the library sets. MKL's results depend on its count
+  (n = 900: ll 1.5e-11, gradient 1.1e-9, updated ll 3.7e-10 relative), OpenBLAS's did not on
+  this case. Exact equality is kept when the BLAS count cannot change; with an MKL loaded with
+  more than 1 thread, 1e-8 relative with a warning. New ctest entry
+  `BlasThreadsTest/BLAS_NUM_THREADS=1` (`OPENBLAS_NUM_THREADS=1;MKL_NUM_THREADS=1`) requires
+  bit-identity on every backend.
+- 2.2, MKL entry points: `set_mkl_threads_global` (`MKL_Set_Num_Threads`, C entry point, weak
+  symbol / dlsym / GetProcAddress as the others) and `touch_mkl_entry_points` (resolves the
+  entry points once). Their users, the fork child handler setting MKL's global count to 1 and
+  the fork prepare handler initializing the lazy statics (2.1), belong to T6's fork handlers and
+  are not on this branch.
+- Known hazard left to T6 (T9 2.1): on this branch alone, a `fork()` made while another thread
+  is inside the first `MKL_Get_Max_Threads()` (the `initial_mkl_threads()` static, which loads
+  MKL) leaves the static's guard taken in the child. Fixed by T6 + T9's prepare handler.
+
 ## Decisions
 
-1. One summation order for the LL gradient on every path instead of one threshold everywhere:
-   it also covers the builds without OpenMP and under TSan, and leaves the threshold free to
-   be tuned per machine.
+1. One summation order for the LL gradient on every path instead of one threshold everywhere
+   (covers the builds without OpenMP and under TSan, leaves the threshold free per machine):
+   implemented by T1 (#441); T5's equivalent change was reverted to avoid the conflict.
 2. `kOmpMinRows` stays 200 (Linux) / 800 (elsewhere), a performance setting.
 3. MKL driven per thread; Accelerate, FlexiBLAS, BLIS documented as not driven.

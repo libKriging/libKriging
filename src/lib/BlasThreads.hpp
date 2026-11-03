@@ -42,6 +42,16 @@ int get_mkl_threads();
 /// Defined in Kriging.cpp.
 int set_mkl_threads_local(int n);
 
+/// Set the global MKL thread count (MKL_Set_Num_Threads; threads without a
+/// thread-local count), no-op without MKL or for n <= 0. For the fork child
+/// handler (T6 / T9). Defined in Kriging.cpp.
+void set_mkl_threads_global(int n);
+
+/// Resolve the MKL entry points once (function-local statics on macOS /
+/// Windows), so that a fork prepare handler never forks while another thread
+/// initializes them (T6 / T9). Defined in Kriging.cpp.
+void touch_mkl_entry_points();
+
 }  // namespace detail
 }  // namespace libKriging
 

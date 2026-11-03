@@ -12,11 +12,6 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
-- **Thread-independent and OS-independent LL gradient** (#445, T5): the log-likelihood theta
-  gradient sums per-row partial sums in one fixed order on every path (parallel from
-  `kOmpMinRows` on, sequential below, without OpenMP, under TSan). Before, the order switched
-  at n = 200 on Linux and n = 800 elsewhere, so for 200 <= n < 800 a fit depended on the OS
-  (fitted theta up to 4e-4 relative). Below n = 200 the gradient changes in its last bits.
 - **MKL thread control** (#445, T5): with Intel MKL / oneMKL, each multistart worker sets its own
   MKL thread count to its share of the budget (`MKL_Set_Num_Threads_Local`), and each public
   method the calling thread's count to the budget, restored after (before: every worker kept

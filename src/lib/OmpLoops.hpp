@@ -21,13 +21,14 @@
 namespace libKriging {
 namespace detail {
 /// Smallest n for which the O(n^2) loops of an objective evaluation (covariance
-/// matrix, log-likelihood gradient) run in parallel. A performance setting only:
-/// these loops write independent entries or reduce in the same fixed order on
-/// the parallel and sequential paths (per-row partial sums, then rows in
-/// order), so the results do not depend on it, hence not on the OS
-/// (docs/dev/rationalization/T5-omp-threshold-blas.md). With BLAS and OpenMP
-/// both at the thread budget (physical cores, ThreadBudget.hpp) the loops pay
-/// off from n = 200 on Linux (i9-10900K, OpenBLAS pthreads / OpenMP, libgomp:
+/// matrix, log-likelihood gradient) run in parallel. A performance setting only
+/// once the LL gradient sums in one fixed order on the parallel and sequential
+/// paths (#441, T1); the covariance loops write independent entries. Before
+/// that, the gradient's summation order, hence the fitted model, changed at
+/// this threshold: with the per-OS values below it depended on the OS for
+/// 200 <= n < 800 (docs/dev/rationalization/T5-omp-threshold-blas.md). With
+/// BLAS and OpenMP both at the thread budget (physical cores, ThreadBudget.hpp)
+/// the loops pay off from n = 200 on Linux (i9-10900K, OpenBLAS pthreads / OpenMP, libgomp:
 /// x3 at n = 200-500, bench/thread-budget/RESULTS.md; Xeon 4 cores: T5 log).
 /// Elsewhere (libomp, Accelerate, Windows OpenBLAS) not measured yet: kept at
 /// 800, see #416 (macOS) and #417 (Windows). LK_OMP_MIN_ROWS overrides it at
