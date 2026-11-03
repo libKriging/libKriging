@@ -8,17 +8,53 @@ resolved by keeping both sides, unbuilt.
 
 ## Status
 
-Done. Last runs:
-- self-hosted (run 41332870292, commit 31f81f69): **all three jobs green** — both Linux jobs on
-  the i9-10900K (`alien-runner`: OpenBLAS alone; oneMKL preloaded and linked, GNU and INTEL
-  threading layers) and the macOS job on the Apple silicon Mac (budget 10; the MLPKriging
-  limitation reported in its non-blocking step);
-- GitHub-hosted (run 41304855128, commit e30acf5): both Linux jobs green (AMD EPYC, 2 cores),
-  macOS 15 arm64 green apart from the same MLPKriging limitation.
+Done; the fixes found here have since been ported to T5 / T6 (section 0). Last CI runs before
+the port: self-hosted run 41332870292 (commit 31f81f69) green on all three jobs; GitHub-hosted
+run 41304855128 (commit e30acf5) green apart from the MLPKriging limitation (section 5).
+After the merge of the ported T5 / T6 (2026-11-03), every workflow run of the repository ends
+in `startup_failure` (repository / account level, not this branch): the merged branch is
+checked locally only (section 0).
 
 Two known limitations: MKL's fast memory manager after `fork()` with concurrent MKL work
-(2.1), the single-start MLPKriging calibration case on macOS Release (5). Fixes to port to T5 /
-T6 / master: sections 2.1–2.6.
+(2.1), the single-start MLPKriging calibration case on macOS Release (5).
+
+## 0. Ported to T5 / T6, what stays here (2026-11-03)
+
+T5 (#445, 9fd2049) and T6 (#446, 26434ab) carry the fixes of this log that need only one of
+them; this branch merges both again and keeps only what needs both, plus the T9 work.
+
+| Section | Change | Now in |
+|---|---|---|
+| 2.1 | fork prepare handler initializes `physical_cores` / `initial_blas_threads` | T6 |
+| 2.1 | ... and the MKL statics (`initial_mkl_threads`, `touch_mkl_entry_points`) | **T9** (needs T5's MKL count and T6's handlers) |
+| 2.2 | MKL entry points `set_mkl_threads_global`, `touch_mkl_entry_points` | T5 |
+| 2.2 | fork child handler calls `set_mkl_threads_global(1)`; fork test checks the child's MKL count | **T9** (needs both) |
+| 2.3 | OpenMP-independence test premise under MKL, ctest `BlasThreadsTest/BLAS_NUM_THREADS=1` | T5 |
+| 2.4 | degenerate fit: sigma2 = nugget = 0 exactly | **T9** (to port to master: independent of T5 / T6) |
+| 2.5 | KrigingWarmRestartTest best of 3 | **T9** |
+| 2.6 | ConcurrentCallsTest budget-1 bit-identical case, full budget 1e-3 (marked provisional in T6) | T6 |
+| — | T6 additions: fork verdict through a pipe (valgrind), no allocation in the fork child under ASan / LSan | T6 |
+| 3–6 | workflow `blas-backends.yml`, `BlasBackendTest` / `backend_probe.c`, docs | **T9** |
+
+T5 also reverted its LL gradient reduction (kept in T1, #441). Consequence for the shared
+reference of section 4: on Linux (threshold 200) n = 250 / 500 / 750 take the parallel path,
+whose order is the one of the reference: identical to the bit with OpenBLAS at 1 thread
+(checked after the merge). On macOS / Windows (threshold 800) they take the sequential path
+again until T1: gaps of the order T5 measured before its change (fitted theta 3.7e-4,
+gradient 3.4e-8), within the tolerances (1e-3, 1e-6) but not run in CI since (startup_failure).
+
+The ASan / LSan change of T6 (the fork child does not fit) applies to sanitizer builds only:
+the MKL jobs (Release) still fit in the child, so the fork case still exercises MKL there.
+
+Checks of the merged branch (local, Xeon 4 cores, Release):
+
+| BLAS | ctest |
+|---|---|
+| OpenBLAS | 239 / 239 |
+| oneMKL preloaded, GNU | 237 / 237 + 2 / 2 (fork case and `ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1` with `MKL_DISABLE_FAST_MM=1`) |
+| oneMKL preloaded, INTEL | 237 / 237 + 2 / 2 |
+
+`[backend]` on MKL: workers NThr 1 (130 calls), caller NThr 4, as before.
 
 Local machine: Intel Xeon @ 2.80 GHz, 4 vCPUs (`physical_cores()` = 4), Ubuntu 24.04, GCC 13,
 OpenBLAS 0.3.26 pthreads (`libopenblas-pthread-dev`), oneMKL 2024.2.2 (pip wheel, with
