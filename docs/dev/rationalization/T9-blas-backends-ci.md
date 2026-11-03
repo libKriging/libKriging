@@ -11,9 +11,12 @@ resolved by keeping both sides, unbuilt.
 Done; the fixes found here have since been ported to T5 / T6 (section 0). Last CI runs before
 the port: self-hosted run 41332870292 (commit 31f81f69) green on all three jobs; GitHub-hosted
 run 41304855128 (commit e30acf5) green apart from the MLPKriging limitation (section 5).
-After the merge of the ported T5 / T6 (2026-11-03), every workflow run of the repository ends
-in `startup_failure` (repository / account level, not this branch): the merged branch is
-checked locally only (section 0).
+Since 2026-11-02 16:42 UTC (first on this branch: commit 7e7fe984, run 41484067950), every
+workflow run ends in `startup_failure`, for every workflow of the commit (`main.yml`,
+`binding-api`, `notebooks`, `compat-r` as well as `blas-backends.yml`, including those the
+commit does not touch) and on other branches: repository / account level, not this branch.
+The merged branch (commit 6bce4ab6, run 41632134231: `startup_failure`) is checked locally only
+(section 0); no retry or empty commit was pushed.
 
 Two known limitations: MKL's fast memory manager after `fork()` with concurrent MKL work
 (2.1), the single-start MLPKriging calibration case on macOS Release (5).
