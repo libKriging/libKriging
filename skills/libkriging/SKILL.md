@@ -177,7 +177,7 @@ gradient-based optimizer — the analytic gradient is still correct, this is
 an optimization-landscape issue, not a bug.
 
 `MLPKriging`'s predictive stdev is calibrated by a 3-fold cross-validation
-after the fit (`var_scale()`, shown in `summary()`; the mean and
+(5-fold for a multistart `"BFGSn"`) after the fit (`var_scale()`, shown in `summary()`; the mean and
 `logLikelihood()` are unchanged; ~2.2x the CPU time of the single-start fit
 alone): without it, the many network weights
 overfit the training points and the 95 % intervals can cover ~1 % of new

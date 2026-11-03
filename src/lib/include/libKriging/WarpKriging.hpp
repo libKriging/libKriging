@@ -967,9 +967,11 @@ class WarpKriging : protected KrigingImpl {
   arma::uword m_max_iter_adam = 200;
   double m_adam_lr = 3e-2;
   // K-fold calibration of the predictive variance of a joint MLP warp (#407):
-  // number of folds (0 disables, other warpings are never calibrated), and
-  // the resulting factor applied to σ² by predict/simulate.
-  arma::uword m_calibration_folds = 3;
+  // number of folds (0 disables, other warpings are never calibrated;
+  // kCalibrationFoldsAuto: see calibration_folds()), and the resulting factor
+  // applied to σ² by predict/simulate.
+  static constexpr arma::uword kCalibrationFoldsAuto = static_cast<arma::uword>(-1);
+  arma::uword m_calibration_folds = kCalibrationFoldsAuto;
   double m_var_scale = 1.0;
   // Starting point (θ, warp params) of the optimiser start that gave the fit:
   // the calibration refits each fold from there.
@@ -998,6 +1000,10 @@ class WarpKriging : protected KrigingImpl {
   void ensure_joint_warp(arma::uword d_in);
   // Iteration budget of the joint (warp params + θ) L-BFGS-B.
   unsigned int joint_bfgs_max_iter(arma::uword n_total) const;
+  // Number of folds of the variance calibration: the "calibration_folds"
+  // tuning value, or by default 3 for a single-start fit and 5 for a
+  // multistart (T8: 3 folds over-widen the intervals of a multistart fit).
+  arma::uword calibration_folds() const;
   // K-fold cross-validated calibration of the predictive variance (sets
   // m_var_scale); only for a joint MLP warp fitted without noise.
   void calibrate_variance();

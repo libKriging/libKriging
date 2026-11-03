@@ -4,8 +4,10 @@ Task specification: `docs/dev/Rationalization.md`, section T8.
 
 ## Status
 
-Done: `calibration_folds` defaults to 3 (was 5), factor no longer clamped to >= 1. Same
-optimiser, budget and starting point per fold as before (no warm start, no reduced budget).
+Done: `calibration_folds` defaults to 3 for a single-start fit (was 5) and stays 5 for a
+multistart (revised in section "CI follow-up": K = 3 over-widens the intervals of a multistart
+fit); factor no longer clamped to >= 1. Same optimiser, budget and starting point per fold as
+before (no warm start, no reduced budget).
 
 ## Setup
 
@@ -133,3 +135,66 @@ NLPD 17.1 / 94.7, coverage 0.575 / 0.271):
   n <= 120 matrices. It costs more than the calibration itself (relevant to T5).
 - 15 / 48 fits (hartmann6, borehole, ...) give different results on 1 and 4 cores (fit and
   calibration alike): thread-count dependence of the fit (§1.3, T1 / T5).
+
+## CI follow-up (PR #448, runs 41168746602 / 41168750296 / 41168750288)
+
+### guideline-checks
+
+`clang-format` (14, as the job) reformatted `T8/bench_t8.cpp`, committed unformatted. Fixed with
+clang-format 14.0.6; `git-clang-format --commit <base>` reports no change.
+
+### Octave macOS (run 41168746602, push event)
+
+- Failing test: **#222 `approximate LOO / LMP fits are consistent with the exact fits`**
+  (`KrigingApproxObjectivesTest.cpp:230`, `CHECK(ka.leaveOneOut("nystrom(80)") ==
+  ka.leaveOneOut("nystrom"))`, both printed `0.0000000158`): an exact floating-point equality on
+  `Kriging` with the Nyström method, code T8 does not touch (T8 changes only
+  `WarpKriging::calibrate_variance` and its default).
+- Not reproducible from one run to the next: the same commit (74d4d7f) passes the whole Octave
+  macOS job in the `pull_request` run 41168750296, and test #222 passes on Linux here.
+  Outside T8; to be handled with the thread / BLAS reproducibility tasks (T1 / T5 / T9).
+- `MLPKriging predictive variance is calibrated (#407)` **passes** in both Octave macOS runs
+  (macos-26 arm64 image, Release, Accelerate), as on the base branch (K = 5).
+
+### Cross-check with T9 (macOS Release, Accelerate, macos-15: calibration test fails)
+
+T9's failure was measured with K = 5 (T9 is not based on T8): `optim=BFGS`, coverage 0.72 <
+0.8, uncalibrated Q2 −0.68. The macOS values of the passing T8 runs are not printed (Catch2 prints
+`INFO` only on failure): the test now prints its scores on every platform (`[calibration] ...`
+lines, no assertion changed) so that the next macOS run gives them.
+
+As a substitute for the platform variation (different data / MLP initialisation on macOS, see
+T9), the test case was replayed on 40 designs (seed 407 = the test, then 1407, 2407, ...;
+`T8/calseeds.cpp`, results `T8/calseeds_linux.txt`), K = 5 vs K = 3, Linux:
+
+| optim, K | all test assertions pass | coverage > 0.8 | NLPD < 0.5 uncalibrated | NLPD < Kriging + 2 (BFGS4) | coverage mean / min |
+|---|---|---|---|---|---|
+| BFGS, 5 | 33 / 40 | 39 | 34 | – | 0.951 / 0.722 |
+| BFGS, 3 | 33 / 40 | 40 | 33 | – | 0.960 / 0.830 |
+| BFGS4, 5 | 39 / 40 | 39 | 40 | 40 | 0.964 / 0.723 |
+| BFGS4, 3 | 38 / 40 | 40 | 39 | 38 | 0.993 / 0.937 |
+
+- The T9 failure mode (single start, coverage ~0.72) is the low tail of K = 5 (seed 1 of 40 here:
+  0.722); with K = 3 the single-start coverage never falls below 0.83. T8 does not cause it and
+  makes it less likely; it cannot be stated that it removes it on macos-15 without a run there.
+- Whatever K, the single-start case fails on ~1 design in 6 (mostly `NLPD < 0.5 x uncalibrated`
+  when the uncalibrated NLPD is already moderate): the test depends on its design, as T9
+  concluded. Not loosened here; follow-up of #407 (T9's proposal).
+
+### Revision: K = 5 for a multistart
+
+The 40 designs show K = 3 over-widening the intervals of the `BFGS4` fit (coverage 0.993, var_scale
+up to 87597 with Q2 0.986): paired NLPD difference K3 − K5 **+0.56, 95 % CI [+0.32, +0.81]**
+(single start: +0.06, CI [−0.74, +1.01]). Confirmed on the 15-function benchmark with `BFGS4`
+(45 fits, 3 designs): **+0.56, CI [+0.20, +0.97]**, 12 fits worse by > 1 vs 3 better by > 1,
+coverage 0.980 vs 0.963, for a CPU saving of only 26 % (49.7 → 36.7 s, 4 cores). The initial
+benchmark had 3 `BFGS4` fits, too few to see it. Interpretation: with a multistart the fit is
+the best of n starts, while each fold is refitted from that one start on 2/3 of the data, so
+its held-out errors overstate the fit's error; with 4/5 of the data the gap is smaller. A single
+start has no such selection, and K = 3 remains equivalent there (135 fits).
+
+Decision: the default (`calibration_folds` absent or `"auto"`) is K = 3 for a single start and
+K = 5 for `"BFGSn"`, n > 1 (`WarpKriging::calibration_folds()`); an explicit value is used as
+is; the JSON records the number of folds used. On the test: `BFGS` var_scale 190.06 (K = 3),
+`BFGS4` 4395.88 (K = 5, unchanged from before T8); a new assertion checks that the default
+equals the explicit K. `ctest`: 226 / 226 (Linux, Release, OpenBLAS).

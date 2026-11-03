@@ -62,8 +62,8 @@ static arma::vec branin_proj5(const arma::mat& X) {
 }
 
 static arma::vec branin_proj10(const arma::mat& X) {
-  arma::mat W = {{0.9, -0.4, 0.7, 0.2, -0.5, 0.3, -0.1, 0.6, 0.0, -0.2},
-                 {-0.3, 0.8, 0.1, -0.6, 0.4, -0.2, 0.5, 0.0, 0.3, 0.7}};
+  arma::mat W
+      = {{0.9, -0.4, 0.7, 0.2, -0.5, 0.3, -0.1, 0.6, 0.0, -0.2}, {-0.3, 0.8, 0.1, -0.6, 0.4, -0.2, 0.5, 0.0, 0.3, 0.7}};
   W.each_col() /= arma::sum(arma::abs(W), 1);
   arma::mat U = X * W.t();
   U.each_row() -= arma::sum(arma::clamp(W, -arma::datum::inf, 0.0), 1).t();
@@ -76,14 +76,10 @@ static arma::vec branin_proj10(const arma::mat& X) {
 static double hartmann(const arma::rowvec& x, int d) {
   static const double a[4] = {1.0, 1.2, 3.0, 3.2};
   static const double A3[4][3] = {{3, 10, 30}, {0.1, 10, 35}, {3, 10, 30}, {0.1, 10, 35}};
-  static const double P3[4][3] = {{0.3689, 0.1170, 0.2673},
-                                  {0.4699, 0.4387, 0.7470},
-                                  {0.1091, 0.8732, 0.5547},
-                                  {0.0381, 0.5743, 0.8828}};
-  static const double A6[4][6] = {{10, 3, 17, 3.5, 1.7, 8},
-                                  {0.05, 10, 17, 0.1, 8, 14},
-                                  {3, 3.5, 1.7, 10, 17, 8},
-                                  {17, 8, 0.05, 10, 0.1, 14}};
+  static const double P3[4][3]
+      = {{0.3689, 0.1170, 0.2673}, {0.4699, 0.4387, 0.7470}, {0.1091, 0.8732, 0.5547}, {0.0381, 0.5743, 0.8828}};
+  static const double A6[4][6]
+      = {{10, 3, 17, 3.5, 1.7, 8}, {0.05, 10, 17, 0.1, 8, 14}, {3, 3.5, 1.7, 10, 17, 8}, {17, 8, 0.05, 10, 0.1, 14}};
   static const double P6[4][6] = {{0.1312, 0.1696, 0.5569, 0.0124, 0.8283, 0.5886},
                                   {0.2329, 0.4135, 0.8307, 0.3736, 0.1004, 0.9991},
                                   {0.2348, 0.1451, 0.3522, 0.2883, 0.3047, 0.6650},
@@ -106,10 +102,12 @@ static std::vector<Case> cases() {
   c.push_back({"branin2", 2, 30, [](const arma::mat& X) {
                  return rowmap(X, [](const arma::rowvec& x) { return branin1(15 * x(0) - 5, 15 * x(1)); });
                }});
-  c.push_back({"hartmann3", 3, 40,
-               [](const arma::mat& X) { return rowmap(X, [](const arma::rowvec& x) { return hartmann(x, 3); }); }});
-  c.push_back({"hartmann6", 6, 80,
-               [](const arma::mat& X) { return rowmap(X, [](const arma::rowvec& x) { return hartmann(x, 6); }); }});
+  c.push_back({"hartmann3", 3, 40, [](const arma::mat& X) {
+                 return rowmap(X, [](const arma::rowvec& x) { return hartmann(x, 3); });
+               }});
+  c.push_back({"hartmann6", 6, 80, [](const arma::mat& X) {
+                 return rowmap(X, [](const arma::rowvec& x) { return hartmann(x, 6); });
+               }});
   c.push_back({"ishigami", 3, 60, [](const arma::mat& X) {
                  return rowmap(X, [](const arma::rowvec& u) {
                    arma::rowvec x = -M_PI + 2 * M_PI * u;
@@ -149,22 +147,24 @@ static std::vector<Case> cases() {
                    return s;
                  });
                }});
-  c.push_back({"goldstein_log", 2, 40, [](const arma::mat& X) {
-                 return rowmap(X, [](const arma::rowvec& u) {
-                   const double x = 4 * u(0) - 2, y = 4 * u(1) - 2;
-                   const double a = 1 + std::pow(x + y + 1, 2) * (19 - 14 * x + 3 * x * x - 14 * y + 6 * x * y + 3 * y * y);
-                   const double b
-                       = 30 + std::pow(2 * x - 3 * y, 2) * (18 - 32 * x + 12 * x * x + 48 * y - 36 * x * y + 27 * y * y);
-                   return std::log(a * b);
-                 });
-               }});
+  c.push_back(
+      {"goldstein_log", 2, 40, [](const arma::mat& X) {
+         return rowmap(X, [](const arma::rowvec& u) {
+           const double x = 4 * u(0) - 2, y = 4 * u(1) - 2;
+           const double a = 1 + std::pow(x + y + 1, 2) * (19 - 14 * x + 3 * x * x - 14 * y + 6 * x * y + 3 * y * y);
+           const double b
+               = 30 + std::pow(2 * x - 3 * y, 2) * (18 - 32 * x + 12 * x * x + 48 * y - 36 * x * y + 27 * y * y);
+           return std::log(a * b);
+         });
+       }});
   c.push_back({"otlcircuit", 6, 60, [](const arma::mat& X) {
                  return rowmap(X, [](const arma::rowvec& u) {
-                   const double Rb1 = 50 + 100 * u(0), Rb2 = 25 + 45 * u(1), Rf = 0.5 + 2.5 * u(2), Rc1 = 1.2 + 1.3 * u(3),
-                                Rc2 = 0.25 + 0.95 * u(4), b = 50 + 250 * u(5);
+                   const double Rb1 = 50 + 100 * u(0), Rb2 = 25 + 45 * u(1), Rf = 0.5 + 2.5 * u(2),
+                                Rc1 = 1.2 + 1.3 * u(3), Rc2 = 0.25 + 0.95 * u(4), b = 50 + 250 * u(5);
                    const double Vb1 = 12 * Rb2 / (Rb1 + Rb2);
                    const double den = b * (Rc2 + 9) + Rf;
-                   return (Vb1 + 0.74) * b * (Rc2 + 9) / den + 11.35 * Rf / den + 0.74 * Rf * b * (Rc2 + 9) / (den * Rc1);
+                   return (Vb1 + 0.74) * b * (Rc2 + 9) / den + 11.35 * Rf / den
+                          + 0.74 * Rf * b * (Rc2 + 9) / (den * Rc1);
                  });
                }});
   c.push_back({"piston", 7, 70, [](const arma::mat& X) {
@@ -178,9 +178,8 @@ static std::vector<Case> cases() {
                  });
                }});
   c.push_back({"forrester", 1, 15, [](const arma::mat& X) {
-                 return rowmap(X, [](const arma::rowvec& x) {
-                   return std::pow(6 * x(0) - 2, 2) * std::sin(12 * x(0) - 4);
-                 });
+                 return rowmap(
+                     X, [](const arma::rowvec& x) { return std::pow(6 * x(0) - 2, 2) * std::sin(12 * x(0) - 4); });
                }});
   c.push_back({"sin_inter2", 2, 100, [](const arma::mat& X) {
                  return rowmap(X, [](const arma::rowvec& x) { return std::sin(3 * (x(0) + x(1))); });
@@ -207,7 +206,8 @@ int main(int argc, char** argv) {
       const arma::vec y = cs.f(X);
       const arma::mat Xt = arma::randu<arma::mat>(1000, cs.d);
       const arma::vec yt = cs.f(Xt);
-      const std::vector<arma::uword> hidden = cs.d >= 10 ? std::vector<arma::uword>{16, 8} : std::vector<arma::uword>{8};
+      const std::vector<arma::uword> hidden
+          = cs.d >= 10 ? std::vector<arma::uword>{16, 8} : std::vector<arma::uword>{8};
       if (dump) {
         FILE* fd = std::fopen(dump, "a");
         std::fprintf(fd, "CASE %s %d %s %s\n", cs.name.c_str(), r, optim.c_str(), folds.c_str());
@@ -226,8 +226,8 @@ int main(int argc, char** argv) {
       const double cpu = cpu_s() - c0;
       auto [mean, sd, _c, _md, _sd] = m.predict(Xt, true, false, false);
       const double vs = m.var_scale();
-      std::fprintf(fo, "FIT %s %d %s %s %.6f %.6f %.17g\n", cs.name.c_str(), r, optim.c_str(), folds.c_str(), wall, cpu,
-                   vs);
+      std::fprintf(
+          fo, "FIT %s %d %s %s %.6f %.6f %.17g\n", cs.name.c_str(), r, optim.c_str(), folds.c_str(), wall, cpu, vs);
       // test residuals with the uncalibrated stdev
       for (arma::uword i = 0; i < Xt.n_rows; ++i) {
         const double s0 = sd(i) / std::sqrt(vs);
