@@ -69,8 +69,8 @@ This page collects questions about libKriging development
  not set, so that this variable may still change the BLAS thread count. The parallel and
  sequential paths of the gradient sum in the same order, so a build without OpenMP, a
  ThreadSanitizer build and every OS (whatever its threshold of parallel loops) give the same
- result for the same BLAS (since #445; before, the order changed at n = 200 on Linux, 800
- elsewhere and without OpenMP).
+ result for the same BLAS (with the vectorized gradients of #441; before, the order changed at
+ n = 200 on Linux, 800 elsewhere and without OpenMP).
 
  These rounding differences stay at that level on a well-conditioned covariance matrix, but
  are amplified by its condition number: on noise-free, smooth data the optimum often lies

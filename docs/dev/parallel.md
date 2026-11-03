@@ -84,7 +84,7 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
 
 Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
 = 200 on Linux, 800 elsewhere until measured (`src/lib/OmpLoops.hpp`), a
-performance setting only (section 4); `n >= 200`
+performance setting only once #441 is merged (section 4); `n >= 200`
 (`compute_dX`, `covMat_sym_*`); `n_o × n_n >= 40000` (predict / simulate `R_on`,
 `covMat_rect`, Vecchia, NestedKriging).
 
@@ -126,10 +126,11 @@ from several user threads (Python `ThreadPoolExecutor`, joblib threads,
 
 - Results do not depend on the OpenMP thread count: each loop writes disjoint
   entries or sums per-row partial results in a fixed order (`BlasThreadsTest`).
-  The sequential path (below `kOmpMinRows`, without OpenMP, under TSan) sums in
-  the same order, so results do not depend on the threshold either, hence not
-  on the OS (bit-identical gradients and fitted theta for thresholds 200, 800,
-  never and a build without OpenMP:
+  With the vectorized gradients (#441, T1) the sequential path (below
+  `kOmpMinRows`, without OpenMP, under TSan) sums in the same order, so results
+  do not depend on the threshold either, hence not on the OS; before #441 the
+  gradient order switched at `kOmpMinRows` (fitted theta up to 4e-4 relative
+  apart between thresholds 200 and 800:
   [T5 log](rationalization/T5-omp-threshold-blas.md)).
 - They may depend on the BLAS thread count and build (FAQ), by rounding, and on
   the CPU: on an Intel Xeon Platinum 8573C CI runner, Ubuntu 22.04's OpenBLAS
@@ -411,7 +412,7 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 - Other BLAS (FlexiBLAS, BLIS; Accelerate): sections 5 and 8 (#422). MKL driven
   since #445, checked in CI since T9.
 - macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then;
-  performance only since #445).
+  performance only with #441).
 - Concurrent calls (3.1): Armadillo's RNG (WarpKriging warp initialization,
   subset-of-data selection) is global where Armadillo disables `thread_local`
   (MinGW, GCC on macOS); Accelerate's count not driven

@@ -103,13 +103,13 @@ void MKL_Set_Num_Threads(int nth) __attribute__((weak));
 namespace {
 typedef int (*mkl_get_max_threads_t)();
 typedef int (*mkl_set_num_threads_local_t)(int);
-typedef void (*mkl_set_num_threads_t)(int);
 mkl_get_max_threads_t get_mkl_get_max_threads() {
   return MKL_Get_Max_Threads;
 }
 mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
   return MKL_Set_Num_Threads_Local;
 }
+typedef void (*mkl_set_num_threads_t)(int);
 mkl_set_num_threads_t get_mkl_set_num_threads() {
   return MKL_Set_Num_Threads;
 }
