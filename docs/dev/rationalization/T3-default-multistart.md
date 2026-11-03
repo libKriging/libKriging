@@ -169,6 +169,40 @@ matern5_2, where the restarted single start is slow) to 3.4 (hartmann6 matern5_2
    - Not justified by this study: the value c = 2 (only 2 against 0 here; 3 in
      `docs/dev/CholJitter.md` on 6–20 sets) and `max_long_range_restart = 2`.
 
+### What the decision rests on (Wilson 95 %)
+
+The decision rests on this task's own grid (T3 protocol above: 136 configurations x 30 sets,
+pass A), not on a T7 grid: T7 had no driver when it was run. The numbers it uses:
+
+| comparison | miss rates (4080 sets) | paired: only the first misses : only the second | share of the discordant sets won by the second |
+|---|---|---|---|
+| BFGS vs BFGS4 | 18 % [17, 19] vs 5 % [4, 6] | 552 : 25 | 96 % [94, 97] |
+| BFGS4 vs BFGS10 | 5 % [4, 6] vs 1 % [1, 1] | 200 : 39 | 84 % [78, 88] |
+| BFGS vs BFGS10 | 18 % [17, 19] vs 1 % [1, 1] | 691 : 3 | 100 % [99, 100] |
+
+Per (objective, noise) cell, BFGS4 wins 92–100 % of the sets where BFGS and BFGS4 disagree (lower
+bounds 86–95 %), for 7.7 (LL nugget) to 24.7 (LOO) points fewer misses. BFGS10 against BFGS4: 2.1–2.8
+points fewer misses on LL / LMP (won 73–89 % of the discordant sets), but **10.7 points on LOO**
+(BFGS4 still misses 12 % [10, 15] of the LOO fits, won by BFGS10 91 % [84, 96]): on LOO the default
+remains a weak choice and BFGS10 is the one to recommend.
+
+### What the part of the grid that was not run could change
+
+- **LOO / LMP at n 1000** (not run, ~60 s per LOO single start): the LOO miss rate of BFGS4 does
+  not fall with n (pooled LOO, 240 sets each: n 100 10 % [7, 14], n 200 12 % [9, 17], n 500 13 %
+  [10, 18]), so the gap to BFGS10 could be as large there; the cost ratios (x 2.8–3.8 on one core) are not measured there.
+- **n > 1000, d > 8, other designs** (clustered, LHS, real data): the single-start miss rate does
+  not grow with n here (14–22 %), but `docs/dev/CholJitter.md` has 2 sets at n 2000 only; with more
+  inactive inputs (sinhalf d 8 is the worst family, BFGS4 10 %) 4 starts may not be enough.
+- **matern3_2, exp**: not run; matern5_2 behaves like gauss for BFGS4 (5 % both).
+- **More cores** (10–20): BFGS10 would cost one round of wall time like BFGS4 here; the single-core
+  cost (the reason for k = 4) does not change.
+- **BFGS4 without the long-range restart on nugget fits** (the warm start is a restarted single
+  start): not run; it decides whether the restart matters on the default nugget path.
+- **Vecchia / Nystrom fits**, which now follow the default: not run.
+- None of these can reverse BFGS4 against BFGS on the measured cells (lower bound 86 % of the
+  discordant sets); they can change the choice of k (4 vs 10) and the LOO recommendation.
+
 ## Limits of the sample (adversarial review of the conclusions)
 
 - **Reference = best of the variants**, BFGS10 included: a miss is relative to the best found,
@@ -204,6 +238,16 @@ matern5_2, where the restarted single start is slow) to 3.4 (hartmann6 matern5_2
 installed on the machine: their binding tests are left to the CI.
 
 ## Follow-ups
+
+- `Kriging::update(..., refit = true)` (noise-free / heterogeneous) refits by one warm-started
+  L-BFGS-B run from the current theta whatever `optim` (the nugget path calls `fit` with the
+  model's `optim`, now `"BFGS4"`): the default multistart does not apply to updates. Found by the R
+  test `test-KrigingMethods.R` ("update almost converge"), which compares an update with a fit
+  started at the same theta: that fit now passes `optim = "BFGS"` (as the update), its intent.
+- `KrigingApproxObjectivesTest` (C++, not modified here, explicit `"BFGS"`) failed once on macOS
+  (Octave job) on the exact equality `leaveOneOut("nystrom(80)") == leaveOneOut("nystrom")`
+  (0.0000000158 both, printed) and passed on the other run of the same commit: a non-deterministic
+  Nystrom evaluation on macOS, not caused by the default change.
 
 - T5: single start slower on 4 cores than on 1 at n 200 (x 2.5, CPU x 10), nugget fit (x 2.6); the
   nugget warm start is serial in front of the pool.

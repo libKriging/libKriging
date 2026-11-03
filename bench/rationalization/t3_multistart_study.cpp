@@ -120,8 +120,16 @@ int main(int argc, char** argv) {
       std::string row;
       try {
         Kriging k = noise == "nugget" ? Kriging(kernel, Kriging::NoiseModel::Nugget) : Kriging(kernel);
-        std::fprintf(stderr, "FIT %s %s %s %s n%llu d%llu set %d %s\n", family.c_str(), kernel.c_str(),
-                     noise.c_str(), objective.c_str(), (unsigned long long)n, (unsigned long long)d, s, v.c_str());
+        std::fprintf(stderr,
+                     "FIT %s %s %s %s n%llu d%llu set %d %s\n",
+                     family.c_str(),
+                     kernel.c_str(),
+                     noise.c_str(),
+                     objective.c_str(),
+                     (unsigned long long)n,
+                     (unsigned long long)d,
+                     s,
+                     v.c_str());
         // the OpenBLAS threads of the previous predict spin ~100 ms: not this fit's CPU time
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
         const double c0 = cpu_ms();
@@ -131,7 +139,9 @@ int main(int argc, char** argv) {
         const double cms = cpu_ms() - c0;
         const arma::vec m = std::get<0>(k.predict(Xt, false, false, false));
         const double rmse = std::sqrt(arma::mean(arma::square(m - yt))) / arma::stddev(yt);
-        const double obj = objective == "LOO" ? k.leaveOneOut() : objective == "LMP" ? k.logMargPost() : k.logLikelihood();
+        const double obj = objective == "LOO"   ? k.leaveOneOut()
+                           : objective == "LMP" ? k.logMargPost()
+                                                : k.logLikelihood();
         std::string th;
         for (arma::uword j = 0; j < d; ++j) {
           char b[32];
@@ -145,9 +155,18 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "ERROR %s\n", e.what());
         row = "nan,nan,nan,nan,nan,nan";
       }
-      std::printf("%s,%s,%s,%s,%llu,%llu,%d,%s,%g,%d,%s\n", family.c_str(), kernel.c_str(), noise.c_str(),
-                  objective.c_str(), (unsigned long long)n, (unsigned long long)d, s, v.c_str(), pct,
-                  Optim::get_num_threads(), row.c_str());
+      std::printf("%s,%s,%s,%s,%llu,%llu,%d,%s,%g,%d,%s\n",
+                  family.c_str(),
+                  kernel.c_str(),
+                  noise.c_str(),
+                  objective.c_str(),
+                  (unsigned long long)n,
+                  (unsigned long long)d,
+                  s,
+                  v.c_str(),
+                  pct,
+                  Optim::get_num_threads(),
+                  row.c_str());
       std::fflush(stdout);
     }
   }
