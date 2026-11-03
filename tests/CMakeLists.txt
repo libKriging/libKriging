@@ -381,6 +381,10 @@ set_tests_properties(BlasThreadsTest/OPENBLAS_NUM_THREADS PROPERTIES ENVIRONMENT
 
 add_executable(ConcurrentCallsTest ConcurrentCallsTest.cpp)
 target_link_libraries(ConcurrentCallsTest LINK_PUBLIC Kriging Catch2)
+if (SANITIZE STREQUAL "ADDRESS" OR SANITIZE STREQUAL "LEAK")
+  # sanitizer allocators are not fork-safe: no allocation in the fork child
+  target_compile_definitions(ConcurrentCallsTest PRIVATE LK_TEST_FORK_NO_CHILD_ALLOC=1)
+endif ()
 add_dependencies(all_test_binaries ConcurrentCallsTest)
 catch_discover_tests(ConcurrentCallsTest)
 # bit-identical to the sequential results when the OpenBLAS count cannot change

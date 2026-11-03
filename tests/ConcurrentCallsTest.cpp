@@ -36,6 +36,12 @@ int openblas_get_num_threads() __attribute__((weak));
 #define LK_TEST_OPENBLAS 1
 #endif
 
+#if defined(__ELF__)
+extern "C" {
+int MKL_Get_Max_Threads() __attribute__((weak));
+}
+#endif
+
 // Public fit / predict / simulate calls from several user threads at once
 // (Python ThreadPoolExecutor, joblib threads, std::thread): no crash, the
 // results of the same calls run one after the other, and the caller's
@@ -47,6 +53,16 @@ int blas_count() {
 #ifdef LK_TEST_OPENBLAS
   if (openblas_get_num_threads)
     return openblas_get_num_threads();
+#endif
+  return 0;
+}
+
+// MKL count of the calling thread, 0 without MKL (or where weak symbols are
+// not available: no MKL run in CI there)
+int mkl_count() {
+#if defined(__ELF__)
+  if (MKL_Get_Max_Threads)
+    return MKL_Get_Max_Threads();
 #endif
   return 0;
 }
@@ -145,7 +161,14 @@ double rel_diff(const Result& a, const Result& b) {
 
 }  // namespace
 
-TEST_CASE("Concurrent fit / predict / simulate from user threads", "[threads][concurrent]") {
+namespace {
+
+// Runs every job sequentially (reference), then from 6 user threads x 3 rounds,
+// at the given thread budget; returns the largest relative difference to the
+// reference and checks it against `tol`.
+double concurrent_vs_sequential(double budget_percent, double tol) {
+  const double saved_percent = Optim::get_num_threads_percent();
+  Optim::set_num_threads_percent(budget_percent);
   const int initial = blas_count();
   // the caller's own count: a known value, restored by the library at the end
   const int caller = std::max(1, std::min(3, initial));
@@ -199,30 +222,54 @@ TEST_CASE("Concurrent fit / predict / simulate from user threads", "[threads][co
 
   for (int t = 0; t < n_threads; ++t)
     CHECK(errors[t].empty());
-  // Concurrent calls share the budget, so their OpenBLAS count is lower than
-  // the one of the sequential calls, which changes the rounding of the BLAS
-  // sums (FAQ, reproducibility): bit-identical results when the count cannot
-  // change (no OpenBLAS, or loaded with 1 thread: the ctest variant
-  // ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1), else up to rounding (4e-14
-  // measured).
-  const double tol = initial > 1 ? 1e-10 : 0.0;
   double worst = 0;
   for (int t = 0; t < n_threads; ++t)
     for (int r = 0; r < n_rounds; ++r)
       for (size_t i = 0; i < jobs.size(); ++i) {
         const double d = rel_diff(got[t][r * jobs.size() + i], ref[i]);
-        INFO("thread " << t << ", round " << r << ", job " << i << " (" << jobs[i].kernel << " " << jobs[i].optim << " "
-                       << jobs[i].objective << "): relative difference " << d);
+        INFO("budget " << budget_percent << " %, thread " << t << ", round " << r << ", job " << i << " ("
+                       << jobs[i].kernel << " " << jobs[i].optim << " " << jobs[i].objective
+                       << "): relative difference " << d);
         CHECK(d <= tol);
         worst = std::max(worst, d);
       }
-  WARN("largest relative difference to the sequential results: " << worst << " (tolerance " << tol << ")");
+  WARN("budget " << budget_percent << " %: largest relative difference to the sequential results: " << worst
+                 << " (tolerance " << tol << ")");
   // the count the library sets is a share of the budget, never more than the
   // count OpenBLAS had when the library first used it
   INFO("OpenBLAS count: caller " << caller << ", max seen " << max_seen.load() << ", initial " << initial);
   CHECK(max_seen.load() <= std::max(initial, caller));
   CHECK(blas_count() == (initial > 0 ? caller : 0));
   set_blas_count(initial);
+  Optim::set_num_threads_percent(saved_percent);
+  return worst;
+}
+
+}  // namespace
+
+// Budget of 1 thread: the sequential and the concurrent calls all run their
+// BLAS (OpenBLAS, MKL; Accelerate is never changed) and OpenMP loops at 1
+// thread, so the results must be bit-identical on every backend: what remains
+// is the concurrency itself (shared state, RNG, count save / restore).
+TEST_CASE("Concurrent calls at a budget of 1 thread give the sequential results", "[threads][concurrent]") {
+  concurrent_vs_sequential(1e-6, 0.0);
+}
+
+TEST_CASE("Concurrent fit / predict / simulate from user threads", "[threads][concurrent]") {
+  // Concurrent calls share the budget, so their BLAS count is lower than the
+  // one of the sequential calls, which changes the rounding of the BLAS sums
+  // (FAQ, reproducibility); a fit amplifies it through the optimizer's
+  // stopping point in the flat part of the likelihood. Bit-identical results
+  // when no count can change (no OpenBLAS / MKL, or loaded with 1 thread: the
+  // ctest variant ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1), else to 1e-3,
+  // the tolerance of the fitted theta between BLAS counts in BlasBackendTest:
+  // measured here 4e-14 (Intel Xeon 4 cores), 6.6e-7 (AMD EPYC 9V74 2 cores,
+  // gauss single start), 7.2e-5 (i9-10900K 10 cores, matern5_2 BFGS4); BFGS4
+  // with 1 or 4 workers differs by up to 8.8e-5 for the same reason (T9 log).
+  // Races (RNG, shared state) give differences of order 1 (other starts), and
+  // are checked bit for bit by the budget-1 case above.
+  const bool count_can_change = blas_count() > 1 || mkl_count() > 1;
+  concurrent_vs_sequential(100, count_can_change ? 1e-3 : 0.0);
 }
 
 TEST_CASE("Optim::get_num_threads is not divided between concurrent calls", "[threads][concurrent]") {
@@ -245,6 +292,23 @@ TEST_CASE("Optim::get_num_threads is not divided between concurrent calls", "[th
   CHECK(seen_min.load() == full);
 }
 
+// ASan / LSan: their allocator is not fork-safe in a multithreaded process (a
+// child of a fork() made while another thread allocates blocks forever in the
+// sanitizer's allocator lock: ASan of GCC 13, LSan of GCC 11; T6 log). Under
+// them the child only checks its BLAS count, without allocating; the parent
+// side (fork handlers while other threads fit, count restored) is unchanged.
+// LSan has no predefined macro: tests/CMakeLists.txt defines
+// LK_TEST_FORK_NO_CHILD_ALLOC for SANITIZE=LEAK / ADDRESS.
+#if !defined(LK_TEST_FORK_NO_CHILD_ALLOC)
+#if defined(__SANITIZE_ADDRESS__)
+#define LK_TEST_FORK_NO_CHILD_ALLOC 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer)
+#define LK_TEST_FORK_NO_CHILD_ALLOC 1
+#endif
+#endif
+#endif
+
 #if defined(LK_TEST_FORK) && !defined(LK_TEST_TSAN)
 // fork() from one thread while others fit: the child runs a fit of its own
 // (no lock held by a thread that does not exist in the child, no scope of
@@ -266,23 +330,38 @@ TEST_CASE("fork() during concurrent fits", "[threads][concurrent]") {
   int failures = 0;
   for (int f = 0; f < 5; ++f) {
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    // The child's verdict comes back through a pipe, not its exit status:
+    // under valgrind the exit status is valgrind's (--error-exitcode), whose
+    // leak check in the child counts the objects of the parent's threads,
+    // which do not exist there.
+    int fds[2];
+    REQUIRE(pipe(fds) == 0);
     const pid_t pid = fork();
     if (pid == 0) {
+      close(fds[0]);
       // alarm: a deadlock in the child fails the test instead of hanging it
       alarm(60);
-      if (blas_count() > 1)
-        _exit(2);
-      Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS2");
-      if (!k.theta().is_finite())
-        _exit(3);
-      _exit(blas_count() <= 1 ? 0 : 4);
+      char verdict = blas_count() > 1 ? 2 : 0;
+#ifndef LK_TEST_FORK_NO_CHILD_ALLOC
+      if (verdict == 0) {
+        Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS2");
+        verdict = !k.theta().is_finite() ? 3 : (blas_count() > 1 ? 4 : 0);
+      }
+#endif
+      (void)!write(fds[1], &verdict, 1);
+      _exit(verdict);
     }
     REQUIRE(pid > 0);
+    close(fds[1]);
+    char verdict = -1;
+    const bool got = read(fds[0], &verdict, 1) == 1;  // 0 bytes: the child died first
+    close(fds[0]);
     int status = 0;
     REQUIRE(waitpid(pid, &status, 0) == pid);
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+    if (!got || verdict != 0) {
       ++failures;
-      WARN("child " << f << ": " << (WIFEXITED(status) ? "exit " : "signal ")
+      WARN("child " << f << ": " << (got ? "verdict " + std::to_string(verdict) : std::string("no verdict")) << ", "
+                    << (WIFEXITED(status) ? "exit " : "signal ")
                     << (WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status)));
     }
   }

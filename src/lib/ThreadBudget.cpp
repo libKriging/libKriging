@@ -314,6 +314,16 @@ CallCount::~CallCount() {
 BudgetScope::BudgetScope() : blas(in_pool_worker() ? 0 : blas_threads_for(budget_total())) {}
 
 void blas_count_fork_prepare() {
+  // Function-local statics read on entry to every public call: a fork() made
+  // while another thread is initializing one leaves its guard taken in the
+  // child, whose first call then blocks forever in __cxa_guard_acquire
+  // (observed with MKL, whose first count query initializes MKL for
+  // milliseconds: T9 log, section 2.1). Initialize them here, before fork(),
+  // waiting for an initialization in progress elsewhere to complete. None of
+  // them takes a lock of the library, so this cannot deadlock with the locks
+  // below. The MKL entry points (T5) are added by T5 / T9.
+  physical_cores();
+  initial_blas_threads();
   blas_state().m.lock();
 }
 
