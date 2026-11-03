@@ -292,6 +292,23 @@ TEST_CASE("Optim::get_num_threads is not divided between concurrent calls", "[th
   CHECK(seen_min.load() == full);
 }
 
+// ASan / LSan: their allocator is not fork-safe in a multithreaded process (a
+// child of a fork() made while another thread allocates blocks forever in the
+// sanitizer's allocator lock: ASan of GCC 13, LSan of GCC 11; T6 log). Under
+// them the child only checks its BLAS count, without allocating; the parent
+// side (fork handlers while other threads fit, count restored) is unchanged.
+// LSan has no predefined macro: tests/CMakeLists.txt defines
+// LK_TEST_FORK_NO_CHILD_ALLOC for SANITIZE=LEAK / ADDRESS.
+#if !defined(LK_TEST_FORK_NO_CHILD_ALLOC)
+#if defined(__SANITIZE_ADDRESS__)
+#define LK_TEST_FORK_NO_CHILD_ALLOC 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer)
+#define LK_TEST_FORK_NO_CHILD_ALLOC 1
+#endif
+#endif
+#endif
+
 #if defined(LK_TEST_FORK) && !defined(LK_TEST_TSAN)
 // fork() from one thread while others fit: the child runs a fit of its own
 // (no lock held by a thread that does not exist in the child, no scope of
@@ -313,23 +330,38 @@ TEST_CASE("fork() during concurrent fits", "[threads][concurrent]") {
   int failures = 0;
   for (int f = 0; f < 5; ++f) {
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    // The child's verdict comes back through a pipe, not its exit status:
+    // under valgrind the exit status is valgrind's (--error-exitcode), whose
+    // leak check in the child counts the objects of the parent's threads,
+    // which do not exist there.
+    int fds[2];
+    REQUIRE(pipe(fds) == 0);
     const pid_t pid = fork();
     if (pid == 0) {
+      close(fds[0]);
       // alarm: a deadlock in the child fails the test instead of hanging it
       alarm(60);
-      if (blas_count() > 1)
-        _exit(2);
-      Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS2");
-      if (!k.theta().is_finite())
-        _exit(3);
-      _exit(blas_count() <= 1 ? 0 : 4);
+      char verdict = blas_count() > 1 ? 2 : 0;
+#ifndef LK_TEST_FORK_NO_CHILD_ALLOC
+      if (verdict == 0) {
+        Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS2");
+        verdict = !k.theta().is_finite() ? 3 : (blas_count() > 1 ? 4 : 0);
+      }
+#endif
+      (void)!write(fds[1], &verdict, 1);
+      _exit(verdict);
     }
     REQUIRE(pid > 0);
+    close(fds[1]);
+    char verdict = -1;
+    const bool got = read(fds[0], &verdict, 1) == 1;  // 0 bytes: the child died first
+    close(fds[0]);
     int status = 0;
     REQUIRE(waitpid(pid, &status, 0) == pid);
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+    if (!got || verdict != 0) {
       ++failures;
-      WARN("child " << f << ": " << (WIFEXITED(status) ? "exit " : "signal ")
+      WARN("child " << f << ": " << (got ? "verdict " + std::to_string(verdict) : std::string("no verdict")) << ", "
+                    << (WIFEXITED(status) ? "exit " : "signal ")
                     << (WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status)));
     }
   }

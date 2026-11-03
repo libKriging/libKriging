@@ -115,9 +115,10 @@ from several user threads (Python `ThreadPoolExecutor`, joblib threads,
 - **Settings** (`Optim::*`, `LinearAlgebra::*`): configuration-before-use. Reads
   from concurrent calls are safe; setting one while calls run is a data race
   and a fit reads several settings at different times. Set them first.
-- Results equal the sequential ones, up to the rounding of the BLAS count
-  (4e-14 relative measured on the stress test; bit-identical with one BLAS
-  thread): `ConcurrentCallsTest`.
+- Results equal the sequential ones, up to the rounding of the BLAS count:
+  bit-identical when every call runs at 1 BLAS thread; otherwise 4e-14 to
+  7e-5 relative measured (machine-dependent, amplified by the optimizer's
+  stopping point): `ConcurrentCallsTest`.
 - Not covered: two threads using the **same** model object (not supported,
   as for any non-const object), Accelerate (no per-thread control, section 5);
   MKL: per-thread count since #445, concurrent calls not yet run against a real MKL (T9).

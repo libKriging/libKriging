@@ -94,9 +94,10 @@ macOS): there concurrent WarpKriging fits or subset selections still share it
 | fork children | 4 of 5 deadlocked (SIGALRM) in run 1; runs 2–3 did not finish in 300 s | 5 / 5 exit 0, 3 runs |
 
 The 4e-14 difference is the rounding of the BLAS sums with the smaller BLAS
-share of concurrent calls (identical in every thread and round): the test
-requires bit-identical results when the count cannot change (no OpenBLAS, or
-loaded with 1 thread), 1e-10 relative otherwise. Before the fix, a job's result
+share of concurrent calls (identical in every thread and round). The first
+version required bit-identical results when the count cannot change (no
+OpenBLAS, or loaded with 1 thread) and 1e-10 relative otherwise; the CI showed
+that 1e-10 was the rounding of one machine (section "CI of #446" below). Before the fix, a job's result
 also depended on the job run before it in the same process: `simulate(seed)`
 reseeds the engine that draws the next fit's starts (unchanged, now per
 thread); the test resets the seed before each job.
@@ -135,6 +136,92 @@ Release build, OpenBLAS 0.3.26 pthreads: `ctest -j2`: **230 / 230 passed**
 `ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1`. Bindings not built here (no
 signature change: `dump_cpp.py` listing identical before / after).
 
+## CI of #446 (head `7b74d6e`) and fixes
+
+Failed jobs, the same in the push and pull_request runs:
+
+| Job | Failing test | Cause |
+|---|---|---|
+| Julia Windows, Octave Linux (`main.yml`), Coverage mode (`analysis.yml`) | `Concurrent fit / predict / simulate from user threads` | job 0 (gauss, single-start `BFGS`, LL) differs from the sequential run by 7.0e-7 (Windows), 4.6e-7 (Coverage) relative, identical in every thread and round; tolerance 1e-10 |
+| Address Sanitizer | `fork() during concurrent fits` (and the `OPENBLAS_NUM_THREADS=1` variant, which runs it too) | one child killed by its 60 s alarm |
+| Leak Sanitizer | same | all 5 children killed by the alarm |
+| Memcheck mode | same | children exit 1; child 0 killed by the alarm |
+
+### Tolerance (T9 log, section 2.6, ported)
+
+The concurrent calls run their BLAS at a smaller share than the sequential
+reference (6 calls on a budget of 2: 1 thread vs 2); the rounding change is
+amplified by the stopping point of a single-start gauss fit. Not a race: the
+variant `ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1` passed bit for bit on the
+same runners. Ported from T9 (`e30acf5`, `31f81f6`):
+
+- new case "Concurrent calls at a budget of 1 thread give the sequential
+  results": sequential and concurrent calls all at 1 BLAS / OpenMP thread,
+  **bit-identical required on every backend**; it checks the concurrency itself
+  (RNG, shared state, count save / restore) at full strength, independently of
+  the BLAS rounding;
+- full-budget case: bit-identical when neither OpenBLAS nor MKL can change
+  count (MKL detected through `MKL_Get_Max_Threads`, weak symbol), else
+  **1e-3 relative — provisional, decision pending with the user**. T9's
+  measurements: 6.6e-7 (AMD EPYC 2 cores), 7.2e-5 (i9-10900K, matern5_2 BFGS4),
+  BFGS4 with 1 vs 4 workers 8.8e-5; 1e-3 is the tolerance on theta between BLAS
+  counts in T9's `BlasBackendTest`. A race or a shared RNG gives differences of
+  order 1 (other starts), and is caught bit for bit by the budget-1 case.
+
+### Fork prepare handler (T9 log, section 2.1, ported)
+
+`blas_count_fork_prepare` now initializes the function-local statics read on
+entry to every public call (`physical_cores()`, `initial_blas_threads()`) before
+locking: a `fork()` made while another thread is initializing one would copy
+its guard "in progress" into the child, whose first call then waits forever
+(seen by T9 with MKL, whose first count query loads MKL for milliseconds). With
+OpenBLAS only, the window is short, but the test forks 20 ms after starting 3
+fitting threads, i.e. during their first calls; under valgrind / ASan, which
+slow these first calls down, it is the case of the CI's child 0. T9's
+`initial_mkl_threads()` and `touch_mkl_entry_points()` belong to T5's MKL code
+and are not on this branch: they come with T5 / T9.
+
+Not ported: T9 section 2.2 (the child handler sets MKL's global count to 1): it
+needs T5's MKL entry points (`MKL_Set_Num_Threads` via weak symbol / dlsym /
+GetProcAddress, next to T5's `MKL_Get_Max_Threads` / `MKL_Set_Num_Threads_Local`);
+left to T9.
+
+### Fork test under valgrind and the sanitizers
+
+- **Memcheck** (`--error-exitcode=1`): the child's exit status is valgrind's.
+  Reproduced locally (Release, the CI's valgrind options): the parent has 0
+  errors; every child reports 140–380 kB "definitely lost", all of them objects
+  of the parent's fitting threads (the pool's `std::vector<std::thread>`,
+  `run_task_pool` buffers): those threads do not exist in the child, so their
+  memory is unreachable there. Not a leak of the library. Fix in the test: the
+  child sends its verdict through a pipe (`write`, async-signal-safe) before
+  `_exit`; the parent reads it (no byte: the child died or was killed), the
+  exit status is only reported. After: the fork case and `[concurrent]` pass
+  under valgrind with the CI options.
+- **ASan** (GCC 13 locally, 3 runs: one random child per run) and **LSan**
+  (GCC 11 on the CI, all children): gdb on the stuck ASan child:
+  `__sanitizer::Mutex::Lock` ← `SizeClassAllocator64::GetFromAllocator` ←
+  `asan_malloc` ← `lkalloc::malloc` ← `arma::Mat::init_cold` (the child's fit).
+  The sanitizer's allocator lock was held by another parent thread at
+  `fork()`: the runtimes of these versions do not lock their allocator around
+  `fork()` (glibc's malloc does), and POSIX only guarantees async-signal-safe
+  functions in the child of a multithreaded process. Outside libKriging; no
+  lock of the library is involved. Change: with ASan / LSan
+  (`LK_TEST_FORK_NO_CHILD_ALLOC`, set by `tests/CMakeLists.txt` for
+  `SANITIZE=ADDRESS / LEAK`, and by `__SANITIZE_ADDRESS__` /
+  `__has_feature`), the child checks its BLAS count and reports, without
+  allocating (no fit); the parent side is unchanged (fork handlers run while 3
+  threads fit, count restored, no deadlock in the parent). The child's fit is
+  still run in every other build (Release / Debug CI jobs, Memcheck,
+  Coverage). After: ASan 5 / 5 runs, LSan (GCC 13) pass.
+
+### Local checks after the fixes
+
+Release, OpenBLAS 0.3.26: `ctest -j2` 231 / 231; `ConcurrentCallsTest` 3 / 3
+runs (budget 1: 0 difference; full budget: 4e-14). Under valgrind (CI options):
+fork case and `[concurrent]` pass. ASan (Debug, GCC 13): 5 / 5 runs; LSan:
+pass. TSan: 0 report in 3 runs, 0 with the CI environment.
+
 ## Open items
 
 - MKL / Accelerate: their thread counts are not driven (T5); with MKL,
@@ -143,6 +230,9 @@ signature change: `dump_cpp.py` listing identical before / after).
 - Armadillo's RNG is global on MinGW / macOS GCC (Armadillo disables its
   `thread_local` there): concurrent WarpKriging fits or subset-of-data
   selections race on it on these platforms (R Windows binding).
+- Full-budget tolerance of `ConcurrentCallsTest`: 1e-3 provisional (T9's
+  value), decision pending with the user.
+- MKL count in the fork child (T9 section 2.2): with T5 / T9.
 - Two threads on the same model object: not supported (documented).
 - `simulate(seed)` changes the seed of the next fit's starts in the same
   thread (pre-existing coupling, kept).
