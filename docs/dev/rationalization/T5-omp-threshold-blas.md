@@ -172,7 +172,10 @@ at 100 % in a child cgroup:
 
 ## 5. Checks
 
-- `ctest` (Release, OpenBLAS pthreads, 4 cores): 226 / 226 passed.
+- `ctest` (Release, OpenBLAS pthreads, 4 cores): 226 / 226 passed; after the revert of the
+  gradient hunk and the T9 ports (2026-11-03): 228 / 228 (new `BlasThreadsTest/BLAS_NUM_THREADS=1`
+  included). Test merge of `origin/ccr-54a50343-4jupn9-t1-vectorized-gradients` (80d66f5):
+  no conflict in `src/lib/KrigingImpl.cpp`; only `CHANGELOG.md` conflicts (adjacent entries).
 - TSan build (`-DSANITIZE=THREAD`, RelWithDebInfo, GCC 13), CI settings
   (`OMP_NUM_THREADS=1`, `.tsan-suppressions`, `tools/linux-macos/test.sh`): `BlasThreadsTest`
   (9 test cases, including the new MKL one, skipped without MKL) and `KrigingTest` pass, 0
