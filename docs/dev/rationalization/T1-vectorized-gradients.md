@@ -11,9 +11,9 @@ gradient is only reached thanks to a change outside the pair loop
 | Criterion | Result |
 |---|---|
 | Gradients equal to the former ones to 1e-10 relative, well-conditioned R, all kernels, d 1-10 | 2.5e-12 worst (cond(R) < 1e8) |
-| FD gradient tests, full ctest | pass (226/226) |
+| FD gradient tests, full ctest | pass (228/228 with `GradientThreadsTest`) |
 | Single-thread gradient time x2 lower, n = 500 and 1500, d = 4 | LL x2.2-3.7, LMP x10-15 (pair loop alone: LL x2.5-3.7) |
-| One summation order whatever threads / OS | yes for the pair loops (bitwise, 1/3/4 threads); BLAS calls excluded |
+| One summation order whatever threads / OS | yes for the pair loops (bitwise for 1-7 threads and `LK_OMP_MIN_ROWS` = 1 / 200 / 1e6; `GradientThreadsTest`); BLAS calls excluded |
 | Memory stated | section Memory |
 
 ## Changes
@@ -25,7 +25,8 @@ gradient is only reached thanks to a change outside the pair loop
   1/theta^3, sqrt(5)/theta, ...) are computed once per dimension and per
   evaluation, so a pair costs at most one division per dimension (one to three
   in `Covariance.cpp`).
-- `KrigingImpl.cpp`: one pair loop `sum_pairs_dln<NW>` shared by both
+- `KrigingImpl.cpp`: one pair loop `sum_pairs_dln<NW>` (in
+  `SeparableDln.hpp`, with the kernel dispatch `with_dln`) shared by both
   gradients: `out[l*d + k] = sum_{j<i} W(i,j)[l] * D_k(i,j)`, the kernel
   dispatched once per call (template, inlined), no `std::function` and no
   `arma::vec` per pair, contiguous accesses (column i of the symmetric R,
@@ -47,14 +48,50 @@ gradient is only reached thanks to a change outside the pair loop
 ## Summation order
 
 The pair sum is taken row by row (j ascending), then over the rows (i
-ascending), for every n, thread count and OS. OpenMP only spreads the rows
-over the threads from n = `kOmpMinRows` on, which does not change the result:
-the `kOmpMinRows` order dependence of the gradient (200 on Linux, 800
-elsewhere) is removed. Checked: gradients bitwise identical with
-`OMP_NUM_THREADS` = 1, 3, 4 at n = 150 (< kOmpMinRows), 300, 1000 (gauss,
-matern5_2, d = 4, `OPENBLAS_NUM_THREADS=1`). Not covered by T1: the BLAS / LAPACK
-calls around the loop (R^-1, triangular solves) still depend on the BLAS
-thread count and vendor.
+ascending), for every n, thread count and OS. The helper
+(`libKriging::detail::sum_pairs_dln`, `src/lib/SeparableDln.hpp`) takes its
+thread count as an argument; `KrigingImpl.cpp` passes the budget from n =
+`kOmpMinRows` on and 1 below, which only decides how many threads share the
+rows: the `kOmpMinRows` order dependence of the gradient (200 on Linux, 800
+elsewhere, hence an OS dependence for 200 <= n < 800) is removed.
+
+Checks:
+
+- `tests/GradientThreadsTest.cpp` (in ctest):
+  - white box: `sum_pairs_dln` with 1 (the path below `kOmpMinRows`), 2, 3, 4
+    and 7 threads gives the same bits as a reference loop written in the
+    documented order (4 kernels, n = 300);
+  - end to end: LL and LMP gradients, plain and Nugget models, n = 100 and
+    900 (above the threshold on every OS), 4 kernels: same bits with a 1-thread
+    budget and with the whole budget (`Optim::set_num_threads_percent`).
+  - Mutation check: putting back the former sequential order for 1 thread
+    (direct accumulation, as before T1 below `kOmpMinRows`) makes both cases
+    fail.
+- Library built with `-DLK_OMP_MIN_ROWS=1` (always parallel) and
+  `-DLK_OMP_MIN_ROWS=1000000` (never parallel) against the default build (200),
+  `OMP_NUM_THREADS` = 1 and 4, `OPENBLAS_NUM_THREADS=1`, n = 60, 150, 300, 900,
+  gauss / matern5_2 / exp, d = 4: LL and LMP gradients, and the Nugget model
+  (BFGS LMP fit, then LL / LMP gradients): bitwise identical in all 144
+  comparisons.
+
+Relation with T5 (#445, commit `beb266e0`, "threshold-independent LL gradient
+reduction"): T5 put the former per-pair loop on the same order (per-row partial
+sums on both paths). T1 replaces that loop and gives the same guarantee, for
+the LMP gradient too, so T5's change of `compute_ll_grad_theta_vecs` is not
+needed on top of T1.
+
+Not covered by T1: the BLAS / LAPACK calls around the loop (R^-1, triangular
+solves) still depend on the BLAS thread count and vendor.
+
+## CI of #441 (first run)
+
+One failed check, `compare` (`.github/workflows/binding-api.yml`, run
+41168886416): the `r methods` job of the same run was cancelled at its 60 min
+timeout while `r-lib/actions/setup-r` was in `apt-get update` (Ubuntu
+mirror), before any build. Without its R dump, `compare` reports one
+difference between the bindings. The other run of the same workflow on the same
+commit (41168881090) passed `r methods` in 4 min and `compare` in 10 s:
+infrastructure, not T1.
 
 ## Measurements
 

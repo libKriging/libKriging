@@ -970,90 +970,17 @@ void KrigingImpl::print_bench(const std::map<std::string, double>& bench) {
 }
 
 namespace {
-
-// Pair loop shared by the LL and LMP theta gradients. For W(i, j) an array of
-// NW per-pair weights (pairs j < i) and D_k(i, j) = dlnCov/dtheta_k(dX_ij),
-// writes out[l * d + k] = sum_{j < i} W(i, j)[l] * D_k(i, j).
-// The sum is taken row by row (j ascending), then over the rows (i ascending),
-// whatever the number of threads, the OS or n: the rows are only spread over
-// the OpenMP threads from n = kOmpMinRows on, which does not change the result.
-// Extra memory: NW * d * n doubles (row partial sums).
-template <std::size_t NW, typename DlnFn, typename WeightFn>
-void sum_pairs_dln(const arma::mat& dX,
-                   arma::uword n,
-                   const arma::vec& theta,
-                   const DlnFn& dln,
-                   const WeightFn& weights,
-                   double* out) {
-  const arma::uword d = theta.n_elem;
-  arma::mat rows(NW * d, n, arma::fill::zeros);
-  auto add_row = [&](arma::uword i) {
-    double* acc = rows.colptr(i);
-    arma::vec D(d);
-    for (arma::uword j = 0; j < i; j++) {
-      dln(dX.colptr(i * n + j), D.memptr());
-      const std::array<double, NW> w = weights(i, j);
-      for (std::size_t l = 0; l < NW; l++)
-        for (arma::uword k = 0; k < d; k++)
-          acc[l * d + k] += w[l] * D.at(k);
-    }
-  };
+// Threads of the gradient pair loops: the budget from n = kOmpMinRows on, 1
+// below. A performance setting only: the sums do not depend on it
+// (SeparableDln.hpp, sum_pairs_dln).
+int pair_loop_threads(arma::uword n) {
 #ifdef LK_OMP_LOOPS
-#pragma omp parallel for schedule(dynamic, 8) \
-    num_threads(libKriging::detail::omp_threads()) if (n >= libKriging::detail::kOmpMinRows)
+  if (n >= libKriging::detail::kOmpMinRows)
+    return libKriging::detail::omp_threads();
 #endif
-  for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++)
-    add_row(static_cast<arma::uword>(si));
-  for (arma::uword r = 0; r < NW * d; r++)
-    out[r] = 0.0;
-  for (arma::uword i = 0; i < n; i++)
-    for (arma::uword r = 0; r < NW * d; r++)
-      out[r] += rows.at(r, i);
+  (void)n;
+  return 1;
 }
-
-// D = dlnCov/dtheta(dx, theta) for a separable kernel (SeparableDln.hpp):
-// one factor per dimension, built once per evaluation.
-template <typename Dln1>
-struct SeparableDln {
-  std::vector<Dln1> f;
-  explicit SeparableDln(const arma::vec& theta) {
-    f.reserve(theta.n_elem);
-    for (arma::uword k = 0; k < theta.n_elem; k++)
-      f.emplace_back(theta.at(k));
-  }
-  void operator()(const double* dx, double* D) const {
-    for (std::size_t k = 0; k < f.size(); k++)
-      D[k] = f[k](dx[k]);
-  }
-};
-
-struct ZeroDln {
-  arma::uword d;
-  void operator()(const double* /*dx*/, double* D) const {
-    for (arma::uword k = 0; k < d; k++)
-      D[k] = 0.0;
-  }
-};
-
-// Calls body(dln) with the dlnCov/dtheta functor of the kernel covType (the
-// kernels accepted by Covariance::resolve).
-template <typename Body>
-void with_dln(const std::string& covType, const arma::vec& theta, Body&& body) {
-  using namespace libKriging::detail;
-  if (covType == "gauss")
-    body(SeparableDln<DlnGauss>(theta));
-  else if (covType == "exp")
-    body(SeparableDln<DlnExp>(theta));
-  else if (covType == "matern3_2")
-    body(SeparableDln<DlnMatern32>(theta));
-  else if (covType == "matern5_2")
-    body(SeparableDln<DlnMatern52>(theta));
-  else if (covType == "whitenoise")
-    body(ZeroDln{theta.n_elem});
-  else
-    throw std::invalid_argument("Unsupported covariance kernel: " + covType);
-}
-
 }  // namespace
 
 void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
@@ -1076,12 +1003,13 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
   //   term1_k = x' dR/dtheta_k x  = sum 2 x_i x_j R_ij D_k(i, j)
   //   term2_k = -tr(R^-1 dR/dtheta_k) = sum -2 Rinv_ij R_ij D_k(i, j)
   arma::vec out(2 * d);
-  with_dln(m_covType, theta, [&](const auto& dln) {
-    sum_pairs_dln<2>(
+  libKriging::detail::with_dln(m_covType, theta, [&](const auto& dln) {
+    libKriging::detail::sum_pairs_dln<2>(
         dX,
         n,
         theta,
         dln,
+        pair_loop_threads(n),
         [&](arma::uword i, arma::uword j) {
           const double R_ij = R.at(j, i);  // symmetric: column i, contiguous in j
           return std::array<double, 2>{2.0 * x.at(i) * x.at(j) * R_ij, -2.0 * Rinv.at(j, i) * R_ij};
@@ -1128,12 +1056,13 @@ arma::vec KrigingImpl::compute_lmp_theta_ans(const KModel& m,
   const double c = 1.0 / (2.0 * sigma2);
   t0 = Bench::toc(bench, "u = M y, S = M + M'", t0);
   arma::vec ans(d);
-  with_dln(m_covType, theta, [&](const auto& dln) {
-    sum_pairs_dln<1>(
+  libKriging::detail::with_dln(m_covType, theta, [&](const auto& dln) {
+    libKriging::detail::sum_pairs_dln<1>(
         dX,
         n,
         theta,
         dln,
+        pair_loop_threads(n),
         [&](arma::uword i, arma::uword j) {
           // R and S symmetric: column i, contiguous in j
           return std::array<double, 1>{m.R.at(j, i) * (-0.5 * S.at(j, i) + c * (u.at(i) * q[j] + u.at(j) * q[i]))};
