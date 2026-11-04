@@ -4,10 +4,12 @@ Task specification: `docs/dev/Rationalization.md`, section T8.
 
 ## Status
 
-Done: `calibration_folds` defaults to 3 for a single-start fit (was 5) and stays 5 for a
-multistart (revised in section "CI follow-up": K = 3 over-widens the intervals of a multistart
-fit); factor no longer clamped to >= 1. Same optimiser, budget and starting point per fold as
-before (no warm start, no reduced budget).
+Done, after decision **D4** (`docs/dev/Rationalization.md` section 3): `calibration_folds`
+stays **5 everywhere**, as on master; the only change to the library is the removal of the
+>= 1 clamp of the variance factor. The K = 3 default and the later multistart-dependent rule
+(K = 3 / 5, `"auto"`) measured below were reverted, with their binding / docs / skill /
+CHANGELOG changes (section "Final state"). Sections "Measurements" to "CI follow-up" are kept
+as the record of what was measured and proposed.
 
 ## Setup
 
@@ -198,3 +200,40 @@ K = 5 for `"BFGSn"`, n > 1 (`WarpKriging::calibration_folds()`); an explicit val
 is; the JSON records the number of folds used. On the test: `BFGS` var_scale 190.06 (K = 3),
 `BFGS4` 4395.88 (K = 5, unchanged from before T8); a new assertion checks that the default
 equals the explicit K. `ctest`: 226 / 226 (Linux, Release, OpenBLAS).
+
+
+## Final state (decision D4)
+
+Library: `m_calibration_folds = 5` (unchanged from master, no `calibration_folds()` rule, no
+`"auto"`, JSON field `calibration_folds` as before T8: the K of the saved model, written since
+#407); `calibrate_variance()` sets `var_scale = mean(z²)` whenever finite and > 0 (was: only if
+> 1). Test: `MLPKrigingCalibrationTest` prints its scores on every platform (`[calibration]`
+lines) and checks that the default equals an explicit `calibration_folds = "5"`; no assertion
+loosened. Its values are those of master to every printed digit (`BFGS`: var_scale 14.8166,
+calibrated NLPD 5.30892, coverage 0.944; `BFGS4`: 4395.88, 4.31493, 1.0).
+
+### Cost of the default fit (K = 5, unchanged)
+
+Default MLPKriging optimizer: `optim = "BFGS"` (single start; `MLPKriging` / `WarpKriging`
+constructors and `fit`). T3 (#443) changes the `Kriging` / `NuggetKriging` / `NoiseKriging`
+default to `"BFGS4"` only; its diff touches no `MLPKriging` / `WarpKriging` file and its docs state
+that they keep `"BFGS"`. The cost therefore stays the one measured above for K = 5 (45
+single-start fits, 15 functions): **x3.97 CPU on 1 core** (median per fit x4.08, 10–90 %
+x3.12–x5.61), **x2.44 wall / x1.98 CPU on 4 cores**, relative to the fit without calibration;
+with `BFGS4` x1.74 CPU on 1 core (3 fits), x1.83 CPU / x1.98 wall on 4 cores. The clamp removal
+does not change the computation (same folds, same refits).
+
+### Effect of removing the clamp alone
+
+On every K = 5 fit measured — 135 single-start fits (benchmark), 45 `BFGS4` fits (benchmark), 80
+fits of the test case on 40 designs (`T8/calseeds_linux.txt`), i.e. 260 fits — the mean z² was
+> 1 (smallest 1.30, median ~60): with the clamp the factor is the same, so coverage and NLPD are
+**identical** with and without it (coverage 0.957, ΔNLPD 0 on the 135 fits). The clamp only
+acted with a reduced fold budget (3 / 135 fits with K = 5 and 10 iterations per call, not a
+default setting). The change is a consistency fix, not a measured gain: the factor is the
+maximum-likelihood estimate of the scale of the held-out residuals, and the "folds are slightly
+optimistic" rationale of the clamp is contradicted by the measured over-coverage of the folds.
+
+Checks: build Release (GCC 13, OpenBLAS 0.3.26), `ctest` 226 / 226, clang-format 14.0.6 on the
+changed files. CI: GitHub Actions ends every run of the repository in `startup_failure`
+(repository level, see `Rationalization.md`), so no CI result on this commit.

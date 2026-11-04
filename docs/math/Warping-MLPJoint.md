@@ -77,14 +77,15 @@ at fixed features sees it, since the features were fitted to the left-out
 point too.
 
 After the fit, the predictive variance is therefore calibrated by K-fold
-cross-validation (K = 3 for a single-start fit, K = 5 for a multistart
-`"BFGSn"`, n > 1, where 3 folds of 2/3 of the data, refitted from one start
-each, over-widen the intervals of the best-of-n fit): the model is refitted on each K−1 folds from
+cross-validation (K = 5): the model is refitted on each K−1 folds from
 the starting point (θ₀, W₀) of the optimiser start that gave the fit,
 with the same single-start optimiser and budget, and predicts the held-out
 fold. With eᵢ the held-out residuals and sᵢ² their predictive variances,
 
   c = mean(eᵢ² / sᵢ²)
+
+(not clamped to c >= 1: an estimate below 1 is kept, though none was seen
+in the T8 measurements)
 
 and `predict` / `simulate` / `update_simulate` use the variance c · σ² · (…)
 instead of σ² · (…). The mean, σ̂² (`sigma2()`) and `logLikelihood()` are
@@ -92,8 +93,7 @@ unchanged; c is reported by `var_scale()` and in `summary()`, kept by
 `update(refit=false)`, recomputed by `update(refit=true)`, and saved with
 the model. It costs K single-start fits, run concurrently in the
 multistart thread pool (`Optim::set_thread_pool_size`). The tuning parameter
-`calibration_folds` sets K (`0` disables the calibration, `"auto"`
-restores the default); it is not
+`calibration_folds` sets K (`0` disables the calibration); it is not
 applied with per-observation noise, nor when n < 2K.
 
 ## Simple example

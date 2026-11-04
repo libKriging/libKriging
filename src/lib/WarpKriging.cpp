@@ -2473,25 +2473,15 @@ std::pair<double, arma::vec> WarpKriging::collapse_penalty() const {
 //  warm start barely moves away from it: 95% coverage 0.92 instead of 0.96,
 //  T8), and σ² is scaled for predict/simulate by the mean squared
 //  standardised held-out residual, the maximum-likelihood scale of the
-//  held-out residuals. It is not clamped to >= 1: on 135 fits of 15 test
-//  functions it was always > 1.29 (median 60-90), and a value below 1 is as
-//  much an estimate as one above. Robust estimates (median, trimmed mean)
-//  under-cover: the heavy tail of the held-out residuals is the signal.
-//  K = 3 by default for a single start: same test coverage and NLPD as K = 5,
-//  the calibrated fit 0.6 times as long; K = 5 for a multistart, where 3
-//  folds (2/3 of the data, one start each) over-widen the intervals of the
-//  best-of-starts fit (docs/dev/rationalization/T8-mlp-calibration-cost.md).
+//  held-out residuals. It is not clamped to >= 1 (T8): a value below 1 is as
+//  much an estimate as one above, and on 260 fits (K = 5) it was always above
+//  1.29 (median ~60). Robust estimates (median, trimmed mean) under-cover:
+//  the heavy tail of the held-out residuals is the signal.
 // -------------------------------------------------------------------------
-arma::uword WarpKriging::calibration_folds() const {
-  if (m_calibration_folds != kCalibrationFoldsAuto)
-    return m_calibration_folds;
-  return (Optim::parse_method(m_optim, "BFGS").second > 1) ? 5 : 3;
-}
-
 void WarpKriging::calibrate_variance() {
   m_var_scale = 1.0;
   const arma::uword n = m_y.n_elem;
-  const arma::uword K = calibration_folds();
+  const arma::uword K = m_calibration_folds;
   if (!m_is_joint || K < 2 || n < 2 * K || !m_noise.is_empty() || total_warp_params() == 0
       || m_start_theta.n_elem != m_theta.n_elem || m_start_warp_params.n_elem != total_warp_params())
     return;
@@ -3105,7 +3095,7 @@ void WarpKriging::fit(const arma::vec& y,
     else if (key == "max_iter_bfgs")
       m_max_iter_bfgs = std::stoul(val);
     else if (key == "calibration_folds")
-      m_calibration_folds = (val == "auto") ? kCalibrationFoldsAuto : std::stoul(val);
+      m_calibration_folds = std::stoul(val);
   }
 
   if (y.n_elem != X.n_rows)
@@ -3527,7 +3517,7 @@ std::string WarpKriging::summary() const {
     if (m_fitted)
       oss << "  * total warp params: " << total_warp_params() << "\n";
     if (m_fitted && m_var_scale != 1.0)
-      oss << "  * predictive variance: sigma2 x " << m_var_scale << " (" << calibration_folds()
+      oss << "  * predictive variance: sigma2 x " << m_var_scale << " (" << m_calibration_folds
           << "-fold calibration)\n";
     summary_bottom(oss);
   }
@@ -3549,7 +3539,7 @@ void WarpKriging::dump_to_json(nlohmann::json& j) const {
   j["max_iter_bfgs"] = m_max_iter_bfgs;
   j["max_iter_adam"] = m_max_iter_adam;
   j["adam_lr"] = m_adam_lr;
-  j["calibration_folds"] = calibration_folds();  // resolved: the folds the factor comes from
+  j["calibration_folds"] = m_calibration_folds;
   j["var_scale"] = m_var_scale;
   j["start_theta"] = to_json(m_start_theta);
   j["start_warp_params"] = to_json(m_start_warp_params);
