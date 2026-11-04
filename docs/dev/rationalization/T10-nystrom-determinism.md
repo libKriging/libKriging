@@ -63,7 +63,7 @@ appendix.
 | fit then `leaveOneOut("nystrom(80)")` / `("nystrom")` alternated | 2000 | 0 |
 | same, a `malloc` of 8–512 bytes kept between calls (alignment of the buffers changes) | 2000 | 0 |
 | `OPENBLAS_NUM_THREADS` 1, 2, 4 × `OMP_NUM_THREADS` 1, 4 × `LK_NUM_THREADS_PERCENT` 0, 50, heap shifts | 500 each (12 settings) | 0 |
-| `ctest -R "...consistent with the exact fits" --repeat until-fail:200`, `OPENBLAS_NUM_THREADS` 1 and 4 (original exact check) | 2 × 200 | see 3.3 |
+| `ctest -R "...consistent with the exact fits" --repeat until-fail:200`, `OPENBLAS_NUM_THREADS` 1 and 4 (original exact check) | 2 × 200 runs | 0 failures |
 
 Within one process, at a fixed BLAS thread count, the criterion is bit-reproducible on Linux.
 
@@ -90,9 +90,10 @@ Same theta, `OPENBLAS_CORETYPE` × `OPENBLAS_NUM_THREADS` (each line one process
 
 ### 3.3 Memory checks
 
-- valgrind memcheck (`--track-origins=yes`), the test case, `OPENBLAS_NUM_THREADS=1`: see
-  section 6 (results).
-- ASan + UBSan build (RelWithDebInfo) of `KrigingApproxObjectivesTest`: see section 6.
+- valgrind 3.22 memcheck (`--track-origins=yes`), the test case (original exact check),
+  `OPENBLAS_NUM_THREADS=1`: `ERROR SUMMARY: 0 errors`, test passed (no uninitialized read).
+- ASan + UBSan build (RelWithDebInfo, GCC) of `KrigingApproxObjectivesTest`, whole file:
+  no report, 220 assertions in 9 test cases passed.
 - MSan: not run (needs every dependency, OpenBLAS and libstdc++ included, instrumented);
   valgrind covers uninitialized reads.
 
@@ -128,3 +129,82 @@ inference from (a) the code reading of section 2, (b) the measured order sensiti
 ## 6. Results of the checks
 
 (filled below)
+
+## Appendix: scripts
+
+Built against the build tree with the compile / link flags of `KrigingApproxObjectivesTest`
+(`tests/CMakeFiles/KrigingApproxObjectivesTest.dir/flags.make`, `link.txt`).
+
+`repro.cpp` (`repro reps perturb [theta1 theta2]`):
+
+```cpp
+// T10 repro: repeated leaveOneOut("nystrom(80)") / ("nystrom") on the model of
+// KrigingApproxObjectivesTest #222, bitwise comparison.
+// usage: repro reps perturb [theta1 theta2]   (theta given: optim "none")
+#include "libKriging/utils/lk_armadillo.hpp"
+#include "libKriging/Kriging.hpp"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <vector>
+static double f2d(double x1, double x2) { return std::sin(3.0 * x1) + std::cos(5.0 * x2) + x1 * x2; }
+int main(int argc, char** argv) {
+  const int reps = argc > 1 ? atoi(argv[1]) : 1000;
+  const bool perturb = argc > 2 && atoi(argv[2]) != 0;
+  arma::arma_rng::set_seed(123);
+  arma::mat X(150, 2, arma::fill::randu);
+  arma::vec y(150);
+  for (arma::uword i = 0; i < 150; ++i) y(i) = f2d(X(i, 0), X(i, 1));
+  Kriging::Parameters par;
+  std::string optim = "BFGS";
+  if (argc > 4) {
+    par.theta = arma::mat{{atof(argv[3]), atof(argv[4])}};
+    par.is_theta_estim = false;
+    optim = "none";
+  }
+  Kriging ka(y, X, "matern5_2", Trend::RegressionModel::Constant, false, optim, "LOO", par, "nystrom(80)");
+  const double ref = ka.leaveOneOut("nystrom(80)");
+  printf("theta = %.17g %.17g  loo = %.17g\n", ka.theta()(0), ka.theta()(1), ref);
+  int ndiff = 0;
+  double maxrel = 0;
+  std::vector<void*> junk;
+  for (int r = 0; r < reps; ++r) {
+    if (perturb) junk.push_back(malloc(8 * (1 + rand() % 64)));  // shift heap addresses (alignment)
+    const double v = ka.leaveOneOut(r % 2 ? "nystrom" : "nystrom(80)");
+    if (std::memcmp(&v, &ref, sizeof v) != 0) {
+      ++ndiff;
+      maxrel = std::max(maxrel, std::abs(v - ref) / std::abs(ref));
+      if (ndiff <= 3) printf("rep %d: %.17g (rel diff %.3g)\n", r, v, (v - ref) / ref);
+    }
+  }
+  printf("reps=%d ndiff=%d maxrel=%.3g\n", reps, ndiff, maxrel);
+  for (auto p : junk) free(p);
+  return ndiff != 0;
+}
+```
+
+`sens.cpp`:
+
+```cpp
+// T10: Nystrom / exact LOO at a fixed theta (the fitted one of test #222), printed to 17 digits,
+// to compare BLAS thread counts / kernels
+#include "libKriging/utils/lk_armadillo.hpp"
+#include "libKriging/Kriging.hpp"
+#include <cstdio>
+static double f2d(double x1, double x2) { return std::sin(3.0 * x1) + std::cos(5.0 * x2) + x1 * x2; }
+int main() {
+  arma::arma_rng::set_seed(123);
+  arma::mat X(150, 2, arma::fill::randu);
+  arma::vec y(150);
+  for (arma::uword i = 0; i < 150; ++i) y(i) = f2d(X(i, 0), X(i, 1));
+  Kriging::Parameters par;
+  par.theta = arma::mat{{3.5521374017423248, 1.53830560290489}};
+  par.is_theta_estim = false;
+  Kriging kn(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LOO", par, "nystrom(80)");
+  Kriging ke(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LOO", par);
+  Kriging kv(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LOO", par, "vecchia(30)");
+  printf("nystrom %.17g exact %.17g vecchia %.17g\n", kn.leaveOneOut("nystrom"), ke.leaveOneOut(), kv.leaveOneOut("vecchia"));
+}
+```
+
+The rank comparison of 3.2 used `sens.cpp` with the method string read from `argv[1]`.
