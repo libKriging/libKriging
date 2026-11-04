@@ -10,21 +10,10 @@ name: BLAS backends
 # The [backend] cases of BlasBackendTest check the backend that is loaded
 # (LK_EXPECT_BLAS makes a backend that failed to load an error, not a skip).
 #
-# Runners: the repository's self-hosted runners (dedicated to long runs and to
-# parallelism / heavy BLAS backends; any Linux distribution; the workspace
-# may persist between jobs and sudo may need a password: only `sudo -n` is
-# tried) for branches of this repository and manual runs; GitHub-hosted
-# runners for pull requests from forks, which must not run code on the
-# self-hosted machines. This condition only routes this workflow: it is not a
-# security boundary, since the workflow file of a pull_request run is taken
-# from the pull request itself (a fork can edit it, or add another workflow
-# targeting self-hosted labels). The boundary is the repository setting
-# requiring approval of workflow runs for pull requests from outside
-# contributors (T9 log, section 3). Labels: GitHub's automatic ones (self-hosted + OS),
-# overridable with the repository variables LK_SELF_HOSTED_LINUX /
-# LK_SELF_HOSTED_MACOS (JSON array, e.g. ["self-hosted.linux"]).
-# Ephemeral runners start empty: every tool and MKL are looked for first and
-# installed only when missing.
+# Runners: GitHub-hosted only (ubuntu-24.04, macos-15). The repository's
+# self-hosted runners were used for measurements (T9 log, section 3.2) and are
+# no longer targeted: a public repository's pull requests can run their own
+# workflow files on any runner registered to it.
 
 on:
   pull_request:
@@ -40,7 +29,7 @@ concurrency:
   group: blas-backends-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-# Least privilege for the token handed to the (self-hosted, persistent) runners
+# Least privilege for the workflow token
 permissions:
   contents: read
 
@@ -55,7 +44,7 @@ env:
 jobs:
   linux-mkl:
     name: "Linux ${{ matrix.name }}"
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON(vars.LK_SELF_HOSTED_LINUX || '["self-hosted","Linux"]') || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -69,115 +58,42 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          # no token left in .git/config of a workspace that persists
           persist-credentials: false
 
-      - name: Tools, OpenBLAS and oneMKL (looked for first, installed if missing)
+      - name: Install OpenBLAS and the oneMKL wheels
         shell: bash
         run: |
-          # sudo without a password only (-n): a runner on a workstation may
-          # need one, and a prompt would hang / fail the job
-          SUDO=""; [ "$(id -u)" != "0" ] && SUDO="sudo -n"
-          ARCH=$(uname -m)
-          if command -v apt-get >/dev/null; then PM=apt
-          elif command -v dnf >/dev/null; then PM=dnf
-          elif command -v zypper >/dev/null; then PM=zypper
-          else PM=none; fi
-          echo "arch $ARCH, package manager $PM"
-          # unversioned .so (link time); no pipe into grep -q: with pipefail
-          # (GitHub's bash) the SIGPIPE of the writer fails the test
-          # Directories of Armadillo's find_library (system and multiarch ones),
-          # not the subdirectories of the Debian alternatives (openblas-pthread/)
-          LIBDIRS="/usr/lib /usr/lib64 /lib /lib64 /usr/local/lib /usr/local/lib64 /usr/lib/$(uname -m)-linux-gnu /lib/$(uname -m)-linux-gnu"
-          has_lib() { for d in $LIBDIRS; do [ -e "$d/$1" ] && return 0; done; return 1; }
-          missing=()
-          command -v cmake >/dev/null || missing+=(cmake)
-          command -v ninja >/dev/null || missing+=(ninja)
-          command -v g++ >/dev/null || missing+=(g++)
-          python3 -m pip --version >/dev/null 2>&1 || missing+=(pip)
-          has_lib liblapack.so || missing+=(lapack)
-          # OpenBLAS: the development link (libopenblas.so), else the runtime
-          # library given to Armadillo's find_library (openblas_LIBRARY)
-          if ! has_lib libopenblas.so; then
-            for f in $(for d in $LIBDIRS; do echo $d/libopenblas.so.0; done) /usr/lib/$(uname -m)-linux-gnu/openblas-pthread/libopenblas.so.0; do
-              if [ -e "$f" ]; then echo "OPENBLAS_LIB=$f" >> $GITHUB_ENV; echo "OpenBLAS runtime only: $f"; break; fi
-            done
-            # only the OpenBLAS build needs it (the MKL-linked one does not)
-            grep -q "^OPENBLAS_LIB=" $GITHUB_ENV || [ "${{ matrix.link }}" != "openblas" ] || missing+=(openblas)
-          fi
-          echo "missing: ${missing[*]:-none}"
-          if [ ${#missing[@]} -gt 0 ] && [ -n "$SUDO" ] && ! $SUDO true 2>/dev/null; then
-            echo "::error::missing ${missing[*]} and no password-less sudo on runner ${RUNNER_NAME}: install them on the runner (Debian / Ubuntu: cmake ninja-build g++ python3-pip libopenblas-pthread-dev liblapack-dev)"
-            exit 1
-          fi
-          if [ ${#missing[@]} -gt 0 ]; then
-            case "$PM" in
-              apt) $SUDO apt-get update -q
-                   $SUDO apt-get install -qy cmake ninja-build g++ python3-pip libopenblas-pthread-dev liblapack-dev ;;
-              dnf) $SUDO dnf install -y cmake ninja-build gcc-c++ python3-pip openblas-devel lapack-devel ;;
-              zypper) $SUDO zypper -n install cmake ninja gcc-c++ python3-pip openblas-devel lapack-devel ;;
-              *) echo "::error::missing ${missing[*]} and no known package manager"; exit 1 ;;
-            esac
-          fi
-          cmake --version | head -1
+          sudo apt-get update -q
+          sudo apt-get install -qy libopenblas-pthread-dev liblapack-dev ninja-build
           # Ubuntu's OpenBLAS Cooperlake kernels gave wrong results on Xeon
           # 6973P-C runners (main.yml, #429): its AVX2 kernels, as the other
-          # Linux jobs (x86 only). No effect on MKL.
-          if [ "$ARCH" == "x86_64" ]; then echo "OPENBLAS_CORETYPE=Haswell" >> $GITHUB_ENV; fi
-
-          # oneMKL (x86_64 only): an installed oneAPI MKL first, else the
-          # pinned pip wheels
-          MKL_LIB=""; IOMP_LIB=""; TBB_LIB=""
-          if [ "$ARCH" == "x86_64" ]; then
-            for d in "${MKLROOT:-/nonexistent}/lib" "${MKLROOT:-/nonexistent}/lib/intel64" \
-                     /opt/intel/oneapi/mkl/latest/lib /opt/intel/oneapi/mkl/latest/lib/intel64; do
-              if [ -f "$d/libmkl_rt.so.2" ]; then MKL_LIB=$d; break; fi
-            done
-            for d in /opt/intel/oneapi/compiler/latest/lib /opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin; do
-              if [ -f "$d/libiomp5.so" ]; then IOMP_LIB=$d; break; fi
-            done
-            [ -d /opt/intel/oneapi/tbb/latest/lib/intel64/gcc4.8 ] && TBB_LIB=/opt/intel/oneapi/tbb/latest/lib/intel64/gcc4.8
-            if [ -n "$MKL_LIB" ] && [ -n "$IOMP_LIB" ]; then
-              echo "installed oneMKL: $MKL_LIB (libiomp5: $IOMP_LIB)"
-            else
-              mkdir -p "$RUNNER_TEMP/mkl" && cd "$RUNNER_TEMP/mkl"
-              python3 -m pip download --no-deps --only-binary=:all: \
-                mkl==${MKL_VERSION} intel-openmp==${INTEL_OPENMP_VERSION} tbb==${TBB_VERSION}
-              for w in *.whl; do python3 -m zipfile -e "$w" x/; done
-              MKL_LIB="$RUNNER_TEMP/mkl/x/mkl-${MKL_VERSION}.data/data/lib"
-              IOMP_LIB="$RUNNER_TEMP/mkl/x/intel_openmp-${INTEL_OPENMP_VERSION}.data/data/lib"
-              TBB_LIB="$RUNNER_TEMP/mkl/x/tbb-${TBB_VERSION}.data/data/lib"
-              rm -f *.whl
-              echo "oneMKL wheel ${MKL_VERSION}: $MKL_LIB"
-            fi
-            ls "$MKL_LIB"/libmkl_rt.so.2 "$IOMP_LIB"/libiomp5.so
-            echo "MKL_AVAILABLE=1" >> $GITHUB_ENV
-          else
-            echo "::warning::no oneMKL on $ARCH: MKL steps skipped"
-            echo "MKL_AVAILABLE=0" >> $GITHUB_ENV
-          fi
+          # Linux jobs. No effect on MKL.
+          echo "OPENBLAS_CORETYPE=Haswell" >> $GITHUB_ENV
+          mkdir -p "$RUNNER_TEMP/mkl" && cd "$RUNNER_TEMP/mkl"
+          python3 -m pip download --no-deps --only-binary=:all: \
+            mkl==${MKL_VERSION} intel-openmp==${INTEL_OPENMP_VERSION} tbb==${TBB_VERSION}
+          for w in *.whl; do python3 -m zipfile -e "$w" x/; done
+          MKL_LIB="$RUNNER_TEMP/mkl/x/mkl-${MKL_VERSION}.data/data/lib"
+          IOMP_LIB="$RUNNER_TEMP/mkl/x/intel_openmp-${INTEL_OPENMP_VERSION}.data/data/lib"
+          TBB_LIB="$RUNNER_TEMP/mkl/x/tbb-${TBB_VERSION}.data/data/lib"
+          ls "$MKL_LIB"/libmkl_rt.so.2 "$IOMP_LIB"/libiomp5.so
           echo "MKL_LIB=$MKL_LIB" >> $GITHUB_ENV
-          echo "MKL_LD_LIBRARY_PATH=$MKL_LIB:$IOMP_LIB${TBB_LIB:+:$TBB_LIB}" >> $GITHUB_ENV
+          echo "MKL_LD_LIBRARY_PATH=$MKL_LIB:$IOMP_LIB:$TBB_LIB" >> $GITHUB_ENV
+          rm -f *.whl
 
       - name: Runner
         shell: bash
         run: |
-          echo "runner: ${RUNNER_NAME} (${RUNNER_ENVIRONMENT:-unknown})"
-          cat /etc/os-release 2>/dev/null | grep -E "^PRETTY_NAME" || true
           LC_ALL=C lscpu | grep -E "^(Architecture|Model name|Vendor ID|CPU\(s\)|Thread|Core|Socket)" || true
           nproc
 
       - name: Configure and build (Release, C++ only)
         id: build
-        if: matrix.link == 'openblas' || env.MKL_AVAILABLE == '1'
         shell: bash
         run: |
-          # a self-hosted runner may keep the workspace between jobs
-          rm -rf build
           # FlexiBLAS (Fedora / RHEL default BLAS) would be found first by
           # Armadillo: the jobs test OpenBLAS and MKL themselves
           EXTRA=(-DALLOW_FLEXIBLAS_LINUX=OFF)
-          if [ -n "${OPENBLAS_LIB:-}" ]; then EXTRA+=(-Dopenblas_LIBRARY="$OPENBLAS_LIB"); fi
           if [ "${{ matrix.link }}" == "mkl" ]; then
             # ARMA_FindMKL looks for mkl_rt (find_library): give it the wheel's
             EXTRA+=(-Dmkl_rt_LIBRARY="$MKL_LIB/libmkl_rt.so.2")
@@ -204,7 +120,7 @@ jobs:
           ctest --output-on-failure
 
       - name: Tests, oneMKL GNU threading layer
-        if: always() && steps.build.outcome == 'success' && env.MKL_AVAILABLE == '1'
+        if: always() && steps.build.outcome == 'success'
         shell: bash
         run: |
           cd build
@@ -223,7 +139,7 @@ jobs:
           exit $rc
 
       - name: Tests, oneMKL INTEL threading layer
-        if: always() && steps.build.outcome == 'success' && env.MKL_AVAILABLE == '1'
+        if: always() && steps.build.outcome == 'success'
         shell: bash
         run: |
           cd build
@@ -242,7 +158,7 @@ jobs:
           exit $rc
 
       - name: MKL_VERBOSE thread counts of a BFGS4 fit
-        if: always() && steps.build.outcome == 'success' && env.MKL_AVAILABLE == '1'
+        if: always() && steps.build.outcome == 'success'
         continue-on-error: true
         shell: bash
         run: |
@@ -261,34 +177,23 @@ jobs:
         run: |
           cd build
           echo "== OpenBLAS / linked BLAS"; ./tests/BlasBackendTest "[.timing]"
-          [ "$MKL_AVAILABLE" == "1" ] || exit 0
           export LD_LIBRARY_PATH="$MKL_LD_LIBRARY_PATH"
           if [ "${{ matrix.link }}" == "openblas" ]; then export LD_PRELOAD="$MKL_LIB/libmkl_rt.so.2"; fi
           echo "== oneMKL GNU"; MKL_THREADING_LAYER=GNU ./tests/BlasBackendTest "[.timing]"
 
   macos-accelerate:
-    name: "macOS Accelerate"
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON(vars.LK_SELF_HOSTED_MACOS || '["self-hosted","macOS"]') || 'macos-15' }}
+    name: "macOS arm64 Accelerate"
+    runs-on: macos-15
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          # no token left in .git/config of a workspace that persists
           persist-credentials: false
-
-      - name: Tools (looked for first, installed if missing)
-        shell: bash
-        run: |
-          xcode-select -p >/dev/null || { echo "::error::Xcode command line tools missing"; exit 1; }
-          if ! command -v cmake >/dev/null; then
-            if command -v brew >/dev/null; then brew install cmake; else python3 -m pip install --user cmake && echo "$(python3 -m site --user-base)/bin" >> $GITHUB_PATH; fi
-          fi
 
       - name: Runner
         shell: bash
         run: |
-          echo "runner: ${RUNNER_NAME} (${RUNNER_ENVIRONMENT:-unknown}), $(uname -m)"
           sw_vers
           sysctl -n machdep.cpu.brand_string hw.physicalcpu hw.logicalcpu hw.perflevel0.physicalcpu 2>/dev/null || true
 
@@ -296,7 +201,6 @@ jobs:
         id: build
         shell: bash
         run: |
-          rm -rf build  # a self-hosted runner may keep the workspace between jobs
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
             -DENABLE_PYTHON_BINDING=off -DENABLE_OCTAVE_BINDING=off -DENABLE_MATLAB_BINDING=off \
             -DCMAKE_INSTALL_LIBDIR=lib | tee cmake.log

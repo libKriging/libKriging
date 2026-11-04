@@ -33,7 +33,7 @@ them; this branch merges both again and keeps only what needs both, plus the T9 
 | 2.2 | MKL entry points `set_mkl_threads_global`, `touch_mkl_entry_points` | T5 |
 | 2.2 | fork child handler calls `set_mkl_threads_global(1)`; fork test checks the child's MKL count | **T9** (needs both) |
 | 2.3 | OpenMP-independence test premise under MKL, ctest `BlasThreadsTest/BLAS_NUM_THREADS=1` | T5 |
-| 2.4 | degenerate fit: sigma2 = nugget = 0 exactly | **T9** (to port to master: independent of T5 / T6) |
+| 2.4 | degenerate fit: sigma2 = nugget = 0 exactly | master through PR #450 (decision D7); the copy here stays until this branch is rebased after #450 (the MKL runs need it) |
 | 2.5 | KrigingWarmRestartTest best of 3 | **T9** |
 | 2.6 | ConcurrentCallsTest budget-1 bit-identical case, full budget 1e-3 (marked provisional in T6) | T6 |
 | — | T6 additions: fork verdict through a pipe (valgrind), no allocation in the fork child under ASan / LSan | T6 |
@@ -157,7 +157,8 @@ rounding residual. Constant y, gauss, n = 10:
 | no noise: sigma2 | 2.42e-32 | 2.42e-32 |
 
 Fix (`Kriging.cpp`, degenerate exact path): estimated sigma2 and nugget set to exactly 0. Not
-T5 / T6: port to master.
+T5 / T6: goes to master through PR #450 (decision D7); this branch keeps its copy until it is
+rebased after #450, since the MKL runs need it.
 
 ### 2.5 `KrigingWarmRestartTest` (warm update < 0.8 x cold fit) — timing noise, test fixed
 
@@ -241,44 +242,28 @@ Release, C++ only, `OPENBLAS_CORETYPE=Haswell` as the other Linux jobs (#429).
 `LK_EXPECT_BLAS` makes a backend that silently failed to load an error instead of a skip of
 every backend case.
 
-**Runners.** The repository's self-hosted runners (dedicated to long runs and to parallelism /
-heavy BLAS backends; any Linux distribution) run the workflow for
-branches of this repository and manual runs; pull requests from forks run on GitHub-hosted
-runners (`ubuntu-24.04`, `macos-15`), so that no outside code runs on the self-hosted machines.
-Labels: GitHub's automatic `[self-hosted, Linux]` / `[self-hosted, macOS]`, overridable with
-the repository variables `LK_SELF_HOSTED_LINUX` / `LK_SELF_HOSTED_MACOS` (JSON arrays). As the
-runners start empty, the first step looks for cmake, ninja, g++, pip, OpenBLAS and LAPACK and
-installs only what is missing (apt, dnf or zypper, through `sudo -n` only: on the first run,
-2026-11-01, the Linux runner `alien-runner` asked sudo for a password and lacked the OpenBLAS
-development link; its runtime `libopenblas.so.0` is then given to Armadillo as
-`openblas_LIBRARY`, and the configure step fails if Armadillo does not report
-`OpenBLAS_FOUND = YES` / `MKL_FOUND = YES`, instead of silently building against the
-reference BLAS); the workspace persists between jobs on these runners (`build/` is removed
-first); oneMKL: an installed oneAPI MKL first
-(`$MKLROOT`, `/opt/intel/oneapi`), else the pinned wheels; no MKL steps on non-x86_64 runners.
-`-DALLOW_FLEXIBLAS_LINUX=OFF`: on Fedora / RHEL, FlexiBLAS would be found before OpenBLAS / MKL.
-The runner's OS, CPU and name are printed: results of section 4 are attributed per machine.
+**Runners: GitHub-hosted only** (`ubuntu-24.04`, `macos-15`; user decision D1, 2026-11-04,
+`docs/dev/Rationalization.md` section 3). From 2026-11-01 to 2026-11-03 the workflow ran on the
+repository's self-hosted runners for branches of the repository (an i9-10900K Linux
+workstation and an Apple silicon Mac); their results stay in this log as measurements
+(section 3.2, sections 4–5), not as CI. Reasons for leaving them:
+- a pull request of this public repository runs its own workflow files, so a fork can target
+  any runner registered to the repository; routing forks to hosted runners in the workflow
+  was not a security boundary (only the approval of outside-contributor runs is);
+- the Linux runner was a personal workstation (personal account and home directory,
+  persistent workspace), which the measures that would make it safe (dedicated user,
+  ephemeral VM, network isolation) did not fit;
+- the acceptance of T9 had been reached on hosted runners (run 41304855128).
+What is lost: more than 4 cores in CI (the `ConcurrentCallsTest` tolerance defect showed only
+at 10 cores) and short queues. Removing the runners from the repository (Settings → Actions →
+Runners), not only from this workflow, is what removes their exposure.
 
-**Security of the self-hosted runners.** The `runs-on` condition sends fork pull requests to
-GitHub-hosted runners (a fork PR has `head.repo.full_name != github.repository`; a deleted
-fork gives null, also hosted), and the workflow has no `push` / `pull_request_target` trigger.
-This only routes *this* workflow and is **not a security boundary**: for `pull_request`
-events, GitHub runs the workflow files of the pull request's merge commit, so a fork can edit
-`blas-backends.yml` or add a workflow with `runs-on: [self-hosted, Linux]`, and the runners,
-registered on a public repository, would accept it. What protects them:
-1. the repository / organization setting *Actions → General → Approval for running fork pull
-   request workflows from contributors* = **Require approval for all external contributors**
-   (a maintainer then reads the diff, workflows included, before approving); not readable
-   from this session: to be checked by an administrator;
-2. on the runner side: a dedicated unprivileged user (the Linux runner runs as a personal
-   account with its home directory; its sudo asks for a password, which limits but does not
-   remove the exposure), ephemeral / just-in-time registration, no credentials in the
-   environment;
-3. in this workflow: `permissions: contents: read` and `persist-credentials: false`, so that
-   the token of a same-repository run is read-only and not left in `.git/config` of the
-   persistent workspace.
-Same-repository branches are trusted by design: this includes branches pushed by agents
-(Claude Code sessions, Copilot) of people with write access. The fork case runs with `MKL_DISABLE_FAST_MM=1` under MKL (2.1).
+The logic written for the self-hosted machines (tool discovery with `sudo -n`, OpenBLAS
+runtime library as `openblas_LIBRARY`, installed oneAPI first, workspace cleaning, runner
+variables) was removed with D1; kept: the configure check that Armadillo found OpenBLAS / MKL
+(it falls back to the reference BLAS silently), `-DALLOW_FLEXIBLAS_LINUX=OFF`,
+`permissions: contents: read`, `persist-credentials: false`, test steps gated on the build.
+
 
 ### 3.1 CI results (run 41300138594, commit e1fbae9)
 
@@ -298,7 +283,7 @@ Timing on the Linux runner (`[.timing]`, budget 2, informative): OpenBLAS BFGS /
 1.75 / 2.26 s. With 2 cores, BFGS4 runs 4 starts on 2 workers: twice a single start's work per
 worker.
 
-### 3.2 Self-hosted runners (run 41331286043, commit 2d9932dd; macOS: run 41329668504)
+### 3.2 Self-hosted runners, 2026-11-01 (measurements; no longer CI since D1) (run 41331286043, commit 2d9932dd; macOS: run 41329668504)
 
 | Runner | Machine | Result |
 |---|---|---|
