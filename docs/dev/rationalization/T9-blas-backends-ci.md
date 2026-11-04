@@ -35,7 +35,7 @@ them; this branch merges both again and keeps only what needs both, plus the T9 
 | 2.3 | OpenMP-independence test premise under MKL, ctest `BlasThreadsTest/BLAS_NUM_THREADS=1` | T5 |
 | 2.4 | degenerate fit: sigma2 = nugget = 0 exactly | master through PR #450 (decision D7); the copy here stays until this branch is rebased after #450 (the MKL runs need it) |
 | 2.5 | KrigingWarmRestartTest best of 3 | **T9** |
-| 2.6 | ConcurrentCallsTest budget-1 bit-identical case, full budget 1e-3 (marked provisional in T6) | T6 |
+| 2.6 | ConcurrentCallsTest budget-1 bit-identical case; full-budget tolerance 1e-4 relative per quantity (decision D2); fork case tagged `[fork]`, excluded under ASan / LSan only (D3) | T6 (4784784, merged here 2026-11-04) |
 | — | T6 additions: fork verdict through a pipe (valgrind), no allocation in the fork child under ASan / LSan | T6 |
 | 3–6 | workflow `blas-backends.yml`, `BlasBackendTest` / `backend_probe.c`, docs | **T9** |
 
@@ -53,9 +53,9 @@ Checks of the merged branch (local, Xeon 4 cores, Release):
 
 | BLAS | ctest |
 |---|---|
-| OpenBLAS | 239 / 239 |
-| oneMKL preloaded, GNU | 237 / 237 + 2 / 2 (fork case and `ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1` with `MKL_DISABLE_FAST_MM=1`) |
-| oneMKL preloaded, INTEL | 237 / 237 + 2 / 2 |
+| OpenBLAS | 239 / 239 (also after the merge of T6 4784784, 2026-11-04) |
+| oneMKL preloaded, GNU | 237 / 237 + 2 / 2, also after the merge of T6 4784784 (fork case and `ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1` with `MKL_DISABLE_FAST_MM=1`) |
+| oneMKL preloaded, INTEL | 237 / 237 + 2 / 2 (also after the merge of T6 4784784) |
 
 `[backend]` on MKL: workers NThr 1 (130 calls), caller NThr 4, as before.
 
@@ -208,6 +208,18 @@ Change (`tests/ConcurrentCallsTest.cpp`):
   checks the concurrency bit for bit.
 
 Port to: T6.
+
+**Superseded (2026-11-04, decisions D2 / D3, T6 4784784).** The full-budget tolerance is now
+1e-4 relative, checked separately for theta, sigma2, objective, predicted mean, stdev and
+simulations; the fork case fits in the child everywhere again and is tagged `[fork]`,
+excluded only under ASan / LSan (`TEST_SPEC "~[fork]"`). Margin of 1e-4 against the gaps
+measured: largest 7.2e-5 (i9-10900K, 10 cores, OpenBLAS, matern5_2 BFGS4: a ratio of 1.4),
+6.6e-7 (AMD EPYC 2 cores), 3.0e-7 (AMD, MKL); BFGS4 pool 1 vs 4 (another data set, n = 300)
+reached 8.8e-5 on theta under MKL. After the merge, 20 runs per configuration on the local
+Xeon (4 cores and `taskset` 2 cores; OpenBLAS, MKL GNU, MKL INTEL; 120 runs): largest gaps
+theta / sigma2 / objective / sims 0, mean 1.8e-15, stdev 4.1e-14 — this machine does not reach
+the regime of the i9 (its budget is capped at its 4 logical CPUs), so it does not test the
+margin; the i9 runner is no longer in CI (D1).
 
 ### 2.7 After the fixes
 
