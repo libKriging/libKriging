@@ -9,6 +9,7 @@
 #include "libKriging/Random.hpp"
 #include <algorithm>
 #include <atomic>
+#include <ostream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -140,8 +141,26 @@ Result run(const Job& j, const arma::mat& Xn, int seed) {
   return r;
 }
 
-// Largest relative difference between two results
-double rel_diff(const Result& a, const Result& b) {
+// Relative differences between two results, per compared quantity
+struct Gaps {
+  double theta = 0, sigma2 = 0, objective = 0, mean = 0, stdev = 0, sims = 0;
+  double max() const { return std::max({theta, sigma2, objective, mean, stdev, sims}); }
+  void keep_worst(const Gaps& g) {
+    theta = std::max(theta, g.theta);
+    sigma2 = std::max(sigma2, g.sigma2);
+    objective = std::max(objective, g.objective);
+    mean = std::max(mean, g.mean);
+    stdev = std::max(stdev, g.stdev);
+    sims = std::max(sims, g.sims);
+  }
+};
+
+std::ostream& operator<<(std::ostream& os, const Gaps& g) {
+  return os << "theta " << g.theta << ", sigma2 " << g.sigma2 << ", objective " << g.objective << ", mean " << g.mean
+            << ", stdev " << g.stdev << ", sims " << g.sims;
+}
+
+Gaps rel_diff(const Result& a, const Result& b) {
   auto rd = [](const arma::mat& u, const arma::mat& v) {
     if (u.n_elem != v.n_elem)
       return 1.0;
@@ -149,14 +168,14 @@ double rel_diff(const Result& a, const Result& b) {
       return 0.0;
     return arma::abs(u - v).max() / std::max(1e-300, arma::abs(v).max());
   };
-  double d = 0;
-  d = std::max(d, rd(a.theta, b.theta));
-  d = std::max(d, std::abs(a.sigma2 - b.sigma2) / std::abs(b.sigma2));
-  d = std::max(d, std::abs(a.objective - b.objective) / std::max(1.0, std::abs(b.objective)));
-  d = std::max(d, rd(a.mean, b.mean));
-  d = std::max(d, rd(a.stdev, b.stdev));
-  d = std::max(d, rd(a.sims, b.sims));
-  return d;
+  Gaps g;
+  g.theta = rd(a.theta, b.theta);
+  g.sigma2 = std::abs(a.sigma2 - b.sigma2) / std::abs(b.sigma2);
+  g.objective = std::abs(a.objective - b.objective) / std::max(1.0, std::abs(b.objective));
+  g.mean = rd(a.mean, b.mean);
+  g.stdev = rd(a.stdev, b.stdev);
+  g.sims = rd(a.sims, b.sims);
+  return g;
 }
 
 }  // namespace
@@ -164,9 +183,9 @@ double rel_diff(const Result& a, const Result& b) {
 namespace {
 
 // Runs every job sequentially (reference), then from 6 user threads x 3 rounds,
-// at the given thread budget; returns the largest relative difference to the
-// reference and checks it against `tol`.
-double concurrent_vs_sequential(double budget_percent, double tol) {
+// at the given thread budget; checks every compared quantity against `tol`
+// and returns the largest relative differences to the reference.
+Gaps concurrent_vs_sequential(double budget_percent, double tol) {
   const double saved_percent = Optim::get_num_threads_percent();
   Optim::set_num_threads_percent(budget_percent);
   const int initial = blas_count();
@@ -222,18 +241,23 @@ double concurrent_vs_sequential(double budget_percent, double tol) {
 
   for (int t = 0; t < n_threads; ++t)
     CHECK(errors[t].empty());
-  double worst = 0;
+  Gaps worst;
   for (int t = 0; t < n_threads; ++t)
     for (int r = 0; r < n_rounds; ++r)
       for (size_t i = 0; i < jobs.size(); ++i) {
-        const double d = rel_diff(got[t][r * jobs.size() + i], ref[i]);
+        const Gaps g = rel_diff(got[t][r * jobs.size() + i], ref[i]);
         INFO("budget " << budget_percent << " %, thread " << t << ", round " << r << ", job " << i << " ("
                        << jobs[i].kernel << " " << jobs[i].optim << " " << jobs[i].objective
-                       << "): relative difference " << d);
-        CHECK(d <= tol);
-        worst = std::max(worst, d);
+                       << "): relative differences " << g);
+        CHECK(g.theta <= tol);
+        CHECK(g.sigma2 <= tol);
+        CHECK(g.objective <= tol);
+        CHECK(g.mean <= tol);
+        CHECK(g.stdev <= tol);
+        CHECK(g.sims <= tol);
+        worst.keep_worst(g);
       }
-  WARN("budget " << budget_percent << " %: largest relative difference to the sequential results: " << worst
+  WARN("budget " << budget_percent << " %: largest relative differences to the sequential results: " << worst
                  << " (tolerance " << tol << ")");
   // the count the library sets is a share of the budget, never more than the
   // count OpenBLAS had when the library first used it
@@ -261,15 +285,17 @@ TEST_CASE("Concurrent fit / predict / simulate from user threads", "[threads][co
   // (FAQ, reproducibility); a fit amplifies it through the optimizer's
   // stopping point in the flat part of the likelihood. Bit-identical results
   // when no count can change (no OpenBLAS / MKL, or loaded with 1 thread: the
-  // ctest variant ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1), else to 1e-3,
-  // the tolerance of the fitted theta between BLAS counts in BlasBackendTest:
-  // measured here 4e-14 (Intel Xeon 4 cores), 6.6e-7 (AMD EPYC 9V74 2 cores,
-  // gauss single start), 7.2e-5 (i9-10900K 10 cores, matern5_2 BFGS4); BFGS4
-  // with 1 or 4 workers differs by up to 8.8e-5 for the same reason (T9 log).
-  // Races (RNG, shared state) give differences of order 1 (other starts), and
-  // are checked bit for bit by the budget-1 case above.
+  // ctest variant ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1), else 1e-4
+  // relative on every compared quantity (decision D2, docs/dev/Rationalization.md
+  // section 3). Largest difference measured over all of them (theta, sigma2,
+  // objective, predictions, simulations): 4e-14 (Intel Xeon 4 cores), 4.6e-7 to
+  // 7.0e-7 (CI runners: Linux Coverage, Octave Linux, Windows), 6.6e-7 (AMD
+  // EPYC 9V74 2 cores, gauss single start), 7.2e-5 (i9-10900K 10 cores,
+  // matern5_2 BFGS4); T6 / T9 logs. Races (RNG, shared state) give differences
+  // of order 1 (other starts), and are checked bit for bit by the budget-1 case
+  // above.
   const bool count_can_change = blas_count() > 1 || mkl_count() > 1;
-  concurrent_vs_sequential(100, count_can_change ? 1e-3 : 0.0);
+  concurrent_vs_sequential(100, count_can_change ? 1e-4 : 0.0);
 }
 
 TEST_CASE("Optim::get_num_threads is not divided between concurrent calls", "[threads][concurrent]") {
@@ -292,28 +318,13 @@ TEST_CASE("Optim::get_num_threads is not divided between concurrent calls", "[th
   CHECK(seen_min.load() == full);
 }
 
-// ASan / LSan: their allocator is not fork-safe in a multithreaded process (a
-// child of a fork() made while another thread allocates blocks forever in the
-// sanitizer's allocator lock: ASan of GCC 13, LSan of GCC 11; T6 log). Under
-// them the child only checks its BLAS count, without allocating; the parent
-// side (fork handlers while other threads fit, count restored) is unchanged.
-// LSan has no predefined macro: tests/CMakeLists.txt defines
-// LK_TEST_FORK_NO_CHILD_ALLOC for SANITIZE=LEAK / ADDRESS.
-#if !defined(LK_TEST_FORK_NO_CHILD_ALLOC)
-#if defined(__SANITIZE_ADDRESS__)
-#define LK_TEST_FORK_NO_CHILD_ALLOC 1
-#elif defined(__has_feature)
-#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer)
-#define LK_TEST_FORK_NO_CHILD_ALLOC 1
-#endif
-#endif
-#endif
-
 #if defined(LK_TEST_FORK) && !defined(LK_TEST_TSAN)
 // fork() from one thread while others fit: the child runs a fit of its own
 // (no lock held by a thread that does not exist in the child, no scope of
 // those threads left in effect), the parent gets its count back.
-TEST_CASE("fork() during concurrent fits", "[threads][concurrent]") {
+// Tagged [fork]: excluded from the ASan / LSan builds by tests/CMakeLists.txt
+// (their allocator is not fork-safe in a multithreaded process: T6 log).
+TEST_CASE("fork() during concurrent fits", "[threads][concurrent][fork]") {
   const int initial = blas_count();
   const int caller = std::max(1, std::min(3, initial));
   set_blas_count(caller);
@@ -342,12 +353,10 @@ TEST_CASE("fork() during concurrent fits", "[threads][concurrent]") {
       // alarm: a deadlock in the child fails the test instead of hanging it
       alarm(60);
       char verdict = blas_count() > 1 ? 2 : 0;
-#ifndef LK_TEST_FORK_NO_CHILD_ALLOC
       if (verdict == 0) {
         Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS2");
         verdict = !k.theta().is_finite() ? 3 : (blas_count() > 1 ? 4 : 0);
       }
-#endif
       (void)!write(fds[1], &verdict, 1);
       _exit(verdict);
     }
