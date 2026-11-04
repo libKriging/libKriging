@@ -227,7 +227,15 @@ TEST_CASE("approximate LOO / LMP fits are consistent with the exact fits", "[app
       CHECK(rmse_a < 0.02 * arma::stddev(yt));
       // the committed criterion is the optimized one
       if (objective == "LOO") {
-        CHECK(ka.leaveOneOut(method) == ka.leaveOneOut(method.substr(0, 7)));  // fitted method string accepted
+        // the fitted method string is accepted and gives the same criterion
+        // (same code path at the same theta). Not bitwise: a BLAS whose thread
+        // partition may change between two calls (Accelerate decides it itself)
+        // changes the summation order, and this criterion (~1.6e-8, LOO errors
+        // ~1e-4 under a near-singular R) moves by up to 1.2e-6 relative with the
+        // BLAS kernel / thread count, while k = 79 or 81 moves it by 2 % or more
+        // (docs/dev/rationalization/T10-nystrom-determinism.md)
+        const double loo_full = ka.leaveOneOut(method), loo_short = ka.leaveOneOut(am);
+        CHECK(std::abs(loo_full - loo_short) <= 1e-5 * std::abs(loo_short));
         CHECK(ka.leaveOneOut(method.substr(0, 7)) < 2.0 * ke.leaveOneOut() + 1e-6);
       } else {
         CHECK(std::isfinite(ka.logMargPost(method.substr(0, 7))));
