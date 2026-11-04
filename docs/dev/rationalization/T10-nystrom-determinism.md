@@ -128,7 +128,9 @@ inference from (a) the code reading of section 2, (b) the measured order sensiti
 
 ## 6. Results of the checks
 
-(filled below)
+- Full `ctest -j4` (Linux, Release, OpenBLAS 0.3.26 pthreads, GCC, no binding): 226 / 226 passed.
+- `clang-format` 18 applied to the changed C++ file (`tests/KrigingApproxObjectivesTest.cpp`).
+- macOS / Accelerate: not run (no machine; GitHub Actions in `startup_failure`).
 
 ## Appendix: scripts
 
