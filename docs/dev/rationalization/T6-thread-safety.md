@@ -162,11 +162,37 @@ same runners. Ported from T9 (`e30acf5`, `31f81f6`):
   the BLAS rounding;
 - full-budget case: bit-identical when neither OpenBLAS nor MKL can change
   count (MKL detected through `MKL_Get_Max_Threads`, weak symbol), else
-  **1e-3 relative — provisional, decision pending with the user**. T9's
-  measurements: 6.6e-7 (AMD EPYC 2 cores), 7.2e-5 (i9-10900K, matern5_2 BFGS4),
-  BFGS4 with 1 vs 4 workers 8.8e-5; 1e-3 is the tolerance on theta between BLAS
-  counts in T9's `BlasBackendTest`. A race or a shared RNG gives differences of
-  order 1 (other starts), and is caught bit for bit by the budget-1 case.
+  **1e-4 relative on each compared quantity** (decision D2,
+  `docs/dev/Rationalization.md` section 3; T9's provisional 1e-3 replaced).
+
+  Justification. Every measured gap so far is the largest relative difference
+  over all compared quantities at once (theta, sigma2, objective, predicted
+  mean and stdev, simulations), so it bounds each of them:
+
+  | Machine | Largest gap (all quantities) | Job |
+  |---|---|---|
+  | Intel Xeon 4 cores (this session) | 4e-14 (predicted stdev; theta 0) | |
+  | CI runners: Coverage (Linux), Octave Linux, Julia Windows | 4.6e-7 – 7.0e-7 | gauss single start |
+  | AMD EPYC 9V74 2 cores (T9) | 6.6e-7 | gauss single start |
+  | i9-10900K 10 cores (T9) | 7.2e-5 | matern5_2 BFGS4 |
+
+  The i9 value (7.2e-5) is therefore not a gap on theta alone, as D2's
+  wording has it, but on the worst of all quantities; 1e-4 is above every
+  measured value for each quantity, theta included, with a margin of 1.4 on
+  the worst one. One tolerance for all quantities is consistent: they are
+  smooth functions of theta (predictions, simulations through the covariance;
+  sigma2 is the profiled variance at theta), so their relative gaps are of
+  the order of theta's. The objective at the optimum is stationary in theta
+  (second order), so its gap is smaller; it is not given a tighter bound
+  because no per-quantity measurement exists on the machines with the largest
+  gaps. The test now checks and reports the six gaps separately (`Gaps`
+  in the test; WARN line "largest relative differences ... theta ..., sigma2
+  ..., objective ..."), so the next CI runs give the per-quantity values. BFGS4
+  with 1 vs 4 workers already differs by up to 8.8e-5 for the same reason (T9
+  log, section 4): 1e-4 leaves no margin there, and a BFGS4 case with a
+  different pool size would need more. A race or a shared RNG gives
+  differences of order 1 (other starts), and is caught bit for bit by the
+  budget-1 case.
 
 ### Fork prepare handler (T9 log, section 2.1, ported)
 
@@ -206,21 +232,35 @@ left to T9.
   `fork()`: the runtimes of these versions do not lock their allocator around
   `fork()` (glibc's malloc does), and POSIX only guarantees async-signal-safe
   functions in the child of a multithreaded process. Outside libKriging; no
-  lock of the library is involved. Change: with ASan / LSan
-  (`LK_TEST_FORK_NO_CHILD_ALLOC`, set by `tests/CMakeLists.txt` for
-  `SANITIZE=ADDRESS / LEAK`, and by `__SANITIZE_ADDRESS__` /
-  `__has_feature`), the child checks its BLAS count and reports, without
-  allocating (no fit); the parent side is unchanged (fork handlers run while 3
-  threads fit, count restored, no deadlock in the parent). The child's fit is
-  still run in every other build (Release / Debug CI jobs, Memcheck,
-  Coverage). After: ASan 5 / 5 runs, LSan (GCC 13) pass.
+  lock of the library is involved.
+
+  First change (`26434ab`): under ASan / LSan the child skipped its fit.
+  Reverted by decision D3: the child keeps its fit wherever the case runs, and
+  the case is **excluded from the ASan / LSan builds in a declared way**: it is
+  tagged `[fork]`, and `tests/CMakeLists.txt` passes `TEST_SPEC "~[fork]"` to
+  `catch_discover_tests` and `"[concurrent]~[fork]"` to the
+  `ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1` variant when `SANITIZE` is
+  `ADDRESS` or `LEAK`, with a comment pointing to this section. The workflows
+  are unchanged. The case still runs in the Release / Debug jobs, Memcheck and
+  Coverage; TSan compiles it out (TSan and `fork()` from a multithreaded
+  process, unchanged). Checked: in the ASan build, `ctest -N` lists no `fork()
+  during concurrent fits`, the variant runs `[concurrent]~[fork]`, and the 4
+  remaining entries pass.
 
 ### Local checks after the fixes
 
-Release, OpenBLAS 0.3.26: `ctest -j2` 231 / 231; `ConcurrentCallsTest` 3 / 3
-runs (budget 1: 0 difference; full budget: 4e-14). Under valgrind (CI options):
-fork case and `[concurrent]` pass. ASan (Debug, GCC 13): 5 / 5 runs; LSan:
-pass. TSan: 0 report in 3 runs, 0 with the CI environment.
+`26434ab`: Release, OpenBLAS 0.3.26: `ctest -j2` 231 / 231; `ConcurrentCallsTest`
+3 / 3 runs (budget 1: 0 difference; full budget: 4e-14). Under valgrind (CI
+options): fork case and `[concurrent]` pass. ASan (Debug, GCC 13): 5 / 5 runs;
+LSan: pass. TSan: 0 report in 3 runs, 0 with the CI environment.
+
+After D2 / D3 (Intel Xeon 2.8 GHz, 4 CPUs, Release, OpenBLAS 0.3.26): `ctest -j2`
+231 / 231 (the `[fork]` case included); full-budget gaps per quantity: theta
+0, sigma2 0, objective 0, mean 1.8e-15, stdev 4.1e-14, simulations 0 (the
+4e-14 of the table is the predicted stdev); budget 1: 0 everywhere. Valgrind
+(CI options) on `[fork]`: pass. ASan build: the `[fork]` case is not
+registered, the 4 other entries pass. TSan: 0 report, 0 with the CI
+environment.
 
 ## Open items
 
@@ -230,8 +270,9 @@ pass. TSan: 0 report in 3 runs, 0 with the CI environment.
 - Armadillo's RNG is global on MinGW / macOS GCC (Armadillo disables its
   `thread_local` there): concurrent WarpKriging fits or subset-of-data
   selections race on it on these platforms (R Windows binding).
-- Full-budget tolerance of `ConcurrentCallsTest`: 1e-3 provisional (T9's
-  value), decision pending with the user.
+- Per-quantity gaps of `ConcurrentCallsTest` at full budget on the machines
+  with the largest gaps (i9-10900K, CI runners): to read from the next runs
+  (WARN line), to confirm the 1e-4 of D2 per quantity.
 - MKL count in the fork child (T9 section 2.2): with T5 / T9.
 - Two threads on the same model object: not supported (documented).
 - `simulate(seed)` changes the seed of the next fit's starts in the same
