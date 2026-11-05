@@ -2477,6 +2477,9 @@ std::pair<double, arma::vec> WarpKriging::collapse_penalty() const {
 //  much an estimate as one above, and on 260 fits (K = 5) it was always above
 //  1.29 (median ~60). Robust estimates (median, trimmed mean) under-cover:
 //  the heavy tail of the held-out residuals is the signal.
+//  K = 3 by default (T8): same coverage and NLPD as K = 5 for a single start
+//  at 0.57 times the CPU time; for a multistart "BFGSn" fit 3 folds widen
+//  the intervals more than 5 (accepted; calibration_folds = 5 is advised).
 // -------------------------------------------------------------------------
 void WarpKriging::calibrate_variance() {
   m_var_scale = 1.0;

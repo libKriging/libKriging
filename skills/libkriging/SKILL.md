@@ -176,14 +176,17 @@ kink at `z=0` can make the likelihood surface locally jagged for a
 gradient-based optimizer — the analytic gradient is still correct, this is
 an optimization-landscape issue, not a bug.
 
-`MLPKriging`'s predictive stdev is calibrated by a 5-fold cross-validation
+`MLPKriging`'s predictive stdev is calibrated by a 3-fold cross-validation
 after the fit (`var_scale()`, shown in `summary()`; the mean and
-`logLikelihood()` are unchanged): without it, the many network weights
+`logLikelihood()` are unchanged; ~2.2x the CPU time of the single-start fit
+alone): without it, the many network weights
 overfit the training points and the 95 % intervals can cover ~1 % of new
 points (#407). Pass `calibration_folds = "0"` in `parameters` to skip it
 (e.g. when only the mean matters and fit time is critical). In higher
 dimension the single-start default (`optim="BFGS"`) can still stop at a poor
-mean: prefer a multistart (`"BFGS10"`) and check Q² on held-out data.
+mean: prefer a multistart (`"BFGS10"`) and check Q² on held-out data. With a
+multistart `"BFGSn"`, set `calibration_folds = "5"` explicitly: 3 folds widen
+the intervals more than needed there (test NLPD +0.56 vs 5 folds, T8).
 
 ## 5. Where to look for exact syntax
 
