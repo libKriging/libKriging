@@ -49,6 +49,16 @@ gradient 3.4e-8), within the tolerances (1e-3, 1e-6) but not run in CI since (st
 The ASan / LSan change of T6 (the fork child does not fit) applies to sanitizer builds only:
 the MKL jobs (Release) still fit in the child, so the fork case still exercises MKL there.
 
+2026-11-05: T6 2037a10 merged (ConcurrentCallsTest reads the OpenBLAS count with
+GetProcAddress under MSVC, as the library: with weak symbols only it read 0 on the Julia
+Windows job and required bit-identity, gaps 2.3e-9–7.0e-7). Same defect for MKL, fixed here
+(test only, to port to T6): `mkl_count()` read MKL through ELF weak symbols only, while the
+library drives MKL also through `dlsym` (macOS / other POSIX) and `GetProcAddress` on
+`mkl_rt*.dll`; it now uses the library's three mechanisms. Check: MKL preloaded with
+`OPENBLAS_NUM_THREADS=1`, the test reads "OpenBLAS 1, MKL 4" and applies 1e-4 instead of
+requiring bit-identity. ctest after the merge: OpenBLAS 239 / 239, MKL GNU and INTEL
+237 / 237 + 2 / 2.
+
 Checks of the merged branch (local, Xeon 4 cores, Release):
 
 | BLAS | ctest |
