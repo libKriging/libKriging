@@ -379,6 +379,27 @@ catch_discover_tests(BlasThreadsTest)
 add_test(NAME BlasThreadsTest/OPENBLAS_NUM_THREADS COMMAND BlasThreadsTest "[.openblas_env]")
 set_tests_properties(BlasThreadsTest/OPENBLAS_NUM_THREADS PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
 
+add_executable(ConcurrentCallsTest ConcurrentCallsTest.cpp)
+target_link_libraries(ConcurrentCallsTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries ConcurrentCallsTest)
+# Declared exclusion (decision D3, docs/dev/Rationalization.md section 3): the
+# [fork] case is not run under ASan / LSan, whose allocator is not fork-safe in
+# a multithreaded process (the child of a fork() made while another thread
+# allocates blocks in the sanitizer's allocator lock: GCC 11 / 13 runtimes,
+# docs/dev/rationalization/T6-thread-safety.md). It runs in every other build
+# (Release / Debug, Memcheck, Coverage; TSan compiles it out).
+if (SANITIZE STREQUAL "ADDRESS" OR SANITIZE STREQUAL "LEAK")
+  set(CONCURRENT_CALLS_SPEC "~[fork]")
+  set(CONCURRENT_CALLS_VARIANT_SPEC "[concurrent]~[fork]")
+else ()
+  set(CONCURRENT_CALLS_SPEC "")
+  set(CONCURRENT_CALLS_VARIANT_SPEC "[concurrent]")
+endif ()
+catch_discover_tests(ConcurrentCallsTest TEST_SPEC ${CONCURRENT_CALLS_SPEC})
+# bit-identical to the sequential results when the OpenBLAS count cannot change
+add_test(NAME ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1 COMMAND ConcurrentCallsTest "${CONCURRENT_CALLS_VARIANT_SPEC}")
+set_tests_properties(ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1 PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
+
 add_executable(SimulateStateResetTest SimulateStateResetTest.cpp)
 target_link_libraries(SimulateStateResetTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries SimulateStateResetTest)

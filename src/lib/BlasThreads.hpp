@@ -4,6 +4,8 @@
 // Private (not installed): OpenBLAS / OpenMP thread-count access, defined in
 // Kriging.cpp (fork handlers, ThreadBudget.cpp).
 
+#include <mutex>
+
 namespace libKriging {
 namespace detail {
 
@@ -29,6 +31,11 @@ void restore_blas_threads(const BlasThreadState& s);
 /// OpenMP ICV is left untouched. Defined in Kriging.cpp.
 int get_openblas_threads();
 void set_openblas_threads(int n);
+
+/// Serializes arma::rcond (LinearAlgebra::rcond_chol). Also held by the fork
+/// handlers, so that the child of a fork() made while another thread is in
+/// rcond_chol does not inherit it locked. Defined in LinearAlgebra.cpp.
+std::mutex& rcond_mutex();
 
 }  // namespace detail
 }  // namespace libKriging

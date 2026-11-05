@@ -40,6 +40,14 @@ This page collects questions about libKriging development
  OMP_NUM_THREADS=1` for many. Children of a `fork()` (R `parallel::mclapply`) already start
  with 1 thread. Details and measurements: [parallel.md](parallel.md).
 
+ Fits / predictions from several threads of one process (Python `ThreadPoolExecutor`, joblib
+ threads, `std::thread`), each on its own model object, are supported: the running calls share
+ the budget (each gets budget / number of running calls) and the BLAS thread count is restored
+ when the last one ends. Set the `Optim` / `LinearAlgebra` settings before starting them, not
+ while they run. Their results equal those of the same calls run one after the other, up to the
+ rounding of the BLAS thread count (next question). `Random::reset_seed` applies to the
+ calling thread only.
+
 # Is a fit reproducible with a fixed seed?
 
  With a fixed seed (`Random::reset_seed`, 123 by default) the multistart starting points are
