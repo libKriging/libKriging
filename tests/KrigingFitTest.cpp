@@ -236,18 +236,21 @@ TEST_CASE("KrigingFitTest - y in the span of the trend, noise models", "[fit][kr
   // the estimated variances are exactly 0, not the rounding residual SSE / n
   // of the BLAS (no noise: 2.4e-32 with OpenBLAS and MKL; nugget: 2.4e-32 with
   // MKL), with every method (the Vecchia / Nystrom commits have their own SSE)
-  for (const std::string method : {"exact", "vecchia(5)", "nystrom(5)"}) {
-    for (const bool normalize : {false, true}) {
-      Kriging k0("gauss");
-      k0.fit(y, X, Trend::RegressionModel::Constant, normalize, "BFGS", "LL", {}, method);
-      CAPTURE(method, normalize, k0.sigma2());
-      CHECK(k0.sigma2() == 0.0);
+  // and kernel (the residual depends on the conditioning of R)
+  for (const std::string kernel : {"gauss", "matern5_2", "exp"}) {
+    for (const std::string method : {"exact", "vecchia(5)", "nystrom(5)"}) {
+      for (const bool normalize : {false, true}) {
+        Kriging k0(kernel);
+        k0.fit(y, X, Trend::RegressionModel::Constant, normalize, "BFGS", "LL", {}, method);
+        CAPTURE(kernel, method, normalize, k0.sigma2());
+        CHECK(k0.sigma2() == 0.0);
 
-      Kriging kn("gauss", Kriging::NoiseModel::Nugget);
-      kn.fit(y, X, Trend::RegressionModel::Constant, normalize, "BFGS", "LL", {}, method);
-      CAPTURE(kn.sigma2(), kn.nugget());
-      CHECK(kn.sigma2() == 0.0);
-      CHECK(kn.nugget() == 0.0);
+        Kriging kn(kernel, Kriging::NoiseModel::Nugget);
+        kn.fit(y, X, Trend::RegressionModel::Constant, normalize, "BFGS", "LL", {}, method);
+        CAPTURE(kn.sigma2(), kn.nugget());
+        CHECK(kn.sigma2() == 0.0);
+        CHECK(kn.nugget() == 0.0);
+      }
     }
   }
 
