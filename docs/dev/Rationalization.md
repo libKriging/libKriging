@@ -85,6 +85,7 @@ mandatory; measurements go in the task's log `docs/dev/rationalization/T<n>-*.md
 | T7 | Statistical benchmark base for the thresholds | `-t7-benchmark-base` | |
 | T8 | MLPKriging calibration cost | `-t8-mlp-calibration-cost` | |
 | T9 | CI of the BLAS backends (MKL, Accelerate) | `-t9-blas-backends-ci` | T5, T6 (branch built on both) |
+| T10 | Intermittent Nystrom LOO equality (`KrigingApproxObjectivesTest`) | `-t10-nystrom-determinism` | |
 
 ### T1. Vectorized LL / LMP theta gradients
 
@@ -172,3 +173,30 @@ mandatory; measurements go in the task's log `docs/dev/rationalization/T<n>-*.md
   helps).
 - Acceptance: the workflow runs green on the PR; any failing assertion is either fixed (in the
   T5 / T6 code carried by this branch) or documented as a known limitation.
+
+### T10. Intermittent Nystrom LOO equality
+
+- `tests/KrigingApproxObjectivesTest.cpp:230` requires exact equality of
+  `leaveOneOut("nystrom(80)")` and `leaveOneOut("nystrom")`; it fails intermittently on the
+  Octave macOS job (seen on #443 and #448) and passes on the other run of the same commit.
+- Diagnose first: do both calls take the same computation path; why two identical calls differ
+  (OpenMP threshold 800 on macOS, Accelerate threading, summation order, uninitialized memory).
+- Acceptance: cause identified with evidence; non-determinism removed in the library, or, only
+  if it is shown acceptable and documented, the test compares with a justified tolerance.
+
+## 3. Decisions (2026-11-04)
+
+| # | Subject | Decision |
+|---|---|---|
+| D1 | Runners of `blas-backends.yml` (T9) | GitHub-hosted only (`ubuntu-24.04`, `macos-15`); no self-hosted runner |
+| D2 | `ConcurrentCallsTest` full-budget tolerance (T6, T9) | 1e-4 on theta (was 1e-10, provisional 1e-3); the budget-1 bit-identical case is kept |
+| D3 | `fork()` case under ASan / LSan (T6) | The case is excluded from the ASan / LSan jobs (declared exclusion); the child keeps its fit everywhere it runs |
+| D4 | MLPKriging calibration folds (T8) | Revised 2026-11-05: K = 3 everywhere (the MLPKriging default optimizer stays single-start `BFGS`, T3 does not change it, so K = 5 kept no gain); accepted cost: NLPD +0.56 [+0.20, +0.97] for multistart `BFGSn` fits, whose users are advised to set K = 5; the removal of the >= 1 clamp is kept |
+| D5 | Intermittent Nystrom test | New task T10 |
+| D6 | Merge order | Successive merges into the program branch (#440), each PR rebased on the previous one, green CI at each step, then #440 to master. Order: T7, T1, T4, T2, T5 + T6 + T9, T3, T8 (T10 when ready). No squash for T5 / T6 / T9 |
+| D7 | Degenerate sigma2 = 0 fix | #450 to master first; T9's copy (its log, section 2.4) dropped when T9 is rebased after #450 |
+
+Self-hosted runners deregistered from the repository (2026-11-05).
+
+Prerequisite of every merge: GitHub Actions runs again (every run of the repository ends in
+`startup_failure` since 2026-11-02 16:42 UTC).
