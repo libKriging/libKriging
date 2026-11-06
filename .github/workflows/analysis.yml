@@ -2,14 +2,17 @@ name: Code Analysis
 
 # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#on
 on:
+  # branches are tested through their pull request (one run per commit, not
+  # one for the push and one for the pull request); master on push
   push:
     branches:
-      - '*'
+      - master
     tags-ignore:
       - 'v*' # done in release
   pull_request:
     branches:
       - '*'
+  workflow_dispatch: # test a branch without a pull request
   schedule:
     - cron: '0 2 * * SAT'
 
@@ -31,6 +34,13 @@ on:
 # always set shell (could be powershell in windows environment)
 #   shell: bash
 
+
+# One run per pull request (or branch) and workflow: a new push to a pull
+# request cancels its run in progress; master pushes and scheduled runs are
+# never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   DEBUG_CI: true
