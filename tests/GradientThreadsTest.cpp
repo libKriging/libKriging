@@ -73,7 +73,9 @@ void require_equal(const std::vector<arma::vec>& a, const std::vector<arma::vec>
 }  // namespace
 
 TEST_CASE("LL / LMP theta gradients do not depend on the OpenMP thread count", "[gradient][threads]") {
-  const arma::uword n = GENERATE(100, 900);  // below / above kOmpMinRows (200 Linux, 800 elsewhere)
+  // below / just above kOmpMinRows (200 Linux, 800 elsewhere): not larger, the
+  // case must stay short under valgrind (Memcheck CI, ctest timeout 1500 s)
+  const arma::uword n = GENERATE(arma::uword(100), static_cast<arma::uword>(libKriging::detail::kOmpMinRows + 10));
   const std::string kernel = GENERATE("gauss", "exp", "matern3_2", "matern5_2");
   const bool nugget = GENERATE(false, true);
   const arma::uword d = 4;

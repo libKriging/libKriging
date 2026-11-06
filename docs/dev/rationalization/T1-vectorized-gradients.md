@@ -62,7 +62,9 @@ Checks:
     and 7 threads gives the same bits as a reference loop written in the
     documented order (4 kernels, n = 300);
   - end to end: LL and LMP gradients, plain and Nugget models, n = 100 and
-    900 (above the threshold on every OS), 4 kernels: same bits with a 1-thread
+    kOmpMinRows + 10 (210 on Linux, 810 elsewhere: just above the threshold
+    of the OS; n = 900 first, which timed out at 1500 s under valgrind in the
+    Memcheck CI), 4 kernels: same bits with a 1-thread
     budget and with the whole budget (`Optim::set_num_threads_percent`).
   - The end-to-end case also goes through the BLAS / LAPACK (R^-1, triangular
     solves), which T1 does not make reproducible. On the macOS arm64 CI
