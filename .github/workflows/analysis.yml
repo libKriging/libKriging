@@ -92,7 +92,9 @@ jobs:
             enable_matlab: off  # disabled: requires MATHWORKS_API_TOKEN secret
             enable_memcheck: on
             force_update: on
-            timeout_minutes: 120
+            # valgrind run: 1h28 (pull_request) to > 2h (push, cancelled at
+            # the former 120 min) on #445, 2026-11-05
+            timeout_minutes: 180
           - name: "Address Sanitizer"
             os: ubuntu-22.04
             mode: Debug
@@ -117,6 +119,9 @@ jobs:
             enable_memcheck: off
             force_update: on
             sanitizer: thread
+            # ctest alone takes most of the 30 min default: 29m12s passed and
+            # one run cancelled at 30 min after all tests passed (#445)
+            timeout_minutes: 60
 
     steps:
       - uses: actions/checkout@v4
