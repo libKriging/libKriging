@@ -23,6 +23,7 @@
 #include "libKriging/utils/utils.hpp"
 
 #include "BlasThreads.hpp"
+#include "RestartPolicy.hpp"
 #include "TaskPool.hpp"
 #include "ThreadBudget.hpp"
 
@@ -4065,13 +4066,14 @@ void Kriging::fit_impl(const arma::vec& y,
             arma::cout << "  start_point: " << theta_start.t() << arma::endl;
           }
 
-          int retry = 0;
-          int lr_restarts = 0;
-          double best_f_opt = std::numeric_limits<double>::infinity();
+          using libKriging::detail::RestartPolicy;
+          RestartPolicy restarts({Optim::max_restart,
+                                  optimizer.factr,
+                                  /*worse_criterion=*/true,
+                                  long_range_restart_on ? Optim::max_long_range_restart : 0});
           arma::vec best_gamma = gamma_tmp;
 
-          while (retry <= Optim::max_restart) {
-            arma::vec gamma_0 = gamma_tmp;
+          while (true) {
             auto opt_result = optimizer.minimize(
                 [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
                   return fit_ofn(vals_inp, &grad_out, &m);
@@ -4082,37 +4084,20 @@ void Kriging::fit_impl(const arma::vec& y,
                 bounds_type.memptr());
 
             if (Optim::log_level > Optim::log_info) {
-              arma::cout << "  Start " << (start_idx + 1) << ", Retry " << (retry) << ": f_opt=" << opt_result.f_opt
-                         << ", num_iters=" << opt_result.num_iters << ", task=" << opt_result.task << arma::endl;
+              arma::cout << "  Start " << (start_idx + 1) << ", Retry " << restarts.retry()
+                         << ": f_opt=" << opt_result.f_opt << ", num_iters=" << opt_result.num_iters
+                         << ", task=" << opt_result.task << arma::endl;
             }
 
-            // "No improvement" below the optimizer's own relative tolerance
-            // (factr * epsmch) is no change: an exact comparison of two equal
-            // optima made the restart decision depend on the rounding (BLAS
-            // thread count, docs/dev/CholJitter.md, starting points)
-            const double f_tol
-                = optimizer.factr * arma::datum::eps * std::max(1.0, std::abs(std::min(best_f_opt, opt_result.f_opt)));
-            const bool worse = (best_f_opt < arma::datum::inf) && (opt_result.f_opt > best_f_opt + f_tol);
-            if (opt_result.f_opt < best_f_opt) {
-              best_f_opt = opt_result.f_opt;
+            if (restarts.record(opt_result.f_opt))
               best_gamma = gamma_tmp;
-            }
 
             // check theta part for distance to bounds
             arma::vec theta_part = (m_noise_model != NoiseModel::None && Optim::reparametrize)
                                        ? (m_noise_model == NoiseModel::Nugget ? nugget_reparam_from(gamma_tmp).head(d)
                                                                               : Optim::reparam_from(gamma_tmp).head(d))
                                        : (Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp.head(d));
-            // over free dimensions only: a pinned one (lower == upper, e.g. a
-            // constant input) is always "at its bound"
-            const arma::uvec free_dims = arma::find(theta_upper > theta_lower);
-            double sol_to_lb = free_dims.is_empty()
-                                   ? arma::datum::inf
-                                   : arma::min(arma::abs(theta_part(free_dims) - theta_lower(free_dims)));
-            double sol_to_ub = free_dims.is_empty()
-                                   ? arma::datum::inf
-                                   : arma::min(arma::abs(theta_part(free_dims) - theta_upper(free_dims)));
-            double sol_to_b = std::min(sol_to_ub, sol_to_lb);
+            const double sol_to_lb = RestartPolicy::distance_to_lower(theta_part, theta_lower, theta_upper);
 
             // Long-range local optimum: on noise-free data the single start
             // often converges (a sharp optimum, not a plateau) with a theta
@@ -4122,49 +4107,36 @@ void Kriging::fit_impl(const arma::vec& y,
             // long-range restart). The best solution is kept, so a genuinely
             // long-range optimum (inactive input) only costs the restarts.
             bool long_range = false;
-            if (long_range_restart_on && lr_restarts < Optim::max_long_range_restart && !free_dims.is_empty())
+            const arma::uvec free_dims = arma::find(theta_upper > theta_lower);
+            if (restarts.long_range_allowed() && !free_dims.is_empty())
               long_range = arma::max(theta_part(free_dims) / m_maxdX(free_dims)) > Optim::long_range_restart;
 
-            // Check abnormal termination or convergence at bounds to decide on restart
-            if ((retry < Optim::max_restart)
-                && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)  // Check for abnormal termination
-                    || (opt_result.num_iters <= 2)     // Start point is strangely quite optimal...
-                    || (sol_to_lb < arma::datum::eps)  // Stuck at lower bound
-                    || long_range                      // Long-range local optimum
-                    || worse)) {                       // No improvement
-              if (long_range)
-                lr_restarts++;
-
-              if (Optim::log_level > Optim::log_none) {
-                arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << (retry + 1)
-                           << "): f_opt=" << opt_result.f_opt << ", sol_to_lb=" << sol_to_lb
-                           << ", sol_to_ub=" << sol_to_ub << arma::endl;
-              }
-
-              // Restart with contracted bounds around initial point (theta part only)
-              // kept inside [theta_lower, theta_upper]: L-BFGS-B does not
-              // project its starting point, so an outside one gave a theta
-              // outside the bounds
-              arma::vec restart_theta = arma::max(
-                  arma::min(arma::vec((theta_start + theta_lower) / pow(2.0, retry + 1)), theta_upper), theta_lower);
-              gamma_tmp.head(d) = restart_theta;
-              if (m_noise_model != NoiseModel::None)
-                gamma_tmp.at(d) = extra0[start_idx % extra0.n_elem];
-              if (Optim::reparametrize) {
-                if (m_noise_model == NoiseModel::Nugget)
-                  gamma_tmp = nugget_reparam_to(gamma_tmp);
-                else if (m_noise_model == NoiseModel::Heterogeneous)
-                  gamma_tmp = Optim::reparam_to(gamma_tmp);
-                else
-                  gamma_tmp.head(d) = Optim::reparam_to(restart_theta);
-              }
-
-              gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
-              gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
-              retry++;
-            } else {
+            if (!restarts.restart(opt_result.task, opt_result.num_iters, sol_to_lb < arma::datum::eps, long_range))
               break;
+
+            if (Optim::log_level > Optim::log_none) {
+              arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << restarts.retry()
+                         << ", reasons " << restarts.last_reasons() << "): f_opt=" << opt_result.f_opt
+                         << ", sol_to_lb=" << sol_to_lb << arma::endl;
             }
+
+            // Restart from the start point contracted toward the lower bound
+            // (theta part only); the local bounds are widened to contain it
+            const arma::vec restart_theta = restarts.restart_theta(theta_start, theta_lower, theta_upper);
+            gamma_tmp.head(d) = restart_theta;
+            if (m_noise_model != NoiseModel::None)
+              gamma_tmp.at(d) = extra0[start_idx % extra0.n_elem];
+            if (Optim::reparametrize) {
+              if (m_noise_model == NoiseModel::Nugget)
+                gamma_tmp = nugget_reparam_to(gamma_tmp);
+              else if (m_noise_model == NoiseModel::Heterogeneous)
+                gamma_tmp = Optim::reparam_to(gamma_tmp);
+              else
+                gamma_tmp.head(d) = Optim::reparam_to(restart_theta);
+            }
+
+            gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
+            gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
           }
 
           // Final evaluation to update model

@@ -17,6 +17,7 @@
 #include "libKriging/utils/utils.hpp"
 
 #include "BlasThreads.hpp"
+#include "RestartPolicy.hpp"
 #include "TaskPool.hpp"
 #include "ThreadBudget.hpp"
 
@@ -2730,14 +2731,14 @@ void WarpKriging::optimise_joint(const std::string& method) {
       return -ll;
     };
 
-    // Retry loop: on abnormal termination / stuck at bound / no progress,
-    // contract θ toward lower bound and restart (mirrors Kriging).
-    int retry = 0;
+    // Restart loop (RestartPolicy, as Kriging): on abnormal termination,
+    // <= 2 iterations, stuck at the lower bound or no improvement, contract θ
+    // toward its lower bound and restart.
+    libKriging::detail::RestartPolicy restarts({Optim::max_restart, optimizer.factr, /*worse_criterion=*/true});
     double best_f = std::numeric_limits<double>::infinity();
     arma::vec best_x = x0;
     arma::vec x = x0;
-    while (retry <= Optim::max_restart) {
-      const double prev_best_f = best_f;
+    while (true) {
       lbfgsb::OptimizeResult res{};
       try {
         res = optimizer.minimize(obj_fn, x, lb.memptr(), ub.memptr(), btype.memptr());
@@ -2753,38 +2754,29 @@ void WarpKriging::optimise_joint(const std::string& method) {
         }
         break;
       }
-      if (res.f_opt < best_f) {
+      if (restarts.record(res.f_opt)) {
         best_f = res.f_opt;
         best_x = x;
       }
       // Iteration budget exhausted while still making progress: resume from
       // the point reached instead of contracting θ back toward its lower
       // bound (which would discard the warp params learnt so far).
-      if ((retry < Optim::max_restart) && (nw > 0) && (res.task.rfind("STOP: TOTAL NO. of ITERATIONS", 0) == 0)
+      const double prev_best_f = restarts.previous_best();
+      if ((nw > 0) && (res.task.rfind("STOP: TOTAL NO. of ITERATIONS", 0) == 0)
           && (!std::isfinite(prev_best_f)
-              || (prev_best_f - res.f_opt) > Optim::objective_rel_tolerance * std::max(1.0, std::abs(res.f_opt)))) {
+              || (prev_best_f - res.f_opt) > Optim::objective_rel_tolerance * std::max(1.0, std::abs(res.f_opt)))
+          && restarts.resume()) {
         x = best_x;
-        retry++;
         continue;
       }
-      arma::vec theta_cur = from_gamma(x.tail(dt));
-      double sol_to_lb = arma::min(arma::abs(theta_cur - theta_lower));
-      // "No improvement" within the optimizer's own tolerance (as Kriging):
-      // a difference at the rounding level must not decide a restart.
-      const double f_tol = optimizer.factr * arma::datum::eps * std::max(1.0, std::abs(best_f));
-      const bool worse = res.f_opt > best_f + f_tol;
-      if ((retry < Optim::max_restart)
-          && ((res.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) || (res.num_iters <= 2)
-              || (sol_to_lb < arma::datum::eps) || worse)) {
-        // Contract theta starting point toward lower bound.
-        arma::vec theta_restart = (theta0 + theta_lower) / std::pow(2.0, retry + 1);
-        x.tail(dt) = to_gamma(theta_restart);
-        if (nw > 0)
-          x.head(nw) = wp_init;
-        retry++;
-      } else {
+      const double sol_to_lb
+          = libKriging::detail::RestartPolicy::distance_to_lower(from_gamma(x.tail(dt)), theta_lower, theta_upper);
+      if (!restarts.restart(res.task, res.num_iters, sol_to_lb < arma::datum::eps))
         break;
-      }
+      // Contract theta starting point toward lower bound.
+      x.tail(dt) = to_gamma(restarts.restart_theta(theta0, theta_lower, theta_upper));
+      if (nw > 0)
+        x.head(nw) = wp_init;
     }
 
     if (nw > 0)
@@ -2810,15 +2802,18 @@ void WarpKriging::optimise_joint(const std::string& method) {
     opt.maximize = true;
     opt.outer_lower = wp_lower;
     opt.outer_upper = wp_upper;
-    // Same restart as the joint BFGS (and Kriging): θ contracted toward its
-    // lower bound, kept inside the bounds (L-BFGS-B does not project its
-    // starting point)
-    opt.max_restart = Optim::max_restart;
-    opt.inner_restart = [&](const arma::vec& gamma0, int retry) -> arma::vec {
-      const arma::vec theta_restart
-          = arma::max(arma::min(arma::vec((from_gamma(gamma0) + theta_lower) / std::pow(2.0, retry + 1)), theta_upper),
-                      theta_lower);
-      return to_gamma(theta_restart);
+    // Restart of the first inner BFGS: same policy as the joint BFGS (and
+    // Kriging), without the "worse" criterion (as before). The at-bound test stays in
+    // the inner (gamma) space, where AdamBFGS made it.
+    libKriging::detail::RestartPolicy inner_restarts({Optim::max_restart, opt.bfgs_factr, /*worse_criterion=*/false});
+    opt.inner_restart
+        = [&](const lbfgsb::OptimizeResult& res, const arma::vec& gamma_end, const arma::vec& gamma0) -> arma::vec {
+      inner_restarts.record(res.f_opt);
+      const double sol_to_lb
+          = libKriging::detail::RestartPolicy::distance_to_lower(gamma_end, gamma_lower, gamma_upper);
+      if (!inner_restarts.restart(res.task, res.num_iters, sol_to_lb < arma::datum::eps))
+        return arma::vec();
+      return to_gamma(inner_restarts.restart_theta(from_gamma(gamma0), theta_lower, theta_upper));
     };
 
     arma::vec current_wp = arma::min(arma::max(wk.pack_warp_params(), wp_lower), wp_upper);
