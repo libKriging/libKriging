@@ -82,7 +82,7 @@ jobs:
         run: |
           tools/linux-macos/apt-install.sh --update liblapack-dev
           case "${{ matrix.binding }}" in
-            octave) tools/linux-macos/apt-install.sh --no-install-recommends octave liboctave-dev libopenblas0 gnuplot-nox ;;
+            octave) tools/linux-macos/apt-install.sh --no-install-recommends octave liboctave-dev libopenblas0 ;;
             r)      tools/linux-macos/apt-install.sh gfortran ;;
           esac
           if [ "${{ matrix.binding }}" == "python" ]; then

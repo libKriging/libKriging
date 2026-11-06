@@ -258,7 +258,7 @@ jobs:
           # available on every x86 runner. No effect where OpenBLAS is absent.
           echo "OPENBLAS_CORETYPE=Haswell" >> $GITHUB_ENV
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
-            tools/linux-macos/apt-install.sh --no-install-recommends octave liboctave-dev libopenblas0 gnuplot-nox
+            tools/linux-macos/apt-install.sh --no-install-recommends octave liboctave-dev libopenblas0
           fi
           if [ "${ENABLE_MATLAB_BINDING}" == "on" ]; then
             tools/linux-macos/apt-install.sh intel-mkl
