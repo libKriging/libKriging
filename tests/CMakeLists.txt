@@ -378,6 +378,10 @@ catch_discover_tests(BlasThreadsTest)
 # the hidden [.openblas_env] case needs OPENBLAS_NUM_THREADS at load time
 add_test(NAME BlasThreadsTest/OPENBLAS_NUM_THREADS COMMAND BlasThreadsTest "[.openblas_env]")
 set_tests_properties(BlasThreadsTest/OPENBLAS_NUM_THREADS PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
+# bit-identical objective / gradient / update whatever the OpenMP count when the
+# BLAS count cannot change (MKL's results depend on its count: T9)
+add_test(NAME BlasThreadsTest/BLAS_NUM_THREADS=1 COMMAND BlasThreadsTest "*do not depend on the OpenMP thread count")
+set_tests_properties(BlasThreadsTest/BLAS_NUM_THREADS=1 PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1;MKL_NUM_THREADS=1")
 
 add_executable(SimulateStateResetTest SimulateStateResetTest.cpp)
 target_link_libraries(SimulateStateResetTest LINK_PUBLIC Kriging Catch2)
