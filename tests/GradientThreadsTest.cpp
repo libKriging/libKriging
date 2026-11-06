@@ -9,6 +9,7 @@
 #include "libKriging/Optim.hpp"
 #include "SeparableDln.hpp"  // private (src/lib)
 #include <array>
+#include <cmath>
 #include <string>
 #include <vector>
 // clang-format on
@@ -23,7 +24,13 @@
 //    depend neither on the thread count nor on kOmpMinRows, hence not on the OS.
 // 2. End to end: the same bits with a 1-thread budget and with the whole
 //    budget, below and above kOmpMinRows. Only the OpenMP loops are bounded
-//    (Optim::set_num_threads_percent); the BLAS count is left as it is.
+//    (Optim::set_num_threads_percent); the BLAS count is left as it is. The
+//    gradients also go through the BLAS / LAPACK (R^-1, triangular solves),
+//    outside this guarantee: with Apple Accelerate (thread count not settable
+//    by the library, on macOS CI two identical calls differ), or a BLAS found
+//    to give different bits for two identical calls (e.g. MKL without CNR),
+//    the comparison falls back to 1e-10 relative (case 1 keeps the bitwise
+//    check of the pair sums).
 
 namespace {
 
@@ -39,13 +46,27 @@ std::vector<arma::vec> gradients(Kriging& k, const arma::vec& gamma) {
   return g;
 }
 
-void require_bitwise_equal(const std::vector<arma::vec>& a, const std::vector<arma::vec>& b) {
+bool bitwise_equal(const std::vector<arma::vec>& a, const std::vector<arma::vec>& b) {
+  for (std::size_t i = 0; i < a.size(); i++)
+    for (arma::uword k = 0; k < a[i].n_elem; k++)
+      if (a[i].at(k) != b[i].at(k))
+        return false;
+  return true;
+}
+
+// rel_tol = 0: same bits; otherwise |a - b| <= rel_tol * max|a| per vector
+void require_equal(const std::vector<arma::vec>& a, const std::vector<arma::vec>& b, double rel_tol) {
   REQUIRE(a.size() == b.size());
   for (std::size_t i = 0; i < a.size(); i++) {
-    CAPTURE(i, a[i], b[i]);
+    CAPTURE(i, a[i], b[i], rel_tol);
     REQUIRE(a[i].n_elem == b[i].n_elem);
-    for (arma::uword k = 0; k < a[i].n_elem; k++)
-      REQUIRE(a[i].at(k) == b[i].at(k));
+    const double scale = arma::abs(a[i]).max();
+    for (arma::uword k = 0; k < a[i].n_elem; k++) {
+      if (rel_tol == 0.0)
+        REQUIRE(a[i].at(k) == b[i].at(k));
+      else
+        REQUIRE(std::abs(a[i].at(k) - b[i].at(k)) <= rel_tol * scale);
+    }
   }
 }
 
@@ -82,11 +103,20 @@ TEST_CASE("LL / LMP theta gradients do not depend on the OpenMP thread count", "
   Optim::set_num_threads_percent(1e-9);  // budget: 1 thread
   REQUIRE(Optim::get_num_threads() == 1);
   const std::vector<arma::vec> g1 = gradients(k, gamma);
+#if defined(__APPLE__)
+  // Accelerate: thread count not settable by the library, results not
+  // reproducible from one call to the next (macOS CI, n = 100)
+  const bool blas_reproducible = false;
+#else
+  const bool blas_reproducible = bitwise_equal(g1, gradients(k, gamma));
+#endif
 
   Optim::set_num_threads_percent(0);  // whole budget
   INFO("thread budget: " << Optim::get_num_threads());
   const std::vector<arma::vec> gn = gradients(k, gamma);
-  require_bitwise_equal(g1, gn);
+  if (!blas_reproducible)
+    WARN("two identical gradient calls differ (BLAS / LAPACK not reproducible): compared to 1e-10 relative");
+  require_equal(g1, gn, blas_reproducible ? 0.0 : 1e-10);
   for (const auto& g : g1)
     REQUIRE(g.is_finite());
 }

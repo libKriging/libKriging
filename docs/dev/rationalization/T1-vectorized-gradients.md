@@ -64,6 +64,15 @@ Checks:
   - end to end: LL and LMP gradients, plain and Nugget models, n = 100 and
     900 (above the threshold on every OS), 4 kernels: same bits with a 1-thread
     budget and with the whole budget (`Optim::set_num_threads_percent`).
+  - The end-to-end case also goes through the BLAS / LAPACK (R^-1, triangular
+    solves), which T1 does not make reproducible. On the macOS arm64 CI
+    (Apple Accelerate, thread count not settable by the library) the first
+    version of the test failed at n = 100, where the pair loop runs on one
+    thread either way: the LL gradients differed at the last bits between
+    the two calls (e.g. 292.0341254297 both printed). With Accelerate, and
+    with any BLAS found to give different bits for two identical calls, the
+    end-to-end case now compares to 1e-10 relative; the white-box case keeps
+    the bitwise check of the pair sums everywhere (it passed on macOS).
   - Mutation check: putting back the former sequential order for 1 thread
     (direct accumulation, as before T1 below `kOmpMinRows`) makes both cases
     fail.
@@ -83,7 +92,19 @@ needed on top of T1.
 Not covered by T1: the BLAS / LAPACK calls around the loop (R^-1, triangular
 solves) still depend on the BLAS thread count and vendor.
 
-## CI of #441 (first run)
+## CI of #441
+
+Head `d485afd` (merge of the base branch):
+
+- `build (macOS Debug)`: `GradientThreadsTest` end-to-end case failed (Accelerate,
+  see above): fixed in the test.
+- `compare` (Binding API run 42062994213): `octave methods` cancelled at its 60 min
+  timeout in "Install dependencies" (apt), before any build; the other Binding API
+  run on the same commit passed its four `methods` jobs. Infrastructure.
+- `Coverage mode` cancelled at its 30 min timeout (build ~27 min) on this and every
+  other rationalization branch at that time: workflow timeout, not T1.
+
+### First run
 
 One failed check, `compare` (`.github/workflows/binding-api.yml`, run
 41168886416): the `r methods` job of the same run was cancelled at its 60 min
