@@ -18,6 +18,15 @@ past release, see the corresponding entry on the
   Kriging's (it kept 1e-10 on its diagonal).
 
 ### Added
+- **Statistical benchmark base of the fit** (T7, `bench/fit-protocol/`): `bench-fit-protocol`
+  (built with the other benchmarks) fits >= 30 seeded data sets per configuration (gauss /
+  matern5_2, noise-free / nugget, LL / LOO / LMP, test functions with and without inactive
+  inputs, n 100-1000) with the optimizers given as arguments and the settings of the
+  environment (`LK_LONG_RANGE_RESTART`, `LK_CHOL_JITTER`, `LK_NUM_THREADS_PERCENT`); `run.py`
+  runs a profile (`smoke`: ~2 min, `reference`, `full`), `summarize.py` reports the miss rate
+  with Wilson 95 % intervals, test RMSE, wall and CPU time. Reference results (4-core machine)
+  committed in `bench/fit-protocol/results/`; see
+  [docs/dev/rationalization/T7-benchmark-base.md](docs/dev/rationalization/T7-benchmark-base.md).
 - **Linear algebra self-test**: `LinearAlgebra::check(n_threads = 0)` calls the `LinearAlgebra`
   routines libKriging relies on (crossprod, diagABA, Cholesky, triangular / general solves,
   inverse, rcond, QR, Woodbury solve, symmetric eigen) and compares each result with a long
