@@ -176,7 +176,7 @@ jobs:
           # OpenBLAS 0.3.20 Cooperlake kernels are wrong on Xeon 6973P-C (main.yml, #429)
           echo "OPENBLAS_CORETYPE=Haswell" >> $GITHUB_ENV
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
-            tools/linux-macos/apt-install.sh --no-install-recommends octave liboctave-dev libopenblas0
+            tools/linux-macos/apt-install.sh --no-install-recommends octave liboctave-dev libopenblas0 gnuplot-nox
           fi
           if [ "${ENABLE_MATLAB_BINDING}" == "on" ]; then
             tools/linux-macos/apt-install.sh intel-mkl
