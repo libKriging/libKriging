@@ -83,7 +83,7 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -qy liblapack-dev
           case "${{ matrix.binding }}" in
-            octave) sudo apt-get install -qy octave liboctave-dev ;;
+            octave) sudo apt-get install -qy --no-install-recommends octave liboctave-dev libopenblas0 ;;
             r)      sudo apt-get install -qy gfortran ;;
           esac
           if [ "${{ matrix.binding }}" == "python" ]; then
