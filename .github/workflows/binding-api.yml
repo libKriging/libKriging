@@ -17,14 +17,23 @@ name: Binding API
 # all the compared methods.
 
 on:
+  # branches are tested through their pull request; master on push
   push:
     branches:
-      - '*'
+      - master
     tags-ignore:
       - 'v*'
   pull_request:
     branches:
       - '*'
+  workflow_dispatch: # test a branch without a pull request
+
+# One run per pull request (or branch) and workflow: a new push to a pull
+# request cancels its run in progress; master pushes and scheduled runs are
+# never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # see main.yml: needed by the pinned pybind11 submodule with cmake >= 4
