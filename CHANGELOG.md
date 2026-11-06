@@ -12,6 +12,14 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Faster theta gradients** (T1, `docs/dev/rationalization/T1-vectorized-gradients.md`): the
+  LL and LMP theta gradients use per-dimension kernel factors in one pair loop (no
+  `std::function` / `arma::vec` per pair), and the LMP gradient is reduced algebraically to one
+  R^-1 and an O(d n^2) loop instead of d O(n^3) solves; `LinearAlgebra::inv_sympd` uses LAPACK
+  `*potri` (x3 fewer flops). Single thread, d = 4, n = 500 / 1500: LL gradient x2.2-3.7, LMP
+  gradient x10-15. The pair sums now have one order whatever the thread count, n and OS (the
+  `kOmpMinRows` dependence of the gradient is removed). Results change at rounding level
+  (< 3e-12 relative for cond(R) < 1e8; more on ill-conditioned R).
 - **Predicted variance floor** (#428): `predict` floors the variance at 4 eps x sigma2 instead of
   clamping it to 0; the stdev is never 0 (no NaN NLPD) and its derivative is 0 (was NaN) where the
   variance is at the floor. The **WarpKriging / MLPKriging committed model is now exact**, as
