@@ -114,6 +114,31 @@ int max_blas_threads_during(F run) {
 #endif
 }
 
+// Smallest OpenBLAS thread count seen while `run` runs (0 without OpenBLAS).
+template <typename F>
+int min_blas_threads_during(F run) {
+#ifdef LK_TEST_OPENBLAS
+  if (!openblas_get_num_threads)
+    return (run(), 0);
+  std::atomic<bool> done{false};
+  std::atomic<int> seen{openblas_get_num_threads()};
+  std::thread monitor([&] {
+    while (!done.load()) {
+      const int b = openblas_get_num_threads();
+      if (b < seen.load())
+        seen.store(b);
+      std::this_thread::yield();
+    }
+  });
+  run();
+  done.store(true);
+  monitor.join();
+  return seen.load();
+#else
+  return (run(), 0);
+#endif
+}
+
 // Restores the thread budget setting at the end of a test.
 struct BudgetGuard {
   double saved = Optim::get_num_threads_percent();
@@ -257,6 +282,46 @@ TEST_CASE("The BLAS thread count never exceeds the thread budget during a fit", 
   CHECK(warp_max <= budget);
   CHECK(single_max == budget);
   CHECK(after == 1);
+#else
+  WARN("no OpenBLAS in this build");
+#endif
+}
+
+TEST_CASE("Below Optim::blas_threads_min_n observations a fit runs OpenBLAS on 1 thread", "[threads]") {
+#ifdef LK_TEST_OPENBLAS
+  if (!openblas_get_num_threads || !openblas_set_num_threads) {
+    WARN("no OpenBLAS in this build");
+    return;
+  }
+  BudgetGuard guard;
+  Optim::set_num_threads_percent(100);
+  const int budget = Optim::get_num_threads();
+  const int min_n = Optim::get_blas_threads_min_n();
+  arma::vec y;
+  arma::mat X;
+  data(y, X, 120);
+  // first use: the library reads the count OpenBLAS was loaded with
+  Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS");
+  const int initial = openblas_get_num_threads();
+  const int expected_large = std::min(budget, initial);
+  if (expected_large < 2) {
+    WARN("fewer than 2 threads: nothing to lower");
+    return;
+  }
+  Optim::set_blas_threads_min_n(100);
+  const int small_min = min_blas_threads_during([&] {
+    Kriging k(y.head(60), X.head_rows(60), "matern5_2", Trend::RegressionModel::Constant, false, "BFGS");
+    k.predict(X, true, false, false);
+  });
+  const int after = openblas_get_num_threads();
+  const int large_min
+      = min_blas_threads_during([&] { Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS"); });
+  Optim::set_blas_threads_min_n(min_n);
+  INFO("budget " << budget << ", initial " << initial << ", OpenBLAS min seen: n = 60 " << small_min << ", n = 120 "
+                 << large_min);
+  CHECK(small_min == 1);
+  CHECK(after == initial);
+  CHECK(large_min == expected_large);
 #else
   WARN("no OpenBLAS in this build");
 #endif

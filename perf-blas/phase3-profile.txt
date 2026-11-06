@@ -1,0 +1,60 @@
+== OPENBLAS_NUM_THREADS=1: by DSO
+    72.37%  libgomp.so.1.0.0       
+    16.06%  libopenblasp-r0.3.26.so
+     5.98%  libKriging.so.1.2.2    
+     2.46%  libc.so.6              
+     1.55%  [kernel.kallsyms]      
+     1.48%  libm.so.6              
+     0.03%  ld-linux-x86-64.so.2   
+     0.03%  liblbfgsb_cpp.so       
+== OPENBLAS_NUM_THREADS=1: top symbols (self)
+    53.75%  libgomp.so.1.0.0         [.] 0x00000000000256c2
+     8.28%  libgomp.so.1.0.0         [.] 0x00000000000256c6
+     6.46%  libopenblasp-r0.3.26.so  [.] dgemm_kernel_COOPERLAKE
+     6.45%  libgomp.so.1.0.0         [.] 0x00000000000256cd
+     2.25%  libopenblasp-r0.3.26.so  [.] dtrsm_kernel_LN_COOPERLAKE
+     1.90%  libc.so.6                [.] __memmove_avx512_unaligned_erms
+     1.73%  libopenblasp-r0.3.26.so  [.] dtrsm_kernel_LT_COOPERLAKE
+     1.64%  libgomp.so.1.0.0         [.] 0x00000000000256c0
+     1.56%  libKriging.so.1.2.2      [.] libKriging::WarpKriging::concentrated_ll_and_grad_theta() const
+     1.18%  libm.so.6                [.] __ieee754_exp_fma
+     1.08%  libgomp.so.1.0.0         [.] 0x00000000000258a2
+     0.74%  libopenblasp-r0.3.26.so  [.] dlantr_
+     0.70%  libgomp.so.1.0.0         [.] 0x00000000000256cb
+     0.66%  libopenblasp-r0.3.26.so  [.] dlatrs_
+     0.64%  libKriging.so.1.2.2      [.] LinearAlgebra::cholCov(arma::Mat<double>*, arma::Mat<double> const&, arma::Col<double> const&, std::function<double (arma::Col<double> const&, arma::Col<double> const&)>, double, arma::Col<double>) [clone ._omp_fn.0]
+     0.63%  libopenblasp-r0.3.26.so  [.] idamax_k_COOPERLAKE
+     0.45%  libKriging.so.1.2.2      [.] std::_Function_handler<double (arma::Col<double> const&, arma::Col<double> const&), Covariance::{lambda(arma::Col<double> const&, arma::Col<double> const&)#1}>::_M_invoke(std::_Any_data const&, arma::Col<double> const&, arma::Col<double> const&)
+     0.44%  libopenblasp-r0.3.26.so  [.] daxpy_k_COOPERLAKE
+     0.43%  libKriging.so.1.2.2      [.] std::_Function_handler<arma::Col<double> (arma::Col<double> const&, arma::Col<double> const&), Covariance::{lambda(arma::Col<double> const&, arma::Col<double> const&)#3}>::_M_invoke(std::_Any_data const&, arma::Col<double> const&, arma::Col<double> const&)
+     0.41%  [kernel.kallsyms]        [k] do_user_addr_fault
+== OPENBLAS_NUM_THREADS=4: by DSO
+    49.98%  libgomp.so.1.0.0       
+    28.88%  [kernel.kallsyms]      
+    10.19%  libopenblasp-r0.3.26.so
+     8.10%  libc.so.6              
+     2.24%  libKriging.so.1.2.2    
+     0.59%  libm.so.6              
+     0.01%  ld-linux-x86-64.so.2   
+     0.01%  liblbfgsb_cpp.so       
+== OPENBLAS_NUM_THREADS=4: top symbols (self)
+    29.16%  libgomp.so.1.0.0         [.] 0x00000000000256c2
+    15.45%  [kernel.kallsyms]        [k] __schedule
+     9.07%  libgomp.so.1.0.0         [.] 0x00000000000258a2
+     7.15%  libc.so.6                [.] __sched_yield
+     7.04%  [kernel.kallsyms]        [k] do_syscall_64
+     4.29%  libgomp.so.1.0.0         [.] 0x00000000000256c6
+     3.50%  [kernel.kallsyms]        [k] do_sched_yield
+     3.30%  libgomp.so.1.0.0         [.] 0x00000000000256cd
+     2.54%  libopenblasp-r0.3.26.so  [.] dgemm_kernel_COOPERLAKE
+     2.32%  libopenblasp-r0.3.26.so  [.] 0x000000000039cabc
+     1.41%  libgomp.so.1.0.0         [.] 0x00000000000258a6
+     1.11%  libgomp.so.1.0.0         [.] 0x00000000000258af
+     1.11%  [kernel.kallsyms]        [k] finish_task_switch.isra.0
+     0.92%  libgomp.so.1.0.0         [.] 0x00000000000256c0
+     0.70%  libc.so.6                [.] __memmove_avx512_unaligned_erms
+     0.62%  libopenblasp-r0.3.26.so  [.] dtrsm_kernel_LN_COOPERLAKE
+     0.53%  libKriging.so.1.2.2      [.] libKriging::WarpKriging::concentrated_ll_and_grad_theta() const
+     0.50%  libopenblasp-r0.3.26.so  [.] dtrsm_kernel_LT_COOPERLAKE
+     0.48%  libm.so.6                [.] __ieee754_exp_fma
+     0.39%  libopenblasp-r0.3.26.so  [.] exec_blas_async_wait

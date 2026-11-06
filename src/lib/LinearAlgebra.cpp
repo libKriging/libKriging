@@ -735,7 +735,18 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve_upper(const arma::mat& U, cons
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::inv_sympd(const arma::mat& L) {
-  return arma::solve(arma::trimatu(L.t()), arma::solve(arma::trimatl(L), arma::eye(L.n_rows, L.n_rows)));
+  // (L L')^-1 from the Cholesky factor with LAPACK *potri: 2n^3/3 flops,
+  // against 2n^3 for the two triangular solves on the identity (kept as the
+  // fallback, e.g. for a zero on the diagonal of L).
+  arma::mat Rinv = L;
+  char uplo = 'L';
+  arma::blas_int n = static_cast<arma::blas_int>(L.n_rows);
+  arma::blas_int info = 0;
+  if (n > 0)
+    arma::lapack::potri(&uplo, &n, Rinv.memptr(), &n, &info);
+  if (info != 0)
+    return arma::solve(arma::trimatu(L.t()), arma::solve(arma::trimatl(L), arma::eye(L.n_rows, L.n_rows)));
+  return arma::symmatl(Rinv);
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_upper(const arma::mat& A) {
