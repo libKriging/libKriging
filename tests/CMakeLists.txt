@@ -315,6 +315,15 @@ if (SANITIZE AND NOT SANITIZE STREQUAL "OFF")
     string(TOLOWER "${SANITIZE}" SANITIZE_LOWER)
     set(CONSUMER_LINKER_FLAGS "${CONSUMER_LINKER_FLAGS} -fsanitize=${SANITIZE_LOWER}")
 endif ()
+# The consumer calls find_dependency(OpenMP) like the library did: where OpenMP is not found by default (Homebrew's
+# keg-only libomp with AppleClang), give it the hints this build was configured with.
+set(CONSUMER_OPENMP_ARGS "")
+foreach (var OpenMP_ROOT OpenMP_CXX_FLAGS OpenMP_CXX_LIB_NAMES OpenMP_libomp_LIBRARY OpenMP_omp_LIBRARY)
+    if (DEFINED ${var} AND NOT "${${var}}" STREQUAL "")
+        list(APPEND CONSUMER_OPENMP_ARGS "-D${var}=${${var}}")
+    endif ()
+endforeach ()
+string(REPLACE ";" "|" CONSUMER_OPENMP_ARGS "${CONSUMER_OPENMP_ARGS}")
 if (NOT CMAKE_VERSION VERSION_LESS 3.15)
     add_test(NAME cmake_package
             COMMAND ${CMAKE_COMMAND}
@@ -327,6 +336,7 @@ if (NOT CMAKE_VERSION VERSION_LESS 3.15)
             -DEXPECTED_VERSION=${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}
             -DINSTALLED_PREFIX=${CMAKE_INSTALL_PREFIX}
             "-DCONSUMER_LINKER_FLAGS=${CONSUMER_LINKER_FLAGS}"
+            "-DCONSUMER_OPENMP_ARGS=${CONSUMER_OPENMP_ARGS}"
             "-DINSTALL_DIRS=${PROJECT_BINARY_DIR}/dependencies/armadillo-code|${PROJECT_BINARY_DIR}/dependencies/lbfgsb_cpp|$<TARGET_PROPERTY:Kriging,BINARY_DIR>"
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake_package/run_test.cmake)
     set_tests_properties(cmake_package PROPERTIES LABELS "install")
