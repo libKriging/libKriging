@@ -3083,7 +3083,7 @@ void WarpKriging::fit(const arma::vec& y,
                       const std::string& objective,
                       const std::map<std::string, std::string>& parameters,
                       const std::string& method) {
-  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
+  libKriging::detail::BudgetScope budget_scope(X.n_rows);  // BLAS at the thread budget for the call
   fit(y, X, regmodel, normalize, optim, objective, Parameters{}, parameters, method);
 }
 
@@ -3100,7 +3100,7 @@ void WarpKriging::fit(const arma::vec& y,
                       const Parameters& parameters,
                       const std::map<std::string, std::string>& tuning,
                       const std::string& method) {
-  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
+  libKriging::detail::BudgetScope budget_scope(X.n_rows);  // BLAS at the thread budget for the call
   if (Kriging::fit_objective_method(objective, method).second != "exact")
     throw std::invalid_argument("WarpKriging::fit: method \"" + method + "\" is not implemented (only \"exact\" is)");
   for (const auto& [key, val] : tuning) {
@@ -3215,7 +3215,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
                                                                                        bool return_stdev,
                                                                                        bool return_cov,
                                                                                        bool return_deriv) const {
-  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
+  libKriging::detail::BudgetScope budget_scope(m_y.n_elem);  // BLAS at the thread budget for the call
   if (!m_fitted)
     throw std::runtime_error("predict: model not fitted");
   validate_discrete_columns(X_n, "predict");
@@ -3386,7 +3386,7 @@ void WarpKriging::clear_simulate_state() {
 //  update()
 // -------------------------------------------------------------------------
 void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit, const arma::vec& noise_u) {
-  libKriging::detail::BudgetScope budget_scope;  // BLAS at the thread budget for the call
+  libKriging::detail::BudgetScope budget_scope(m_y.n_elem + y_u.n_elem);  // BLAS at the thread budget for the call
   if (!m_fitted)
     throw std::runtime_error("update: model not fitted");
   if (y_u.n_elem != X_u.n_rows)
