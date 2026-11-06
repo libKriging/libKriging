@@ -2,6 +2,8 @@
 
 Machine: Apple M4 (4 P + 6 E cores, 10 logical), macOS 15.7.4, Apple clang 17.0.0, cmake 4.4.0, libomp (Homebrew), Accelerate BLAS.
 Branch under test: `origin/ccr-54a50343-4jupn9-t9-blas-backends-ci` (2983509f) unless stated; Q1/Q2 on `...-t10-nystrom-determinism` (e841a604) with the exact check of #451 restored locally.
+**CI finding (checked in the logs of PR #455's run):** every macOS CI job (Debug, R, Octave, Julia, ...) prints "OpenMP not found - multistart optimization will run sequentially": the macOS CI has no OpenMP, so it never exercised libomp (no fork deadlock, no `kOmpMinRows` effect, no multistart threads). The Q4/Q5 "macos-15 3 cores" numbers of the issue were therefore sequential. Fix: `brew install libomp` + `-DOpenMP_ROOT=$(brew --prefix libomp)` in the macOS jobs (decision needed: it will also run the new fork tests under libomp, which #455 makes pass).
+
 Release builds: `cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix libomp) -DOpenMP_ROOT=$(brew --prefix libomp)` (bindings OFF).
 Raw data: `macOS-q4-bench-threads.csv`, `macOS-q4-fit-profile.txt`, `macOS-q5-timing.txt`, `macOS-fork125-sample.txt`, `macOS-rng-seed407.txt`; progress log in `macOS-Accelerate-TODO-updated.md`.
 
@@ -12,7 +14,7 @@ Raw data: `macOS-q4-bench-threads.csv`, `macOS-q4-fit-profile.txt`, `macOS-q5-ti
 |---|---|
 | `consistent with the exact fits`, exact equality restored, `--repeat until-fail:500`, default threads | 500/500 pass |
 | `repro.cpp`, 2000 alternated calls, with and without heap shifts | 0 bitwise differences (LOO = 1.5778344766038358e-08, theta = 3.5521543413903967, 1.538402235248628) |
-| Q2: Nystrom / Vecchia / ApproxObjectives / NormalizeScale test executables, 30 full runs each | 0 failures (fewer than the 500 requested) |
+| Q2: `--repeat until-fail:500` on the 5 test cases holding the 6 checks (`KrigingNystromTest.cpp:172` "Nystrom fit is a permanent light fit", `:816` "Nystrom noise-model save/load round-trip", `KrigingVecchiaTest.cpp:356`/`:390` "Vecchia fit keeps no exact factorization", `KrigingApproxObjectivesTest.cpp:301-302` "method argument checks", `KrigingNormalizeScaleTest.cpp:812` "normalize=false: accessors ... bit for bit") | **500/500 pass for each** (17, 19, 548, 8, 9 s) |
 
 No failure, so the `VECLIB_MAXIMUM_THREADS=1` / `BLASSetThreading` variants were not run. Attribution to Accelerate not confirmed nor refuted on a 10-core M4 (the failure was seen on a 3-core runner). Proposal: keep the 1e-5 relative tolerance.
 
