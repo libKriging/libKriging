@@ -115,6 +115,13 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **Tests**: `KrigingApproxObjectivesTest` "approximate LOO / LMP fits are consistent with the
+  exact fits" compared `leaveOneOut("nystrom(80)")` and `leaveOneOut("nystrom")` bitwise and
+  failed intermittently on macOS (Accelerate). Both calls take the same deterministic code path;
+  the Nystrom LOO of this case (~1.6e-8) moves by up to 1.2e-6 relative with the BLAS kernel or
+  thread count (24 OpenBLAS configurations), and Accelerate chooses its own thread partition per
+  call. The check is now relative, at 1e-5 (another rank k moves it by >= 2 %). No library change.
+  See [docs/dev/rationalization/T10-nystrom-determinism.md](docs/dev/rationalization/T10-nystrom-determinism.md).
 - **Octave**: `Optim.set_log_level`, `set_max_iteration`, `set_thread_start_delay_ms` and
   `set_thread_pool_size` failed with "is not an unsigned 64bits int" when given a plain
   number (`Optim.set_log_level(2)`); they now convert it to `int32`. Their tests
