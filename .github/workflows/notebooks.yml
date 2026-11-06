@@ -17,6 +17,13 @@ on:
     - cron: '0 4 * * SUN'
   workflow_dispatch:
 
+# One run per pull request (or branch) and workflow: a new push to a pull
+# request cancels its run in progress; master pushes and scheduled runs are
+# never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   # cmake >= 4 rejects deps declaring cmake_minimum_required < 3.5 (pinned pybind11)
   CMAKE_POLICY_VERSION_MINIMUM: "3.5"
