@@ -42,14 +42,18 @@ target_link_libraries(bench-threads LINK_PUBLIC Kriging)
 add_executable(bench-threads-ops bench-threads-ops.cpp)
 target_link_libraries(bench-threads-ops LINK_PUBLIC Kriging)
 
+# Statistical benchmark base (T7): bench/fit-protocol/README.md
+add_executable(bench-fit-protocol bench-fit-protocol.cpp)
+target_link_libraries(bench-fit-protocol LINK_PUBLIC Kriging)
+
 # Optionally install benchmarks
-install(TARGETS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia bench-nystrom bench-threads bench-threads-ops
+install(TARGETS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia bench-nystrom bench-threads bench-threads-ops bench-fit-protocol
         RUNTIME DESTINATION bin/bench
         OPTIONAL)  # install.lib does not build them (#384)
 
 # Add custom target to build all benchmarks
 add_custom_target(all_benchmarks
-    DEPENDS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia bench-nystrom bench-threads bench-threads-ops
+    DEPENDS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia bench-nystrom bench-threads bench-threads-ops bench-fit-protocol
     COMMENT "Building all benchmark executables")
 
 # Add CTest entries for benchmarks (optional - can be run manually or via CI)
