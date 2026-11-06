@@ -1,0 +1,147 @@
+From 62df31700c3ae1fc9f562d5448409b9c57b3e100 Mon Sep 17 00:00:00 2001
+From: yannrichet-asnr <yann.richet@asnr.fr>
+Date: Fri, 6 Nov 2026 15:07:37 +0100
+Subject: [PATCH] fix(macOS): no libomp call in the fork handlers;
+ cmake_package forwards OpenMP hints
+
+libomp (LLVM/Intel OpenMP, the runtime of AppleClang builds) registers its own
+pthread_atfork handlers that hold its internal locks across fork() and reset
+the runtime in the child. libkriging_atfork_prepare/child called omp_get_max_threads
+and omp_set_num_threads, which spin on those locks: fork() during concurrent fits
+hung (ConcurrentCallsTest "fork() during concurrent fits") and the child test
+"fork() quiesces the child only" failed. When the runtime is libomp (detected once
+with dlsym("__kmpc_fork_call")), the handlers leave the OpenMP count alone and the
+child sets OMP_NUM_THREADS=1 for libomp's re-initialization. libgomp is unchanged.
+
+The cmake_package consumer now receives the OpenMP_* hints of the build (Homebrew's
+keg-only libomp is not found by default).
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ src/lib/Kriging.cpp                | 34 ++++++++++++++++++++++++++++--
+ tests/CMakeLists.txt               | 10 +++++++++
+ tests/cmake_package/run_test.cmake |  4 ++++
+ 3 files changed, 46 insertions(+), 2 deletions(-)
+
+diff --git a/src/lib/Kriging.cpp b/src/lib/Kriging.cpp
+index 522bbd2c..7f38bad6 100644
+--- a/src/lib/Kriging.cpp
++++ b/src/lib/Kriging.cpp
+@@ -274,11 +274,22 @@ void restore_blas_threads(const BlasThreadState& s) {
+ // single-threaded after e.g. mclapply. The child handler re-asserts
+ // single-threading in case the runtime inherited stale state.
+ #if !defined(_WIN32) && defined(_POSIX_VERSION)
++#include <dlfcn.h>
+ #include <pthread.h>
++#include <stdlib.h>
+ namespace {
+ 
+ libKriging::detail::BlasThreadState atfork_saved;
+ 
++// libomp (LLVM / Intel OpenMP, the macOS runtime) registers its own
++// pthread_atfork handlers: they keep its internal locks across fork() and reset
++// the runtime in the child, which runs after ours. Any omp_* call made from our
++// handlers then spins on a lock that is already held (fork() hangs in the
++// parent, the child's omp_set_num_threads never returns). libgomp has no such
++// handlers. Detected once, at registration: calling dlsym in a handler is not
++// safe either.
++bool omp_runtime_forks_itself = false;
++
+ // The library's mutexes are locked in prepare and unlocked in both processes:
+ // a fork() made while another thread holds one would leave it locked forever
+ // in the child, where that thread does not exist.
+@@ -286,12 +297,21 @@ void libkriging_atfork_prepare() {
+   // locked first: no concurrent scope changes the count between the two lines
+   libKriging::detail::blas_count_fork_prepare();
+   libKriging::detail::rcond_mutex().lock();
++  if (omp_runtime_forks_itself) {
++    atfork_saved = libKriging::detail::BlasThreadState();
++    atfork_saved.blas = libKriging::detail::get_openblas_threads();
++    libKriging::detail::set_openblas_threads(1);
++    return;
++  }
+   atfork_saved = libKriging::detail::get_blas_threads();
+   libKriging::detail::set_blas_threads(1);
+ }
+ 
+ void libkriging_atfork_parent() {
+-  libKriging::detail::restore_blas_threads(atfork_saved);
++  if (omp_runtime_forks_itself)
++    libKriging::detail::set_openblas_threads(atfork_saved.blas);  // the OpenMP count was not touched
++  else
++    libKriging::detail::restore_blas_threads(atfork_saved);
+   libKriging::detail::rcond_mutex().unlock();
+   libKriging::detail::blas_count_fork_parent();
+ }
+@@ -299,7 +319,14 @@ void libkriging_atfork_parent() {
+ void libkriging_atfork_child() {
+   libKriging::detail::rcond_mutex().unlock();
+   libKriging::detail::blas_count_fork_child();
+-  libKriging::detail::set_blas_threads(1);
++  if (omp_runtime_forks_itself) {
++    libKriging::detail::set_openblas_threads(1);
++    // libomp re-initializes in the child after this handler and reads the
++    // environment again: one thread there, without calling into it
++    setenv("OMP_NUM_THREADS", "1", 1);
++  } else {
++    libKriging::detail::set_blas_threads(1);
++  }
+   // MKL's global count too (threads without a thread-local count, i.e. the
+   // child's later threads and the forking thread unless it set its own): with
+   // the GNU threading layer an MKL call at more than 1 thread starts an OpenMP
+@@ -309,6 +336,9 @@ void libkriging_atfork_child() {
+ 
+ struct ForkSafeRegistrar {
+   ForkSafeRegistrar() {
++#ifdef _OPENMP
++    omp_runtime_forks_itself = dlsym(RTLD_DEFAULT, "__kmpc_fork_call") != nullptr;
++#endif
+     pthread_atfork(libkriging_atfork_prepare,  // prepare: quiesce before fork
+                    libkriging_atfork_parent,   // parent:  restore thread counts
+                    libkriging_atfork_child);   // child:   ensure clean state
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index c6d66285..61d8b495 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -315,6 +315,15 @@ if (SANITIZE AND NOT SANITIZE STREQUAL "OFF")
+     string(TOLOWER "${SANITIZE}" SANITIZE_LOWER)
+     set(CONSUMER_LINKER_FLAGS "${CONSUMER_LINKER_FLAGS} -fsanitize=${SANITIZE_LOWER}")
+ endif ()
++# The consumer calls find_dependency(OpenMP) like the library did: where OpenMP is not found by default (Homebrew's
++# keg-only libomp with AppleClang), give it the hints this build was configured with.
++set(CONSUMER_OPENMP_ARGS "")
++foreach (var OpenMP_ROOT OpenMP_CXX_FLAGS OpenMP_CXX_LIB_NAMES OpenMP_libomp_LIBRARY OpenMP_omp_LIBRARY)
++    if (DEFINED ${var} AND NOT "${${var}}" STREQUAL "")
++        list(APPEND CONSUMER_OPENMP_ARGS "-D${var}=${${var}}")
++    endif ()
++endforeach ()
++string(REPLACE ";" "|" CONSUMER_OPENMP_ARGS "${CONSUMER_OPENMP_ARGS}")
+ if (NOT CMAKE_VERSION VERSION_LESS 3.15)
+     add_test(NAME cmake_package
+             COMMAND ${CMAKE_COMMAND}
+@@ -327,6 +336,7 @@ if (NOT CMAKE_VERSION VERSION_LESS 3.15)
+             -DEXPECTED_VERSION=${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}
+             -DINSTALLED_PREFIX=${CMAKE_INSTALL_PREFIX}
+             "-DCONSUMER_LINKER_FLAGS=${CONSUMER_LINKER_FLAGS}"
++            "-DCONSUMER_OPENMP_ARGS=${CONSUMER_OPENMP_ARGS}"
+             "-DINSTALL_DIRS=${PROJECT_BINARY_DIR}/dependencies/armadillo-code|${PROJECT_BINARY_DIR}/dependencies/lbfgsb_cpp|$<TARGET_PROPERTY:Kriging,BINARY_DIR>"
+             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake_package/run_test.cmake)
+     set_tests_properties(cmake_package PROPERTIES LABELS "install")
+diff --git a/tests/cmake_package/run_test.cmake b/tests/cmake_package/run_test.cmake
+index 10094eb5..7770d9c8 100644
+--- a/tests/cmake_package/run_test.cmake
++++ b/tests/cmake_package/run_test.cmake
+@@ -59,6 +59,10 @@ set(configure_args -S "${SRC_DIR}" -B "${consumer_build}" -G "${GENERATOR}"
+ if (CONSUMER_LINKER_FLAGS)
+   list(APPEND configure_args "-DCMAKE_EXE_LINKER_FLAGS=${CONSUMER_LINKER_FLAGS}")
+ endif ()
++if (CONSUMER_OPENMP_ARGS)
++  string(REPLACE "|" ";" CONSUMER_OPENMP_ARGS "${CONSUMER_OPENMP_ARGS}")
++  list(APPEND configure_args ${CONSUMER_OPENMP_ARGS})
++endif ()
+ if (PLATFORM)
+   list(APPEND configure_args -A "${PLATFORM}")
+ endif ()
+-- 
+2.39.5 (Apple Git-154)
+
