@@ -201,7 +201,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
   const std::string default_regmodel = "constant";
 
   const bool default_normalize = false;
-  const std::string default_optim = "BFGS";
+  const std::string default_optim = "BFGS";  // NestedKriging
+  const std::string default_kriging_optim = "BFGS4";
   const std::string default_objective = "LL";
 
   py::class_<Kriging::Parameters>(m, "KrigingParameters")
@@ -242,7 +243,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("kernel"),
            py::arg("regmodel") = default_regmodel,
            py::arg("normalize") = default_normalize,
-           py::arg("optim") = default_optim,
+           py::arg("optim") = default_kriging_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
            py::arg("noise") = py::none(),
@@ -255,7 +256,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("X"),
            py::arg("regmodel") = default_regmodel,
            py::arg("normalize") = default_normalize,
-           py::arg("optim") = default_optim,
+           py::arg("optim") = default_kriging_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
            py::arg("noise") = py::none(),
