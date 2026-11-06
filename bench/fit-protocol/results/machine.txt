@@ -1,0 +1,29 @@
+# 2026-10-31 vm
+Linux-6.18.44-fc-v185-x86_64-with-glibc2.39
+
+CPU(s):                                  4
+Model name:                              Intel(R) Xeon(R) Processor @ 2.10GHz
+Thread(s) per core:                      1
+Core(s) per socket:                      4
+Socket(s):                               1
+L2 cache:                                8 MiB (4 instances)
+L3 cache:                                260 MiB (1 instance)
+
+nproc: 4
+total        used        free      shared  buff/cache   available
+Mem:              15           0          15           0           0          15
+
+libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f1106499000)
+	libopenblas.so.0 => /lib/x86_64-linux-gnu/libopenblas.so.0 (0x00007f1103a20000)
+	liblapack.so.3 => /lib/x86_64-linux-gnu/liblapack.so.3 (0x00007f1103200000)
+
+c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+cmake version 3.28.3
+libKriging 118ca70
+environment: (no LK_/OMP_/BLAS variable)
+
+Build: CMAKE_BUILD_TYPE=Release, Ninja, no binding; OpenBLAS 0.3.26 pthreads (libopenblas0-pthread
+0.3.26+ds-1ubuntu0.1, Ubuntu 24.04 package); library sources of ef9cf51 (this branch changes bench/
+and docs only). Run 2026-10-30/31, one chunk at a time on an otherwise idle 4-vCPU VM; about 4.1 h
+of wall time (4.07 h inside the fits). The run was interrupted once (worker restart) after 103 of
+136 chunks and resumed (run.py keeps the finished chunks).
