@@ -279,6 +279,12 @@ void restore_blas_threads(const BlasThreadState& s) {
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdlib.h>
+#if defined(__APPLE__) && defined(__has_include)
+#if __has_include(<vecLib/thread_api.h>)
+#include <vecLib/thread_api.h>
+#define LK_ACCELERATE_THREADING_API 1
+#endif
+#endif
 namespace {
 
 libKriging::detail::BlasThreadState atfork_saved;
@@ -321,6 +327,13 @@ void libkriging_atfork_parent() {
 void libkriging_atfork_child() {
   // libdispatch (the parallel loops on Apple) is not safe in a fork() child
   libKriging::detail::parallel_loops_off().store(true);
+#if defined(LK_ACCELERATE_THREADING_API)
+  // Accelerate (macOS 15+) multithreads large BLAS / LAPACK calls with libdispatch, which does not
+  // survive fork() without exec: a forked R worker (mclapply) segfaults on its first large
+  // factorization. VECLIB_MAXIMUM_THREADS is read once, already in the parent: use the API.
+  if (__builtin_available(macOS 15.0, *))
+    BLASSetThreading(BLAS_THREADING_SINGLE_THREADED);
+#endif
   libKriging::detail::rcond_mutex().unlock();
   libKriging::detail::blas_count_fork_child();
   if (omp_runtime_forks_itself) {
