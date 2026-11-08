@@ -14,6 +14,13 @@ Status: branch `perf/thread-budget` (PR #415, which includes #414), Linux measur
 | 2. OpenMP loops | covariance matrices (`cholCov`, `update_cholCov`, `covMat_*`), `compute_dX`, log-likelihood gradient, predict / simulate cross-covariances `R_on`, Vecchia neighbour searches, NestedKriging pair loop | `LinearAlgebra.cpp`, `KrigingImpl.cpp`, `Kriging.cpp`, `NestedKriging.cpp` | OpenMP teams of the calling thread |
 | 3. BLAS / LAPACK | Cholesky, triangular solves, products | linked BLAS (see section 5) | the BLAS's own threads |
 
+**Apple: no OpenMP.** On macOS the "OpenMP loops" of row 2 are run by Grand Central Dispatch
+(`dispatch_apply`, part of the OS) through `detail::parallel_for` (`src/lib/ParallelFor.hpp`); the build
+does not look for OpenMP (libomp is keg-only with Homebrew, and installs `pthread_atfork` handlers of its
+own that deadlocked ours: #452). The thread budget, `OMP_NUM_THREADS` and `LK_NUM_THREADS_PERCENT` apply
+the same way. libdispatch is not safe in a `fork()` child (R `mclapply`): there the loops run
+sequentially. `-DLK_APPLE_OPENMP=ON` (with `-DOpenMP_ROOT=$(brew --prefix libomp)`) uses libomp instead.
+
 BLAS calls and OpenMP loops of one thread run **one after the other**, never at
 the same time: each may use the whole share of its thread. They do not split it.
 

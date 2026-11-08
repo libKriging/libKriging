@@ -7,13 +7,23 @@
 // parallel region is not seen): they are compiled out under TSan, as
 // NestedKriging's pair loop.
 
+// Parallel loops (ParallelFor.hpp): OpenMP where it is available; on Apple,
+// Grand Central Dispatch (part of the OS: no libomp to install, no fork-time
+// locks of a third-party runtime). LK_OMP_LOOPS is 1 when either is compiled in.
 #if defined(_OPENMP)
 #define LK_OMP_LOOPS 1
+#elif defined(__APPLE__) && !defined(LK_NO_GCD_LOOPS)
+#define LK_OMP_LOOPS 1
+#define LK_GCD_LOOPS 1
+#endif
+#if defined(LK_OMP_LOOPS)
 #if defined(__SANITIZE_THREAD__)
 #undef LK_OMP_LOOPS
+#undef LK_GCD_LOOPS
 #elif defined(__has_feature)
 #if __has_feature(thread_sanitizer)
 #undef LK_OMP_LOOPS
+#undef LK_GCD_LOOPS
 #endif
 #endif
 #endif
@@ -30,11 +40,12 @@ namespace detail {
 /// BLAS and OpenMP both at the thread budget (physical cores, ThreadBudget.hpp)
 /// the loops pay off from n = 200 on Linux (i9-10900K, OpenBLAS pthreads / OpenMP, libgomp:
 /// x3 at n = 200-500, bench/thread-budget/RESULTS.md; Xeon 4 cores: T5 log).
-/// Elsewhere (libomp, Accelerate, Windows OpenBLAS) not measured yet: kept at
-/// 800, see #416 (macOS) and #417 (Windows). LK_OMP_MIN_ROWS overrides it at
-/// compile time.
+/// Apple (Accelerate, Grand Central Dispatch loops; Apple M4, 10 cores): x2 at
+/// n = 200-400, same times as OpenMP/libomp (macOS-Accelerate-results.md, #452).
+/// Elsewhere (Windows OpenBLAS) not measured yet: kept at 800, see #417.
+/// LK_OMP_MIN_ROWS overrides it at compile time.
 #ifndef LK_OMP_MIN_ROWS
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
 #define LK_OMP_MIN_ROWS 200
 #else
 #define LK_OMP_MIN_ROWS 800

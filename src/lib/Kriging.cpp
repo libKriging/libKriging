@@ -24,6 +24,8 @@
 
 #include "BlasThreads.hpp"
 #include "TaskPool.hpp"
+#include "OmpLoops.hpp"
+#include "ParallelFor.hpp"
 #include "ThreadBudget.hpp"
 
 #include <cassert>
@@ -317,6 +319,8 @@ void libkriging_atfork_parent() {
 }
 
 void libkriging_atfork_child() {
+  // libdispatch (the parallel loops on Apple) is not safe in a fork() child
+  libKriging::detail::parallel_loops_off().store(true);
   libKriging::detail::rcond_mutex().unlock();
   libKriging::detail::blas_count_fork_child();
   if (omp_runtime_forks_itself) {
@@ -1661,11 +1665,9 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
   const arma::mat Xt = m_X.t();
   const double* xp = Xt.memptr();
 
-#if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
-#pragma omp parallel for schedule(dynamic, 16) \
-    num_threads(libKriging::detail::omp_threads()) if (q > 32 && n * m >= 40000)
-#endif
-  for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
+  libKriging::detail::parallel_for(0, static_cast<long>(q), 16, libKriging::detail::omp_threads(), q > 32 && n * m >= 40000,
+                                   [&](long lo_, long hi_) {
+    for (arma::sword t = static_cast<arma::sword>(lo_); t < static_cast<arma::sword>(hi_); ++t) {
     // m nearest observations (normalized space), partial selection
     std::vector<std::pair<double, arma::uword>> cand(n);
     const arma::rowvec x_t = Xn_n.row(static_cast<arma::uword>(t));
@@ -1705,7 +1707,8 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
     mean(t) = arma::dot(F_n.row(static_cast<arma::uword>(t)), m_beta) + arma::dot(a_vec, resid);
     if (return_stdev)
       stdev(t) = std::sqrt(var_scale * std::max(0.0, 1.0 - arma::dot(r, a_vec)));
-  }
+      }
+  });
 
   // de-normalize outputs
   mean = mean * m_scaleY + m_centerY;
@@ -1771,11 +1774,9 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
   arma::mat Dobs(m_obs, q);
   const arma::mat Xt = m_X.t();
   const double* xp = Xt.memptr();
-#if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
-#pragma omp parallel for schedule(dynamic, 16) \
-    num_threads(libKriging::detail::omp_threads()) if (q > 32 && n * m_obs >= 40000)
-#endif
-  for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
+  libKriging::detail::parallel_for(0, static_cast<long>(q), 16, libKriging::detail::omp_threads(), q > 32 && n * m_obs >= 40000,
+                                   [&](long lo_, long hi_) {
+    for (arma::sword t = static_cast<arma::sword>(lo_); t < static_cast<arma::sword>(hi_); ++t) {
     std::vector<std::pair<double, arma::uword>> cand(n);
     const arma::rowvec x_t = Xn_n.row(static_cast<arma::uword>(t));
     for (arma::uword j = 0; j < n; ++j) {
@@ -1792,7 +1793,8 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
       Nobs(j, static_cast<arma::uword>(t)) = cand[j].second;
       Dobs(j, static_cast<arma::uword>(t)) = cand[j].first;
     }
-  }
+      }
+  });
 
   // 2) sequential pass: the m nearest of (observations U previous simulation
   //    points) are among (m nearest observations U previous simulation points).

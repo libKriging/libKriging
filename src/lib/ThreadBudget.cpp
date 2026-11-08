@@ -1,3 +1,4 @@
+#include "OmpLoops.hpp"
 #include "ThreadBudget.hpp"
 
 #include "libKriging/Optim.hpp"
@@ -5,6 +6,7 @@
 #include "BlasThreads.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <atomic>
 #include <cmath>
 #include <mutex>
@@ -289,6 +291,15 @@ int budget_full() {
 #ifdef _OPENMP
   const int omp_limit = omp_get_max_threads();
   if (omp_limit > 0 && !tl_in_pool)  // pool workers: their share is set below
+    total = std::min(total, omp_limit);
+#elif defined(LK_GCD_LOOPS)
+  // no OpenMP runtime: OMP_NUM_THREADS still bounds the parallel loops
+  static const int omp_limit = [] {
+    const char* e = std::getenv("OMP_NUM_THREADS");
+    const int v = e ? std::atoi(e) : 0;
+    return v > 0 ? v : 0;
+  }();
+  if (omp_limit > 0 && !tl_in_pool)
     total = std::min(total, omp_limit);
 #endif
   // The OpenBLAS count (OPENBLAS_NUM_THREADS) bounds the BLAS only, not the

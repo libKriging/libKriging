@@ -36,8 +36,16 @@ enable_language(CXX)
 
 #------------------------------------------------------
 
-# Find and enable OpenMP for parallel optimization
-find_package(OpenMP)
+# Find and enable OpenMP for parallel optimization.
+# Apple: no OpenMP by default (libomp is not part of the OS, keg-only with Homebrew, and installs
+# fork handlers of its own); the parallel loops use Grand Central Dispatch (src/lib/ParallelFor.hpp).
+# LK_APPLE_OPENMP=ON uses libomp as before (then pass -DOpenMP_ROOT=$(brew --prefix libomp)).
+option(LK_APPLE_OPENMP "Use OpenMP (libomp) instead of Grand Central Dispatch on Apple platforms" OFF)
+if(APPLE AND NOT LK_APPLE_OPENMP)
+    message(STATUS "Apple: parallel loops use Grand Central Dispatch, OpenMP not used (LK_APPLE_OPENMP=OFF)")
+else()
+    find_package(OpenMP)
+endif()
 if(OpenMP_CXX_FOUND)
     message(STATUS "OpenMP found - enabling parallel multistart optimization")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
@@ -51,8 +59,8 @@ if(OpenMP_CXX_FOUND)
     endif()
 
     message(STATUS "Armadillo's internal OpenMP disabled (see line 189)")
-else()
-    message(WARNING "OpenMP not found - multistart optimization will run sequentially")
+elseif(NOT APPLE OR LK_APPLE_OPENMP)
+    message(WARNING "OpenMP not found - OpenMP loops will run sequentially")
     message(STATUS "To enable OpenMP: install libomp-dev (or libomp-18-dev) package")
 endif()
 

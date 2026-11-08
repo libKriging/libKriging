@@ -18,6 +18,7 @@
 
 #include "BlasThreads.hpp"
 #include "OmpLoops.hpp"
+#include "ParallelFor.hpp"
 #include "ThreadBudget.hpp"
 
 #include <stdexcept>
@@ -297,34 +298,18 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
 
   auto t0 = Bench::tic();
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
-#ifdef _OPENMP
-  arma::uword total_work = n_o * n_n;
-  if (total_work >= 40000) {
-    int optimal_threads = libKriging::detail::omp_threads();
-#pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if (total_work >= 40000)
-    for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
-      for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
-        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-        if (dij.is_zero(arma::datum::eps))
-          R_on.at(i, j) = 1.0;
-        else
-          R_on.at(i, j) = _Cov(dij, m_theta) * R_on_factor;
-      }
-    }
-  } else {
-#endif
-    for (arma::uword i = 0; i < n_o; i++) {
-      for (arma::uword j = 0; j < n_n; j++) {
-        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-        if (dij.is_zero(arma::datum::eps))
-          R_on.at(i, j) = 1.0;
-        else
-          R_on.at(i, j) = _Cov(dij, m_theta) * R_on_factor;
-      }
-    }
-#ifdef _OPENMP
-  }
-#endif
+  libKriging::detail::parallel_for(
+      0, static_cast<long>(n_o * n_n), 512, libKriging::detail::omp_threads(), n_o * n_n >= 40000,
+      [&](long lo, long hi) {
+        for (arma::uword idx = static_cast<arma::uword>(lo); idx < static_cast<arma::uword>(hi); idx++) {
+          const arma::uword i = idx / n_n, j = idx % n_n;
+          arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
+          if (dij.is_zero(arma::datum::eps))
+            R_on.at(i, j) = 1.0;
+          else
+            R_on.at(i, j) = _Cov(dij, m_theta) * R_on_factor;
+        }
+      });
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
@@ -464,34 +449,18 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
   t0 = Bench::toc(nullptr, "R_nn          ", t0);
 
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
-#ifdef _OPENMP
-  arma::uword total_work = n_o * n_n;
-  if (total_work >= 40000) {
-    int optimal_threads = libKriging::detail::omp_threads();
-#pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if (total_work >= 40000)
-    for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
-      for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
-        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-        if (R_on_coincident_to_one && dij.is_zero(arma::datum::eps))
-          R_on.at(i, j) = 1.0;
-        else
-          R_on.at(i, j) = _Cov(dij, m_theta) * R_on_factor;
-      }
-    }
-  } else {
-#endif
-    for (arma::uword i = 0; i < n_o; i++) {
-      for (arma::uword j = 0; j < n_n; j++) {
-        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-        if (R_on_coincident_to_one && dij.is_zero(arma::datum::eps))
-          R_on.at(i, j) = 1.0;
-        else
-          R_on.at(i, j) = _Cov(dij, m_theta) * R_on_factor;
-      }
-    }
-#ifdef _OPENMP
-  }
-#endif
+  libKriging::detail::parallel_for(
+      0, static_cast<long>(n_o * n_n), 512, libKriging::detail::omp_threads(), n_o * n_n >= 40000,
+      [&](long lo, long hi) {
+        for (arma::uword idx = static_cast<arma::uword>(lo); idx < static_cast<arma::uword>(hi); idx++) {
+          const arma::uword i = idx / n_n, j = idx % n_n;
+          arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
+          if (R_on_coincident_to_one && dij.is_zero(arma::datum::eps))
+            R_on.at(i, j) = 1.0;
+          else
+            R_on.at(i, j) = _Cov(dij, m_theta) * R_on_factor;
+        }
+      });
   t0 = Bench::toc(nullptr, "R_on        ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
@@ -1006,11 +975,11 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
     // the optimum reached, may change noticeably between the two orders.
     arma::mat term1_rows(d, n, arma::fill::zeros);
     arma::mat term2_rows(d, n, arma::fill::zeros);
-#pragma omp parallel for schedule(dynamic, 8) num_threads(libKriging::detail::omp_threads())
-    for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
-      const arma::uword i = static_cast<arma::uword>(si);
-      add_row(i, term1_rows.colptr(i), term2_rows.colptr(i));
-    }
+    libKriging::detail::parallel_for(0, static_cast<long>(n), 8, libKriging::detail::omp_threads(), true,
+                                     [&](long lo, long hi) {
+      for (arma::uword i = static_cast<arma::uword>(lo); i < static_cast<arma::uword>(hi); i++)
+        add_row(i, term1_rows.colptr(i), term2_rows.colptr(i));
+    });
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword k = 0; k < d; k++) {
         term1_vec.at(k) += term1_rows.at(k, i);
