@@ -420,9 +420,50 @@ CallCount::~CallCount() {
   g_calls.store(s.calls, std::memory_order_relaxed);
 }
 
-BudgetScope::BudgetScope()
-    : blas(in_pool_worker() ? 0 : blas_threads_for(budget_total())),
-      mkl(in_pool_worker() ? 0 : mkl_threads_for(budget_total())) {}
+namespace {
+// Threshold of the automatic small-problem rule (REPORT-blas-threads.md):
+// below it, on a 4-core VM, one BLAS thread next to the OpenMP team is
+// 1.7-3.6x faster per fit than both teams at the budget; above it, the BLAS
+// threads pay off again.
+constexpr unsigned long long kAutoBlasMinN = 500;
+
+int scope_blas_threads(unsigned long long n) {
+  if (in_pool_worker())
+    return 0;
+  const int budget = budget_total();
+  const int target = blas_threads_for(budget);
+  unsigned long long min_n = 0;
+  if (Optim::blas_threads_min_n > 0) {
+    min_n = static_cast<unsigned long long>(Optim::blas_threads_min_n);
+  } else if (Optim::blas_threads_min_n < 0) {
+    // automatic: only when the BLAS threads and the OpenMP team (both at the
+    // budget) outnumber the logical CPUs, i.e. without SMT headroom (VMs, CI
+    // runners, SMT off). With SMT (budget = physical cores, half the logical
+    // CPUs) the BLAS at the budget is faster at every size
+    // (bench/thread-budget/RESULTS.md, section 9).
+    // the count OpenBLAS was loaded with when the call leaves it as is: not
+    // the current count, which another thread's scope may have lowered for
+    // its own call (T6 shared count state); the decision of a call must not
+    // depend on the other calls running (T9 log, section 0)
+    const int blas = target > 0 ? target : initial_blas_threads();
+    if (blas > 1 && blas + budget > logical_cpus())
+      min_n = kAutoBlasMinN;
+  }
+  // A request like any other: it goes through the shared count state of the
+  // ScopedBlasThreads (smallest live request in effect, the last scope restores
+  // the count), so concurrent calls run their OpenBLAS at 1 thread as long as a
+  // small-problem call is running (the count is process-global).
+  if (min_n > 0 && n > 0 && n < min_n)
+    return 1;
+  return target;
+}
+}  // namespace
+
+// The small-problem rule applies to OpenBLAS only (#436 measured OpenBLAS): the
+// calling thread's MKL count stays at the budget (MKL lowers its own count for
+// small problems, MKL_DYNAMIC).
+BudgetScope::BudgetScope(unsigned long long n)
+    : blas(scope_blas_threads(n)), mkl(in_pool_worker() ? 0 : mkl_threads_for(budget_total())) {}
 
 void blas_count_fork_prepare() {
   // Function-local statics read on entry to every public call: a fork() made

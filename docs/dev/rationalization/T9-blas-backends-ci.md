@@ -49,6 +49,47 @@ gradient 3.4e-8), within the tolerances (1e-3, 1e-6) but not run in CI since (st
 The ASan / LSan change of T6 (the fork child does not fit) applies to sanitizer builds only:
 the MKL jobs (Release) still fit in the child, so the fork case still exercises MKL there.
 
+2026-11-05: T6 2037a10 merged (ConcurrentCallsTest reads the OpenBLAS count with
+GetProcAddress under MSVC, as the library: with weak symbols only it read 0 on the Julia
+Windows job and required bit-identity, gaps 2.3e-9–7.0e-7). Same defect for MKL, fixed here
+(test only, to port to T6): `mkl_count()` read MKL through ELF weak symbols only, while the
+library drives MKL also through `dlsym` (macOS / other POSIX) and `GetProcAddress` on
+`mkl_rt*.dll`; it now uses the library's three mechanisms. Check: MKL preloaded with
+`OPENBLAS_NUM_THREADS=1`, the test reads "OpenBLAS 1, MKL 4" and applies 1e-4 instead of
+requiring bit-identity. ctest after the merge: OpenBLAS 239 / 239, MKL GNU and INTEL
+237 / 237 + 2 / 2.
+
+2026-11-06: master merged (a866c44, #436 "small-problem BLAS rule": OpenBLAS at 1 thread
+for a fit / predict / update on fewer than `Optim::blas_threads_min_n` observations; automatic
+threshold 500 when the BLAS threads and the OpenMP team outnumber the logical CPUs). Conflicts
+in `ThreadBudget.cpp` / `.hpp`, resolved as follows (to carry into the program branch when it
+merges master):
+- `BudgetScope(n)` keeps T6's `CallCount` first (the rule's `budget_total()` counts the call)
+  and T5's per-thread MKL scope; the rule only changes the count the scope's
+  `ScopedBlasThreads` requests (1 instead of `blas_threads_for(budget)`). It therefore goes
+  through T6's shared count state: smallest live request in effect, restored by the last
+  scope, never a direct `openblas_set_num_threads`. Consequence (OpenBLAS's count is
+  process-global): while a small-problem call runs, concurrent calls run their OpenBLAS at 1
+  thread too; results depend on that by rounding only (`ConcurrentCallsTest`, D2).
+- The automatic condition read the current OpenBLAS count when the call leaves it as is; with
+  T6 that count may be another thread's transient request. It now reads the count OpenBLAS was
+  loaded with (`initial_blas_threads()`, on which `blas_threads_for` and the restore already
+  rely), so a call's decision does not depend on the other calls running.
+- Concurrent calls: the condition uses `budget_total()`, already divided by the number of
+  running calls, so it holds less often when several calls share the budget (their
+  oversubscription is already removed by the split).
+- MKL: not concerned (#436 measured OpenBLAS only); the calling thread's MKL count stays
+  `mkl_threads_for(budget_total())`. With MKL preloaded on an OpenBLAS build, the rule lowers
+  an OpenBLAS count that the BLAS calls do not use: harmless.
+- Pool workers: unchanged (the pool sets their share; the rule applies to the calling thread's
+  scope only).
+- On the local 4-core VM the automatic rule is active (budget 4, OpenBLAS loaded with 4, 4
+  logical CPUs): the T5 / T6 / T9 thread tests now mostly run OpenBLAS at 1 thread for n < 500.
+  They were also run with the rule off (`LK_BLAS_THREADS_MIN_N=0`): 29 / 29.
+
+Checks after the merge: OpenBLAS ctest 240 / 240 (with #436's new test: 1 thread at n = 60,
+count restored, 4 threads at n = 120); oneMKL preloaded, GNU and INTEL: 238 / 238 + 2 / 2.
+
 Checks of the merged branch (local, Xeon 4 cores, Release):
 
 | BLAS | ctest |

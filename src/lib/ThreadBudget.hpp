@@ -122,9 +122,12 @@ struct CallCount {
 /// and sets the calling thread's MKL at mkl_threads_for(budget_total())
 /// (OpenBLAS defaults to the logical CPUs, which costs 1.3-2x on a
 /// hyperthreaded machine) until it returns; no-op inside a pool worker (the
-/// pool has set the worker's share).
+/// pool has set the worker's share). With the number n of training
+/// observations, OpenBLAS is requested at 1 thread instead when n is below the
+/// threshold of the small-problem rule (Optim::blas_threads_min_n, #436),
+/// through the same shared count state; MKL is not concerned by the rule.
 struct BudgetScope {
-  BudgetScope();
+  explicit BudgetScope(unsigned long long n = 0);
   BudgetScope(const BudgetScope&) = delete;
   BudgetScope& operator=(const BudgetScope&) = delete;
 
