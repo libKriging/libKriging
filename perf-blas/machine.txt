@@ -1,0 +1,27 @@
+# nproc
+4
+# lscpu
+CPU(s):                                  4
+Model name:                              Intel(R) Xeon(R) Processor @ 2.10GHz
+Thread(s) per core:                      1
+Core(s) per socket:                      4
+Socket(s):                               1
+Flags: ... avx512f ... (AVX-512)
+L3 cache:                                260 MiB (1 instance)
+# OpenBLAS
+	libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fcf5a215000)
+	libopenblas.so.0 => /lib/x86_64-linux-gnu/libopenblas.so.0 (0x00007fcf57620000)
+	liblapack.so.3 => /lib/x86_64-linux-gnu/liblapack.so.3 (0x00007fcf56e00000)
+/usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.26.so
+/usr/lib/x86_64-linux-gnu/openblas-pthread/liblapack.so.3
+libopenblas-dev:amd64 0.3.26+ds-1ubuntu0.1
+libopenblas-pthread-dev:amd64 0.3.26+ds-1ubuntu0.1
+libopenblas0:amd64 0.3.26+ds-1ubuntu0.1
+libopenblas0-pthread:amd64 0.3.26+ds-1ubuntu0.1
+# OPENBLAS_CORETYPE from OpenBLAS
+Cooperlake | OpenBLAS 0.3.26 NO_LAPACKE DYNAMIC_ARCH NO_AFFINITY Cooperlake MAX_THREADS=64 | threads 4
+# cgroup cpu.max
+# compiler
+c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+# base
+07fc2a8 Merge pull request #433 from libKriging/ccr-2621ce70-v7kvol-long-range-restart

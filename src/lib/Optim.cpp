@@ -255,3 +255,13 @@ LIBKRIGING_EXPORT void Optim::set_thread_pool_size(int pool_size) {
 LIBKRIGING_EXPORT int Optim::get_thread_pool_size() {
   return Optim::thread_pool_size;
 };
+
+int Optim::blas_threads_min_n = get_env_or_default("LK_BLAS_THREADS_MIN_N", -1);  // -1: automatic
+
+LIBKRIGING_EXPORT void Optim::set_blas_threads_min_n(int min_n) {
+  Optim::blas_threads_min_n = min_n;
+};
+
+LIBKRIGING_EXPORT int Optim::get_blas_threads_min_n() {
+  return Optim::blas_threads_min_n;
+};
