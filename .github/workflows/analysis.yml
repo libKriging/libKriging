@@ -79,7 +79,7 @@ jobs:
             enable_matlab: off  # disabled: requires MATHWORKS_API_TOKEN secret
             enable_memcheck: on
             force_update: on
-            timeout_minutes: 120
+            timeout_minutes: 180  # 93-149 min measured (valgrind, noisy runners): 120 was too tight
           - name: "Address Sanitizer"
             os: ubuntu-22.04
             mode: Debug
