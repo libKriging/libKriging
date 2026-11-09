@@ -29,18 +29,102 @@
 #endif
 #endif
 
-#if !defined(_MSC_VER) && (!defined(__APPLE__) || !defined(__arm64__))
+// OpenBLAS found the way the library finds it (Kriging.cpp): weak symbols with
+// GCC / Clang, GetProcAddress on libopenblas.dll / openblas.dll with MSVC. The
+// full-budget case relies on it: a count the library can change but the test
+// cannot read would make it require bit-identical results (CI, MSVC with
+// conda's openblas.dll: count read as 0 while the library set it; T6 log).
+#if defined(_MSC_VER)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+namespace {
+FARPROC openblas_proc(const char* name) {
+  HMODULE m = GetModuleHandleA("libopenblas.dll");
+  if (!m)
+    m = GetModuleHandleA("openblas.dll");
+  return m ? GetProcAddress(m, name) : nullptr;
+}
+using openblas_get_t = int (*)();
+using openblas_set_t = void (*)(int);
+// resolved at the first call, as the library does
+openblas_get_t openblas_get() {
+  static const auto f = reinterpret_cast<openblas_get_t>(openblas_proc("openblas_get_num_threads"));
+  return f;
+}
+openblas_set_t openblas_set() {
+  static const auto f = reinterpret_cast<openblas_set_t>(openblas_proc("openblas_set_num_threads"));
+  return f;
+}
+}  // namespace
+#define LK_TEST_OPENBLAS 1
+#elif !defined(__APPLE__) || !defined(__arm64__)
 extern "C" {
 void openblas_set_num_threads(int num_threads) __attribute__((weak));
 int openblas_get_num_threads() __attribute__((weak));
 }
+namespace {
+using openblas_get_t = int (*)();
+using openblas_set_t = void (*)(int);
+openblas_get_t openblas_get() {
+  return openblas_get_num_threads;
+}
+openblas_set_t openblas_set() {
+  return openblas_set_num_threads;
+}
+}  // namespace
 #define LK_TEST_OPENBLAS 1
 #endif
 
+// MKL found the way the library finds it (Kriging.cpp): weak symbol on ELF,
+// GetProcAddress on mkl_rt.2.dll / mkl_rt.dll / mkl_rt.1.dll on Windows (MSVC
+// and MinGW), dlsym elsewhere on POSIX. The library sets the MKL count of each
+// call / worker wherever it finds MKL, so the test must see MKL there too, or
+// it would take the count for fixed and require bit-identical results (T9).
 #if defined(__ELF__)
 extern "C" {
 int MKL_Get_Max_Threads() __attribute__((weak));
 }
+namespace {
+using mkl_get_t = int (*)();
+mkl_get_t mkl_get() {
+  return MKL_Get_Max_Threads;
+}
+}  // namespace
+#elif defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+namespace {
+using mkl_get_t = int (*)();
+mkl_get_t mkl_get() {
+  static const mkl_get_t f = [] {
+    for (const char* dll : {"mkl_rt.2.dll", "mkl_rt.dll", "mkl_rt.1.dll"})
+      if (HMODULE m = GetModuleHandleA(dll))
+        return reinterpret_cast<mkl_get_t>(GetProcAddress(m, "MKL_Get_Max_Threads"));
+    return mkl_get_t{nullptr};
+  }();
+  return f;
+}
+}  // namespace
+#elif defined(__APPLE__) || defined(__unix__)
+#include <dlfcn.h>
+namespace {
+using mkl_get_t = int (*)();
+mkl_get_t mkl_get() {
+  static const mkl_get_t f = reinterpret_cast<mkl_get_t>(dlsym(RTLD_DEFAULT, "MKL_Get_Max_Threads"));
+  return f;
+}
+}  // namespace
+#else
+namespace {
+using mkl_get_t = int (*)();
+mkl_get_t mkl_get() {
+  return nullptr;
+}
+}  // namespace
 #endif
 
 // Public fit / predict / simulate calls from several user threads at once
@@ -52,26 +136,24 @@ namespace {
 
 int blas_count() {
 #ifdef LK_TEST_OPENBLAS
-  if (openblas_get_num_threads)
-    return openblas_get_num_threads();
+  if (const auto get = openblas_get())
+    return get();
 #endif
   return 0;
 }
 
-// MKL count of the calling thread, 0 without MKL (or where weak symbols are
-// not available: no MKL run in CI there)
+// MKL count of the calling thread, 0 without MKL
 int mkl_count() {
-#if defined(__ELF__)
-  if (MKL_Get_Max_Threads)
-    return MKL_Get_Max_Threads();
-#endif
+  if (const auto get = mkl_get())
+    return get();
   return 0;
 }
 
 void set_blas_count(int n) {
 #ifdef LK_TEST_OPENBLAS
-  if (openblas_set_num_threads && n > 0)
-    openblas_set_num_threads(n);
+  const auto set = openblas_set();
+  if (set && n > 0)
+    set(n);
 #endif
 }
 
@@ -295,6 +377,9 @@ TEST_CASE("Concurrent fit / predict / simulate from user threads", "[threads][co
   // of order 1 (other starts), and are checked bit for bit by the budget-1 case
   // above.
   const bool count_can_change = blas_count() > 1 || mkl_count() > 1;
+  WARN("BLAS counts read by the test: OpenBLAS "
+       << blas_count() << ", MKL " << mkl_count()
+       << (count_can_change ? ": tolerance 1e-4" : ": bit-identical required"));
   concurrent_vs_sequential(100, count_can_change ? 1e-4 : 0.0);
 }
 

@@ -262,6 +262,39 @@ After D2 / D3 (Intel Xeon 2.8 GHz, 4 CPUs, Release, OpenBLAS 0.3.26): `ctest -j2
 registered, the 4 other entries pass. TSan: 0 report, 0 with the CI
 environment.
 
+### CI of `0e5d935`: Julia Windows (MSVC)
+
+Job "build (Julia Windows, windows-latest, Release, on)", both runs (jobs
+127369612414, 127369567561): `Concurrent fit / predict / simulate from user
+threads` failed with tolerance 0, gaps per quantity (job 0, gauss `BFGS`, LL):
+theta 2.3e-9, sigma2 2.0e-8, objective 2.5e-9, mean 1.1e-10, stdev 7.0e-7,
+simulations 1.1e-9; the budget-1 case passed with 0 everywhere.
+
+Cause: the test's premise detection, not the library. The build is MSVC, the
+BLAS conda's OpenBLAS 0.3.33 (`openblas.dll`, `LinearAlgebra::check` in the
+same log). The library reaches OpenBLAS there through `GetModuleHandleA` /
+`GetProcAddress` (MSVC has no weak symbols) and sets its count; the test read
+the count through weak symbols only, compiled out with MSVC, so it read 0,
+concluded "the count cannot change" and required bit-identical results. The
+gaps are those of the BLAS count (same order as the Linux CI runners: 4.6e-7 –
+7.0e-7) and within D2's 1e-4.
+
+Fix (`tests/ConcurrentCallsTest.cpp`): the test finds OpenBLAS exactly as the
+library does (MSVC: `GetProcAddress` on `libopenblas.dll`, then `openblas.dll`,
+resolved at the first call; elsewhere weak symbols). A count the library can
+change is then always seen by the test, and "bit-identical" is required only
+when the library cannot change any count (no OpenBLAS found the library's way,
+or OpenBLAS at 1 thread; MKL is not driven on this branch). The test now
+prints the counts it read and the tolerance chosen (WARN "BLAS counts read by
+the test"). D2 is unchanged: 1e-4 whenever a count can change. Not compiled
+locally (no MSVC here): to be confirmed by the Windows CI job. Linux: OpenBLAS
+4 → 1e-4 (gaps: stdev 4.1e-14, mean 1.8e-15, others 0); `OPENBLAS_NUM_THREADS=1`
+→ bit-identical required and obtained. T9 (#449) carries the same test and
+needs the same change. Full `ctest -j2` (Release): 231 / 231; a first run had
+`KrigingWarmRestartTest` failing (timing assertion, warm update vs cold fit, in
+the first tests started in parallel; T9 log 2.5), passing 3 / 3 alone and in
+the second full run: unrelated to this change (test file only).
+
 ## Open items
 
 - MKL / Accelerate: their thread counts are not driven (T5); with MKL,
