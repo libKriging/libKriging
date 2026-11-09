@@ -103,6 +103,33 @@ multistart tests (`KrigingTest` BFGS20 vs best of 20 BFGS1, WarpKrigingTest, MLP
 The base tree's test suite was not run for comparison; the bit-identity check is the driver
 above (theta, LL, predictions).
 
+## Notebook CI timings (python-notebooks job, PR #444 head 9cf09a5)
+
+The python-notebooks job of 9cf09a5 (= 3dd3015 + T4) timed out (cell > 3600 s on the n = 6000
+exact fit of `docs/math/subsetofdata_vs_cholesky.ipynb`), while the job of 3dd3015 alone passed
+(1763 s for that notebook; llvecchia 74 s vs 414 s, nested 309 s vs 625 s, llnystrom 92 s vs
+132 s). Reproduced locally, same machine, 3dd3015 vs 9cf09a5, as CI (`OMP_NUM_THREADS=1`,
+OpenBLAS 0.3.26, wheel built with `pip install --no-build-isolation .`, notebook code cells run
+as a script, per-cell timing):
+
+| Notebook / fit | 3dd3015 | 9cf09a5 (T4) |
+|---|---|---|
+| llvecchia_vs_cholesky, whole notebook | 62 s | 61 s |
+| — exact BFGS(1) fit, n = 2400 | 52.5 s | 52.4 s |
+| — vecchia(15) BFGS(1) fit, n = 2400 | 0.46 s | 0.43 s |
+| subsetofdata_vs_cholesky, whole notebook | 1753 s | 1734 s |
+| — exact BFGS(1) fit, n = 6000 | 1748.5 s | 1729.5 s |
+
+(the two subsetofdata runs ran concurrently, one core each). Same theta and test RMSE in both.
+C++ timings (same driver as above, `OMP_NUM_THREADS=1` and 4 threads: exact BFGS(1) n = 500,
+1200, 2400; vecchia(15/30) and nystrom(100) BFGS(1); exact BFGS4 n = 1000) are equal within
+noise, with bit-identical theta. The CI slowdown is not reproduced by T4: the same job's small
+notebooks (bindings/Python/*.ipynb) and its wheel build were as fast as on 3dd3015, only the
+large-n single-threaded exact fits were slower, which points at the runner (CPU / memory
+bandwidth of that VM), not at the code. With BFGS(1) the multistart runs one start inline: T4
+allocates the same single KModel as before (and none for Vecchia / Nystrom) and does no extra
+factorization.
+
 ## Decisions
 
 - Per-task allocation rather than worker-indexed buffers (see TaskPool above).
