@@ -243,7 +243,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{matrix.force_update}}" == "on" ]; then
-            sudo apt update
+            tools/linux-macos/apt-install.sh --update
           fi
           # Builds without OpenMP: see EXTRA_CMAKE_OPTIONS in "Define local variables"
           # (CMAKE_DISABLE_FIND_PACKAGE_OpenMP); libomp-dev is removed too so that
@@ -251,26 +251,26 @@ jobs:
           if [ "${DISABLE_OPENMP}" == "on" ]; then
             sudo apt-get remove -y libomp-dev libomp5-dev || true
           fi
-          sudo apt install liblapack-dev python3-pip
+          tools/linux-macos/apt-install.sh liblapack-dev python3-pip
           # Ubuntu 22.04's OpenBLAS 0.3.20 (pulled by octave, and present in the
           # R jobs) gives wrong results with its Cooperlake kernels on Xeon
           # 6973P-C runners (docs/dev/parallel.md 4, #429): use its AVX2 kernels,
           # available on every x86 runner. No effect where OpenBLAS is absent.
           echo "OPENBLAS_CORETYPE=Haswell" >> $GITHUB_ENV
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
-            sudo apt install -qy octave liboctave-dev
+            tools/linux-macos/apt-install.sh --no-install-recommends octave liboctave-dev libopenblas0
           fi
           if [ "${ENABLE_MATLAB_BINDING}" == "on" ]; then
-            sudo apt install -qy intel-mkl
+            tools/linux-macos/apt-install.sh intel-mkl
           fi
           if [ "${ENABLE_R_BINDING}" == "on" ]; then
-            sudo apt install -qy liblapack-dev gfortran # r-base
+            tools/linux-macos/apt-install.sh liblapack-dev gfortran # r-base
           fi
           if [ "${ENABLE_COVERAGE}" == "on" ]; then
-            sudo apt install -qy lcov
+            tools/linux-macos/apt-install.sh lcov
           fi
           if [ "${ENABLE_MEMCHECK}" == "on" ]; then
-            sudo apt install -qy valgrind python3-setuptools
+            tools/linux-macos/apt-install.sh valgrind python3-setuptools
           fi
         if: runner.os == 'Linux' # or use $RUNNER_OS
 
@@ -397,7 +397,7 @@ jobs:
       - name: Check that the sdist builds and works
         shell: bash
         run: |
-          sudo apt install -qy liblapack-dev
+          tools/linux-macos/apt-install.sh liblapack-dev
           python -m venv /tmp/venv-sdist
           /tmp/venv-sdist/bin/pip install dist/pylibkriging-*.tar.gz
           cd /tmp && /tmp/venv-sdist/bin/python -c "
