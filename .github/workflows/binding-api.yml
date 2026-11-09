@@ -17,14 +17,23 @@ name: Binding API
 # all the compared methods.
 
 on:
+  # branches are tested through their pull request; master on push
   push:
     branches:
-      - '*'
+      - master
     tags-ignore:
       - 'v*'
   pull_request:
     branches:
       - '*'
+  workflow_dispatch: # test a branch without a pull request
+
+# One run per pull request (or branch) and workflow: a new push to a pull
+# request cancels its run in progress; master pushes and scheduled runs are
+# never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # see main.yml: needed by the pinned pybind11 submodule with cmake >= 4
@@ -71,11 +80,10 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -qy liblapack-dev
+          tools/linux-macos/apt-install.sh --update liblapack-dev
           case "${{ matrix.binding }}" in
-            octave) sudo apt-get install -qy octave liboctave-dev ;;
-            r)      sudo apt-get install -qy gfortran ;;
+            octave) tools/linux-macos/apt-install.sh --no-install-recommends octave liboctave-dev libopenblas0 ;;
+            r)      tools/linux-macos/apt-install.sh gfortran ;;
           esac
           if [ "${{ matrix.binding }}" == "python" ]; then
             python3 -m pip install -r bindings/Python/pylibkriging/requirements.txt \

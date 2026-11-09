@@ -371,6 +371,13 @@ endif()
 catch_discover_tests(WarpKrigingUpdateSimulateTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
+add_executable(GradientThreadsTest GradientThreadsTest.cpp)
+target_link_libraries(GradientThreadsTest LINK_PUBLIC Kriging Catch2)
+# white-box test of the private gradient pair sums (src/lib/SeparableDln.hpp)
+target_include_directories(GradientThreadsTest PRIVATE ${PROJECT_SOURCE_DIR}/src/lib)
+add_dependencies(all_test_binaries GradientThreadsTest)
+catch_discover_tests(GradientThreadsTest)
+
 add_executable(BlasThreadsTest BlasThreadsTest.cpp)
 target_link_libraries(BlasThreadsTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries BlasThreadsTest)
