@@ -22,12 +22,40 @@ past release, see the corresponding entry on the
   maximum-likelihood scale; the clamp was never active on the 260 K = 5 fits measured).
   Models saved before keep their number of folds. See
   `docs/dev/rationalization/T8-mlp-calibration-cost.md`.
+- **Faster theta gradients** (T1, `docs/dev/rationalization/T1-vectorized-gradients.md`): the
+  LL and LMP theta gradients use per-dimension kernel factors in one pair loop (no
+  `std::function` / `arma::vec` per pair), and the LMP gradient is reduced algebraically to one
+  R^-1 and an O(d n^2) loop instead of d O(n^3) solves; `LinearAlgebra::inv_sympd` uses LAPACK
+  `*potri` (x3 fewer flops). Single thread, d = 4, n = 500 / 1500: LL gradient x2.2-3.7, LMP
+  gradient x10-15. The pair sums now have one order whatever the thread count, n and OS (the
+  `kOmpMinRows` dependence of the gradient is removed). Results change at rounding level
+  (< 3e-12 relative for cond(R) < 1e8; more on ill-conditioned R).
 - **Predicted variance floor** (#428): `predict` floors the variance at 4 eps x sigma2 instead of
   clamping it to 0; the stdev is never 0 (no NaN NLPD) and its derivative is 0 (was NaN) where the
   variance is at the floor. The **WarpKriging / MLPKriging committed model is now exact**, as
   Kriging's (it kept 1e-10 on its diagonal).
 
 ### Added
+- **Statistical benchmark base of the fit** (T7, `bench/fit-protocol/`): `bench-fit-protocol`
+  (built with the other benchmarks) fits >= 30 seeded data sets per configuration (gauss /
+  matern5_2, noise-free / nugget, LL / LOO / LMP, test functions with and without inactive
+  inputs, n 100-1000) with the optimizers given as arguments and the settings of the
+  environment (`LK_LONG_RANGE_RESTART`, `LK_CHOL_JITTER`, `LK_NUM_THREADS_PERCENT`); `run.py`
+  runs a profile (`smoke`: ~2 min, `reference`, `full`), `summarize.py` reports the miss rate
+  with Wilson 95 % intervals, test RMSE, wall and CPU time. Reference results (4-core machine)
+  committed in `bench/fit-protocol/results/`; see
+  [docs/dev/rationalization/T7-benchmark-base.md](docs/dev/rationalization/T7-benchmark-base.md).
+- **Small-problem BLAS rule** (OpenBLAS only): `fit`, `predict` and `update` of `Kriging`,
+  `WarpKriging` and `MLPKriging` on fewer than 500 training observations run OpenBLAS on
+  1 thread instead of the thread budget, restored after the call, when the BLAS threads and the
+  OpenMP team (both at the budget) outnumber the logical CPUs (no SMT headroom: VMs, CI runners).
+  There the idle OpenBLAS threads spin next to the OpenMP team of the covariance / gradient
+  loops: on a 4-vCPU VM, fits at n = 200 are 1.7-3.6x faster (all classes), n = 400 up to 1.8x
+  (MLP warping / MLPKriging), with 1.5-5x less CPU time; from n ~ 500-700 on the BLAS threads pay
+  off again and are kept. `Optim::set_blas_threads_min_n(n)` / `LK_BLAS_THREADS_MIN_N`: -1
+  automatic (default), 0 off, n > 0 explicit threshold. Bindings: not exposed (the environment
+  variable applies). Not measured on a machine with SMT, where the rule stays off. See
+  [REPORT-blas-threads.md](REPORT-blas-threads.md).
 - **Linear algebra self-test**: `LinearAlgebra::check(n_threads = 0)` calls the `LinearAlgebra`
   routines libKriging relies on (crossprod, diagABA, Cholesky, triangular / general solves,
   inverse, rcond, QR, Woodbury solve, symmetric eigen) and compares each result with a long
