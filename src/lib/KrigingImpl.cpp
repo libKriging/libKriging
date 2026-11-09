@@ -299,7 +299,11 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
   auto t0 = Bench::tic();
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
   libKriging::detail::parallel_for(
-      0, static_cast<long>(n_o * n_n), 512, libKriging::detail::omp_threads(), n_o * n_n >= 40000,
+      0,
+      static_cast<long>(n_o * n_n),
+      512,
+      libKriging::detail::omp_threads(),
+      n_o * n_n >= 40000,
       [&](long lo, long hi) {
         for (arma::uword idx = static_cast<arma::uword>(lo); idx < static_cast<arma::uword>(hi); idx++) {
           const arma::uword i = idx / n_n, j = idx % n_n;
@@ -450,7 +454,11 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
 
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
   libKriging::detail::parallel_for(
-      0, static_cast<long>(n_o * n_n), 512, libKriging::detail::omp_threads(), n_o * n_n >= 40000,
+      0,
+      static_cast<long>(n_o * n_n),
+      512,
+      libKriging::detail::omp_threads(),
+      n_o * n_n >= 40000,
       [&](long lo, long hi) {
         for (arma::uword idx = static_cast<arma::uword>(lo); idx < static_cast<arma::uword>(hi); idx++) {
           const arma::uword i = idx / n_n, j = idx % n_n;
@@ -975,11 +983,11 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
     // the optimum reached, may change noticeably between the two orders.
     arma::mat term1_rows(d, n, arma::fill::zeros);
     arma::mat term2_rows(d, n, arma::fill::zeros);
-    libKriging::detail::parallel_for(0, static_cast<long>(n), 8, libKriging::detail::omp_threads(), true,
-                                     [&](long lo, long hi) {
-      for (arma::uword i = static_cast<arma::uword>(lo); i < static_cast<arma::uword>(hi); i++)
-        add_row(i, term1_rows.colptr(i), term2_rows.colptr(i));
-    });
+    libKriging::detail::parallel_for(
+        0, static_cast<long>(n), 8, libKriging::detail::omp_threads(), true, [&](long lo, long hi) {
+          for (arma::uword i = static_cast<arma::uword>(lo); i < static_cast<arma::uword>(hi); i++)
+            add_row(i, term1_rows.colptr(i), term2_rows.colptr(i));
+        });
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword k = 0; k < d; k++) {
         term1_vec.at(k) += term1_rows.at(k, i);

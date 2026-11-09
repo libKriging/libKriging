@@ -23,9 +23,9 @@
 #include "libKriging/utils/utils.hpp"
 
 #include "BlasThreads.hpp"
-#include "TaskPool.hpp"
 #include "OmpLoops.hpp"
 #include "ParallelFor.hpp"
+#include "TaskPool.hpp"
 #include "ThreadBudget.hpp"
 
 #include <cassert>
@@ -1665,50 +1665,55 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
   const arma::mat Xt = m_X.t();
   const double* xp = Xt.memptr();
 
-  libKriging::detail::parallel_for(0, static_cast<long>(q), 16, libKriging::detail::omp_threads(), q > 32 && n * m >= 40000,
-                                   [&](long lo_, long hi_) {
-    for (arma::sword t = static_cast<arma::sword>(lo_); t < static_cast<arma::sword>(hi_); ++t) {
-    // m nearest observations (normalized space), partial selection
-    std::vector<std::pair<double, arma::uword>> cand(n);
-    const arma::rowvec x_t = Xn_n.row(static_cast<arma::uword>(t));
-    for (arma::uword j = 0; j < n; ++j) {
-      double s = 0;
-      for (arma::uword k = 0; k < d; ++k) {
-        const double dk = x_t(k) - xp[j * d + k];
-        s += dk * dk;
-      }
-      cand[j] = {s, j};
-    }
-    if (m < n)
-      std::nth_element(cand.begin(), cand.begin() + m, cand.end());
-    arma::uvec Ni(m);
-    for (arma::uword j = 0; j < m; ++j)
-      Ni(j) = cand[j].second;
+  libKriging::detail::parallel_for(
+      0,
+      static_cast<long>(q),
+      16,
+      libKriging::detail::omp_threads(),
+      q > 32 && n * m >= 40000,
+      [&](long lo_, long hi_) {
+        for (arma::sword t = static_cast<arma::sword>(lo_); t < static_cast<arma::sword>(hi_); ++t) {
+          // m nearest observations (normalized space), partial selection
+          std::vector<std::pair<double, arma::uword>> cand(n);
+          const arma::rowvec x_t = Xn_n.row(static_cast<arma::uword>(t));
+          for (arma::uword j = 0; j < n; ++j) {
+            double s = 0;
+            for (arma::uword k = 0; k < d; ++k) {
+              const double dk = x_t(k) - xp[j * d + k];
+              s += dk * dk;
+            }
+            cand[j] = {s, j};
+          }
+          if (m < n)
+            std::nth_element(cand.begin(), cand.begin() + m, cand.end());
+          arma::uvec Ni(m);
+          for (arma::uword j = 0; j < m; ++j)
+            Ni(j) = cand[j].second;
 
-    // local kriging on the neighborhood, with the noisy correlation block
-    // (Nugget: alpha*C + (1-alpha)*I, Heterogeneous: C + diag(noise/sigma2))
-    arma::mat RN(m, m);
-    arma::vec r(m);
-    for (arma::uword a = 0; a < m; ++a) {
-      for (arma::uword b = a + 1; b < m; ++b) {
-        const arma::vec dx = (m_X.row(Ni(a)) - m_X.row(Ni(b))).t();
-        RN(a, b) = RN(b, a) = f * _Cov(dx, m_theta);
-      }
-      RN(a, a) = (is_hetero ? 1.0 + m_noise(Ni(a)) / m_sigma2 : 1.0 + jitter) + LinearAlgebra::num_nugget;
-      const arma::vec dx = (m_X.row(Ni(a)) - x_t).t();
-      // as predict(): a prediction point equal to an observation gets the
-      // observation's (noisy) covariance 1 in Nugget mode
-      r(a) = (is_nugget && dx.is_zero(arma::datum::eps)) ? 1.0 : f * _Cov(dx, m_theta);
-    }
-    const arma::mat LN = LinearAlgebra::safe_chol_lower(RN);
-    const arma::vec a_vec = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), r));
+          // local kriging on the neighborhood, with the noisy correlation block
+          // (Nugget: alpha*C + (1-alpha)*I, Heterogeneous: C + diag(noise/sigma2))
+          arma::mat RN(m, m);
+          arma::vec r(m);
+          for (arma::uword a = 0; a < m; ++a) {
+            for (arma::uword b = a + 1; b < m; ++b) {
+              const arma::vec dx = (m_X.row(Ni(a)) - m_X.row(Ni(b))).t();
+              RN(a, b) = RN(b, a) = f * _Cov(dx, m_theta);
+            }
+            RN(a, a) = (is_hetero ? 1.0 + m_noise(Ni(a)) / m_sigma2 : 1.0 + jitter) + LinearAlgebra::num_nugget;
+            const arma::vec dx = (m_X.row(Ni(a)) - x_t).t();
+            // as predict(): a prediction point equal to an observation gets the
+            // observation's (noisy) covariance 1 in Nugget mode
+            r(a) = (is_nugget && dx.is_zero(arma::datum::eps)) ? 1.0 : f * _Cov(dx, m_theta);
+          }
+          const arma::mat LN = LinearAlgebra::safe_chol_lower(RN);
+          const arma::vec a_vec = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), r));
 
-    const arma::vec resid = m_y(Ni) - m_F.rows(Ni) * m_beta;
-    mean(t) = arma::dot(F_n.row(static_cast<arma::uword>(t)), m_beta) + arma::dot(a_vec, resid);
-    if (return_stdev)
-      stdev(t) = std::sqrt(var_scale * std::max(0.0, 1.0 - arma::dot(r, a_vec)));
-      }
-  });
+          const arma::vec resid = m_y(Ni) - m_F.rows(Ni) * m_beta;
+          mean(t) = arma::dot(F_n.row(static_cast<arma::uword>(t)), m_beta) + arma::dot(a_vec, resid);
+          if (return_stdev)
+            stdev(t) = std::sqrt(var_scale * std::max(0.0, 1.0 - arma::dot(r, a_vec)));
+        }
+      });
 
   // de-normalize outputs
   mean = mean * m_scaleY + m_centerY;
@@ -1774,27 +1779,32 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim,
   arma::mat Dobs(m_obs, q);
   const arma::mat Xt = m_X.t();
   const double* xp = Xt.memptr();
-  libKriging::detail::parallel_for(0, static_cast<long>(q), 16, libKriging::detail::omp_threads(), q > 32 && n * m_obs >= 40000,
-                                   [&](long lo_, long hi_) {
-    for (arma::sword t = static_cast<arma::sword>(lo_); t < static_cast<arma::sword>(hi_); ++t) {
-    std::vector<std::pair<double, arma::uword>> cand(n);
-    const arma::rowvec x_t = Xn_n.row(static_cast<arma::uword>(t));
-    for (arma::uword j = 0; j < n; ++j) {
-      double s = 0;
-      for (arma::uword k = 0; k < d; ++k) {
-        const double dk = x_t(k) - xp[j * d + k];
-        s += dk * dk;
-      }
-      cand[j] = {s, j};
-    }
-    if (m_obs < n)
-      std::nth_element(cand.begin(), cand.begin() + m_obs, cand.end());
-    for (arma::uword j = 0; j < m_obs; ++j) {
-      Nobs(j, static_cast<arma::uword>(t)) = cand[j].second;
-      Dobs(j, static_cast<arma::uword>(t)) = cand[j].first;
-    }
-      }
-  });
+  libKriging::detail::parallel_for(
+      0,
+      static_cast<long>(q),
+      16,
+      libKriging::detail::omp_threads(),
+      q > 32 && n * m_obs >= 40000,
+      [&](long lo_, long hi_) {
+        for (arma::sword t = static_cast<arma::sword>(lo_); t < static_cast<arma::sword>(hi_); ++t) {
+          std::vector<std::pair<double, arma::uword>> cand(n);
+          const arma::rowvec x_t = Xn_n.row(static_cast<arma::uword>(t));
+          for (arma::uword j = 0; j < n; ++j) {
+            double s = 0;
+            for (arma::uword k = 0; k < d; ++k) {
+              const double dk = x_t(k) - xp[j * d + k];
+              s += dk * dk;
+            }
+            cand[j] = {s, j};
+          }
+          if (m_obs < n)
+            std::nth_element(cand.begin(), cand.begin() + m_obs, cand.end());
+          for (arma::uword j = 0; j < m_obs; ++j) {
+            Nobs(j, static_cast<arma::uword>(t)) = cand[j].second;
+            Dobs(j, static_cast<arma::uword>(t)) = cand[j].first;
+          }
+        }
+      });
 
   // 2) sequential pass: the m nearest of (observations U previous simulation
   //    points) are among (m nearest observations U previous simulation points).
