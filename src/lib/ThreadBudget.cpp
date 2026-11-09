@@ -320,9 +320,50 @@ ScopedBlasThreads::~ScopedBlasThreads() {
     set_openblas_threads(saved);
 }
 
-BudgetScope::BudgetScope()
-    : blas(in_pool_worker() ? 0 : blas_threads_for(budget_total())),
-      mkl(in_pool_worker() ? 0 : mkl_threads_for(budget_total())) {}
+namespace {
+// Threshold of the automatic small-problem rule (REPORT-blas-threads.md):
+// below it, on a 4-core VM, one BLAS thread next to the OpenMP team is
+// 1.7-3.6x faster per fit than both teams at the budget; above it, the BLAS
+// threads pay off again.
+constexpr unsigned long long kAutoBlasMinN = 500;
+
+// True when the small-problem rule puts a BLAS loaded with `blas` threads on
+// 1 thread for n training observations.
+bool small_problem(unsigned long long n, int blas, int budget) {
+  unsigned long long min_n = 0;
+  if (Optim::blas_threads_min_n > 0) {
+    min_n = static_cast<unsigned long long>(Optim::blas_threads_min_n);
+  } else if (Optim::blas_threads_min_n < 0) {
+    // automatic: only when the BLAS threads and the OpenMP team (both at the
+    // budget) outnumber the logical CPUs, i.e. without SMT headroom (VMs, CI
+    // runners, SMT off). With SMT (budget = physical cores, half the logical
+    // CPUs) the BLAS at the budget is faster at every size
+    // (bench/thread-budget/RESULTS.md, section 9).
+    if (blas > 1 && blas + budget > logical_cpus())
+      min_n = kAutoBlasMinN;
+  }
+  return min_n > 0 && n > 0 && n < min_n;
+}
+
+int scope_blas_threads(unsigned long long n) {
+  if (in_pool_worker())
+    return 0;
+  const int budget = budget_total();
+  const int target = blas_threads_for(budget);
+  return small_problem(n, target > 0 ? target : get_openblas_threads(), budget) ? 1 : target;
+}
+
+// The same rule for the calling thread's MKL count (no-op without MKL).
+int scope_mkl_threads(unsigned long long n) {
+  if (in_pool_worker())
+    return 0;
+  const int budget = budget_total();
+  const int target = mkl_threads_for(budget);
+  return small_problem(n, target > 0 ? target : get_mkl_threads(), budget) ? 1 : target;
+}
+}  // namespace
+
+BudgetScope::BudgetScope(unsigned long long n) : blas(scope_blas_threads(n)), mkl(scope_mkl_threads(n)) {}
 
 }  // namespace detail
 }  // namespace libKriging

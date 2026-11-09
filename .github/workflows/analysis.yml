@@ -2,14 +2,17 @@ name: Code Analysis
 
 # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#on
 on:
+  # branches are tested through their pull request (one run per commit, not
+  # one for the push and one for the pull request); master on push
   push:
     branches:
-      - '*'
+      - master
     tags-ignore:
       - 'v*' # done in release
   pull_request:
     branches:
       - '*'
+  workflow_dispatch: # test a branch without a pull request
   schedule:
     - cron: '0 2 * * SAT'
 
@@ -31,6 +34,13 @@ on:
 # always set shell (could be powershell in windows environment)
 #   shell: bash
 
+
+# One run per pull request (or branch) and workflow: a new push to a pull
+# request cancels its run in progress; master pushes and scheduled runs are
+# never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   DEBUG_CI: true
@@ -70,6 +80,10 @@ jobs:
             enable_octave: on
             enable_coverage: on
             force_update: on
+            # Debug + coverage build and tests take 25-30 min on ubuntu-22.04
+            # (master, 2026-10-29: 29 min; one run cancelled at the former
+            # 30 min default)
+            timeout_minutes: 60
             # /!\ need after_success
           - name: "Memcheck mode"
             os: ubuntu-22.04
@@ -78,7 +92,9 @@ jobs:
             enable_matlab: off  # disabled: requires MATHWORKS_API_TOKEN secret
             enable_memcheck: on
             force_update: on
-            timeout_minutes: 120
+            # valgrind run: 1h28 (pull_request) to > 2h (push, cancelled at
+            # the former 120 min) on #445, 2026-11-05
+            timeout_minutes: 180
           - name: "Address Sanitizer"
             os: ubuntu-22.04
             mode: Debug
@@ -103,6 +119,9 @@ jobs:
             enable_memcheck: off
             force_update: on
             sanitizer: thread
+            # ctest alone takes most of the 30 min default: 29m12s passed and
+            # one run cancelled at 30 min after all tests passed (#445)
+            timeout_minutes: 60
 
     steps:
       - uses: actions/checkout@v4
