@@ -497,7 +497,12 @@ TEST_CASE("Fitted theta for 200 <= n < 800 matches the shared reference", "[back
     CHECK(dll_fixed <= (gauss ? 1e-8 : 1e-11));
     CHECK(dgrad_fixed <= (gauss ? 1e-6 : 1e-10));
     CHECK(dll <= 1e-7);
-    CHECK(dtheta <= (gauss ? 1e-5 : 1e-3));
+    // Fitted theta: the LL is flat along some directions, so theta moves more
+    // than the LL. Same 1e-3 for both kernels: gauss n = 750 on Accelerate
+    // (macOS-latest arm64, main.yml) gave theta 5.1e-5 with LL 1.5e-9, LL at
+    // fixed theta 5.8e-10, gradient 2.9e-8; matern5_2 n = 250 gave theta 1.0e-4.
+    // (The first gauss bound, 1e-5, came from a single macos-15 sample, 5.4e-8.)
+    CHECK(dtheta <= 1e-3);
   }
 }
 
