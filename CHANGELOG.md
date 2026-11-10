@@ -117,7 +117,7 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
-- **`sigma2` / `nugget` exactly 0 when y lies in the span of the trend** (found in #449): the fit
+- **`sigma2` / `nugget` exactly 0 when y lies in the span of the trend** (#450, found in #449): the fit
   without optimization committed on such data (e.g. constant y with a constant trend) is documented
   to estimate sigma2 = 0 (and nugget = 0), but stored SSE / n, the rounding residual of the BLAS:
   constant y, gauss, n = 10, `normalize = false`: 2.4e-32 without noise (OpenBLAS and MKL), 2.4e-32 /
