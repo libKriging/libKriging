@@ -17,6 +17,7 @@
 #include "libKriging/utils/utils.hpp"
 
 #include "BlasThreads.hpp"
+#include "RestartPolicy.hpp"
 #include "TaskPool.hpp"
 #include "ThreadBudget.hpp"
 
@@ -2730,14 +2731,14 @@ void WarpKriging::optimise_joint(const std::string& method) {
       return -ll;
     };
 
-    // Retry loop: on abnormal termination / stuck at bound / no progress,
-    // contract θ toward lower bound and restart (mirrors Kriging).
-    int retry = 0;
+    // Restart loop (RestartPolicy, as Kriging): on abnormal termination,
+    // <= 2 iterations, stuck at the lower bound or no improvement, contract θ
+    // toward its lower bound and restart.
+    libKriging::detail::RestartPolicy restarts({Optim::max_restart, optimizer.factr, /*worse_criterion=*/true});
     double best_f = std::numeric_limits<double>::infinity();
     arma::vec best_x = x0;
     arma::vec x = x0;
-    while (retry <= Optim::max_restart) {
-      const double prev_best_f = best_f;
+    while (true) {
       lbfgsb::OptimizeResult res{};
       try {
         res = optimizer.minimize(obj_fn, x, lb.memptr(), ub.memptr(), btype.memptr());
@@ -2753,38 +2754,29 @@ void WarpKriging::optimise_joint(const std::string& method) {
         }
         break;
       }
-      if (res.f_opt < best_f) {
+      if (restarts.record(res.f_opt)) {
         best_f = res.f_opt;
         best_x = x;
       }
       // Iteration budget exhausted while still making progress: resume from
       // the point reached instead of contracting θ back toward its lower
       // bound (which would discard the warp params learnt so far).
-      if ((retry < Optim::max_restart) && (nw > 0) && (res.task.rfind("STOP: TOTAL NO. of ITERATIONS", 0) == 0)
+      const double prev_best_f = restarts.previous_best();
+      if ((nw > 0) && (res.task.rfind("STOP: TOTAL NO. of ITERATIONS", 0) == 0)
           && (!std::isfinite(prev_best_f)
-              || (prev_best_f - res.f_opt) > Optim::objective_rel_tolerance * std::max(1.0, std::abs(res.f_opt)))) {
+              || (prev_best_f - res.f_opt) > Optim::objective_rel_tolerance * std::max(1.0, std::abs(res.f_opt)))
+          && restarts.resume()) {
         x = best_x;
-        retry++;
         continue;
       }
-      arma::vec theta_cur = from_gamma(x.tail(dt));
-      double sol_to_lb = arma::min(arma::abs(theta_cur - theta_lower));
-      // "No improvement" within the optimizer's own tolerance (as Kriging):
-      // a difference at the rounding level must not decide a restart.
-      const double f_tol = optimizer.factr * arma::datum::eps * std::max(1.0, std::abs(best_f));
-      const bool worse = res.f_opt > best_f + f_tol;
-      if ((retry < Optim::max_restart)
-          && ((res.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) || (res.num_iters <= 2)
-              || (sol_to_lb < arma::datum::eps) || worse)) {
-        // Contract theta starting point toward lower bound.
-        arma::vec theta_restart = (theta0 + theta_lower) / std::pow(2.0, retry + 1);
-        x.tail(dt) = to_gamma(theta_restart);
-        if (nw > 0)
-          x.head(nw) = wp_init;
-        retry++;
-      } else {
+      const double sol_to_lb
+          = libKriging::detail::RestartPolicy::distance_to_lower(from_gamma(x.tail(dt)), theta_lower, theta_upper);
+      if (!restarts.restart(res.task, res.num_iters, sol_to_lb < arma::datum::eps))
         break;
-      }
+      // Contract theta starting point toward lower bound.
+      x.tail(dt) = to_gamma(restarts.restart_theta(theta0, theta_lower, theta_upper));
+      if (nw > 0)
+        x.head(nw) = wp_init;
     }
 
     if (nw > 0)
@@ -2810,15 +2802,18 @@ void WarpKriging::optimise_joint(const std::string& method) {
     opt.maximize = true;
     opt.outer_lower = wp_lower;
     opt.outer_upper = wp_upper;
-    // Same restart as the joint BFGS (and Kriging): θ contracted toward its
-    // lower bound, kept inside the bounds (L-BFGS-B does not project its
-    // starting point)
-    opt.max_restart = Optim::max_restart;
-    opt.inner_restart = [&](const arma::vec& gamma0, int retry) -> arma::vec {
-      const arma::vec theta_restart
-          = arma::max(arma::min(arma::vec((from_gamma(gamma0) + theta_lower) / std::pow(2.0, retry + 1)), theta_upper),
-                      theta_lower);
-      return to_gamma(theta_restart);
+    // Restart of the first inner BFGS: same policy as the joint BFGS (and
+    // Kriging), without the "worse" criterion (as before). The at-bound test stays in
+    // the inner (gamma) space, where AdamBFGS made it.
+    libKriging::detail::RestartPolicy inner_restarts({Optim::max_restart, opt.bfgs_factr, /*worse_criterion=*/false});
+    opt.inner_restart
+        = [&](const lbfgsb::OptimizeResult& res, const arma::vec& gamma_end, const arma::vec& gamma0) -> arma::vec {
+      inner_restarts.record(res.f_opt);
+      const double sol_to_lb
+          = libKriging::detail::RestartPolicy::distance_to_lower(gamma_end, gamma_lower, gamma_upper);
+      if (!inner_restarts.restart(res.task, res.num_iters, sol_to_lb < arma::datum::eps))
+        return arma::vec();
+      return to_gamma(inner_restarts.restart_theta(from_gamma(gamma0), theta_lower, theta_upper));
     };
 
     arma::vec current_wp = arma::min(arma::max(wk.pack_warp_params(), wp_lower), wp_upper);
@@ -2898,42 +2893,58 @@ void WarpKriging::optimise_joint(const std::string& method) {
   };
 
   // Helper: extract result from a WarpKriging instance after optimization
+  // (moves the matrices out of wk: called on the best start only, whose
+  // clone is not used afterwards)
   auto extract_result = [](WarpKriging& wk, double neg_ll) -> OptimizationResult {
     OptimizationResult r;
     r.neg_ll = neg_ll;
     r.theta = wk.m_theta;
     r.warp_params = wk.pack_warp_params();
     r.sigma2 = wk.m_sigma2;
-    r.beta = wk.m_beta;
-    r.z = wk.m_z;
-    r.M = wk.m_M;
-    r.circ = wk.m_circ;
-    r.C = wk.m_T;
-    r.Rinv = wk.m_Rinv;
-    r.R = wk.m_R;
-    r.Phi = wk.m_X;
-    r.dPhi = wk.m_dX;
+    r.beta = std::move(wk.m_beta);
+    r.z = std::move(wk.m_z);
+    r.M = std::move(wk.m_M);
+    r.circ = std::move(wk.m_circ);
+    r.C = std::move(wk.m_T);
+    r.Rinv = std::move(wk.m_Rinv);
+    r.R = std::move(wk.m_R);
+    r.Phi = std::move(wk.m_X);
+    r.dPhi = std::move(wk.m_dX);
     r.logdet = wk.m_logdet;
     r.success = true;
     return r;
   };
 
-  // Helper: restore best result to `this`
-  auto restore_best = [&](const OptimizationResult& r) {
+  // Helper: restore best result to `this` (moved: r is not used afterwards)
+  auto restore_best = [&](OptimizationResult& r) {
     if (n_warp > 0)
       unpack_warp_params(r.warp_params);
     m_theta = r.theta;
     m_sigma2 = r.sigma2;
-    m_beta = r.beta;
-    m_z = r.z;
-    m_M = r.M;
-    m_circ = r.circ;
-    m_T = r.C;
-    m_Rinv = r.Rinv;
-    m_R = r.R;
-    m_X = r.Phi;
-    m_dX = r.dPhi;
+    m_beta = std::move(r.beta);
+    m_z = std::move(r.z);
+    m_M = std::move(r.M);
+    m_circ = std::move(r.circ);
+    m_T = std::move(r.C);
+    m_Rinv = std::move(r.Rinv);
+    m_R = std::move(r.R);
+    m_X = std::move(r.Phi);
+    m_dX = std::move(r.dPhi);
     m_logdet = r.logdet;
+  };
+
+  // Helper: free the n x n (and n^2 x d for m_dX) state of a clone. A start
+  // rebuilds all of it (refresh_cache) before reading it, so the clones need
+  // not carry it while they wait for their start or once it is done.
+  auto release_gp_state = [](WarpKriging& wk) {
+    wk.m_X.reset();
+    wk.m_dX.reset();
+    wk.m_maxdX.reset();
+    wk.m_R.reset();
+    wk.m_T.reset();
+    wk.m_Rinv.reset();
+    wk.m_M.reset();
+    wk.m_z.reset();
   };
 
   // Helper: run parallel multistart with a given optimizer function
@@ -2967,19 +2978,28 @@ void WarpKriging::optimise_joint(const std::string& method) {
       for (int i = 1; i < multistart; ++i)
         wp_starts[i] = random_warp_params(static_cast<uint64_t>(42 + 1000 * i));
 
-    std::vector<OptimizationResult> results(multistart);
+    // Only the best start's state is kept (moved into `best` as the starts
+    // finish); the others are freed with their clone's state. Same choice as
+    // a scan of the starts in index order (lowest neg_ll, then lowest start
+    // index), whatever the order in which they finish.
+    OptimizationResult best;
+    int best_idx = -1;
     std::mutex results_mutex;
 
-    // Create per-thread WarpKriging clones
+    // Per-start WarpKriging clones, built here since the warp constructors
+    // reseed the RNG, without their GP state: only the running starts (at
+    // most the pool size) hold one (docs/dev/rationalization/T4-kmodel-per-worker.md).
     std::vector<WarpKriging> clones;
     clones.reserve(multistart);
-    for (int i = 0; i < multistart; ++i)
+    for (int i = 0; i < multistart; ++i) {
       clones.push_back(clone_for_thread());
+      release_gp_state(clones.back());
+    }
 
     // Worker function
     auto worker = [&](int task_id) {
+      WarpKriging& wk = clones[task_id];
       try {
-        WarpKriging& wk = clones[task_id];
         // Reset to initial warp params and set starting theta
         if (n_warp > 0)
           wk.unpack_warp_params(wp_starts[task_id]);
@@ -2988,35 +3008,29 @@ void WarpKriging::optimise_joint(const std::string& method) {
 
         double neg_ll = optimizer_fn(wk);
 
-        OptimizationResult r = extract_result(wk, neg_ll);
-        r.start_theta = theta0_rand.row(task_id).t();
-        r.start_warp_params = wp_starts[task_id];
         std::lock_guard<std::mutex> lock(results_mutex);
-        results[task_id] = std::move(r);
+        if ((neg_ll < best.neg_ll) || (neg_ll == best.neg_ll && best_idx >= 0 && task_id < best_idx)) {
+          best = extract_result(wk, neg_ll);
+          best.start_theta = theta0_rand.row(task_id).t();
+          best.start_warp_params = wp_starts[task_id];
+          best_idx = task_id;
+        }
       } catch (const std::exception& e) {
         if (Optim::log_level > Optim::log_none) {
           std::lock_guard<std::mutex> lock(results_mutex);
           arma::cout << "Warning: WarpKriging multistart " << (task_id + 1) << " failed: " << e.what() << arma::endl;
         }
       }
+      release_gp_state(wk);
     };
 
     // Starts run concurrently in a thread pool (see run_task_pool).
     run_task_pool(multistart, worker, "multistart");
 
-    // Find best result
-    int best_idx = -1;
-    double best_neg_ll = std::numeric_limits<double>::infinity();
-    for (int i = 0; i < multistart; ++i) {
-      if (results[i].success && results[i].neg_ll < best_neg_ll) {
-        best_neg_ll = results[i].neg_ll;
-        best_idx = i;
-      }
-    }
     if (best_idx >= 0) {
-      restore_best(results[best_idx]);
-      m_start_theta = results[best_idx].start_theta;
-      m_start_warp_params = results[best_idx].start_warp_params;
+      restore_best(best);
+      m_start_theta = best.start_theta;
+      m_start_warp_params = best.start_warp_params;
     }
   };
 

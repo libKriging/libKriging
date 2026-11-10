@@ -37,12 +37,49 @@ past release, see the corresponding entry on the
   span of the trend now gives sigma2 = nugget = 0 exactly (MKL left ~1e-32). Known limitation:
   with MKL, `fork()` while other threads run MKL needs `MKL_DISABLE_FAST_MM=1`
   ([docs/dev/parallel.md](docs/dev/parallel.md), section 7).
+- **Single L-BFGS-B restart policy** (T2, [docs/dev/rationalization/T2-restart-policy.md](docs/dev/rationalization/T2-restart-policy.md)):
+  the restart criteria (abnormal stop, <= 2 iterations, at the lower bound, long-range optimum,
+  worse than the best run beyond factr x epsmch) and the contracted restart point, copied in
+  `Kriging::fit`, the WarpKriging joint BFGS and `AdamBFGS`, are now one private component
+  (`src/lib/RestartPolicy.hpp`). The **"worse" criterion no longer cascades**: a restart started
+  only because the previous run was worse does not trigger another one by being worse again
+  (before: up to `max_restart` = 10 restarts, each from a point closer to the lower bound). Kriging
+  and WarpKriging (joint BFGS) fits that went through such a cascade end with fewer restarts and
+  may end at a slightly different point (4 of 1728 measured Kriging fits, |ΔLL| <= 1.1e-5, 12 %
+  fewer restarts; 216 WarpKriging fits unchanged). `AdamBFGS::inner_restart` now decides the restart itself
+  (it receives the run's result, end and start points; `AdamBFGS::max_restart` is removed).
+- **Faster theta gradients** (T1, `docs/dev/rationalization/T1-vectorized-gradients.md`): the
+  LL and LMP theta gradients use per-dimension kernel factors in one pair loop (no
+  `std::function` / `arma::vec` per pair), and the LMP gradient is reduced algebraically to one
+  R^-1 and an O(d n^2) loop instead of d O(n^3) solves; `LinearAlgebra::inv_sympd` uses LAPACK
+  `*potri` (x3 fewer flops). Single thread, d = 4, n = 500 / 1500: LL gradient x2.2-3.7, LMP
+  gradient x10-15. The pair sums now have one order whatever the thread count, n and OS (the
+  `kOmpMinRows` dependence of the gradient is removed). Results change at rounding level
+  (< 3e-12 relative for cond(R) < 1e8; more on ill-conditioned R).
 - **Predicted variance floor** (#428): `predict` floors the variance at 4 eps x sigma2 instead of
   clamping it to 0; the stdev is never 0 (no NaN NLPD) and its derivative is 0 (was NaN) where the
   variance is at the floor. The **WarpKriging / MLPKriging committed model is now exact**, as
   Kriging's (it kept 1e-10 on its diagonal).
+- **Multistart memory** (#444): a `Kriging` BFGS multistart no longer allocates and keeps the
+  n x n model (R, L, R^-1, ...) of every start, nor deep-copies it into a result per start: each
+  start builds its model in its task (at most min(multistart, pool size) alive at once) and only
+  the best start's model is kept, moved (not copied). `WarpKriging` multistart clones no longer
+  carry the GP state (R, Cholesky, R^-1, features, dX) outside their running start, and only the
+  best start's state is kept (moved). Fitted results are bit-identical; peak RSS at n = 2000,
+  BFGS20 (4 cores): 3369 → 1501 MB; n = 1000, BFGS10: 564 → 330 MB; WarpKriging n = 1000,
+  BFGS10: 1112 → 578 MB. See
+  [docs/dev/rationalization/T4-kmodel-per-worker.md](docs/dev/rationalization/T4-kmodel-per-worker.md).
 
 ### Added
+- **Statistical benchmark base of the fit** (T7, `bench/fit-protocol/`): `bench-fit-protocol`
+  (built with the other benchmarks) fits >= 30 seeded data sets per configuration (gauss /
+  matern5_2, noise-free / nugget, LL / LOO / LMP, test functions with and without inactive
+  inputs, n 100-1000) with the optimizers given as arguments and the settings of the
+  environment (`LK_LONG_RANGE_RESTART`, `LK_CHOL_JITTER`, `LK_NUM_THREADS_PERCENT`); `run.py`
+  runs a profile (`smoke`: ~2 min, `reference`, `full`), `summarize.py` reports the miss rate
+  with Wilson 95 % intervals, test RMSE, wall and CPU time. Reference results (4-core machine)
+  committed in `bench/fit-protocol/results/`; see
+  [docs/dev/rationalization/T7-benchmark-base.md](docs/dev/rationalization/T7-benchmark-base.md).
 - **Small-problem BLAS rule** (OpenBLAS only): `fit`, `predict` and `update` of `Kriging`,
   `WarpKriging` and `MLPKriging` on fewer than 500 training observations run OpenBLAS on
   1 thread instead of the thread budget, restored after the call, when the BLAS threads and the
