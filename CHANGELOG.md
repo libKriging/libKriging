@@ -12,6 +12,34 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **MKL thread control** (#445, T5): with Intel MKL / oneMKL, each multistart worker sets its own
+  MKL thread count to its share of the budget (`MKL_Set_Num_Threads_Local`), and each public
+  method the calling thread's count to the budget, restored after (before: every worker kept
+  all MKL threads). Apple Accelerate, FlexiBLAS and BLIS are still not driven (documented in
+  the FAQ: `VECLIB_MAXIMUM_THREADS=1` etc. for multistart fits).
+- **cgroup v1 CPU quotas** (#445, T5): the thread budget also reads `cpu.cfs_quota_us` /
+  `cpu.cfs_period_us`, and the quotas of the parent cgroups (v1 and v2).
+- **Concurrent calls from user threads** (T6, #446): the save / restore of the process-global
+  OpenBLAS thread count is shared by all threads under a mutex (count in effect = smallest live
+  request, the last scope restores the caller's count); concurrent public calls split the thread
+  budget (budget / running calls) instead of each taking all of it; `Random`'s engine and seed
+  are per thread (`reset_seed` applies to the calling thread; a new thread starts from seed 123);
+  the fork handlers hold the library's mutexes, so a `fork()` made while another thread fits no
+  longer deadlocks the child. `Optim` / `LinearAlgebra` settings are documented as
+  configuration-before-use. See [docs/dev/parallel.md](docs/dev/parallel.md), section 3.1.
+- **BLAS backends in CI, fork fixes** (T9, #449): new workflow `blas-backends.yml` (Linux with
+  oneMKL preloaded on OpenBLAS and linked, GNU and INTEL threading layers; macOS arm64
+  Accelerate) and `[backend]` tests (`BlasBackendTest`: per-worker MKL / OpenBLAS counts read in
+  the thread of each LAPACK call, caller's MKL count restored, BFGS4 with 1 or 4 workers, shared
+  reference values for 200 <= n < 800). Fixes found by running MKL: the fork prepare handler
+  initializes the lazy statics of the call path (a `fork()` during another thread's first call
+  deadlocked the child with MKL), the fork child sets MKL to 1 thread, and a fit on data in the
+  span of the trend now gives sigma2 = nugget = 0 exactly (MKL left ~1e-32), and
+  `LinearAlgebra::inv_sympd` checks its LAPACK `potri` result in O(n^2) against triangular
+  solves and falls back to them (a wrong `R^-1` gave a LL gradient off by 7e6 relative on a
+  macOS Accelerate runner, #452). Known limitation:
+  with MKL, `fork()` while other threads run MKL needs `MKL_DISABLE_FAST_MM=1`
+  ([docs/dev/parallel.md](docs/dev/parallel.md), section 7).
 - **Single L-BFGS-B restart policy** (T2, [docs/dev/rationalization/T2-restart-policy.md](docs/dev/rationalization/T2-restart-policy.md)):
   the restart criteria (abnormal stop, <= 2 iterations, at the lower bound, long-range optimum,
   worse than the best run beyond factr x epsmch) and the contracted restart point, copied in

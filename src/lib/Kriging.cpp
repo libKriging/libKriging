@@ -89,6 +89,103 @@ openblas_get_num_threads_t get_openblas_get_num_threads() {
 #endif
 #endif
 
+// Intel MKL / oneMKL thread control, C interface (MKL_Get_Max_Threads,
+// MKL_Set_Num_Threads_Local take and return int by value; the lower-case
+// mkl_set_num_threads_local exported by libmkl_rt is the Fortran entry point,
+// int by reference). Weak symbols on ELF, as OpenBLAS above: they resolve to the
+// MKL the library's BLAS calls go to (linked, libblas.so.3 alternative, or
+// preloaded). dlsym elsewhere on POSIX (Mach-O has no undefined weak symbols
+// without a link-time definition), GetProcAddress on Windows.
+#if defined(__ELF__)
+extern "C" {
+int MKL_Get_Max_Threads() __attribute__((weak));
+int MKL_Set_Num_Threads_Local(int nth) __attribute__((weak));
+void MKL_Set_Num_Threads(int nth) __attribute__((weak));
+}
+namespace {
+typedef int (*mkl_get_max_threads_t)();
+typedef int (*mkl_set_num_threads_local_t)(int);
+mkl_get_max_threads_t get_mkl_get_max_threads() {
+  return MKL_Get_Max_Threads;
+}
+mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
+  return MKL_Set_Num_Threads_Local;
+}
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  return MKL_Set_Num_Threads;
+}
+}  // namespace
+#elif defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+namespace {
+typedef int (*mkl_get_max_threads_t)();
+typedef int (*mkl_set_num_threads_local_t)(int);
+FARPROC get_mkl_proc(const char* name) {
+  for (const char* dll : {"mkl_rt.2.dll", "mkl_rt.dll", "mkl_rt.1.dll"}) {
+    HMODULE h = GetModuleHandleA(dll);
+    if (h)
+      return GetProcAddress(h, name);
+  }
+  return nullptr;
+}
+mkl_get_max_threads_t get_mkl_get_max_threads() {
+  static mkl_get_max_threads_t func = reinterpret_cast<mkl_get_max_threads_t>(get_mkl_proc("MKL_Get_Max_Threads"));
+  return func;
+}
+mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
+  static mkl_set_num_threads_local_t func
+      = reinterpret_cast<mkl_set_num_threads_local_t>(get_mkl_proc("MKL_Set_Num_Threads_Local"));
+  return func;
+}
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  static mkl_set_num_threads_t func = reinterpret_cast<mkl_set_num_threads_t>(get_mkl_proc("MKL_Set_Num_Threads"));
+  return func;
+}
+}  // namespace
+#elif defined(__APPLE__) || defined(__unix__)
+#include <dlfcn.h>
+namespace {
+typedef int (*mkl_get_max_threads_t)();
+typedef int (*mkl_set_num_threads_local_t)(int);
+mkl_get_max_threads_t get_mkl_get_max_threads() {
+  static mkl_get_max_threads_t func
+      = reinterpret_cast<mkl_get_max_threads_t>(dlsym(RTLD_DEFAULT, "MKL_Get_Max_Threads"));
+  return func;
+}
+mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
+  static mkl_set_num_threads_local_t func
+      = reinterpret_cast<mkl_set_num_threads_local_t>(dlsym(RTLD_DEFAULT, "MKL_Set_Num_Threads_Local"));
+  return func;
+}
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  static mkl_set_num_threads_t func
+      = reinterpret_cast<mkl_set_num_threads_t>(dlsym(RTLD_DEFAULT, "MKL_Set_Num_Threads"));
+  return func;
+}
+}  // namespace
+#else
+namespace {
+typedef int (*mkl_get_max_threads_t)();
+typedef int (*mkl_set_num_threads_local_t)(int);
+mkl_get_max_threads_t get_mkl_get_max_threads() {
+  return nullptr;
+}
+mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
+  return nullptr;
+}
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  return nullptr;
+}
+}  // namespace
+#endif
+
 namespace libKriging {
 namespace detail {
 BlasThreadState get_blas_threads() {
@@ -132,6 +229,28 @@ void set_openblas_threads(int n) {
 #endif
 }
 
+int get_mkl_threads() {
+  auto fn = get_mkl_get_max_threads();
+  return fn ? fn() : 0;
+}
+
+int set_mkl_threads_local(int n) {
+  auto fn = get_mkl_set_num_threads_local();
+  return fn ? fn(n) : -1;
+}
+
+void set_mkl_threads_global(int n) {
+  auto fn = get_mkl_set_num_threads();
+  if (fn && n > 0)
+    fn(n);
+}
+
+void touch_mkl_entry_points() {
+  get_mkl_get_max_threads();
+  get_mkl_set_num_threads_local();
+  get_mkl_set_num_threads();
+}
+
 void restore_blas_threads(const BlasThreadState& s) {
 #if !defined(__APPLE__) || !defined(__arm64__)
   auto fn = get_openblas_set_num_threads();
@@ -162,17 +281,32 @@ namespace {
 
 libKriging::detail::BlasThreadState atfork_saved;
 
+// The library's mutexes are locked in prepare and unlocked in both processes:
+// a fork() made while another thread holds one would leave it locked forever
+// in the child, where that thread does not exist.
 void libkriging_atfork_prepare() {
+  // locked first: no concurrent scope changes the count between the two lines
+  libKriging::detail::blas_count_fork_prepare();
+  libKriging::detail::rcond_mutex().lock();
   atfork_saved = libKriging::detail::get_blas_threads();
   libKriging::detail::set_blas_threads(1);
 }
 
 void libkriging_atfork_parent() {
   libKriging::detail::restore_blas_threads(atfork_saved);
+  libKriging::detail::rcond_mutex().unlock();
+  libKriging::detail::blas_count_fork_parent();
 }
 
 void libkriging_atfork_child() {
+  libKriging::detail::rcond_mutex().unlock();
+  libKriging::detail::blas_count_fork_child();
   libKriging::detail::set_blas_threads(1);
+  // MKL's global count too (threads without a thread-local count, i.e. the
+  // child's later threads and the forking thread unless it set its own): with
+  // the GNU threading layer an MKL call at more than 1 thread starts an OpenMP
+  // team in the child. The parent's MKL count is not changed.
+  libKriging::detail::set_mkl_threads_global(1);
 }
 
 struct ForkSafeRegistrar {
