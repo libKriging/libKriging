@@ -36,11 +36,14 @@ TEST_CASE("AdamBFGS restarts the first inner BFGS stopped at a corner of the bou
   auto plain = opt.optimize(arma::vec(), arma::vec{1.0}, lower, upper, fn);
   CHECK(plain.x_inner(0) == Approx(3.0));
 
-  opt.max_restart = 2;
-  opt.inner_restart = [](const arma::vec&, int) { return arma::vec{-1.0}; };
+  int restarts = 0;
+  opt.inner_restart = [&restarts](const lbfgsb::OptimizeResult& res, const arma::vec&, const arma::vec&) {
+    return (res.num_iters <= 2 && restarts++ < 2) ? arma::vec{-1.0} : arma::vec();
+  };
   auto restarted = opt.optimize(arma::vec(), arma::vec{1.0}, lower, upper, fn);
   CHECK(restarted.x_inner(0) == Approx(-1.45).margin(0.01));
   CHECK(restarted.f_opt > plain.f_opt);
+  CHECK(restarts == 1);
 }
 
 TEST_CASE("AdamBFGS step decay goes closer to the optimum than stopping at the plateau", "[AdamBFGS]") {

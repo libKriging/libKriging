@@ -16,18 +16,29 @@ name: BLAS backends
 # workflow files on any runner registered to it.
 
 on:
-  pull_request:
+  # branches are tested through their pull request (one run per commit, not
+  # one for the push and one for the pull request); master on push (as main.yml)
+  push:
+    branches:
+      - master
     paths:
       - 'src/**'
       - 'tests/**'
       - '.github/workflows/blas-backends.yml'
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - '*'
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/blas-backends.yml'
+  workflow_dispatch: # test a branch without a pull request
 
-# A new push to the PR cancels the run of the previous one (runners are shared
-# with main.yml; obsolete runs only delay the current one)
+# One run per pull request (or branch) and workflow: a new push to a pull
+# request cancels its run in progress; master pushes are never cancelled.
 concurrency:
-  group: blas-backends-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least privilege for the workflow token
 permissions:
@@ -63,8 +74,9 @@ jobs:
       - name: Install OpenBLAS and the oneMKL wheels
         shell: bash
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -qy libopenblas-pthread-dev liblapack-dev ninja-build
+          # retries and mirror switch on a slow apt mirror (as the other workflows)
+          tools/linux-macos/apt-install.sh --update
+          tools/linux-macos/apt-install.sh libopenblas-pthread-dev liblapack-dev ninja-build
           # Ubuntu's OpenBLAS Cooperlake kernels gave wrong results on Xeon
           # 6973P-C runners (main.yml, #429): its AVX2 kernels, as the other
           # Linux jobs. No effect on MKL.

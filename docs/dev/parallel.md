@@ -108,6 +108,14 @@ from several user threads (Python `ThreadPoolExecutor`, joblib threads,
   it, in whatever order the calls end. Concurrent calls thus run with their
   BLAS at the share of the most constrained one (never more than the budget;
   no oversubscription from one call restoring the count of another).
+  Side effect of the small-problem rule (#436, section 3): a call on a small
+  problem (`n < Optim::blas_threads_min_n`, automatic threshold 500) requests 1
+  BLAS thread, so while it runs it also sets the process-wide OpenBLAS count to
+  1 for the concurrent calls on big problems. Their results are unchanged (up
+  to the rounding above); their BLAS throughput drops for that time. To avoid
+  it, run small and big problems in separate phases, or disable the rule
+  (`Optim::set_blas_threads_min_n(0)` or `LK_BLAS_THREADS_MIN_N=0`). MKL is not
+  concerned (per-thread count, rule not applied).
 - **Random engine**: `Random`'s engine and seed are per thread
   (`thread_local`): a multistart fit draws its starts and `simulate()` reseeds
   in the calling thread, without racing with the other calls. `reset_seed()`
@@ -121,7 +129,8 @@ from several user threads (Python `ThreadPoolExecutor`, joblib threads,
   stopping point): `ConcurrentCallsTest`.
 - Not covered: two threads using the **same** model object (not supported,
   as for any non-const object), Accelerate (no per-thread control, section 5);
-  MKL: per-thread count since #445, concurrent calls not yet run against a real MKL (T9).
+  MKL: per-thread count since #445; `ConcurrentCallsTest` runs against oneMKL
+  (GNU and INTEL threading layers) in `blas-backends.yml` (T9).
 
 ## 4. Reproducibility
 

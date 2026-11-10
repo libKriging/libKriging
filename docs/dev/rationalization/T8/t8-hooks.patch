@@ -1,0 +1,58 @@
+diff --git a/src/lib/WarpKriging.cpp b/src/lib/WarpKriging.cpp
+index ec7add4..b982b04 100644
+--- a/src/lib/WarpKriging.cpp
++++ b/src/lib/WarpKriging.cpp
+@@ -25,6 +25,8 @@
+ #include <cassert>
+ #include <chrono>
+ #include <cmath>
++#include <cstdio>  // T8-EXP
++#include <cstdlib>  // T8-EXP
+ #include <fstream>
+ #include <functional>
+ #include <iomanip>
+@@ -2493,6 +2495,13 @@ void WarpKriging::calibrate_variance() {
+   Parameters start;
+   start.theta = m_start_theta;
+   start.warp_params = m_start_warp_params;
++  if (const char* e = std::getenv("LK_T8_START"); e && std::string(e) == "fit") {  // T8-EXP
++    start.theta = m_theta;
++    start.warp_params = pack_warp_params();
++  }
++  const char* t8_iter = std::getenv("LK_T8_ITER");  // T8-EXP
++  const char* t8_dump = std::getenv("LK_T8_DUMP");  // T8-EXP
++  std::vector<std::vector<double>> t8_z(K);  // T8-EXP
+   const std::string method = Optim::parse_method(m_optim, "BFGS").first;
+ 
+   // The folds are independent: refitted concurrently (see run_task_pool), the
+@@ -2503,6 +2512,8 @@ void WarpKriging::calibrate_variance() {
+     folds.emplace_back(warping_strings(), m_covType);
+     WarpKriging& wf = folds.back();
+     wf.m_max_iter_bfgs = m_max_iter_bfgs;
++    if (t8_iter)
++      wf.m_max_iter_bfgs = std::stoul(t8_iter);  // T8-EXP
+     wf.m_max_iter_adam = m_max_iter_adam;
+     wf.m_adam_lr = m_adam_lr;
+     wf.m_calibration_folds = 0;  // no nested calibration
+@@ -2530,6 +2541,7 @@ void WarpKriging::calibrate_variance() {
+         if (v > 0 && std::isfinite(v) && std::isfinite(e)) {
+           fold_z2[f] += e * e / v;
+           ++fold_nz[f];
++          t8_z[f].push_back(e / std::sqrt(v));  // T8-EXP
+         }
+       }
+     } catch (const std::exception& e) {
+@@ -2549,6 +2561,13 @@ void WarpKriging::calibrate_variance() {
+     sum_z2 += fold_z2[f];
+     n_z += fold_nz[f];
+   }
++  if (t8_dump) {  // T8-EXP
++    FILE* fp = std::fopen(t8_dump, "a");
++    for (arma::uword f = 0; f < K; ++f)
++      for (double z : t8_z[f])
++        std::fprintf(fp, "Z %u %.17g\n", (unsigned)f, z);
++    std::fclose(fp);
++  }
+   if (2 * n_z < n)  // too few held-out residuals to calibrate on
+     return;
+   const double factor = sum_z2 / static_cast<double>(n_z);

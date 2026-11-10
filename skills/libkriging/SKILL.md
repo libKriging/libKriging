@@ -126,7 +126,7 @@ is both simpler and, for NestedKriging's NK aggregation, actually a
 | `regmodel` / trend | `"constant"`, `"linear"`, `"interactive"`, `"quadratic"` (`"none"` = zero mean) | `"constant"` (ordinary kriging) is the default and usually the right start. Move to `"linear"` if the response has an obvious global trend the GP should not have to explain via short-range correlation. Avoid `"quadratic"`/`"interactive"` in high dimension — parameter count grows fast and can overfit the trend, starving the covariance part. |
 | `objective` | `"LL"` (log-likelihood, default), `"LOO"` (leave-one-out, [details](../../docs/math/LOO.md)), `"LMP"` (log marginal posterior, [details](../../docs/math/LMP.md)) | `"LL"` by default. `"LOO"` is a reasonable alternative when you specifically care about predictive accuracy at the design points rather than the full likelihood. `"LMP"` is a good alternative with few observations, where `"LL"` can drift θ into a degenerate (too small/too large) range. |
 | `method` | `"exact"` (default), `"vecchia"` / `"vecchia(m)"`, `"nystrom"` / `"nystrom(k)"` | How the covariance is evaluated, for the fit and afterwards. Approximate methods only for scaling, with any `objective` (see §1.5; the approximate `"LOO"` is the leave-one-out of the approximate joint law, not of the local Vecchia predictor); noise models (both methods) only with `objective="LL"`, `"LOO"` / `"LMP"` noise-free — they approximate the criterion, so don't use them on small problems expecting identical results to the exact fit. |
-| `optim` | `"BFGS"` (default), `"BFGSk"` for k random restarts (e.g. `"BFGS10"`), `"none"` | Use `"none"` only when supplying fixed/known hyperparameters via `parameters` (e.g. reusing a fit, or a controlled experiment). For a difficult/multimodal likelihood (many inputs, clustered design), multistart (`"BFGS10"`+) is cheap insurance against a bad local optimum — recommend it over blindly trusting a single `"BFGS"` run when the user reports an unstable or suspicious fit. |
+| `optim` | `"BFGS4"` (default for `Kriging`: 4 random starts run in parallel, the best kept), `"BFGSk"` for k starts (e.g. `"BFGS10"`), `"BFGS"` (single start, the `Kriging` default up to 1.2; still the default of `WarpKriging` / `MLPKriging` / `NestedKriging`), `"none"` | Use `"none"` only when supplying fixed/known hyperparameters via `parameters` (e.g. reusing a fit, or a controlled experiment). A single start misses the likelihood optimum on ~18 % of the benchmark data sets against ~5 % for `"BFGS4"` and ~1 % for `"BFGS10"` (docs/dev/rationalization/T3-default-multistart.md): for a difficult/multimodal likelihood (many or inactive inputs, LOO objective) or a suspicious fit, recommend `"BFGS10"`+; `"BFGS"` only when fit time on a single core matters more than the optimum (x 1.6–3.7 cheaper there). |
 | `normalize` | boolean, default off | Turn on when input dimensions have very different scales/units — it rescales `X`/`y` to `[0,1]` internally, which helps the optimizer's bounds and starting values. On `Kriging` everything public stays in the original scale of `X`/`y`: `parameters` in, `theta()`/`sigma2()`/`nugget()`/`noise()`/`beta()` and the `*Fun(theta)` objectives (values and gradients) out, so they round-trip and match a `normalize=false` fit (`X()`/`y()` are the internal normalized data). Not on `WarpKriging`/`MLPKriging` (warped feature space); not supported yet on `NestedKriging`. |
 | `noise` | vector, `"nugget"`, or absent | See §1.2. |
 | `parameters` | dict/struct with `sigma2`, `theta`, `beta`, plus per-argument `is_*_estim` flags | Use to seed the optimizer (multistart with multiple `theta` rows) or to fix a hyperparameter (`is_theta_estim=false` with a single `theta` row) rather than estimate it. A fixed `theta` stays fixed with any `optim`: with `"BFGS"` the other hyperparameters (nugget, heterogeneous-noise `sigma2`) are still optimized per their own `is_*_estim` flags, while `optim="none"` optimizes nothing. An `is_*_estim=false` flag without the matching value is ignored (the parameter is estimated). |
@@ -176,14 +176,17 @@ kink at `z=0` can make the likelihood surface locally jagged for a
 gradient-based optimizer — the analytic gradient is still correct, this is
 an optimization-landscape issue, not a bug.
 
-`MLPKriging`'s predictive stdev is calibrated by a 5-fold cross-validation
+`MLPKriging`'s predictive stdev is calibrated by a 3-fold cross-validation
 after the fit (`var_scale()`, shown in `summary()`; the mean and
-`logLikelihood()` are unchanged): without it, the many network weights
+`logLikelihood()` are unchanged; ~2.2x the CPU time of the single-start fit
+alone): without it, the many network weights
 overfit the training points and the 95 % intervals can cover ~1 % of new
 points (#407). Pass `calibration_folds = "0"` in `parameters` to skip it
 (e.g. when only the mean matters and fit time is critical). In higher
 dimension the single-start default (`optim="BFGS"`) can still stop at a poor
-mean: prefer a multistart (`"BFGS10"`) and check Q² on held-out data.
+mean: prefer a multistart (`"BFGS10"`) and check Q² on held-out data. With a
+multistart `"BFGSn"`, set `calibration_folds = "5"` explicitly: 3 folds widen
+the intervals more than needed there (test NLPD +0.56 vs 5 folds, T8).
 
 ## 5. Where to look for exact syntax
 

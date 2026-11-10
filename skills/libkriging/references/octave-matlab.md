@@ -14,10 +14,10 @@ class/options to pick.
 % k = Kriging(y, X, kernel, regmodel, normalize, optim, objective, parameters, noise_model, noise, method)
 %   noise_model: "none" (default), "nugget" or "heterogeneous" (then noise = variance vector)
 %   method: "exact" (default) | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (see Large designs)
-k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL");
-k_nug = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "nugget");
+k = Kriging(y, X, "matern5_2", "constant", false, "BFGS4", "LL");
+k_nug = Kriging(y, X, "matern5_2", "constant", false, "BFGS4", "LL", [], "nugget");
 % Unfitted model, to configure before fit:
-% k0 = Kriging("matern5_2"); k0.fit(y, X, "constant", false, "BFGS", "LL");
+% k0 = Kriging("matern5_2"); k0.fit(y, X, "constant", false, "BFGS4", "LL");
 %   fit(y, X, regmodel, normalize, optim, objective, parameters, method)
 %   (heterogeneous noise: fit(y, noise, X, regmodel, normalize, optim, objective, parameters, method))
 
@@ -50,7 +50,7 @@ lmp = k.logMargPost();        % idem
 ```
 
 Optional starting/fixed hyperparameters go through `Params(...)`, e.g.
-`Kriging(y, X, "gauss", "constant", false, "BFGS", "LL", Params("is_sigma2_estim", true))`.
+`Kriging(y, X, "gauss", "constant", false, "BFGS4", "LL", Params("is_sigma2_estim", true))`.
 
 Do **not** call `NuggetKriging(...)`/`NoiseKriging(...)` for new models —
 libKriging's noise handling is unified into `Kriging`'s trailing `noise`
@@ -94,11 +94,11 @@ idx = Kriging.subsetOfData(X, int32(2000), "kmeans", int32(123));
 k = Kriging(y(idx), X(idx, :), "matern5_2");
 
 % Or keep every point and approximate the likelihood (objective "LL"; vecchia also with
-% noise_model "nugget" / "heterogeneous", e.g. Kriging(y, X, k, "constant", false, "BFGS", "LL", [],
+% noise_model "nugget" / "heterogeneous", e.g. Kriging(y, X, k, "constant", false, "BFGS4", "LL", [],
 % "nugget", [], "vecchia(30)"), then simulate(nsim, seed, X, with_nugget, will_update, "vecchia")):
 % method is the 11th constructor argument ([] for unused parameters / noise)
-k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "vecchia(30)");   % d <~ 5
-k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "nystrom(50)");   % higher d
+k = Kriging(y, X, "matern5_2", "constant", false, "BFGS4", "LL", [], "none", [], "vecchia(30)");   % d <~ 5
+k = Kriging(y, X, "matern5_2", "constant", false, "BFGS4", "LL", [], "none", [], "nystrom(50)");   % higher d
 mth = k.method()   % "nystrom(50)"; k.objective() is "LL"
 r = k.nystrom_rank()   % 50 (0 if the model was not fitted with method "nystrom")
 m = k.vecchia_neighbors()   % 30 for a "vecchia(30)" fit (0 otherwise)
@@ -106,15 +106,15 @@ m = k.vecchia_neighbors()   % 30 for a "vecchia(30)" fit (0 otherwise)
 An approximate fit keeps no exact factorization, and the method is explicit at every step
 (`"exact"` by default, never inferred from the fit):
 ```matlab
-kn = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "nystrom(50)");
+kn = Kriging(y, X, "matern5_2", "constant", false, "BFGS4", "LL", [], "none", [], "nystrom(50)");
 [m, s] = kn.predict(Xnew, true, false, false, "nystrom");   % "exact" would raise
 sims = kn.simulate(int32(10), int32(123), Xnew, false, "nystrom");
 ll = kn.logLikelihood("nystrom");                            % the fitted objective
 % noisy data: Nystrom (not Vecchia) supports both noise models
-knn = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "nugget", [], "nystrom(50)");
-knh = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "heterogeneous", noise_var, "nystrom(50)");
+knn = Kriging(y, X, "matern5_2", "constant", false, "BFGS4", "LL", [], "nugget", [], "nystrom(50)");
+knh = Kriging(y, X, "matern5_2", "constant", false, "BFGS4", "LL", [], "heterogeneous", noise_var, "nystrom(50)");
 kv = Kriging("matern5_2");
-kv.fit(y, X, "constant", false, "BFGS", "LL", [], "vecchia(30)");
+kv.fit(y, X, "constant", false, "BFGS4", "LL", [], "vecchia(30)");
 [m, s] = kv.predict(Xnew, true, false, false, "vecchia");    % or kv.method()
 kv.update(y_u, X_u, true);                                   % Vecchia refit, still approximate
 % the exact model at the Vecchia estimate: a separate exact fit, theta fixed
