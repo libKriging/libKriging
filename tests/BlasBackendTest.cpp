@@ -5,6 +5,7 @@
 
 #include <catch2/catch.hpp>
 #include "libKriging/Kriging.hpp"
+#include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
 #include "libKriging/Random.hpp"
 #include <algorithm>
@@ -504,6 +505,53 @@ TEST_CASE("Fitted theta for 200 <= n < 800 matches the shared reference", "[back
     // (The first gauss bound, 1e-5, came from a single macos-15 sample, 5.4e-8.)
     CHECK(dtheta <= 1e-3);
   }
+}
+
+// Accelerate's dpotri intermittently returned a wrong inverse on 5-core macOS
+// runners (gauss n = 750 at theta_fixed: LL gradient 2.7e10 against 3.4e3, LL
+// unchanged; T9 log, #452). Calls dpotri directly, repeatedly, and reports the
+// results that disagree with two triangular solves (diagnostic, no check);
+// checks that LinearAlgebra::inv_sympd, which verifies its potri result, gives
+// the solves' inverse every time.
+TEST_CASE("inv_sympd is right even when the backend's potri is not", "[backend]") {
+  const arma::uword n = 750;
+  arma::mat X;
+  arma::vec y;
+  weyl_data(n, X, y);
+  const arma::vec theta = {0.3, 0.5, 0.7};
+  arma::mat R(n, n);
+  for (arma::uword i = 0; i < n; ++i)
+    for (arma::uword j = 0; j < n; ++j)
+      R.at(i, j) = std::exp(-0.5 * arma::accu(arma::square((X.row(i) - X.row(j)).t() / theta)));
+  R.diag() += 1e-9;  // the gauss jitter of the fits (LinearAlgebra::kernel_chol_jitter)
+  const arma::mat L = arma::chol(R, "lower");
+  const arma::mat ref = arma::solve(arma::trimatu(L.t()), arma::solve(arma::trimatl(L), arma::eye(n, n)));
+  const double scale = arma::abs(ref).max();
+  const int reps = 20;
+  int faults = 0;
+  double worst_potri = 0.0, worst_lib = 0.0;
+  for (int r = 0; r < reps; ++r) {
+    arma::mat P = L;
+    char uplo = 'L';
+    arma::blas_int nn = static_cast<arma::blas_int>(n), info = 0;
+    arma::lapack::potri(&uplo, &nn, P.memptr(), &nn, &info);
+    const double gap = (info == 0) ? arma::abs(arma::symmatl(P) - ref).max() / scale : arma::datum::inf;
+    worst_potri = std::max(worst_potri, gap);
+    if (!(gap <= 1e-8))
+      ++faults;
+    const double gap_lib = arma::abs(LinearAlgebra::inv_sympd(L) - ref).max() / scale;
+    worst_lib = std::max(worst_lib, gap_lib);
+    CHECK(gap_lib <= 1e-8);
+  }
+  std::printf(
+      "[backend] %s potri, n = %u: %d / %d results off the triangular solves (worst relative gap %.3g); "
+      "inv_sympd worst %.3g\n",
+      backend().c_str(),
+      static_cast<unsigned>(n),
+      faults,
+      reps,
+      worst_potri,
+      worst_lib);
 }
 
 namespace {

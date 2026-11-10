@@ -748,9 +748,24 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::inv_sympd(const arma::mat& L) {
   arma::blas_int info = 0;
   if (n > 0)
     arma::lapack::potri(&uplo, &n, Rinv.memptr(), &n, &info);
+  if (info == 0 && n > 0) {
+    Rinv = arma::symmatl(Rinv);
+    // O(n^2) check of the potri result against two triangular solves with the
+    // same L, on a fixed vector. A correct potri agrees to 3e-13 (measured up
+    // to n = 1500, cond(R) = 4e15); Accelerate's potri intermittently returned
+    // a wrong inverse on 5-core macOS runners (gauss n = 750: LL gradient 2.7e10
+    // against 3.4e3, LL unchanged; docs/dev/rationalization/T9-blas-backends-ci.md,
+    // #452). Then the solves are used instead.
+    arma::vec v(L.n_rows);
+    for (arma::uword i = 0; i < v.n_elem; ++i)
+      v.at(i) = std::fmod(0.5 + static_cast<double>(i + 1) * 0.6180339887498949, 1.0) - 0.5;
+    const arma::vec w = arma::solve(arma::trimatu(L.t()), arma::solve(arma::trimatl(L), v));
+    if (!(arma::norm(Rinv * v - w, "inf") <= 1e-8 * arma::norm(w, "inf")))
+      info = -1;
+  }
   if (info != 0)
     return arma::solve(arma::trimatu(L.t()), arma::solve(arma::trimatl(L), arma::eye(L.n_rows, L.n_rows)));
-  return arma::symmatl(Rinv);
+  return Rinv;
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_upper(const arma::mat& A) {

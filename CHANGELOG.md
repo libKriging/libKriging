@@ -34,7 +34,10 @@ past release, see the corresponding entry on the
   reference values for 200 <= n < 800). Fixes found by running MKL: the fork prepare handler
   initializes the lazy statics of the call path (a `fork()` during another thread's first call
   deadlocked the child with MKL), the fork child sets MKL to 1 thread, and a fit on data in the
-  span of the trend now gives sigma2 = nugget = 0 exactly (MKL left ~1e-32). Known limitation:
+  span of the trend now gives sigma2 = nugget = 0 exactly (MKL left ~1e-32), and
+  `LinearAlgebra::inv_sympd` checks its LAPACK `potri` result in O(n^2) against triangular
+  solves and falls back to them (a wrong `R^-1` gave a LL gradient off by 7e6 relative on a
+  macOS Accelerate runner, #452). Known limitation:
   with MKL, `fork()` while other threads run MKL needs `MKL_DISABLE_FAST_MM=1`
   ([docs/dev/parallel.md](docs/dev/parallel.md), section 7).
 - **Single L-BFGS-B restart policy** (T2, [docs/dev/rationalization/T2-restart-policy.md](docs/dev/rationalization/T2-restart-policy.md)):
