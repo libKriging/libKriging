@@ -759,8 +759,14 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::inv_sympd(const arma::mat& L) {
     arma::vec v(L.n_rows);
     for (arma::uword i = 0; i < v.n_elem; ++i)
       v.at(i) = std::fmod(0.5 + static_cast<double>(i + 1) * 0.6180339887498949, 1.0) - 0.5;
-    const arma::vec w = arma::solve(arma::trimatu(L.t()), arma::solve(arma::trimatl(L), v));
-    if (!(arma::norm(Rinv * v - w, "inf") <= 1e-8 * arma::norm(w, "inf")))
+    // two LAPACK *trtrs on the vector (O(n^2), no copy of L, no condition
+    // estimate as arma::solve does: those cost 35 to 100 % of potri itself)
+    arma::vec w = v;
+    char lo = 'L', no = 'N', tr = 'T', nonunit = 'N';
+    arma::blas_int one = 1, info_w = 0, info_wt = 0;
+    arma::lapack::trtrs(&lo, &no, &nonunit, &n, &one, const_cast<double*>(L.memptr()), &n, w.memptr(), &n, &info_w);
+    arma::lapack::trtrs(&lo, &tr, &nonunit, &n, &one, const_cast<double*>(L.memptr()), &n, w.memptr(), &n, &info_wt);
+    if (info_w != 0 || info_wt != 0 || !(arma::norm(Rinv * v - w, "inf") <= 1e-8 * arma::norm(w, "inf")))
       info = -1;
   }
   if (info != 0)
