@@ -3571,6 +3571,19 @@ void Kriging::fit_impl(const arma::vec& y,
     } else
       m_est_sigma2 = true;
 
+    // Degenerate data: the estimated variances are 0, as documented above. The
+    // SSE / n computed below is 0 only up to the rounding of the BLAS (constant
+    // y, gauss, n = 10, no noise: 2.4e-32 with OpenBLAS and MKL; nugget: 2.4e-32
+    // with MKL; method "vecchia": 2.0e-22), so it is not used.
+    auto zero_degenerate_variances = [&]() {
+      if (!degenerate)
+        return;
+      if (m_est_sigma2)
+        m_sigma2 = 0.0;
+      if (m_noise_model == NoiseModel::Nugget && m_est_nugget)
+        m_nugget = 0.0;
+    };
+
     if (m_nystrom_k > 0) {
       // LLNystrom objective with optim="none": commit a genuine Nystrom-light
       // fit at the given (fixed) theta -- beta/sigma2/U/D via the same
@@ -3631,6 +3644,7 @@ void Kriging::fit_impl(const arma::vec& y,
         m_sigma2 = sse / n;
       else
         m_sigma2 = sigma2;
+      zero_degenerate_variances();
       m_nystrom_U = std::move(U_v);
       m_nystrom_D = std::move(D_v);
       m_nystrom_light = true;
@@ -3685,6 +3699,7 @@ void Kriging::fit_impl(const arma::vec& y,
       } else {
         m_sigma2 = sigma2;
       }
+      zero_degenerate_variances();
       m_vecchia_light = true;
       m_is_empty = true;  // no committed factorization: predict routes to predictVecchia
       return;
@@ -3740,6 +3755,7 @@ void Kriging::fit_impl(const arma::vec& y,
     } else {
       m_sigma2 = sigma2;
     }
+    zero_degenerate_variances();
 
   } else {
     auto theta_bounds_pair = Optim::theta_bounds(m_maxdX, m_dX, m_y, n);

@@ -233,6 +233,27 @@ TEST_CASE("KrigingFitTest - y in the span of the trend, noise models", "[fit][kr
   CHECK(arma::abs(mean - 1.0).max() < 1e-8);
   CHECK(stdev.is_finite());
 
+  // the estimated variances are exactly 0, not the rounding residual SSE / n
+  // of the BLAS (no noise: 2.4e-32 with OpenBLAS and MKL; nugget: 2.4e-32 with
+  // MKL), with every method (the Vecchia / Nystrom commits have their own SSE)
+  // and kernel (the residual depends on the conditioning of R)
+  for (const std::string kernel : {"gauss", "matern5_2", "exp"}) {
+    for (const std::string method : {"exact", "vecchia(5)", "nystrom(5)"}) {
+      for (const bool normalize : {false, true}) {
+        Kriging k0(kernel);
+        k0.fit(y, X, Trend::RegressionModel::Constant, normalize, "BFGS", "LL", {}, method);
+        CAPTURE(kernel, method, normalize, k0.sigma2());
+        CHECK(k0.sigma2() == 0.0);
+
+        Kriging kn(kernel, Kriging::NoiseModel::Nugget);
+        kn.fit(y, X, Trend::RegressionModel::Constant, normalize, "BFGS", "LL", {}, method);
+        CAPTURE(kn.sigma2(), kn.nugget());
+        CHECK(kn.sigma2() == 0.0);
+        CHECK(kn.nugget() == 0.0);
+      }
+    }
+  }
+
   // known heterogeneous noise: sigma2 = 0 is not representable -> explicit error
   Kriging khet("gauss", Kriging::NoiseModel::Heterogeneous);
   CHECK_THROWS_AS(
