@@ -16,21 +16,21 @@ file gives the exact call syntax.
 Kriging model(y, X, "matern5_2",
               Trend::RegressionModel::Constant,  // regmodel
               /*normalize=*/false,
-              "BFGS",                              // optim
+              "BFGS4",                             // optim (default: 4 parallel starts; "BFGS" = single start, the default up to 1.2)
               "LL",                                // objective
               /*parameters=*/{},
               "exact");                            // method (default)
 
 // Or default-construct, then fit (equivalent):
 Kriging model2("matern5_2");
-model2.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {});
+model2.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS4", "LL", {});
 
 // Heterogeneous known noise: separate fit() overload taking `noise` before X.
 arma::vec noise_var = ...; // one variance per observation
-model.fit(y, noise_var, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {});
+model.fit(y, noise_var, X, Trend::RegressionModel::Constant, false, "BFGS4", "LL", {});
 // For an unknown, homogeneous nugget instead, construct/fit with:
 Kriging nugget_model("matern5_2", Kriging::NoiseModel::Nugget);
-nugget_model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {});
+nugget_model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS4", "LL", {});
 ```
 
 `Trend::RegressionModel` is an enum: `None, Constant, Linear, Interactive,

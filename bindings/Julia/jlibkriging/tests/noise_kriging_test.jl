@@ -27,7 +27,7 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
     @testset "Construction with data (vector noise)" begin
         nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
         @test kernel(nk) == "matern5_2"
-        @test optim(nk) == "BFGS"
+        @test optim(nk) == "BFGS4"  # default optimizer of Kriging (T3)
         @test objective(nk) == "LL"
         @test regmodel(nk) == "constant"
         @test noise_model(nk) == "heterogeneous"

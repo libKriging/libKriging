@@ -12,7 +12,7 @@ x=seq(0,1,,51)
 contour(x,x,matrix(f(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 points(X)
 
-r <- Kriging(y, X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
+r <- Kriging(y, X,"gauss", optim = "BFGS", parameters = list(theta=matrix(runif(40),ncol=2)))  # 20 starts (one per theta row)
 
 # ll = function(X) {
 #   logLikelihoodFun(r,X,return_grad=F)$logLikelihood
@@ -135,7 +135,9 @@ t=seq(0.01,2,,51)
 contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
 points(as.list(r)$theta[1],as.list(r)$theta[2])
 
-r2 <- Kriging(c(y,y2), rbind(X,X2),"gauss", parameters = list(theta=matrix(as.list(r)$theta,ncol=2)))
+# a single start from r's theta, as the warm restart of update() (the default
+# optim "BFGS4" adds 3 random starts); r and r2 print the same optim
+r2 <- Kriging(c(y,y2), rbind(X,X2),"gauss", optim = "BFGS", parameters = list(theta=matrix(as.list(r)$theta,ncol=2)))
 ll2 = function(Theta){apply(Theta,1,function(theta) logLikelihoodFun(r2,theta)$logLikelihood)}
 contour(t,t,matrix(ll2(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=T,col='red')
 points(as.list(r2)$theta[1],as.list(r2)$theta[2],col='red')
