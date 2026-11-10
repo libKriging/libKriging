@@ -161,6 +161,13 @@ past release, see the corresponding entry on the
   thread count (24 OpenBLAS configurations), and Accelerate chooses its own thread partition per
   call. The check is now relative, at 1e-5 (another rank k moves it by >= 2 %). No library change.
   See [docs/dev/rationalization/T10-nystrom-determinism.md](docs/dev/rationalization/T10-nystrom-determinism.md).
+- **`sigma2` / `nugget` exactly 0 when y lies in the span of the trend** (#450, found in #449): the fit
+  without optimization committed on such data (e.g. constant y with a constant trend) is documented
+  to estimate sigma2 = 0 (and nugget = 0), but stored SSE / n, the rounding residual of the BLAS:
+  constant y, gauss, n = 10, `normalize = false`: 2.4e-32 without noise (OpenBLAS and MKL), 2.4e-32 /
+  2.4e-35 with a nugget (MKL), 2.0e-22 with `method = "vecchia(5)"`, 2.5e-32 / 2.5e-35 with
+  `method = "nystrom(5)"` and a nugget (OpenBLAS). The estimated variances are now set to 0 on this
+  path (exact, Vecchia and Nystrom methods). Heterogeneous noise is unchanged (still rejected).
 - **Octave**: `Optim.set_log_level`, `set_max_iteration`, `set_thread_start_delay_ms` and
   `set_thread_pool_size` failed with "is not an unsigned 64bits int" when given a plain
   number (`Optim.set_log_level(2)`); they now convert it to `int32`. Their tests
