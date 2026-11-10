@@ -274,7 +274,10 @@ margin; the i9 runner is no longer in CI (D1).
 
 ## 3. CI workflow `.github/workflows/blas-backends.yml`
 
-Triggers: `pull_request` touching `src/**`, `tests/**` or the workflow; `workflow_dispatch`.
+Triggers (aligned with `main.yml`, #453): `push` on `master` and `pull_request`, both when
+`src/**`, `tests/**` or the workflow change; `workflow_dispatch`. Concurrency block of `main.yml`
+(a new push cancels the pull request's run in progress, never a `master` run). apt through
+`tools/linux-macos/apt-install.sh` (retries, mirror switch).
 Release, C++ only, `OPENBLAS_CORETYPE=Haswell` as the other Linux jobs (#429).
 
 - **Linux, OpenBLAS build, oneMKL preloaded** (ubuntu-24.04, `libopenblas-pthread-dev`):
