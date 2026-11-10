@@ -51,6 +51,16 @@ past release, see the corresponding entry on the
   may end at a slightly different point (4 of 1728 measured Kriging fits, |ΔLL| <= 1.1e-5, 12 %
   fewer restarts; 216 WarpKriging fits unchanged). `AdamBFGS::inner_restart` now decides the restart itself
   (it receives the run's result, end and start points; `AdamBFGS::max_restart` is removed).
+- **MLPKriging variance calibration** (T8): `calibration_folds` defaults to 3 instead of 5. For
+  the default single-start fit, the calibrated fit takes x2.2 the CPU time of the uncalibrated
+  fit instead of x4.0 on 1 core (wall x1.8 instead of x2.4 on 4 cores), with the same 95 %
+  coverage (0.965 vs 0.957 on 135 fits) and test NLPD (+0.08, 95 % CI [-0.30, 0.45]). With a
+  multistart `"BFGSn"`, 3 folds widen the intervals more (test NLPD +0.56, CI [+0.20, +0.97], 45
+  `BFGS4` fits): set `calibration_folds = "5"` explicitly there. The factor is also no longer
+  clamped to >= 1 (`var_scale()` = mean squared standardised held-out residual, the
+  maximum-likelihood scale; the clamp was never active on the 260 K = 5 fits measured).
+  Models saved before keep their number of folds. See
+  `docs/dev/rationalization/T8-mlp-calibration-cost.md`.
 - **Faster theta gradients** (T1, `docs/dev/rationalization/T1-vectorized-gradients.md`): the
   LL and LMP theta gradients use per-dimension kernel factors in one pair loop (no
   `std::function` / `arma::vec` per pair), and the LMP gradient is reduced algebraically to one
