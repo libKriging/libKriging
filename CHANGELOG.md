@@ -12,6 +12,17 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Single L-BFGS-B restart policy** (T2, [docs/dev/rationalization/T2-restart-policy.md](docs/dev/rationalization/T2-restart-policy.md)):
+  the restart criteria (abnormal stop, <= 2 iterations, at the lower bound, long-range optimum,
+  worse than the best run beyond factr x epsmch) and the contracted restart point, copied in
+  `Kriging::fit`, the WarpKriging joint BFGS and `AdamBFGS`, are now one private component
+  (`src/lib/RestartPolicy.hpp`). The **"worse" criterion no longer cascades**: a restart started
+  only because the previous run was worse does not trigger another one by being worse again
+  (before: up to `max_restart` = 10 restarts, each from a point closer to the lower bound). Kriging
+  and WarpKriging (joint BFGS) fits that went through such a cascade end with fewer restarts and
+  may end at a slightly different point (4 of 1728 measured Kriging fits, |ΔLL| <= 1.1e-5, 12 %
+  fewer restarts; 216 WarpKriging fits unchanged). `AdamBFGS::inner_restart` now decides the restart itself
+  (it receives the run's result, end and start points; `AdamBFGS::max_restart` is removed).
 - **Faster theta gradients** (T1, `docs/dev/rationalization/T1-vectorized-gradients.md`): the
   LL and LMP theta gradients use per-dimension kernel factors in one pair loop (no
   `std::function` / `arma::vec` per pair), and the LMP gradient is reduced algebraically to one
