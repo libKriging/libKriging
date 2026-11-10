@@ -19,12 +19,12 @@ name: Binding API
 on:
   push:
     branches:
-      - '*'
+      - '**'
     tags-ignore:
       - 'v*'
   pull_request:
     branches:
-      - '*'
+      - '**'
 
 env:
   # see main.yml: needed by the pinned pybind11 submodule with cmake >= 4
