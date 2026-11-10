@@ -1,0 +1,18 @@
+$ ./potri_repro 250 1000
+n=250 theta=(0.3,0.5,0.7) calls=1000 stress=0 single=0: 0 faults (info!=0: 0), worst gap 1.57e-15, worst fault 0, 0.3 ms/call
+$ ./potri_repro 500 1000
+n=500 theta=(0.3,0.5,0.7) calls=1000 stress=0 single=0: 0 faults (info!=0: 0), worst gap 5.79e-15, worst fault 0, 1.3 ms/call
+$ ./potri_repro 750 1000
+n=750 theta=(0.3,0.5,0.7) calls=1000 stress=0 single=0: 0 faults (info!=0: 0), worst gap 1.11e-14, worst fault 0, 3.3 ms/call
+$ ./potri_repro 1000 1000
+n=1000 theta=(0.3,0.5,0.7) calls=1000 stress=0 single=0: 0 faults (info!=0: 0), worst gap 2.76e-14, worst fault 0, 7.8 ms/call
+$ ./potri_repro 750 1000 0.4048 0.6122 0.5592
+n=750 theta=(0.4048,0.6122,0.5592) calls=1000 stress=0 single=0: 0 faults (info!=0: 0), worst gap 1.98e-14, worst fault 0, 3.3 ms/call
+$ VECLIB_MAXIMUM_THREADS=1 ./potri_repro 750 1000
+n=750 theta=(0.3,0.5,0.7) calls=1000 stress=0 single=0: 0 faults (info!=0: 0), worst gap 1.11e-14, worst fault 0, 3.7 ms/call
+$ ./potri_repro 750 1000 --single
+n=750 theta=(0.3,0.5,0.7) calls=1000 stress=0 single=1: 0 faults (info!=0: 0), worst gap 1.11e-14, worst fault 0, 3.3 ms/call
+$ ./potri_repro 750 1000 --stress 5
+n=750 theta=(0.3,0.5,0.7) calls=1000 stress=5 single=0: 0 faults (info!=0: 0), worst gap 1.11e-14, worst fault 0, 12.2 ms/call
+$ ./potri_repro 750 1000 --stress 10
+n=750 theta=(0.3,0.5,0.7) calls=1000 stress=10 single=0: 0 faults (info!=0: 0), worst gap 1.11e-14, worst fault 0, 31.9 ms/call

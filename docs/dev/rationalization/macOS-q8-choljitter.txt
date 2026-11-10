@@ -1,0 +1,282 @@
+## default
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+## VECLIB_MAXIMUM_THREADS=1
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 2 seed 1: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] gauss n 200 d 4 seed 8: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+[jitter] matern5_2 n 200 d 4 seed 1: theta gap 0, LL gap 0
+All tests passed (33 assertions in 4 test cases)

@@ -72,3 +72,19 @@ Debug full suite: same four failures as Release.
 
 ## Full suite, Debug (`ctest -j4 --timeout 120`, T9 branch): 233/237
 Same four failures as Release: #115, #125 (timeout), #145, #230. No Debug-only failure.
+
+## Q8 — possibly wrong `dpotri` from Accelerate (found on #449): not reproduced on the M4; the guard is too slow, a cheaper one is proposed
+Branch `origin/ccr-54a50343-4jupn9-t9-blas-backends-ci` at 6b84215e (guard of #449 in `inv_sympd`), Apple M4 (10 cores), macOS 15.7.4, Accelerate.
+
+| Check | Result |
+|---|---|
+| `BlasBackendTest "[backend]"` x 20 runs, default threading (each run prints `accelerate potri, n = 750: k / 20`) | k = 0 in all 20 runs: 0 / 400 faulty `dpotri`, worst relative gap 1.56e-14 (`macOS-q8-potri-backendtest.txt`) |
+| same with `VECLIB_MAXIMUM_THREADS=1` | k = 0 in all 20 runs: 0 / 400 |
+| Standalone reproducer (`macOS-q8-potri_repro.cpp`, no libKriging: gauss correlation matrix of the test, +1e-9, `dpotrf` then 1000 x `dpotri` on a fresh copy, against `dpotrs` of the identity) n = 250, 500, 750, 1000 (theta 0.3 0.5 0.7); n = 750 with theta 0.4048 0.6122 0.5592 (the one quoted in the issue; the test itself uses 0.3 0.5 0.7); `VECLIB_MAXIMUM_THREADS=1`; `BLASSetThreading(single)`; 5 and 10 background threads running `dgemm` | **0 faults in 9000 calls**, worst gap 2.8e-14 (n = 1000), `info` always 0 (`macOS-q8-potri-repro.txt`) |
+
+Conclusion: **not reproduced** (inconclusive, not refuted): the failures were seen on 5-core GitHub runners (job 129621767306), none of the conditions tried here (threads, contention, size, theta) triggers it on a 10-core M4. No Apple report possible without a reproducer.
+
+**Guard cost: not negligible.** `inv_sympd` with the guard against `potri` + `symmatl` alone (`macOS-q8-guard-cost.txt`): n = 500: +62 %, n = 1000: +100 % (6.9 ms), n = 1500: +81 %, n = 2000: +59 %, n = 3000: +35 % (58 ms). Roughly 12-14 % of an LL + gradient evaluation at n = 800-1500. The cost is in the two `arma::solve(trimat...)` on the vector (condition estimate and copy of L, plus `L.t()`), not in the O(n^2) arithmetic (`macOS-q8-guard-parts.txt`, ms at n = 500 / 1000 / 2000 / 3000: `solve` x 2 1.51 / 6.44 / 28.7 / 64.1; `cblas_dtrsv` x 2 0.05 / 0.21 / 0.98 / 3.13; `Rinv * v` 0.01 / 0.02 / 0.71 / 1.02).
+**Proposal** (`macOS-q8-guard-trtrs.patch`, 21 lines, not applied: the library belongs to #449): the two solves with `arma::lapack::trtrs` ('N' then 'T', on L itself), same inequality. Cost: +8 % (n = 500), +9 % (1000), +10 % (1500), +5 % (2000), +7 % (3000) of `potri` (`macOS-q8-guard-cost-trtrs.txt`); the same vector as before (agreement of the two ways to 3e-14 at n = 1000, 1.7e-12 at n = 3000). Detection (`macOS-q8-guard-detect.txt`, n = 750): a top-left half block left unprocessed (the interposer of the issue) gives a gap of 0.91 (threshold 1e-8): detected; a correct inverse 2e-14; a single entry off by 1e-6 relative gives 7.6e-9: not detected, as before (one vector only checks the aggregate). With the patch: `BlasBackendTest` 5 cases pass, full suite on the T9 branch (without `fork()` / `cmake_package`, which fail there for other reasons: #455) 239 / 240, the failure being the MLP calibration test (#407).
+
+**`CholJitterTest` tolerance (1e-3 on Apple only, #449):** the three fits (budget 10 %, 100 %, 200 %) are **bit-identical on the M4**, 20 runs with default threading and 20 with `VECLIB_MAXIMUM_THREADS=1`, 3 cases: theta gap and LL gap exactly 0 (`macOS-q8-choljitter.txt`). Nothing to say about 1e-4 vs 1e-3 from this machine. Also: a `dpotri` fault of the kind of the issue (gradient of order 1e10) would send the optimizer elsewhere, not give the 1.7e-4 theta gap that justified 1e-3, so the two are probably unrelated.
