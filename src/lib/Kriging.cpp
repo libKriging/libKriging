@@ -298,6 +298,14 @@ libKriging::detail::BlasThreadState atfork_saved;
 // safe either.
 bool omp_runtime_forks_itself = false;
 
+#if defined(LK_ACCELERATE_THREADING_API)
+// Accelerate's int BLASSetThreading(BLAS_THREADING) (macOS 15+, enum of
+// underlying type int), looked up at registration rather than referenced: a
+// build linked to another BLAS (ALLOW_OPENBLAS_MACOS) still links. Null when
+// no Accelerate is loaded in the process.
+int (*accelerate_set_threading)(int) = nullptr;
+#endif
+
 // The library's mutexes are locked in prepare and unlocked in both processes:
 // a fork() made while another thread holds one would leave it locked forever
 // in the child, where that thread does not exist.
@@ -329,8 +337,10 @@ void libkriging_atfork_child() {
   // Accelerate (macOS 15+) multithreads large BLAS / LAPACK calls with libdispatch, which does not
   // survive fork() without exec: a forked R worker (mclapply) segfaults on its first large
   // factorization. VECLIB_MAXIMUM_THREADS is read once, already in the parent: use the API.
-  if (__builtin_available(macOS 15.0, *))
-    BLASSetThreading(BLAS_THREADING_SINGLE_THREADED);
+  if (accelerate_set_threading) {
+    if (__builtin_available(macOS 15.0, *))
+      accelerate_set_threading(static_cast<int>(BLAS_THREADING_SINGLE_THREADED));
+  }
 #endif
   libKriging::detail::rcond_mutex().unlock();
   libKriging::detail::blas_count_fork_child();
@@ -353,6 +363,9 @@ struct ForkSafeRegistrar {
   ForkSafeRegistrar() {
 #ifdef _OPENMP
     omp_runtime_forks_itself = dlsym(RTLD_DEFAULT, "__kmpc_fork_call") != nullptr;
+#endif
+#if defined(LK_ACCELERATE_THREADING_API)
+    accelerate_set_threading = reinterpret_cast<int (*)(int)>(dlsym(RTLD_DEFAULT, "BLASSetThreading"));
 #endif
     pthread_atfork(libkriging_atfork_prepare,  // prepare: quiesce before fork
                    libkriging_atfork_parent,   // parent:  restore thread counts
