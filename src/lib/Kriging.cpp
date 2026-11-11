@@ -276,10 +276,21 @@ void restore_blas_threads(const BlasThreadState& s) {
 // single-threaded after e.g. mclapply. The child handler re-asserts
 // single-threading in case the runtime inherited stale state.
 #if !defined(_WIN32) && defined(_POSIX_VERSION)
+#include <dlfcn.h>
 #include <pthread.h>
+#include <stdlib.h>
 namespace {
 
 libKriging::detail::BlasThreadState atfork_saved;
+
+// libomp (LLVM / Intel OpenMP, the macOS runtime) registers its own
+// pthread_atfork handlers: they keep its internal locks across fork() and reset
+// the runtime in the child, which runs after ours. Any omp_* call made from our
+// handlers then spins on a lock that is already held (fork() hangs in the
+// parent, the child's omp_set_num_threads never returns). libgomp has no such
+// handlers. Detected once, at registration: calling dlsym in a handler is not
+// safe either.
+bool omp_runtime_forks_itself = false;
 
 // The library's mutexes are locked in prepare and unlocked in both processes:
 // a fork() made while another thread holds one would leave it locked forever
@@ -288,12 +299,21 @@ void libkriging_atfork_prepare() {
   // locked first: no concurrent scope changes the count between the two lines
   libKriging::detail::blas_count_fork_prepare();
   libKriging::detail::rcond_mutex().lock();
+  if (omp_runtime_forks_itself) {
+    atfork_saved = libKriging::detail::BlasThreadState();
+    atfork_saved.blas = libKriging::detail::get_openblas_threads();
+    libKriging::detail::set_openblas_threads(1);
+    return;
+  }
   atfork_saved = libKriging::detail::get_blas_threads();
   libKriging::detail::set_blas_threads(1);
 }
 
 void libkriging_atfork_parent() {
-  libKriging::detail::restore_blas_threads(atfork_saved);
+  if (omp_runtime_forks_itself)
+    libKriging::detail::set_openblas_threads(atfork_saved.blas);  // the OpenMP count was not touched
+  else
+    libKriging::detail::restore_blas_threads(atfork_saved);
   libKriging::detail::rcond_mutex().unlock();
   libKriging::detail::blas_count_fork_parent();
 }
@@ -301,7 +321,14 @@ void libkriging_atfork_parent() {
 void libkriging_atfork_child() {
   libKriging::detail::rcond_mutex().unlock();
   libKriging::detail::blas_count_fork_child();
-  libKriging::detail::set_blas_threads(1);
+  if (omp_runtime_forks_itself) {
+    libKriging::detail::set_openblas_threads(1);
+    // libomp re-initializes in the child after this handler and reads the
+    // environment again: one thread there, without calling into it
+    setenv("OMP_NUM_THREADS", "1", 1);
+  } else {
+    libKriging::detail::set_blas_threads(1);
+  }
   // MKL's global count too (threads without a thread-local count, i.e. the
   // child's later threads and the forking thread unless it set its own): with
   // the GNU threading layer an MKL call at more than 1 thread starts an OpenMP
@@ -311,6 +338,9 @@ void libkriging_atfork_child() {
 
 struct ForkSafeRegistrar {
   ForkSafeRegistrar() {
+#ifdef _OPENMP
+    omp_runtime_forks_itself = dlsym(RTLD_DEFAULT, "__kmpc_fork_call") != nullptr;
+#endif
     pthread_atfork(libkriging_atfork_prepare,  // prepare: quiesce before fork
                    libkriging_atfork_parent,   // parent:  restore thread counts
                    libkriging_atfork_child);   // child:   ensure clean state
