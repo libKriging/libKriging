@@ -1,0 +1,16 @@
+# ThreadSanitizer suppressions for the Clang + LLVM libomp + Archer build
+# (tools/linux-macos/test.sh, #420). Archer (libarcher, loaded through
+# OMP_TOOL_LIBRARIES) reports the OpenMP synchronization to TSan, so races in
+# code run inside an OpenMP region are checked; only the uninstrumented
+# runtimes are silenced.
+#
+# libomp's own mutexes (pthread_mutex_init in a worker vs pthread_mutex_lock on
+# the main thread): libomp is not built with TSan. called_from_lib ignores the
+# interceptors called from libomp itself only, not the outlined loop bodies it
+# runs (verified: a race planted in an `omp parallel for` is still reported).
+called_from_lib:libomp.so
+#
+# OpenBLAS pthreads workers (uninstrumented): reports whose stack passes
+# through OpenBLAS, e.g. its threads' memset in dscal_k vs Armadillo reading the
+# result on the calling thread after the BLAS call returned.
+race:libopenblas

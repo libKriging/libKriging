@@ -415,8 +415,8 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 
 ## 10. Open items
 
-- TSan does not see the OpenMP loops (compiled out, `LK_OMP_LOOPS`); the R
-  fork-safety test does not check the children's budget (#420).
+- TSan sees the OpenMP loops only in the Clang + Archer job (`LK_TSAN_OPENMP`);
+  the GCC / libgomp TSan job compiles them out (`LK_OMP_LOOPS`) (#420).
 - Optional CI job running `bench-threads.sh` on a small grid, no threshold
   (runners are too noisy for pass / fail on timings) (#421).
 - Other BLAS (FlexiBLAS, BLIS; Accelerate): sections 5 and 8 (#422). MKL driven

@@ -20,8 +20,10 @@
 #endif
 
 // ThreadSanitizer reports false-positive races on OpenMP stack captures when
-// libgomp is not TSan-instrumented; disable the NK pair-loop parallelism there.
-#if defined(__SANITIZE_THREAD__)
+// libgomp is not TSan-instrumented; disable the NK pair-loop parallelism there,
+// unless the OpenMP runtime is TSan-aware (LK_TSAN_OPENMP, OmpLoops.hpp).
+#if defined(LK_TSAN_OPENMP)
+#elif defined(__SANITIZE_THREAD__)
 #define LK_NESTED_NO_OMP 1
 #elif defined(__has_feature)
 #if __has_feature(thread_sanitizer)

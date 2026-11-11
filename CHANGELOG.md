@@ -12,6 +12,13 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Thread Sanitizer on the OpenMP loops** (#420, leftover of #439): with Clang + LLVM libomp,
+  CMake finds Archer (`libarcher`) under `SANITIZE=THREAD` and defines `LK_TSAN_OPENMP`: the
+  OpenMP loops (`OmpLoops.hpp`, NestedKriging's pair loop) stay compiled in and run on 2 threads
+  under TSan (`tools/linux-macos/test.sh` loads Archer, `.tsan-suppressions-archer`); new CI job
+  "Thread Sanitizer (Clang + Archer)". The GCC / libgomp TSan job still compiles them out. The
+  R fork test also checks that `mcparallel` children run on a thread budget of 1, before and
+  after a fit in them, and that the parent's budget is unchanged.
 - **MKL thread control** (#445, T5): with Intel MKL / oneMKL, each multistart worker sets its own
   MKL thread count to its share of the budget (`MKL_Set_Num_Threads_Local`), and each public
   method the calling thread's count to the budget, restored after (before: every worker kept

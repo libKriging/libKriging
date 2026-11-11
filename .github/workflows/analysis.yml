@@ -122,6 +122,18 @@ jobs:
             # ctest alone takes most of the 30 min default: 29m12s passed and
             # one run cancelled at 30 min after all tests passed (#445)
             timeout_minutes: 60
+          # OpenMP loops checked by TSan: Clang + LLVM libomp + Archer (libarcher,
+          # in libomp-dev); the GCC job above compiles them out (#420)
+          - name: "Thread Sanitizer (Clang + Archer)"
+            os: ubuntu-22.04
+            mode: Debug
+            enable_python: off
+            enable_octave: off
+            enable_memcheck: off
+            force_update: on
+            sanitizer: thread
+            compiler: clang
+            timeout_minutes: 90
 
     steps:
       - uses: actions/checkout@v4
@@ -143,6 +155,7 @@ jobs:
           echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
           echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
           echo "SANITIZE=${{matrix.sanitizer}}"                  >> $GITHUB_ENV
+          echo "COMPILER=${{matrix.compiler}}"                   >> $GITHUB_ENV
 
       - name: Define local variables Unix Like
         shell: bash
@@ -189,6 +202,9 @@ jobs:
           fi
           if [ "${ENABLE_MEMCHECK}" == "on" ]; then
             tools/linux-macos/apt-install.sh valgrind python3-setuptools
+          fi
+          if [ "${COMPILER}" == "clang" ]; then
+            tools/linux-macos/apt-install.sh clang libomp-dev
           fi
         if: runner.os == 'Linux' # or use $RUNNER_OS
 

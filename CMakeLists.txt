@@ -314,6 +314,23 @@ add_definitions(-DCARMA_DO_NOT_EXPORT_ALIEN_MEM_FUNCTIONS)
 #------------------------------------------------------
 
 string(TOUPPER "${SANITIZE}" SANITIZE)
+
+# ThreadSanitizer with LLVM libomp: its Archer tool (libarcher, next to libomp)
+# reports the OpenMP synchronization to TSan, so the OpenMP loops stay in and
+# are checked (LK_TSAN_OPENMP, src/lib/OmpLoops.hpp; #420). tools/linux-macos/test.sh
+# loads it with OMP_TOOL_LIBRARIES. Otherwise (GCC / libgomp) they are compiled
+# out under TSan.
+if (SANITIZE STREQUAL "THREAD" AND OpenMP_CXX_FOUND AND OpenMP_omp_LIBRARY)
+    get_filename_component(LIBKRIGING_OMP_LIBDIR "${OpenMP_omp_LIBRARY}" REALPATH)
+    get_filename_component(LIBKRIGING_OMP_LIBDIR "${LIBKRIGING_OMP_LIBDIR}" DIRECTORY)
+    find_library(LIBKRIGING_ARCHER_LIBRARY NAMES archer HINTS "${LIBKRIGING_OMP_LIBDIR}" NO_DEFAULT_PATH)
+    if (LIBKRIGING_ARCHER_LIBRARY)
+        add_compile_definitions(LK_TSAN_OPENMP)
+        message(STATUS "ThreadSanitizer + Archer (${LIBKRIGING_ARCHER_LIBRARY}): OpenMP loops checked")
+    else ()
+        message(STATUS "ThreadSanitizer without Archer: OpenMP loops compiled out")
+    endif ()
+endif ()
 if (NOT SANITIZE STREQUAL "OFF" AND NOT SANITIZE STREQUAL "")
     # instrumented build: wall-clock assertions of the tests are not meaningful
     add_compile_definitions(LK_INSTRUMENTED_BUILD)
