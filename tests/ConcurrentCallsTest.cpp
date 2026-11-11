@@ -18,6 +18,7 @@
 #if !defined(_WIN32) && defined(_POSIX_VERSION)
 #include <sys/wait.h>
 #include <unistd.h>
+#include "test_fork_exit.hpp"
 #define LK_TEST_FORK 1
 #endif
 
@@ -443,7 +444,7 @@ TEST_CASE("fork() during concurrent fits", "[threads][concurrent][fork]") {
         verdict = !k.theta().is_finite() ? 3 : (blas_count() > 1 ? 4 : 0);
       }
       (void)!write(fds[1], &verdict, 1);
-      _exit(verdict);
+      lk_test_fork_child_exit(verdict);
     }
     REQUIRE(pid > 0);
     close(fds[1]);

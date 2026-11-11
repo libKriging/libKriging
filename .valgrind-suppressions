@@ -45,6 +45,91 @@
    ...
    fun:_dl_find_object_update
 }
+# OpenMP runtime (libgomp) and libKriging one-time allocations, kept until
+# exit by design. Identified on the Memcheck job of #440 (909a0d30, about 1 to
+# 7 records per test) and reproduced with GCC 13 / glibc 2.39. libgomp is
+# matched by object: it has no symbols on the runners. Only "reachable" (and,
+# for the thread TLS, "possible") kinds: a "definite" leak stays reported.
+{
+   libgomp-constructor-ICVs
+   # initialize_env (library constructor): the ICV / OMP_* environment
+   # state, referenced by libgomp's globals for the life of the process.
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*
+   obj:*/libgomp.so*
+   ...
+   fun:_dl_init
+}
+{
+   libgomp-thread-pool-and-team
+   # The thread pool, team and work-share blocks of the first parallel
+   # regions: libgomp keeps its idle threads and their pool for reuse and
+   # never frees them at exit (allocation made inside libgomp, the frame
+   # after the allocator is in libgomp, below a GOMP_parallel* entry).
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*
+   obj:*/libgomp.so*
+   ...
+   fun:GOMP_parallel*
+}
+{
+   libgomp-per-thread-ICV
+   # The calling thread's own ICV block, created by its first
+   # omp_set_num_threads (gomp_new_icv): kept for the main thread until exit
+   # (freed at the exit of any other thread).
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*
+   obj:*/libgomp.so*
+   ...
+   fun:omp_set_*
+}
+{
+   libgomp-worker-thread-dtv
+   # glibc's DTV (TLS vector) of the libgomp pool threads, still alive at
+   # exit: the thread descriptor points past the block header, hence
+   # "possibly lost". Restricted to threads created by libgomp; a
+   # std::thread left running at exit stays reported.
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   ...
+   fun:_dl_allocate_tls
+   ...
+   fun:pthread_create*
+   obj:*/libgomp.so*
+}
+{
+   libKriging-task-pool-thread-dtv
+   # glibc's DTV of the threads of run_task_pool (src/lib/TaskPool.cpp), all
+   # joined (ThreadJoiner) before the call returns: glibc keeps the stack and
+   # descriptor of a joined thread in its stack cache for reuse, whose DTV
+   # pointer is past the block header, hence "possibly lost" at exit (seen
+   # on 2 of 245 tests). Other threads stay reported.
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   ...
+   fun:_dl_allocate_tls
+   ...
+   fun:pthread_create*
+   ...
+   fun:*run_task_pool*
+}
+{
+   libKriging-blas_state-singleton
+   # src/lib/ThreadBudget.cpp blas_state(): `static BlasCountState* s = new
+   # BlasCountState`, never destroyed (leaky singleton): the pthread_atfork
+   # handlers and the scopes of threads still running at exit cannot use a
+   # destroyed mutex (104 bytes, one per process).
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:_Znw*
+   fun:*blas_state*
+}
+
 # Octave suppressions
 # Generated using (prefer Matlab which has less leaks)
 # * --gen-suppressions=all in main CMakeLists.txt to generate targets
