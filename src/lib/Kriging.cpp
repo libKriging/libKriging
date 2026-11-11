@@ -4143,6 +4143,9 @@ void Kriging::fit_impl(const arma::vec& y,
       double best_model_objective = min_ofn;
       int best_model_idx = -1;
       std::mutex best_model_mutex;
+      // Verbose output of the starts, which run concurrently: Armadillo's
+      // operator<< changes the stream's format flags (found by TSan + Archer, #420)
+      std::mutex log_mutex;
 
       // Worker function for each thread
       auto optimize_worker = [&](arma::uword start_idx) -> OptimizationResult {
@@ -4205,6 +4208,7 @@ void Kriging::fit_impl(const arma::vec& y,
           arma::ivec bounds_type{gd, arma::fill::value(2)};
 
           if (Optim::log_level > Optim::log_none) {
+            std::lock_guard<std::mutex> log_lock(log_mutex);
             arma::cout << "BFGS (start " << (start_idx + 1) << "/" << multistart << "):" << arma::endl;
             arma::cout << "  objective: " << m_objective << arma::endl;
             arma::cout << "  max iterations: " << optimizer.max_iter << arma::endl;
@@ -4235,6 +4239,7 @@ void Kriging::fit_impl(const arma::vec& y,
                 bounds_type.memptr());
 
             if (Optim::log_level > Optim::log_info) {
+              std::lock_guard<std::mutex> log_lock(log_mutex);
               arma::cout << "  Start " << (start_idx + 1) << ", Retry " << restarts.retry()
                          << ": f_opt=" << opt_result.f_opt << ", num_iters=" << opt_result.num_iters
                          << ", task=" << opt_result.task << arma::endl;
@@ -4266,6 +4271,7 @@ void Kriging::fit_impl(const arma::vec& y,
               break;
 
             if (Optim::log_level > Optim::log_none) {
+              std::lock_guard<std::mutex> log_lock(log_mutex);
               arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << restarts.retry()
                          << ", reasons " << restarts.last_reasons() << "): f_opt=" << opt_result.f_opt
                          << ", sol_to_lb=" << sol_to_lb << arma::endl;
@@ -4326,6 +4332,7 @@ void Kriging::fit_impl(const arma::vec& y,
           result.success = false;
           result.error_message = e.what();
           if (Optim::log_level > Optim::log_none) {
+            std::lock_guard<std::mutex> log_lock(log_mutex);
             arma::cout << "Warning: start point " << (start_idx + 1) << " failed: " << e.what() << arma::endl;
           }
         }

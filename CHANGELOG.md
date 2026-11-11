@@ -19,6 +19,10 @@ past release, see the corresponding entry on the
   "Thread Sanitizer (Clang + Archer)". The GCC / libgomp TSan job still compiles them out. The
   R fork test also checks that `mcparallel` children run on a thread budget of 1, before and
   after a fit in them, and that the parent's budget is unchanged.
+- **Verbose output of the Kriging multistart** (#420): the log lines of the concurrent starts
+  (`Optim::set_log_level` > 0) are written under a mutex; Armadillo's `operator<<` changes the
+  stream's format flags, a data race between pool workers found by the Clang + Archer TSan job
+  (the GCC TSan job runs on 1 thread, i.e. a pool of 1 worker, and does not see it).
 - **MKL thread control** (#445, T5): with Intel MKL / oneMKL, each multistart worker sets its own
   MKL thread count to its share of the budget (`MKL_Set_Num_Threads_Local`), and each public
   method the calling thread's count to the budget, restored after (before: every worker kept
