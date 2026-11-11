@@ -201,7 +201,17 @@ TEST_CASE("fork() quiesces the child only and restores the parent's thread count
   const pid_t pid = fork();
   if (pid == 0) {
     const Threads c = get_threads();
-    bool ok = c.blas <= 1 && c.omp <= 1;
+    // The thread budget (multistart pool, OpenMP loops) is 1 in the child
+    // whatever the OpenMP runtime, also without OpenMP, before and after a fit
+    // made in the child (#420).
+    bool ok = c.blas <= 1 && c.omp <= 1 && Optim::get_num_threads() == 1;
+    {
+      arma::vec y;
+      arma::mat X;
+      data(y, X);
+      Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS4");
+      ok = ok && k.theta().is_finite() && get_threads().blas <= 1 && Optim::get_num_threads() == 1;
+    }
 #ifdef LK_TEST_MKL
     // MKL's global count is set to 1 in the child too (needed without OpenMP,
     // where nothing else lowers it: T9 log)

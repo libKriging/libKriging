@@ -321,6 +321,9 @@ void libkriging_atfork_parent() {
 void libkriging_atfork_child() {
   libKriging::detail::rcond_mutex().unlock();
   libKriging::detail::blas_count_fork_child();
+  // budget of 1 in the child whatever the OpenMP runtime (none, libgomp,
+  // libomp): a plain store, no call into the runtime (#420)
+  libKriging::detail::set_forked_child();
   if (omp_runtime_forks_itself) {
     libKriging::detail::set_openblas_threads(1);
     // libomp re-initializes in the child after this handler and reads the

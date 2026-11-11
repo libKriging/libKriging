@@ -264,13 +264,17 @@ the function-local statics every public call reads (cores, initial OpenBLAS /
 MKL counts): a `fork()` during another thread's first call (MKL's first
 `MKL_Get_Max_Threads` initializes MKL for milliseconds) left their guard taken
 in the child, which blocked at its first call (T9). The child also sets MKL's
-global count to 1. **MKL limitation**: a `fork()` while other threads run MKL
+global count to 1, and caps the thread budget at 1 (a plain store, no call
+into the OpenMP runtime: #455), so the multistart pool and the OpenMP loops of
+a child run on 1 thread whatever the OpenMP runtime, also in builds without
+OpenMP, where nothing else bounded them (#420); `Optim::set_num_threads_percent`
+called in the child lifts the cap. **MKL limitation**: a `fork()` while other threads run MKL
 calls can leave MKL's fast memory manager locked in the child (deadlock in
 `mkl_serv_allocate` / at thread exit); set `MKL_DISABLE_FAST_MM=1` in that case
 (not needed when forking from a thread with no concurrent MKL work, e.g. R's
 `mclapply`). The R Linux binary bundles OpenBLAS pthreads for that reason (the OpenMP
 build deadlocks in forked workers). With `mclapply`, give each worker one thread
-(`Optim::set_num_threads_percent` small, or `OPENBLAS_NUM_THREADS=1`).
+(the default since #420; `OPENBLAS_NUM_THREADS=1` for other OpenBLAS users).
 
 ## 8. Decisions
 

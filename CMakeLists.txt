@@ -318,18 +318,52 @@ string(TOUPPER "${SANITIZE}" SANITIZE)
 # ThreadSanitizer with LLVM libomp: its Archer tool (libarcher, next to libomp)
 # reports the OpenMP synchronization to TSan, so the OpenMP loops stay in and
 # are checked (LK_TSAN_OPENMP, src/lib/OmpLoops.hpp; #420). tools/linux-macos/test.sh
-# loads it with OMP_TOOL_LIBRARIES. Otherwise (GCC / libgomp) they are compiled
-# out under TSan.
+# loads it with OMP_TOOL_LIBRARIES when LIBKRIGING_TSAN_OPENMP is ON. Archer must
+# be checked at run time: up to LLVM 16 it does not detect TSan and stops
+# ("Archer detected OpenMP application without TSan stopping operation"), so the
+# fork / join of every parallel region is reported as a race. Otherwise (GCC /
+# libgomp, no working Archer) the loops are compiled out under TSan.
+option(LIBKRIGING_REQUIRE_ARCHER "SANITIZE=THREAD: fail if Archer cannot check the OpenMP loops" OFF)
+set(LIBKRIGING_TSAN_OPENMP OFF CACHE INTERNAL "TSan build with a working Archer (LK_TSAN_OPENMP)")
 if (SANITIZE STREQUAL "THREAD" AND OpenMP_CXX_FOUND AND OpenMP_omp_LIBRARY)
     get_filename_component(LIBKRIGING_OMP_LIBDIR "${OpenMP_omp_LIBRARY}" REALPATH)
     get_filename_component(LIBKRIGING_OMP_LIBDIR "${LIBKRIGING_OMP_LIBDIR}" DIRECTORY)
     find_library(LIBKRIGING_ARCHER_LIBRARY NAMES archer HINTS "${LIBKRIGING_OMP_LIBDIR}" NO_DEFAULT_PATH)
+    set(LIBKRIGING_ARCHER_STATUS "no libarcher next to ${OpenMP_omp_LIBRARY}")
     if (LIBKRIGING_ARCHER_LIBRARY)
+        set(_archer_dir "${CMAKE_BINARY_DIR}/archer_check")
+        file(WRITE "${_archer_dir}/archer_check.cpp"
+             "#include <cstdio>\nint main() {\n  int s = 0;\n#pragma omp parallel reduction(+ : s)\n  s += 1;\n  std::printf(\"%d\\n\", s);\n  return 0;\n}\n")
+        try_compile(_archer_built "${_archer_dir}/build" SOURCES "${_archer_dir}/archer_check.cpp"
+                    COMPILE_DEFINITIONS -fsanitize=thread ${OpenMP_CXX_FLAGS}
+                    LINK_LIBRARIES -fsanitize=thread ${OpenMP_CXX_LIBRARIES}
+                    OUTPUT_VARIABLE _archer_build_log
+                    COPY_FILE "${_archer_dir}/archer_check")
+        if (_archer_built)
+            execute_process(COMMAND ${CMAKE_COMMAND} -E env OMP_NUM_THREADS=2
+                                    "OMP_TOOL_LIBRARIES=${LIBKRIGING_ARCHER_LIBRARY}" ARCHER_OPTIONS=verbose=1
+                                    "${_archer_dir}/archer_check"
+                            OUTPUT_VARIABLE _archer_out ERROR_VARIABLE _archer_err RESULT_VARIABLE _archer_rc)
+            if ("${_archer_out}${_archer_err}" MATCHES "with TSan")
+                set(LIBKRIGING_TSAN_OPENMP ON CACHE INTERNAL "TSan build with a working Archer (LK_TSAN_OPENMP)")
+            else ()
+                string(STRIP "${_archer_out}${_archer_err}" _archer_msg)
+                set(LIBKRIGING_ARCHER_STATUS "${LIBKRIGING_ARCHER_LIBRARY} inactive: ${_archer_msg}")
+            endif ()
+        else ()
+            set(LIBKRIGING_ARCHER_STATUS "TSan + OpenMP check program did not build")
+        endif ()
+    endif ()
+    if (LIBKRIGING_TSAN_OPENMP)
         add_compile_definitions(LK_TSAN_OPENMP)
         message(STATUS "ThreadSanitizer + Archer (${LIBKRIGING_ARCHER_LIBRARY}): OpenMP loops checked")
+    elseif (LIBKRIGING_REQUIRE_ARCHER)
+        message(FATAL_ERROR "LIBKRIGING_REQUIRE_ARCHER: ${LIBKRIGING_ARCHER_STATUS}")
     else ()
-        message(STATUS "ThreadSanitizer without Archer: OpenMP loops compiled out")
+        message(STATUS "ThreadSanitizer without a working Archer (${LIBKRIGING_ARCHER_STATUS}): OpenMP loops compiled out")
     endif ()
+elseif (LIBKRIGING_REQUIRE_ARCHER)
+    message(FATAL_ERROR "LIBKRIGING_REQUIRE_ARCHER needs SANITIZE=THREAD and LLVM libomp")
 endif ()
 if (NOT SANITIZE STREQUAL "OFF" AND NOT SANITIZE STREQUAL "")
     # instrumented build: wall-clock assertions of the tests are not meaningful

@@ -123,6 +123,8 @@ class Optim {
   // OpenBLAS count (OPENBLAS_NUM_THREADS) in effect when the library is first
   // used. The multistart pool gets it first (one worker per start, up to the
   // budget), each worker's BLAS / OpenMP calls the rest (budget / workers).
+  // 1 thread in a forked child (fork(), R's parallel::mclapply) until
+  // set_num_threads_percent is called in it.
   static double num_threads_percent;
   LIBKRIGING_EXPORT static void set_num_threads_percent(double x);
   LIBKRIGING_EXPORT static double get_num_threads_percent();

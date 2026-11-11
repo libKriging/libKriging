@@ -42,11 +42,10 @@ test_that("fit / predict in forked children after a multistart fit in the parent
   }
 })
 
-# The child handlers set the OpenBLAS / OpenMP counts to 1 (with LLVM libomp,
-# which resets its own state in the child after them: OMP_NUM_THREADS=1, read
-# when it re-initializes), so the thread budget, which bounds every pool and
-# OpenMP loop of the library, is 1 in a child, before and after a fit there;
-# the parent's budget is unchanged (#420).
+# The child handler caps the thread budget, which bounds every pool and OpenMP
+# loop of the library, at 1 in a forked child, whatever the OpenMP runtime and
+# also without OpenMP (R on macOS, the "without OpenMP" builds): 1 before and
+# after a fit there; the parent's budget is unchanged (#420).
 test_that("forked children run on a budget of 1 thread; the parent's is unchanged (#420)", {
   skip_on_os("windows")  # no fork()
   skip_on_cran()
