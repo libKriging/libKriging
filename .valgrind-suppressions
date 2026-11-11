@@ -130,6 +130,44 @@
    fun:*blas_state*
 }
 
+# libstdc++'s emergency exception pool (eh_alloc.cc: one block of ~72 KB,
+# 72,704 bytes with GCC < 13, 73,728 with GCC 13, allocated by a static
+# initializer before main and kept for the life of the process) in an
+# executable linking libstdc++ statically, where valgrind cannot free it at
+# exit as it does for libstdc++.so. Seen in cmake_package, whose traced
+# process is the Kitware CMake binary of the Memcheck job (get-cmake, 3.24.4,
+# no symbols: malloc <- cmake <- cmake <- __libc_start_main, #461 run
+# 43092133407); the first entry is the same block with symbols. Without
+# symbols, frames of the executable directly under __libc_start_main are the
+# static initializers (glibc >= 2.34 calls main through
+# __libc_start_call_main): one frame under glibc's call_init when glibc runs them,
+# two when the binary carries its own __libc_csu_init (built on an older glibc).
+{
+   libstdcxx-emergency-eh-pool-static
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:_GLOBAL__sub_I_eh_alloc.cc
+}
+{
+   libstdcxx-emergency-eh-pool-static-in-cmake-binary-1
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   obj:*/bin/cmake
+   fun:call_init
+   fun:__libc_start_main*
+}
+{
+   libstdcxx-emergency-eh-pool-static-in-cmake-binary-2
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   obj:*/bin/cmake
+   obj:*/bin/cmake
+   fun:__libc_start_main*
+}
+
 # Octave suppressions
 # Generated using (prefer Matlab which has less leaks)
 # * --gen-suppressions=all in main CMakeLists.txt to generate targets
