@@ -50,19 +50,19 @@ if (length(getenv("GITHUB_ACTION"))>0)
 else
     h = figure(1);       
     h.Visible = 'off'; % no display
-end
 
-hold on;
-plot(x,f(x));
-scatter(X,f(X));
-for i=1:10
-   plot(x,s(:,i),'b');
-end
-hold off;
-try
-    saveas(h, 'mplot2.png'); % plot to file
-catch
-    fprintf("Cannot export plot\n")
+    hold on;
+    plot(x,f(x));
+    scatter(X,f(X));
+    for i=1:10
+       plot(x,s(:,i),'b');
+    end
+    hold off;
+    try
+        saveas(h, 'mplot2.png'); % plot to file
+    catch
+        fprintf("Cannot export plot\n")
+    end
 end
 
 Xn = [0.3;0.4];

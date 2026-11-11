@@ -274,7 +274,10 @@ margin; the i9 runner is no longer in CI (D1).
 
 ## 3. CI workflow `.github/workflows/blas-backends.yml`
 
-Triggers: `pull_request` touching `src/**`, `tests/**` or the workflow; `workflow_dispatch`.
+Triggers (aligned with `main.yml`, #453): `push` on `master` and `pull_request`, both when
+`src/**`, `tests/**` or the workflow change; `workflow_dispatch`. Concurrency block of `main.yml`
+(a new push cancels the pull request's run in progress, never a `master` run). apt through
+`tools/linux-macos/apt-install.sh` (retries, mirror switch).
 Release, C++ only, `OPENBLAS_CORETYPE=Haswell` as the other Linux jobs (#429).
 
 - **Linux, OpenBLAS build, oneMKL preloaded** (ubuntu-24.04, `libopenblas-pthread-dev`):
@@ -471,6 +474,49 @@ case). The macOS job of `blas-backends.yml` runs it in a separate, reported, non
 end with Q2 < 0 depending on the data / platform; either the calibration test uses a design
 where the single start is known to converge on every platform, or the single-start case only
 checks what calibration can do (NLPD gain, `var_scale > 1`).
+
+### Wrong `R^-1` from Accelerate's `dpotri` (5-core runners), and run-to-run variation — #452
+
+`main.yml`, commit b1fc75a7, `Fitted theta for 200 <= n < 800 matches the shared reference`,
+gauss n = 750 at `theta_fixed`, relative gaps to the reference:
+
+| job (macOS-latest, Accelerate) | budget | theta | LL | LL at fixed theta | gradient at fixed theta |
+|---|---|---|---|---|---|
+| Octave macOS, a34482fd | 5 | 5.1e-5 | 1.5e-9 | 5.77e-10 | 2.9e-8 |
+| Julia macOS, b1fc75a7 | 5 | 1.9e-4 | 2.2e-8 | 5.77e-10 | **7.2e6** |
+| Octave macOS / macOS Debug, b1fc75a7 | 3 | 4.7e-8 | 6.2e-10 | 5.77e-10 | 2.6e-8 |
+
+Julia job gradient: (2.72e10, 1.92e10, 2.41e9), reference (3353, 1469, -3808). The LL at
+fixed theta is the same to every digit in all runs, so R, its Cholesky factor L and the
+triangular solves are reproducible; the gradient's only other ingredient is `R^-1`
+(`LinearAlgebra::inv_sympd`: LAPACK `dpotri` on L). Rounding cannot explain it: R + 1e-9 I has
+cond 3e11 there, and on Linux the trace terms move by 1e-5 relative when R is perturbed by 1e-13
+on its diagonal. A partial inverse does: the top-left half block left equal to its input gives
+(3.8e9, 1.8e9, 2.4e9). An `LD_PRELOAD` `dpotri_` that does this reproduces the failure on Linux
+(gradient gap 781 and 102 against 1e-10, fitted theta off), so a wrong `dpotri` result is
+sufficient. That Accelerate's `dpotri` is the actual cause is not shown (no macOS machine here).
+Supporting evidence: only on the 5-core runners, intermittently (the same runner type passed on
+a34482fd), and matern5_2 n = 750 also changes from run to run there (fitted theta 1.0e-7, then
+1.0e-4), which the fits' gradients would explain.
+
+Fix (library, `LinearAlgebra::inv_sympd`): after `dpotri`, `R^-1 v` is compared with two
+triangular solves with the same L on a fixed vector (O(n^2), against O(n^3) for the inverse); on
+a gap > 1e-8 relative the inverse is recomputed with the solves. A correct `dpotri` agrees to
+3e-13 or better (Linux, n up to 1500, cond(R) up to 4e15), so OpenBLAS / MKL results are
+unchanged bit for bit. With the faulty `dpotri_` preloaded: 20 / 20 faults detected, the
+gradient back to 3.1e-8 of the reference. New `[backend]` case `inv_sympd is right even when
+the backend's potri is not`: calls `dpotri` 20 times at that matrix and prints how many results
+disagree with the solves (diagnostic for #452, no check), and checks `inv_sympd` every time. The
+fixed-theta tolerances are unchanged.
+
+`CholJitterTest` (`fixed Cholesky jitter: the fit does not depend on the thread budget`, macOS
+Debug, 3-core runner): gauss n 200 d 2 seed 1, theta gap 1.7e-4 between budgets 10 % / 100 % /
+200 %, LL equal to 5 digits. On macOS the budget changes nothing on that path (single start, no
+OpenMP in the macOS builds, the library sets no Accelerate thread count; the #436 rule only sets
+OpenBLAS), so the three fits are the same computation: the gap is run-to-run variation (or the
+`dpotri` fault above, the gradient being the BFGS direction). Theta tolerance 1e-3 under
+`__APPLE__` (still below the 0.3 % / 31 % basin changes the test is about), LL check unchanged;
+1e-4 elsewhere.
 
 ## 6. Timings (local, informative; `[.timing]`, median of 3, matern5_2, budget 4)
 

@@ -19,12 +19,15 @@
 #include "BlasThreads.hpp"
 #include "OmpLoops.hpp"
 #include "ParallelFor.hpp"
+#include "SeparableDln.hpp"
 #include "ThreadBudget.hpp"
 
+#include <array>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -943,6 +946,20 @@ void KrigingImpl::print_bench(const std::map<std::string, double>& bench) {
     arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
 }
 
+namespace {
+// Threads of the gradient pair loops: the budget from n = kOmpMinRows on, 1
+// below. A performance setting only: the sums do not depend on it
+// (SeparableDln.hpp, sum_pairs_dln).
+int pair_loop_threads(arma::uword n) {
+#ifdef LK_OMP_LOOPS
+  if (n >= libKriging::detail::kOmpMinRows)
+    return libKriging::detail::omp_threads();
+#endif
+  (void)n;
+  return 1;
+}
+}  // namespace
+
 void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
                                              const arma::mat& Rinv,
                                              const arma::mat& x,
@@ -959,46 +976,25 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
   // its complexity class.
   arma::mat dX_local;
   const arma::mat& dX = m_dX.is_empty() ? (dX_local = LinearAlgebra::compute_dX(m_X)) : m_dX;
-  // Adds the contributions of the pairs (i, j < i) of row i to t1 / t2.
-  auto add_row = [&](arma::uword i, double* t1, double* t2) {
-    const double x_i = x.at(i);
-    for (arma::uword j = 0; j < i; j++) {
-      arma::vec dlnCov = _DlnCovDtheta(dX.col(i * n + j), theta);
-      double R_ij = R.at(i, j);
-      double x_j = x.at(j);
-      double Rinv_ij = Rinv.at(i, j);
-      for (arma::uword k = 0; k < d; k++) {
-        double gradR_k_ij = R_ij * dlnCov.at(k);
-        t1[k] += 2.0 * x_i * gradR_k_ij * x_j;
-        t2[k] -= 2.0 * Rinv_ij * gradR_k_ij;
-      }
-    }
-  };
-#ifdef LK_OMP_LOOPS
-  if (n >= libKriging::detail::kOmpMinRows) {
-    // Per-row partial sums, then summed over rows in a fixed order: the result
-    // does not depend on the number of threads. It differs from the sequential
-    // order kept below kOmpMinRows (and without OpenMP or under TSan): on an
-    // ill-conditioned R the trace term cancels heavily, so the gradient, hence
-    // the optimum reached, may change noticeably between the two orders.
-    arma::mat term1_rows(d, n, arma::fill::zeros);
-    arma::mat term2_rows(d, n, arma::fill::zeros);
-    libKriging::detail::parallel_for(
-        0, static_cast<long>(n), 8, libKriging::detail::omp_threads(), true, [&](long lo, long hi) {
-          for (arma::uword i = static_cast<arma::uword>(lo); i < static_cast<arma::uword>(hi); i++)
-            add_row(i, term1_rows.colptr(i), term2_rows.colptr(i));
-        });
-    for (arma::uword i = 0; i < n; i++) {
-      for (arma::uword k = 0; k < d; k++) {
-        term1_vec.at(k) += term1_rows.at(k, i);
-        term2_vec.at(k) += term2_rows.at(k, i);
-      }
-    }
-    return;
-  }
-#endif
-  for (arma::uword i = 0; i < n; i++)
-    add_row(i, term1_vec.memptr(), term2_vec.memptr());
+  // dR/dtheta_k = R % D_k (zero diagonal), so over the pairs j < i:
+  //   term1_k = x' dR/dtheta_k x  = sum 2 x_i x_j R_ij D_k(i, j)
+  //   term2_k = -tr(R^-1 dR/dtheta_k) = sum -2 Rinv_ij R_ij D_k(i, j)
+  arma::vec out(2 * d);
+  libKriging::detail::with_dln(m_covType, theta, [&](const auto& dln) {
+    libKriging::detail::sum_pairs_dln<2>(
+        dX,
+        n,
+        theta,
+        dln,
+        pair_loop_threads(n),
+        [&](arma::uword i, arma::uword j) {
+          const double R_ij = R.at(j, i);  // symmetric: column i, contiguous in j
+          return std::array<double, 2>{2.0 * x.at(i) * x.at(j) * R_ij, -2.0 * Rinv.at(j, i) * R_ij};
+        },
+        out.memptr());
+  });
+  term1_vec += out.head(d);
+  term2_vec += out.tail(d);
 }
 
 arma::vec KrigingImpl::compute_lmp_theta_ans(const KModel& m,
@@ -1009,30 +1005,47 @@ arma::vec KrigingImpl::compute_lmp_theta_ans(const KModel& m,
                                              std::map<std::string, double>* bench) const {
   const arma::uword n = m_X.n_rows;
   const arma::uword d = theta.n_elem;
-  arma::vec ans(d, arma::fill::none);
-  arma::mat Wb_k;
   // See compute_ll_grad_theta_vecs's comment: lazily rebuild m_dX locally if
   // it was skipped at fit time (Nystrom/light Vecchia) but this exact
   // (LMP-gradient) path is reached anyway.
   arma::mat dX_local;
   const arma::mat& dX = m_dX.is_empty() ? (dX_local = LinearAlgebra::compute_dX(m_X)) : m_dX;
-  for (arma::uword k = 0; k < d; k++) {
-    auto t0 = Bench::tic();
-    arma::mat gradR_k(n, n, arma::fill::zeros);
-    for (arma::uword i = 0; i < n; i++) {
-      for (arma::uword j = 0; j < i; j++) {
-        arma::vec dlnCov = _DlnCovDtheta(dX.col(i * n + j), theta);
-        double gradR_k_ij = m.R.at(i, j) * dlnCov.at(k);
-        gradR_k.at(i, j) = gradR_k_ij;
-        gradR_k.at(j, i) = gradR_k_ij;
-      }
-    }
-    t0 = Bench::toc(bench, "gradR_k [optimized]", t0);
-    Wb_k = LinearAlgebra::solve_upper(m.L.t(), LinearAlgebra::solve_lower(m.L, gradR_k)).t()
-           - gradR_k * Rinv_X_Xt_Rinv_X_inv_Xt_Rinv;
-    t0 = Bench::toc(bench, "Wb_k = gradR_k \\ L \\ Tt - gradR_k * RiFFtRiFiFtRi", t0);
-    ans[k] = -sum(Wb_k.diag()) / 2.0 + as_scalar(trans(m_y) * trans(Wb_k) * Q_output) / (2.0 * sigma2);
-    t0 = Bench::toc(bench, "ans[k] = Sum(diag(Wb_k)) + yt * Wb_kt * Qo / S2...", t0);
+  auto t0 = Bench::tic();
+  // With G_k = dR/dtheta_k = R % D_k (symmetric, zero diagonal), P =
+  // Rinv_X_Xt_Rinv_X_inv_Xt_Rinv and M = R^-1 - P, the former
+  // Wb_k = (L^-T L^-1 G_k)' - G_k P is G_k M, so
+  //   ans_k = -tr(G_k M) / 2 + (M y)' G_k Q / (2 sigma2)
+  //         = sum_{j < i} G_k(i, j) [-(M_ij + M_ji) / 2 + (u_i q_j + u_j q_i) / (2 sigma2)]
+  // with u = M y, q = Q: one R^-1 (O(n^3)) then O(d n^2), instead of d
+  // triangular solves with n right-hand sides (O(d n^3)).
+  const arma::mat& P = Rinv_X_Xt_Rinv_X_inv_Xt_Rinv;
+  arma::vec u;
+  arma::mat S;  // M + M' = 2 R^-1 - P - P'
+  {
+    arma::mat Rinv_local;
+    const bool has_Rinv = (m.Rinv.memptr() != nullptr) && (arma::size(m.Rinv) == arma::size(m.L));
+    const arma::mat& Rinv = has_Rinv ? m.Rinv : (Rinv_local = LinearAlgebra::inv_sympd(m.L));
+    t0 = Bench::toc(bench, "R^-1 = L^-T * L^-1", t0);
+    u = Rinv * m_y - P * m_y;
+    S = 2.0 * Rinv - P - P.t();
   }
+  const double* q = Q_output.memptr();
+  const double c = 1.0 / (2.0 * sigma2);
+  t0 = Bench::toc(bench, "u = M y, S = M + M'", t0);
+  arma::vec ans(d);
+  libKriging::detail::with_dln(m_covType, theta, [&](const auto& dln) {
+    libKriging::detail::sum_pairs_dln<1>(
+        dX,
+        n,
+        theta,
+        dln,
+        pair_loop_threads(n),
+        [&](arma::uword i, arma::uword j) {
+          // R and S symmetric: column i, contiguous in j
+          return std::array<double, 1>{m.R.at(j, i) * (-0.5 * S.at(j, i) + c * (u.at(i) * q[j] + u.at(j) * q[i]))};
+        },
+        ans.memptr());
+  });
+  t0 = Bench::toc(bench, "ans[k] = Sum(G_k % W) [vectorized]", t0);
   return ans;
 }

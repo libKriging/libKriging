@@ -74,11 +74,11 @@ classKriging <- function(nk) {
 #'     objective function (\code{logLikelihoodFun()}, ...) stay in the
 #'     original scale of \code{X} and \code{y}.
 #' @param optim Character giving the Optimization method used to fit
-#'     hyper-parameters. Possible values are: \code{"BFGS"} and
+#'     hyper-parameters. Possible values are: \code{"BFGSk"} (default
+#'     \code{"BFGS4"}: L-BFGS-B from k starting points run in
+#'     parallel, the best kept; \code{"BFGS"} is a single start) and
 #'     \code{"none"}, the later simply keeping the values given in
-#'     \code{parameters}. The method \code{"BFGS"} uses the gradient
-#'     of the objective (note that \code{"BFGS10"} means 10
-#'     multi-start of BFGS).
+#'     \code{parameters}. The default was \code{"BFGS"} up to 1.2.
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
@@ -147,7 +147,7 @@ classKriging <- function(nk) {
 Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                     regmodel = c("constant", "linear", "interactive", "quadratic", "none"),
                     normalize = FALSE,
-                    optim = c("BFGS", "none"),
+                    optim = c("BFGS4", "BFGS", "none"),
                     objective = c("LL", "LOO", "LMP"),
                     parameters = NULL,
                     noise = NULL,
@@ -305,10 +305,11 @@ summary.Kriging <- function(object, ...) {
 #'     objective function (\code{logLikelihoodFun()}, ...) stay in the
 #'     original scale of \code{X} and \code{y}.
 #' @param optim Character giving the Optimization method used to fit
-#'     hyper-parameters. Possible values are: \code{"BFGS"} and
+#'     hyper-parameters. Possible values are: \code{"BFGSk"} (default
+#'     \code{"BFGS4"}: L-BFGS-B from k starting points run in
+#'     parallel, the best kept; \code{"BFGS"} is a single start) and
 #'     \code{"none"}, the later simply keeping the values given in
-#'     \code{parameters}. The method \code{"BFGS"} uses the gradient
-#'     of the objective (note that \code{"BFGS10"} means 10 multi-start of BFGS).
+#'     \code{parameters}. The default was \code{"BFGS"} up to 1.2.
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
@@ -349,7 +350,7 @@ summary.Kriging <- function(object, ...) {
 fit.Kriging <- function(object, y, X,
                     regmodel = c("constant", "linear", "interactive", "quadratic", "none"),
                     normalize = FALSE,
-                    optim = c("BFGS", "none"),
+                    optim = c("BFGS4", "BFGS", "none"),
                     objective = c("LL", "LOO", "LMP"),
                     parameters = NULL,
                     noise = NULL,
