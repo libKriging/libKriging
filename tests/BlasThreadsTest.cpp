@@ -37,6 +37,14 @@ int openblas_get_num_threads() __attribute__((weak));
 #define LK_TEST_OPENBLAS 1
 #endif
 
+#if defined(__ELF__)
+// Intel MKL / oneMKL, C entry points (absent without MKL)
+extern "C" {
+int MKL_Get_Max_Threads() __attribute__((weak));
+}
+#define LK_TEST_MKL 1
+#endif
+
 namespace {
 
 struct Threads {
@@ -187,10 +195,20 @@ TEST_CASE("fork() quiesces the child only and restores the parent's thread count
     WARN("no readable BLAS / OpenMP thread count in this build");
     return;
   }
+#ifdef LK_TEST_MKL
+  const int mkl_before = MKL_Get_Max_Threads ? MKL_Get_Max_Threads() : 0;
+#endif
   const pid_t pid = fork();
   if (pid == 0) {
     const Threads c = get_threads();
-    _exit((c.blas <= 1 && c.omp <= 1) ? 0 : 1);
+    bool ok = c.blas <= 1 && c.omp <= 1;
+#ifdef LK_TEST_MKL
+    // MKL's global count is set to 1 in the child too (needed without OpenMP,
+    // where nothing else lowers it: T9 log)
+    if (MKL_Get_Max_Threads)
+      ok = ok && MKL_Get_Max_Threads() <= 1;
+#endif
+    _exit(ok ? 0 : 1);
   }
   REQUIRE(pid > 0);
   int status = 0;
@@ -200,6 +218,10 @@ TEST_CASE("fork() quiesces the child only and restores the parent's thread count
   const Threads after = get_threads();
   CHECK(after.blas == guard.set.blas);
   CHECK(after.omp == guard.set.omp);
+#ifdef LK_TEST_MKL
+  if (MKL_Get_Max_Threads)
+    CHECK(MKL_Get_Max_Threads() == mkl_before);
+#endif
 }
 #endif
 
@@ -225,13 +247,32 @@ TEST_CASE("Objective, gradient and update do not depend on the OpenMP thread cou
     k.update(y.tail(300), X.tail_rows(300), false);
     return std::make_tuple(ll, arma::vec(grad), k.logLikelihood());
   };
+  // The budget follows the OpenMP limit, and so does the BLAS count the library
+  // sets (blas_threads_for / mkl_threads_for). OpenBLAS's results did not
+  // change with its count here; MKL's do (n = 900, relative: ll 1.5e-11,
+  // gradient 1.1e-9, updated ll 3.7e-10; T9 log):
+  // with an MKL loaded with more than 1 thread only the rounding is compared,
+  // bit-identity is required by BlasThreadsTest/BLAS_NUM_THREADS=1 (MKL and
+  // OpenBLAS loaded with 1 thread: the BLAS count cannot change).
+#ifdef LK_TEST_MKL
+  const bool blas_count_changes = MKL_Get_Max_Threads && MKL_Get_Max_Threads() > 1;
+#else
+  const bool blas_count_changes = false;
+#endif
   const auto [ll1, grad1, llu1] = run(1);
   const auto [ll4, grad4, llu4] = run(4);
   omp_set_num_threads(initial);
 
-  CHECK(ll1 == ll4);
-  CHECK(arma::all(grad1 == grad4));
-  CHECK(llu1 == llu4);
+  if (blas_count_changes) {
+    WARN("MKL loaded with more than 1 thread: its results depend on its thread count, compared to 1e-8");
+    CHECK(std::abs(ll1 - ll4) <= 1e-8 * std::abs(ll4));
+    CHECK(arma::norm(grad1 - grad4, "inf") <= 1e-8 * arma::norm(grad4, "inf"));
+    CHECK(std::abs(llu1 - llu4) <= 1e-8 * std::abs(llu4));
+  } else {
+    CHECK(ll1 == ll4);
+    CHECK(arma::all(grad1 == grad4));
+    CHECK(llu1 == llu4);
+  }
 }
 #endif
 
@@ -388,6 +429,28 @@ TEST_CASE("Objective, gradient and update do not depend on the thread budget", "
     CHECK(arma::norm(grad - grad0) <= 1e-12 * arma::norm(grad0));
     CHECK(std::abs(llu - llu0) <= 1e-12 * std::abs(llu0));
   }
+}
+
+// With MKL, the library lowers the MKL count of the calling thread to the
+// budget for a call and of each pool worker to its share (thread-local,
+// MKL_Set_Num_Threads_Local); the caller's count is restored after.
+TEST_CASE("A fit leaves the caller's MKL thread count unchanged", "[threads]") {
+#ifdef LK_TEST_MKL
+  if (!MKL_Get_Max_Threads) {
+    WARN("no MKL in this process");
+    return;
+  }
+  BudgetGuard guard;
+  Optim::set_num_threads_percent(1e-6);  // budget 1: below MKL's count when it has more than 1
+  const int before = MKL_Get_Max_Threads();
+  arma::vec y;
+  arma::mat X;
+  data(y, X, 60);
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS4");
+  CHECK(MKL_Get_Max_Threads() == before);
+#else
+  WARN("no MKL weak symbols on this platform");
+#endif
 }
 
 // Hidden: run by the BlasThreadsTest/OPENBLAS_NUM_THREADS test with

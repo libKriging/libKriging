@@ -12,12 +12,98 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **MKL thread control** (#445, T5): with Intel MKL / oneMKL, each multistart worker sets its own
+  MKL thread count to its share of the budget (`MKL_Set_Num_Threads_Local`), and each public
+  method the calling thread's count to the budget, restored after (before: every worker kept
+  all MKL threads). Apple Accelerate, FlexiBLAS and BLIS are still not driven (documented in
+  the FAQ: `VECLIB_MAXIMUM_THREADS=1` etc. for multistart fits).
+- **cgroup v1 CPU quotas** (#445, T5): the thread budget also reads `cpu.cfs_quota_us` /
+  `cpu.cfs_period_us`, and the quotas of the parent cgroups (v1 and v2).
+- **Concurrent calls from user threads** (T6, #446): the save / restore of the process-global
+  OpenBLAS thread count is shared by all threads under a mutex (count in effect = smallest live
+  request, the last scope restores the caller's count); concurrent public calls split the thread
+  budget (budget / running calls) instead of each taking all of it; `Random`'s engine and seed
+  are per thread (`reset_seed` applies to the calling thread; a new thread starts from seed 123);
+  the fork handlers hold the library's mutexes, so a `fork()` made while another thread fits no
+  longer deadlocks the child. `Optim` / `LinearAlgebra` settings are documented as
+  configuration-before-use. See [docs/dev/parallel.md](docs/dev/parallel.md), section 3.1.
+- **BLAS backends in CI, fork fixes** (T9, #449): new workflow `blas-backends.yml` (Linux with
+  oneMKL preloaded on OpenBLAS and linked, GNU and INTEL threading layers; macOS arm64
+  Accelerate) and `[backend]` tests (`BlasBackendTest`: per-worker MKL / OpenBLAS counts read in
+  the thread of each LAPACK call, caller's MKL count restored, BFGS4 with 1 or 4 workers, shared
+  reference values for 200 <= n < 800). Fixes found by running MKL: the fork prepare handler
+  initializes the lazy statics of the call path (a `fork()` during another thread's first call
+  deadlocked the child with MKL), the fork child sets MKL to 1 thread, and a fit on data in the
+  span of the trend now gives sigma2 = nugget = 0 exactly (MKL left ~1e-32), and
+  `LinearAlgebra::inv_sympd` checks its LAPACK `potri` result in O(n^2) against triangular
+  solves and falls back to them (a wrong `R^-1` gave a LL gradient off by 7e6 relative on a
+  macOS Accelerate runner, #452). Known limitation:
+  with MKL, `fork()` while other threads run MKL needs `MKL_DISABLE_FAST_MM=1`
+  ([docs/dev/parallel.md](docs/dev/parallel.md), section 7).
+- **Single L-BFGS-B restart policy** (T2, [docs/dev/rationalization/T2-restart-policy.md](docs/dev/rationalization/T2-restart-policy.md)):
+  the restart criteria (abnormal stop, <= 2 iterations, at the lower bound, long-range optimum,
+  worse than the best run beyond factr x epsmch) and the contracted restart point, copied in
+  `Kriging::fit`, the WarpKriging joint BFGS and `AdamBFGS`, are now one private component
+  (`src/lib/RestartPolicy.hpp`). The **"worse" criterion no longer cascades**: a restart started
+  only because the previous run was worse does not trigger another one by being worse again
+  (before: up to `max_restart` = 10 restarts, each from a point closer to the lower bound). Kriging
+  and WarpKriging (joint BFGS) fits that went through such a cascade end with fewer restarts and
+  may end at a slightly different point (4 of 1728 measured Kriging fits, |ΔLL| <= 1.1e-5, 12 %
+  fewer restarts; 216 WarpKriging fits unchanged). `AdamBFGS::inner_restart` now decides the restart itself
+  (it receives the run's result, end and start points; `AdamBFGS::max_restart` is removed).
+- **MLPKriging variance calibration** (T8): `calibration_folds` defaults to 3 instead of 5. For
+  the default single-start fit, the calibrated fit takes x2.2 the CPU time of the uncalibrated
+  fit instead of x4.0 on 1 core (wall x1.8 instead of x2.4 on 4 cores), with the same 95 %
+  coverage (0.965 vs 0.957 on 135 fits) and test NLPD (+0.08, 95 % CI [-0.30, 0.45]). With a
+  multistart `"BFGSn"`, 3 folds widen the intervals more (test NLPD +0.56, CI [+0.20, +0.97], 45
+  `BFGS4` fits): set `calibration_folds = "5"` explicitly there. The factor is also no longer
+  clamped to >= 1 (`var_scale()` = mean squared standardised held-out residual, the
+  maximum-likelihood scale; the clamp was never active on the 260 K = 5 fits measured).
+  Models saved before keep their number of folds. See
+  `docs/dev/rationalization/T8-mlp-calibration-cost.md`.
+- **Faster theta gradients** (T1, `docs/dev/rationalization/T1-vectorized-gradients.md`): the
+  LL and LMP theta gradients use per-dimension kernel factors in one pair loop (no
+  `std::function` / `arma::vec` per pair), and the LMP gradient is reduced algebraically to one
+  R^-1 and an O(d n^2) loop instead of d O(n^3) solves; `LinearAlgebra::inv_sympd` uses LAPACK
+  `*potri` (x3 fewer flops). Single thread, d = 4, n = 500 / 1500: LL gradient x2.2-3.7, LMP
+  gradient x10-15. The pair sums now have one order whatever the thread count, n and OS (the
+  `kOmpMinRows` dependence of the gradient is removed). Results change at rounding level
+  (< 3e-12 relative for cond(R) < 1e8; more on ill-conditioned R).
+- **Default optimizer of `Kriging`: `"BFGS4"`** (was `"BFGS"`), in C++ and every binding (Python
+  `Kriging` / `KrigingRegressor`, R `Kriging()` / `fit()`, Octave / MATLAB, Julia): 4 random
+  starts run in parallel, the best kept. On 4080 benchmark data sets (sin, Hartmann6, Branin and
+  sinhalf with inactive inputs; gauss / matern5_2; noise-free / nugget; LL / LOO / LMP; n
+  100–1000; 30 sets per configuration) a single start ends more than 10 units below the best
+  optimum found on 18 % [17, 19] of the sets, `"BFGS4"` on 5 % [4, 6], `"BFGS10"` on 1 % [1, 1]
+  (Wilson 95 %); the cost of `"BFGS4"` is x 1.6–3.8 the single start on one core, x 0.3–2.6 its
+  wall time on 4 cores (`docs/dev/rationalization/T3-default-multistart.md`). Results of fits
+  that relied on the default change; pass `optim = "BFGS"` for the previous behaviour.
+  `WarpKriging`, `MLPKriging` and `NestedKriging` keep `"BFGS"`. The long-range restart of a
+  single start is kept (it never added a miss on noise-free LL, 113 sets fewer of 960).
 - **Predicted variance floor** (#428): `predict` floors the variance at 4 eps x sigma2 instead of
   clamping it to 0; the stdev is never 0 (no NaN NLPD) and its derivative is 0 (was NaN) where the
   variance is at the floor. The **WarpKriging / MLPKriging committed model is now exact**, as
   Kriging's (it kept 1e-10 on its diagonal).
+- **Multistart memory** (#444): a `Kriging` BFGS multistart no longer allocates and keeps the
+  n x n model (R, L, R^-1, ...) of every start, nor deep-copies it into a result per start: each
+  start builds its model in its task (at most min(multistart, pool size) alive at once) and only
+  the best start's model is kept, moved (not copied). `WarpKriging` multistart clones no longer
+  carry the GP state (R, Cholesky, R^-1, features, dX) outside their running start, and only the
+  best start's state is kept (moved). Fitted results are bit-identical; peak RSS at n = 2000,
+  BFGS20 (4 cores): 3369 → 1501 MB; n = 1000, BFGS10: 564 → 330 MB; WarpKriging n = 1000,
+  BFGS10: 1112 → 578 MB. See
+  [docs/dev/rationalization/T4-kmodel-per-worker.md](docs/dev/rationalization/T4-kmodel-per-worker.md).
 
 ### Added
+- **Statistical benchmark base of the fit** (T7, `bench/fit-protocol/`): `bench-fit-protocol`
+  (built with the other benchmarks) fits >= 30 seeded data sets per configuration (gauss /
+  matern5_2, noise-free / nugget, LL / LOO / LMP, test functions with and without inactive
+  inputs, n 100-1000) with the optimizers given as arguments and the settings of the
+  environment (`LK_LONG_RANGE_RESTART`, `LK_CHOL_JITTER`, `LK_NUM_THREADS_PERCENT`); `run.py`
+  runs a profile (`smoke`: ~2 min, `reference`, `full`), `summarize.py` reports the miss rate
+  with Wilson 95 % intervals, test RMSE, wall and CPU time. Reference results (4-core machine)
+  committed in `bench/fit-protocol/results/`; see
+  [docs/dev/rationalization/T7-benchmark-base.md](docs/dev/rationalization/T7-benchmark-base.md).
 - **Small-problem BLAS rule** (OpenBLAS only): `fit`, `predict` and `update` of `Kriging`,
   `WarpKriging` and `MLPKriging` on fewer than 500 training observations run OpenBLAS on
   1 thread instead of the thread budget, restored after the call, when the BLAS threads and the
@@ -117,6 +203,13 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **Tests**: `KrigingApproxObjectivesTest` "approximate LOO / LMP fits are consistent with the
+  exact fits" compared `leaveOneOut("nystrom(80)")` and `leaveOneOut("nystrom")` bitwise and
+  failed intermittently on macOS (Accelerate). Both calls take the same deterministic code path;
+  the Nystrom LOO of this case (~1.6e-8) moves by up to 1.2e-6 relative with the BLAS kernel or
+  thread count (24 OpenBLAS configurations), and Accelerate chooses its own thread partition per
+  call. The check is now relative, at 1e-5 (another rank k moves it by >= 2 %). No library change.
+  See [docs/dev/rationalization/T10-nystrom-determinism.md](docs/dev/rationalization/T10-nystrom-determinism.md).
 - **`sigma2` / `nugget` exactly 0 when y lies in the span of the trend** (#450, found in #449): the fit
   without optimization committed on such data (e.g. constant y with a constant trend) is documented
   to estimate sigma2 = 0 (and nugget = 0), but stored SSE / n, the rounding residual of the BLAS:

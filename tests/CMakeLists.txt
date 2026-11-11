@@ -315,6 +315,19 @@ if (SANITIZE AND NOT SANITIZE STREQUAL "OFF")
     string(TOLOWER "${SANITIZE}" SANITIZE_LOWER)
     set(CONSUMER_LINKER_FLAGS "${CONSUMER_LINKER_FLAGS} -fsanitize=${SANITIZE_LOWER}")
 endif ()
+# The consumer calls find_dependency(OpenMP) like the library did: where OpenMP is not found by default (Homebrew's
+# keg-only libomp with AppleClang), give it the hints this build was configured with.
+set(CONSUMER_OPENMP_ARGS "")
+if (DEFINED OpenMP_ROOT AND NOT "${OpenMP_ROOT}" STREQUAL "")
+    list(APPEND CONSUMER_OPENMP_ARGS "-DOpenMP_ROOT=${OpenMP_ROOT}")
+endif ()
+# the runtime library found by this build (OpenMP_<name>_LIBRARY, e.g. libomp, gomp)
+foreach (name IN LISTS OpenMP_CXX_LIB_NAMES)
+    if (DEFINED OpenMP_${name}_LIBRARY AND NOT "${OpenMP_${name}_LIBRARY}" STREQUAL "")
+        list(APPEND CONSUMER_OPENMP_ARGS "-DOpenMP_${name}_LIBRARY=${OpenMP_${name}_LIBRARY}")
+    endif ()
+endforeach ()
+string(REPLACE ";" "|" CONSUMER_OPENMP_ARGS "${CONSUMER_OPENMP_ARGS}")
 if (NOT CMAKE_VERSION VERSION_LESS 3.15)
     add_test(NAME cmake_package
             COMMAND ${CMAKE_COMMAND}
@@ -327,6 +340,7 @@ if (NOT CMAKE_VERSION VERSION_LESS 3.15)
             -DEXPECTED_VERSION=${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}
             -DINSTALLED_PREFIX=${CMAKE_INSTALL_PREFIX}
             "-DCONSUMER_LINKER_FLAGS=${CONSUMER_LINKER_FLAGS}"
+            "-DCONSUMER_OPENMP_ARGS=${CONSUMER_OPENMP_ARGS}"
             "-DINSTALL_DIRS=${PROJECT_BINARY_DIR}/dependencies/armadillo-code|${PROJECT_BINARY_DIR}/dependencies/lbfgsb_cpp|$<TARGET_PROPERTY:Kriging,BINARY_DIR>"
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake_package/run_test.cmake)
     set_tests_properties(cmake_package PROPERTIES LABELS "install")
@@ -371,6 +385,13 @@ endif()
 catch_discover_tests(WarpKrigingUpdateSimulateTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
+add_executable(GradientThreadsTest GradientThreadsTest.cpp)
+target_link_libraries(GradientThreadsTest LINK_PUBLIC Kriging Catch2)
+# white-box test of the private gradient pair sums (src/lib/SeparableDln.hpp)
+target_include_directories(GradientThreadsTest PRIVATE ${PROJECT_SOURCE_DIR}/src/lib)
+add_dependencies(all_test_binaries GradientThreadsTest)
+catch_discover_tests(GradientThreadsTest)
+
 add_executable(BlasThreadsTest BlasThreadsTest.cpp)
 target_link_libraries(BlasThreadsTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries BlasThreadsTest)
@@ -378,6 +399,45 @@ catch_discover_tests(BlasThreadsTest)
 # the hidden [.openblas_env] case needs OPENBLAS_NUM_THREADS at load time
 add_test(NAME BlasThreadsTest/OPENBLAS_NUM_THREADS COMMAND BlasThreadsTest "[.openblas_env]")
 set_tests_properties(BlasThreadsTest/OPENBLAS_NUM_THREADS PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
+# bit-identical objective / gradient / update whatever the OpenMP count when the
+# BLAS count cannot change (MKL's results depend on its count: T9)
+add_test(NAME BlasThreadsTest/BLAS_NUM_THREADS=1 COMMAND BlasThreadsTest "*do not depend on the OpenMP thread count")
+set_tests_properties(BlasThreadsTest/BLAS_NUM_THREADS=1 PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1;MKL_NUM_THREADS=1")
+
+add_executable(ConcurrentCallsTest ConcurrentCallsTest.cpp)
+target_link_libraries(ConcurrentCallsTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries ConcurrentCallsTest)
+# Declared exclusion (decision D3, docs/dev/Rationalization.md section 3): the
+# [fork] case is not run under ASan / LSan, whose allocator is not fork-safe in
+# a multithreaded process (the child of a fork() made while another thread
+# allocates blocks in the sanitizer's allocator lock: GCC 11 / 13 runtimes,
+# docs/dev/rationalization/T6-thread-safety.md). It runs in every other build
+# (Release / Debug, Memcheck, Coverage; TSan compiles it out).
+if (SANITIZE STREQUAL "ADDRESS" OR SANITIZE STREQUAL "LEAK")
+  set(CONCURRENT_CALLS_SPEC "~[fork]")
+  set(CONCURRENT_CALLS_VARIANT_SPEC "[concurrent]~[fork]")
+else ()
+  set(CONCURRENT_CALLS_SPEC "")
+  set(CONCURRENT_CALLS_VARIANT_SPEC "[concurrent]")
+endif ()
+catch_discover_tests(ConcurrentCallsTest TEST_SPEC ${CONCURRENT_CALLS_SPEC})
+# bit-identical to the sequential results when the OpenBLAS count cannot change
+add_test(NAME ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1 COMMAND ConcurrentCallsTest "${CONCURRENT_CALLS_VARIANT_SPEC}")
+set_tests_properties(ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1 PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
+
+# BLAS backends (T9): [backend] cases check the backend actually loaded (OpenBLAS,
+# MKL linked or preloaded, Accelerate) and skip the others. On Linux the probe
+# (backend_probe.c, C: not compiled against Armadillo's prototypes) interposes
+# dpotrf_ to read the BLAS counts in the thread of each call.
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_executable(BlasBackendTest BlasBackendTest.cpp backend_probe.c)
+    target_compile_definitions(BlasBackendTest PRIVATE LK_BACKEND_PROBE)
+else ()
+    add_executable(BlasBackendTest BlasBackendTest.cpp)
+endif ()
+target_link_libraries(BlasBackendTest LINK_PUBLIC Kriging Catch2 ${CMAKE_DL_LIBS})
+add_dependencies(all_test_binaries BlasBackendTest)
+catch_discover_tests(BlasBackendTest)
 
 add_executable(SimulateStateResetTest SimulateStateResetTest.cpp)
 target_link_libraries(SimulateStateResetTest LINK_PUBLIC Kriging Catch2)
@@ -402,6 +462,12 @@ add_executable(AdamBFGSTest AdamBFGSTest.cpp)
 target_link_libraries(AdamBFGSTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries AdamBFGSTest)
 catch_discover_tests(AdamBFGSTest)
+
+add_executable(RestartPolicyTest RestartPolicyTest.cpp)
+target_link_libraries(RestartPolicyTest LINK_PUBLIC Kriging Catch2)
+target_include_directories(RestartPolicyTest PRIVATE ${PROJECT_SOURCE_DIR}/src/lib)  # private header
+add_dependencies(all_test_binaries RestartPolicyTest)
+catch_discover_tests(RestartPolicyTest)
 
 add_executable(WarpKrigingCollapseTest WarpKrigingCollapseTest.cpp)
 target_link_libraries(WarpKrigingCollapseTest LINK_PUBLIC Kriging Catch2)

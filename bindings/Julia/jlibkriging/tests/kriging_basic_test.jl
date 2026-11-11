@@ -27,7 +27,7 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
     @testset "Direct construction with data" begin
         k = Kriging(y_train, X_train, "gauss")
         @test kernel(k) == "gauss"
-        @test optim(k) == "BFGS"
+        @test optim(k) == "BFGS4"  # default optimizer of Kriging (T3)
         @test objective(k) == "LL"
         @test regmodel(k) == "constant"
     end

@@ -4,7 +4,9 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
+#include <algorithm>
 #include <chrono>
+#include <memory>
 #include "libKriging/Kriging.hpp"
 #include "libKriging/Optim.hpp"
 // clang-format on
@@ -68,23 +70,32 @@ TEST_CASE("KrigingWarmRestartTest - Warm restart is faster than cold fit", "[upd
     const int saved_pool_size = Optim::get_thread_pool_size();
     Optim::set_thread_pool_size(1);
 
-    // Initial fit with multi-start BFGS
-    Kriging kr("gauss");
+    // Best of 3 (each from a new initial fit): a single sample is noisy at
+    // these sizes (n = 33, ~1-5 ms), e.g. with a threaded MKL the first BLAS
+    // calls of a new thread cost 15-45 ms (T9 log)
+    std::unique_ptr<Kriging> warm, cold;
     Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
-    kr.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS4", "LL", params);
+    double warm_ms = 1e300, cold_ms = 1e300;
+    for (int rep = 0; rep < 3; ++rep) {
+      // Initial fit with multi-start BFGS
+      warm = std::make_unique<Kriging>("gauss");
+      Kriging& kr = *warm;
+      kr.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS4", "LL", params);
 
-    // Measure warm restart update (forces single-start BFGS)
-    auto t0 = std::chrono::high_resolution_clock::now();
-    kr.update(y_new, X_new, true);
-    auto t1 = std::chrono::high_resolution_clock::now();
-    double warm_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+      // Measure warm restart update (forces single-start BFGS)
+      auto t0 = std::chrono::high_resolution_clock::now();
+      kr.update(y_new, X_new, true);
+      auto t1 = std::chrono::high_resolution_clock::now();
+      warm_ms = std::min(warm_ms, std::chrono::duration<double, std::milli>(t1 - t0).count());
 
-    // Measure cold multi-start fit on combined data
-    Kriging kr_cold("gauss");
-    auto t2 = std::chrono::high_resolution_clock::now();
-    kr_cold.fit(y_combined, X_combined, Trend::RegressionModel::Constant, false, "BFGS4", "LL", params);
-    auto t3 = std::chrono::high_resolution_clock::now();
-    double cold_ms = std::chrono::duration<double, std::milli>(t3 - t2).count();
+      // Measure cold multi-start fit on combined data
+      cold = std::make_unique<Kriging>("gauss");
+      Kriging& kr_cold = *cold;
+      auto t2 = std::chrono::high_resolution_clock::now();
+      kr_cold.fit(y_combined, X_combined, Trend::RegressionModel::Constant, false, "BFGS4", "LL", params);
+      auto t3 = std::chrono::high_resolution_clock::now();
+      cold_ms = std::min(cold_ms, std::chrono::duration<double, std::milli>(t3 - t2).count());
+    }
 
     INFO("Warm restart: " << warm_ms << " ms");
     INFO("Cold fit:     " << cold_ms << " ms");
@@ -96,8 +107,8 @@ TEST_CASE("KrigingWarmRestartTest - Warm restart is faster than cold fit", "[upd
 
     // And predictions should still be close
     arma::mat X_test(10, d, arma::fill::randu);
-    auto pred_warm = kr.predict(X_test, true, false, false);
-    auto pred_cold = kr_cold.predict(X_test, true, false, false);
+    auto pred_warm = warm->predict(X_test, true, false, false);
+    auto pred_cold = cold->predict(X_test, true, false, false);
     CHECK(arma::approx_equal(std::get<0>(pred_warm), std::get<0>(pred_cold), "reldiff", 0.15));
   }
 

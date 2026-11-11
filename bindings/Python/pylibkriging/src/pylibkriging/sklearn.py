@@ -111,10 +111,12 @@ class KrigingRegressor(_BaseKrigingEstimator):
         Trend / regression model.
     normalize : bool, default=False
         Rescale X/y to [0, 1] internally before fitting.
-    optim : str, default="BFGS"
-        Optimizer for the hyperparameters: ``"BFGS"``, ``"BFGS<k>"`` for
-        k random restarts (e.g. ``"BFGS10"``), or ``"none"`` to keep
-        `parameters` fixed rather than estimate them.
+    optim : str, default="BFGS4"
+        Optimizer for the hyperparameters: ``"BFGS<k>"`` for k random
+        starts run in parallel, the best kept (default ``"BFGS4"``; the
+        default was ``"BFGS"``, a single start, up to 1.2), ``"BFGS"`` for
+        a single start, or ``"none"`` to keep `parameters` fixed rather
+        than estimate them.
     objective : str, default="LL"
         Fit criterion: ``"LL"``, ``"LOO"`` or ``"LMP"``.
     method : str, default="exact"
@@ -161,7 +163,7 @@ class KrigingRegressor(_BaseKrigingEstimator):
     """
 
     def __init__(self, kernel="matern5_2", regmodel="constant", normalize=False,
-                 optim="BFGS", objective="LL", noise=None, parameters=None,
+                 optim="BFGS4", objective="LL", noise=None, parameters=None,
                  method="exact"):
         # sklearn convention: __init__ must only assign parameters to
         # identically-named attributes, with no validation or other
@@ -287,7 +289,7 @@ class WarpKrigingRegressor(_BaseKrigingEstimator):
     regmodel : str, default="constant"
     normalize : bool, default=False
     optim : str, default="BFGS"
-        Note this default differs from `KrigingRegressor`'s `"BFGS"`:
+        Note this default differs from `KrigingRegressor`'s `"BFGS4"`:
         fitting the warp parameters benefits from the extra Adam-style
         steps, matching libKriging's own default for this class.
     objective : str, default="LL"

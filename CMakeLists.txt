@@ -278,6 +278,8 @@ if (ENABLE_COVERAGE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g --coverage")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
+    # instrumented build: wall-clock assertions of the tests are not meaningful
+    add_compile_definitions(LK_INSTRUMENTED_BUILD)
 endif()
 
 #------------------------------------------------------
@@ -312,6 +314,10 @@ add_definitions(-DCARMA_DO_NOT_EXPORT_ALIEN_MEM_FUNCTIONS)
 #------------------------------------------------------
 
 string(TOUPPER "${SANITIZE}" SANITIZE)
+if (NOT SANITIZE STREQUAL "OFF" AND NOT SANITIZE STREQUAL "")
+    # instrumented build: wall-clock assertions of the tests are not meaningful
+    add_compile_definitions(LK_INSTRUMENTED_BUILD)
+endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(LIBKRIGING_CXX_FLAGS "${LIBKRIGING_CXX_FLAGS} -Wall -Wextra")

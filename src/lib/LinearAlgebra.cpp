@@ -145,11 +145,15 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
 double LinearAlgebra::min_rcond = 1e-18;
 
 // MKL's dgecon (called by arma::rcond) is not thread-safe when invoked from
-// multiple std::threads concurrently. Serialize all rcond calls with a mutex.
-static std::mutex s_rcond_mutex;
+// multiple std::threads concurrently. Serialize all rcond calls with a mutex
+// (also held by the fork handlers, Kriging.cpp).
+std::mutex& libKriging::detail::rcond_mutex() {
+  static std::mutex m;
+  return m;
+}
 
 LIBKRIGING_EXPORT double LinearAlgebra::rcond_chol(arma::mat chol) {
-  std::lock_guard<std::mutex> lock(s_rcond_mutex);
+  std::lock_guard<std::mutex> lock(libKriging::detail::rcond_mutex());
   double rcond = arma::rcond(chol);
   rcond *= rcond;
   if (warn_chol)
@@ -735,7 +739,39 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve_upper(const arma::mat& U, cons
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::inv_sympd(const arma::mat& L) {
-  return arma::solve(arma::trimatu(L.t()), arma::solve(arma::trimatl(L), arma::eye(L.n_rows, L.n_rows)));
+  // (L L')^-1 from the Cholesky factor with LAPACK *potri: 2n^3/3 flops,
+  // against 2n^3 for the two triangular solves on the identity (kept as the
+  // fallback, e.g. for a zero on the diagonal of L).
+  arma::mat Rinv = L;
+  char uplo = 'L';
+  arma::blas_int n = static_cast<arma::blas_int>(L.n_rows);
+  arma::blas_int info = 0;
+  if (n > 0)
+    arma::lapack::potri(&uplo, &n, Rinv.memptr(), &n, &info);
+  if (info == 0 && n > 0) {
+    Rinv = arma::symmatl(Rinv);
+    // O(n^2) check of the potri result against two triangular solves with the
+    // same L, on a fixed vector. A correct potri agrees to 3e-13 (measured up
+    // to n = 1500, cond(R) = 4e15); Accelerate's potri intermittently returned
+    // a wrong inverse on 5-core macOS runners (gauss n = 750: LL gradient 2.7e10
+    // against 3.4e3, LL unchanged; docs/dev/rationalization/T9-blas-backends-ci.md,
+    // #452). Then the solves are used instead.
+    arma::vec v(L.n_rows);
+    for (arma::uword i = 0; i < v.n_elem; ++i)
+      v.at(i) = std::fmod(0.5 + static_cast<double>(i + 1) * 0.6180339887498949, 1.0) - 0.5;
+    // two LAPACK *trtrs on the vector (O(n^2), no copy of L, no condition
+    // estimate as arma::solve does: those cost 35 to 100 % of potri itself)
+    arma::vec w = v;
+    char lo = 'L', no = 'N', tr = 'T', nonunit = 'N';
+    arma::blas_int one = 1, info_w = 0, info_wt = 0;
+    arma::lapack::trtrs(&lo, &no, &nonunit, &n, &one, const_cast<double*>(L.memptr()), &n, w.memptr(), &n, &info_w);
+    arma::lapack::trtrs(&lo, &tr, &nonunit, &n, &one, const_cast<double*>(L.memptr()), &n, w.memptr(), &n, &info_wt);
+    if (info_w != 0 || info_wt != 0 || !(arma::norm(Rinv * v - w, "inf") <= 1e-8 * arma::norm(w, "inf")))
+      info = -1;
+  }
+  if (info != 0)
+    return arma::solve(arma::trimatu(L.t()), arma::solve(arma::trimatl(L), arma::eye(L.n_rows, L.n_rows)));
+  return Rinv;
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_upper(const arma::mat& A) {

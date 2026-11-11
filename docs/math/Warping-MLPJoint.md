@@ -77,12 +77,15 @@ at fixed features sees it, since the features were fitted to the left-out
 point too.
 
 After the fit, the predictive variance is therefore calibrated by K-fold
-cross-validation (K = 5): the model is refitted on each K−1 folds from
+cross-validation (K = 3): the model is refitted on each K−1 folds from
 the starting point (θ₀, W₀) of the optimiser start that gave the fit,
 with the same single-start optimiser and budget, and predicts the held-out
 fold. With eᵢ the held-out residuals and sᵢ² their predictive variances,
 
-  c = max(1, mean(eᵢ² / sᵢ²))
+  c = mean(eᵢ² / sᵢ²)
+
+(not clamped to c >= 1: an estimate below 1 is kept, though none was seen
+in the T8 measurements)
 
 and `predict` / `simulate` / `update_simulate` use the variance c · σ² · (…)
 instead of σ² · (…). The mean, σ̂² (`sigma2()`) and `logLikelihood()` are
@@ -91,7 +94,12 @@ unchanged; c is reported by `var_scale()` and in `summary()`, kept by
 the model. It costs K single-start fits, run concurrently in the
 multistart thread pool (`Optim::set_thread_pool_size`). The tuning parameter
 `calibration_folds` sets K (`0` disables the calibration); it is not
-applied with per-observation noise, nor when n < 2K.
+applied with per-observation noise, nor when n < 2K. K = 3 by default: for
+the single-start default fit it gives the same coverage and NLPD as K = 5 at
+about 0.57 times the CPU time. With a multistart `"BFGSn"`, set
+`calibration_folds = "5"` explicitly: each fold is refitted from the one
+winning start on 2/3 of the data, which overstates the error of the
+best-of-n fit (test NLPD +0.56 vs K = 5, 95 % CI [+0.20, +0.97], T8).
 
 ## Simple example
 

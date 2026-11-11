@@ -87,6 +87,20 @@ TEST_CASE("MLPKriging predictive variance is calibrated (#407)", "[mlp][calibrat
 
   const Scores sr = score(raw, Xt, yt);
   const Scores sc = score(cal, Xt, yt);
+  // Printed on every platform (not only on failure), to compare the scores across platforms.
+  std::printf(
+      "[calibration] optim=%s Kriging Q2 %.6g NLPD %.6g cov %.4g | uncalibrated Q2 %.6g NLPD %.6g cov %.4g | "
+      "calibrated NLPD %.6g cov %.4g var_scale %.6g\n",
+      optim.c_str(),
+      sk.q2,
+      sk.nlpd,
+      sk.coverage,
+      sr.q2,
+      sr.nlpd,
+      sr.coverage,
+      sc.nlpd,
+      sc.coverage,
+      cal.var_scale());
   INFO("optim=" << optim << " | Kriging Q2 " << sk.q2 << " NLPD " << sk.nlpd << " cov " << sk.coverage
                 << " | uncalibrated Q2 " << sr.q2 << " NLPD " << sr.nlpd << " cov " << sr.coverage
                 << " | calibrated NLPD " << sc.nlpd << " cov " << sc.coverage << " var_scale " << cal.var_scale());
@@ -96,6 +110,11 @@ TEST_CASE("MLPKriging predictive variance is calibrated (#407)", "[mlp][calibrat
   CHECK(cal.logLikelihood() == Approx(raw.logLikelihood()).epsilon(1e-10));
   CHECK(sc.q2 == Approx(sr.q2).epsilon(1e-10));
   CHECK(cal.var_scale() > 1.0);
+
+  // Default number of folds: 3 (T8, decision D4 revised).
+  MLPKriging cal_k({8}, 2, "tanh", "matern5_2");
+  cal_k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", {{"calibration_folds", "3"}});
+  CHECK(cal_k.var_scale() == cal.var_scale());
 
   CHECK(sc.coverage > 0.8);
   CHECK(sc.nlpd < 0.5 * sr.nlpd);

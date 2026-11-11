@@ -23,6 +23,7 @@
 #include "libKriging/utils/utils.hpp"
 
 #include "BlasThreads.hpp"
+#include "RestartPolicy.hpp"
 #include "TaskPool.hpp"
 #include "ThreadBudget.hpp"
 
@@ -30,6 +31,7 @@
 #include <cstdlib>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
+#include <mutex>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -87,6 +89,103 @@ openblas_get_num_threads_t get_openblas_get_num_threads() {
 #endif
 #endif
 
+// Intel MKL / oneMKL thread control, C interface (MKL_Get_Max_Threads,
+// MKL_Set_Num_Threads_Local take and return int by value; the lower-case
+// mkl_set_num_threads_local exported by libmkl_rt is the Fortran entry point,
+// int by reference). Weak symbols on ELF, as OpenBLAS above: they resolve to the
+// MKL the library's BLAS calls go to (linked, libblas.so.3 alternative, or
+// preloaded). dlsym elsewhere on POSIX (Mach-O has no undefined weak symbols
+// without a link-time definition), GetProcAddress on Windows.
+#if defined(__ELF__)
+extern "C" {
+int MKL_Get_Max_Threads() __attribute__((weak));
+int MKL_Set_Num_Threads_Local(int nth) __attribute__((weak));
+void MKL_Set_Num_Threads(int nth) __attribute__((weak));
+}
+namespace {
+typedef int (*mkl_get_max_threads_t)();
+typedef int (*mkl_set_num_threads_local_t)(int);
+mkl_get_max_threads_t get_mkl_get_max_threads() {
+  return MKL_Get_Max_Threads;
+}
+mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
+  return MKL_Set_Num_Threads_Local;
+}
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  return MKL_Set_Num_Threads;
+}
+}  // namespace
+#elif defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+namespace {
+typedef int (*mkl_get_max_threads_t)();
+typedef int (*mkl_set_num_threads_local_t)(int);
+FARPROC get_mkl_proc(const char* name) {
+  for (const char* dll : {"mkl_rt.2.dll", "mkl_rt.dll", "mkl_rt.1.dll"}) {
+    HMODULE h = GetModuleHandleA(dll);
+    if (h)
+      return GetProcAddress(h, name);
+  }
+  return nullptr;
+}
+mkl_get_max_threads_t get_mkl_get_max_threads() {
+  static mkl_get_max_threads_t func = reinterpret_cast<mkl_get_max_threads_t>(get_mkl_proc("MKL_Get_Max_Threads"));
+  return func;
+}
+mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
+  static mkl_set_num_threads_local_t func
+      = reinterpret_cast<mkl_set_num_threads_local_t>(get_mkl_proc("MKL_Set_Num_Threads_Local"));
+  return func;
+}
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  static mkl_set_num_threads_t func = reinterpret_cast<mkl_set_num_threads_t>(get_mkl_proc("MKL_Set_Num_Threads"));
+  return func;
+}
+}  // namespace
+#elif defined(__APPLE__) || defined(__unix__)
+#include <dlfcn.h>
+namespace {
+typedef int (*mkl_get_max_threads_t)();
+typedef int (*mkl_set_num_threads_local_t)(int);
+mkl_get_max_threads_t get_mkl_get_max_threads() {
+  static mkl_get_max_threads_t func
+      = reinterpret_cast<mkl_get_max_threads_t>(dlsym(RTLD_DEFAULT, "MKL_Get_Max_Threads"));
+  return func;
+}
+mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
+  static mkl_set_num_threads_local_t func
+      = reinterpret_cast<mkl_set_num_threads_local_t>(dlsym(RTLD_DEFAULT, "MKL_Set_Num_Threads_Local"));
+  return func;
+}
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  static mkl_set_num_threads_t func
+      = reinterpret_cast<mkl_set_num_threads_t>(dlsym(RTLD_DEFAULT, "MKL_Set_Num_Threads"));
+  return func;
+}
+}  // namespace
+#else
+namespace {
+typedef int (*mkl_get_max_threads_t)();
+typedef int (*mkl_set_num_threads_local_t)(int);
+mkl_get_max_threads_t get_mkl_get_max_threads() {
+  return nullptr;
+}
+mkl_set_num_threads_local_t get_mkl_set_num_threads_local() {
+  return nullptr;
+}
+typedef void (*mkl_set_num_threads_t)(int);
+mkl_set_num_threads_t get_mkl_set_num_threads() {
+  return nullptr;
+}
+}  // namespace
+#endif
+
 namespace libKriging {
 namespace detail {
 BlasThreadState get_blas_threads() {
@@ -130,6 +229,28 @@ void set_openblas_threads(int n) {
 #endif
 }
 
+int get_mkl_threads() {
+  auto fn = get_mkl_get_max_threads();
+  return fn ? fn() : 0;
+}
+
+int set_mkl_threads_local(int n) {
+  auto fn = get_mkl_set_num_threads_local();
+  return fn ? fn(n) : -1;
+}
+
+void set_mkl_threads_global(int n) {
+  auto fn = get_mkl_set_num_threads();
+  if (fn && n > 0)
+    fn(n);
+}
+
+void touch_mkl_entry_points() {
+  get_mkl_get_max_threads();
+  get_mkl_set_num_threads_local();
+  get_mkl_set_num_threads();
+}
+
 void restore_blas_threads(const BlasThreadState& s) {
 #if !defined(__APPLE__) || !defined(__arm64__)
   auto fn = get_openblas_set_num_threads();
@@ -155,26 +276,71 @@ void restore_blas_threads(const BlasThreadState& s) {
 // single-threaded after e.g. mclapply. The child handler re-asserts
 // single-threading in case the runtime inherited stale state.
 #if !defined(_WIN32) && defined(_POSIX_VERSION)
+#include <dlfcn.h>
 #include <pthread.h>
+#include <stdlib.h>
 namespace {
 
 libKriging::detail::BlasThreadState atfork_saved;
 
+// libomp (LLVM / Intel OpenMP, the macOS runtime) registers its own
+// pthread_atfork handlers: they keep its internal locks across fork() and reset
+// the runtime in the child, which runs after ours. Any omp_* call made from our
+// handlers then spins on a lock that is already held (fork() hangs in the
+// parent, the child's omp_set_num_threads never returns). libgomp has no such
+// handlers. Detected once, at registration: calling dlsym in a handler is not
+// safe either.
+bool omp_runtime_forks_itself = false;
+
+// The library's mutexes are locked in prepare and unlocked in both processes:
+// a fork() made while another thread holds one would leave it locked forever
+// in the child, where that thread does not exist.
 void libkriging_atfork_prepare() {
+  // locked first: no concurrent scope changes the count between the two lines
+  libKriging::detail::blas_count_fork_prepare();
+  libKriging::detail::rcond_mutex().lock();
+  if (omp_runtime_forks_itself) {
+    atfork_saved = libKriging::detail::BlasThreadState();
+    atfork_saved.blas = libKriging::detail::get_openblas_threads();
+    libKriging::detail::set_openblas_threads(1);
+    return;
+  }
   atfork_saved = libKriging::detail::get_blas_threads();
   libKriging::detail::set_blas_threads(1);
 }
 
 void libkriging_atfork_parent() {
-  libKriging::detail::restore_blas_threads(atfork_saved);
+  if (omp_runtime_forks_itself)
+    libKriging::detail::set_openblas_threads(atfork_saved.blas);  // the OpenMP count was not touched
+  else
+    libKriging::detail::restore_blas_threads(atfork_saved);
+  libKriging::detail::rcond_mutex().unlock();
+  libKriging::detail::blas_count_fork_parent();
 }
 
 void libkriging_atfork_child() {
-  libKriging::detail::set_blas_threads(1);
+  libKriging::detail::rcond_mutex().unlock();
+  libKriging::detail::blas_count_fork_child();
+  if (omp_runtime_forks_itself) {
+    libKriging::detail::set_openblas_threads(1);
+    // libomp re-initializes in the child after this handler and reads the
+    // environment again: one thread there, without calling into it
+    setenv("OMP_NUM_THREADS", "1", 1);
+  } else {
+    libKriging::detail::set_blas_threads(1);
+  }
+  // MKL's global count too (threads without a thread-local count, i.e. the
+  // child's later threads and the forking thread unless it set its own): with
+  // the GNU threading layer an MKL call at more than 1 thread starts an OpenMP
+  // team in the child. The parent's MKL count is not changed.
+  libKriging::detail::set_mkl_threads_global(1);
 }
 
 struct ForkSafeRegistrar {
   ForkSafeRegistrar() {
+#ifdef _OPENMP
+    omp_runtime_forks_itself = dlsym(RTLD_DEFAULT, "__kmpc_fork_call") != nullptr;
+#endif
     pthread_atfork(libkriging_atfork_prepare,  // prepare: quiesce before fork
                    libkriging_atfork_parent,   // parent:  restore thread counts
                    libkriging_atfork_child);   // child:   ensure clean state
@@ -3951,61 +4117,32 @@ void Kriging::fit_impl(const arma::vec& y,
         }
       }
 
-      // Preallocate KModels for each thread to avoid race conditions
-      arma::uword n_data = n;
-      arma::uword p_data = m_F.n_cols;
-      std::vector<Kriging::KModel> preallocated_models(multistart);
-
-      if (Optim::log_level > Optim::log_none) {
-        arma::cout << "Preallocating " << multistart << " KModel structures (n=" << n_data << ", p=" << p_data << ")..."
-                   << arma::endl;
-      }
-
-      // approximate methods never use the dense KModel: no n x n allocation
-      for (int i = 0; i < multistart && build_dX; i++) {
-        auto& m = preallocated_models[i];
-        m.R = arma::mat(n_data, n_data, arma::fill::none);
-        m.L = arma::mat(n_data, n_data, arma::fill::none);
-        m.Linv = arma::mat();  // Empty matrix
-        m.Rinv = arma::mat();  // Empty matrix -- computed lazily on demand, like Linv; must NOT be
-                               // preallocated at the right size (fill::none) the way the other KModel
-                               // fields below are, or the lazy size-check in _logLikelihood would
-                               // mistake this uninitialized block for an already-computed R^-1
-        m.Fstar = arma::mat(n_data, p_data, arma::fill::none);
-        m.ystar = arma::vec(n_data, arma::fill::none);
-        m.Rstar = arma::mat(p_data, p_data, arma::fill::none);
-        m.Qstar = arma::mat(n_data, p_data, arma::fill::none);
-        m.Estar = arma::vec(n_data, arma::fill::none);
-        m.betahat = arma::vec(p_data, arma::fill::none);
-        m.SSEstar = 0.0;
-      }
-
-      // Multi-threading implementation for BFGS multistart
-      // Each thread uses its own preallocated KModel, so no mutex needed
-
-      // Structure to hold optimization results from each thread
+      // n x n buffers per running start, not per start: each start builds
+      // its KModel in its task (so at most min(multistart, pool size) of them
+      // are alive at once, docs/dev/rationalization/T4-kmodel-per-worker.md)
+      // and only the best start's model is kept, moved (not copied) into
+      // best_model as the starts finish. The other starts keep their scalar
+      // results only (below).
       struct OptimizationResult {
         arma::uword start_index;
         double objective_value;
         arma::vec gamma;
         arma::vec theta;
         double extra_param = 0.0;  // alpha (Nugget) or sigma2 (Heterogeneous)
-        arma::mat L;
-        arma::mat R;
-        arma::mat Fstar;
-        arma::mat Rstar;
-        arma::mat Qstar;
-        arma::mat Rinv;
-        arma::vec Estar;
-        arma::vec ystar;
-        double SSEstar;
-        arma::vec betahat;
         bool success;
         std::string error_message;
 
         OptimizationResult()
             : start_index(0), objective_value(std::numeric_limits<double>::infinity()), success(false) {}
       };
+
+      // Model of the best start so far: same choice as a scan of the starts
+      // in index order (lowest objective, then lowest start index), whatever
+      // the order in which the starts finish.
+      Kriging::KModel best_model{};
+      double best_model_objective = min_ofn;
+      int best_model_idx = -1;
+      std::mutex best_model_mutex;
 
       // Worker function for each thread
       auto optimize_worker = [&](arma::uword start_idx) -> OptimizationResult {
@@ -4033,12 +4170,11 @@ void Kriging::fit_impl(const arma::vec& y,
           gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
           gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
 
-          // Use pre-allocated KModel for this thread (thread-safe)
-          if (start_idx >= preallocated_models.size()) {
-            throw std::runtime_error("Preallocated model index out of bounds");
-          }
-
-          Kriging::KModel& m = preallocated_models[start_idx];
+          // This start's own KModel (thread-safe); approximate methods never
+          // use the dense KModel: no n x n allocation
+          Kriging::KModel m{};
+          if (build_dX)
+            m = allocate_KModel();
           // This "warm-up" populate_Model call primes `m` before the BFGS
           // loop; its result is unconditionally overwritten by the first
           // fit_ofn evaluation for objectives that touch km_data (exact
@@ -4081,13 +4217,14 @@ void Kriging::fit_impl(const arma::vec& y,
             arma::cout << "  start_point: " << theta_start.t() << arma::endl;
           }
 
-          int retry = 0;
-          int lr_restarts = 0;
-          double best_f_opt = std::numeric_limits<double>::infinity();
+          using libKriging::detail::RestartPolicy;
+          RestartPolicy restarts({Optim::max_restart,
+                                  optimizer.factr,
+                                  /*worse_criterion=*/true,
+                                  long_range_restart_on ? Optim::max_long_range_restart : 0});
           arma::vec best_gamma = gamma_tmp;
 
-          while (retry <= Optim::max_restart) {
-            arma::vec gamma_0 = gamma_tmp;
+          while (true) {
             auto opt_result = optimizer.minimize(
                 [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
                   return fit_ofn(vals_inp, &grad_out, &m);
@@ -4098,37 +4235,20 @@ void Kriging::fit_impl(const arma::vec& y,
                 bounds_type.memptr());
 
             if (Optim::log_level > Optim::log_info) {
-              arma::cout << "  Start " << (start_idx + 1) << ", Retry " << (retry) << ": f_opt=" << opt_result.f_opt
-                         << ", num_iters=" << opt_result.num_iters << ", task=" << opt_result.task << arma::endl;
+              arma::cout << "  Start " << (start_idx + 1) << ", Retry " << restarts.retry()
+                         << ": f_opt=" << opt_result.f_opt << ", num_iters=" << opt_result.num_iters
+                         << ", task=" << opt_result.task << arma::endl;
             }
 
-            // "No improvement" below the optimizer's own relative tolerance
-            // (factr * epsmch) is no change: an exact comparison of two equal
-            // optima made the restart decision depend on the rounding (BLAS
-            // thread count, docs/dev/CholJitter.md, starting points)
-            const double f_tol
-                = optimizer.factr * arma::datum::eps * std::max(1.0, std::abs(std::min(best_f_opt, opt_result.f_opt)));
-            const bool worse = (best_f_opt < arma::datum::inf) && (opt_result.f_opt > best_f_opt + f_tol);
-            if (opt_result.f_opt < best_f_opt) {
-              best_f_opt = opt_result.f_opt;
+            if (restarts.record(opt_result.f_opt))
               best_gamma = gamma_tmp;
-            }
 
             // check theta part for distance to bounds
             arma::vec theta_part = (m_noise_model != NoiseModel::None && Optim::reparametrize)
                                        ? (m_noise_model == NoiseModel::Nugget ? nugget_reparam_from(gamma_tmp).head(d)
                                                                               : Optim::reparam_from(gamma_tmp).head(d))
                                        : (Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp.head(d));
-            // over free dimensions only: a pinned one (lower == upper, e.g. a
-            // constant input) is always "at its bound"
-            const arma::uvec free_dims = arma::find(theta_upper > theta_lower);
-            double sol_to_lb = free_dims.is_empty()
-                                   ? arma::datum::inf
-                                   : arma::min(arma::abs(theta_part(free_dims) - theta_lower(free_dims)));
-            double sol_to_ub = free_dims.is_empty()
-                                   ? arma::datum::inf
-                                   : arma::min(arma::abs(theta_part(free_dims) - theta_upper(free_dims)));
-            double sol_to_b = std::min(sol_to_ub, sol_to_lb);
+            const double sol_to_lb = RestartPolicy::distance_to_lower(theta_part, theta_lower, theta_upper);
 
             // Long-range local optimum: on noise-free data the single start
             // often converges (a sharp optimum, not a plateau) with a theta
@@ -4138,49 +4258,36 @@ void Kriging::fit_impl(const arma::vec& y,
             // long-range restart). The best solution is kept, so a genuinely
             // long-range optimum (inactive input) only costs the restarts.
             bool long_range = false;
-            if (long_range_restart_on && lr_restarts < Optim::max_long_range_restart && !free_dims.is_empty())
+            const arma::uvec free_dims = arma::find(theta_upper > theta_lower);
+            if (restarts.long_range_allowed() && !free_dims.is_empty())
               long_range = arma::max(theta_part(free_dims) / m_maxdX(free_dims)) > Optim::long_range_restart;
 
-            // Check abnormal termination or convergence at bounds to decide on restart
-            if ((retry < Optim::max_restart)
-                && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)  // Check for abnormal termination
-                    || (opt_result.num_iters <= 2)     // Start point is strangely quite optimal...
-                    || (sol_to_lb < arma::datum::eps)  // Stuck at lower bound
-                    || long_range                      // Long-range local optimum
-                    || worse)) {                       // No improvement
-              if (long_range)
-                lr_restarts++;
-
-              if (Optim::log_level > Optim::log_none) {
-                arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << (retry + 1)
-                           << "): f_opt=" << opt_result.f_opt << ", sol_to_lb=" << sol_to_lb
-                           << ", sol_to_ub=" << sol_to_ub << arma::endl;
-              }
-
-              // Restart with contracted bounds around initial point (theta part only)
-              // kept inside [theta_lower, theta_upper]: L-BFGS-B does not
-              // project its starting point, so an outside one gave a theta
-              // outside the bounds
-              arma::vec restart_theta = arma::max(
-                  arma::min(arma::vec((theta_start + theta_lower) / pow(2.0, retry + 1)), theta_upper), theta_lower);
-              gamma_tmp.head(d) = restart_theta;
-              if (m_noise_model != NoiseModel::None)
-                gamma_tmp.at(d) = extra0[start_idx % extra0.n_elem];
-              if (Optim::reparametrize) {
-                if (m_noise_model == NoiseModel::Nugget)
-                  gamma_tmp = nugget_reparam_to(gamma_tmp);
-                else if (m_noise_model == NoiseModel::Heterogeneous)
-                  gamma_tmp = Optim::reparam_to(gamma_tmp);
-                else
-                  gamma_tmp.head(d) = Optim::reparam_to(restart_theta);
-              }
-
-              gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
-              gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
-              retry++;
-            } else {
+            if (!restarts.restart(opt_result.task, opt_result.num_iters, sol_to_lb < arma::datum::eps, long_range))
               break;
+
+            if (Optim::log_level > Optim::log_none) {
+              arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << restarts.retry()
+                         << ", reasons " << restarts.last_reasons() << "): f_opt=" << opt_result.f_opt
+                         << ", sol_to_lb=" << sol_to_lb << arma::endl;
             }
+
+            // Restart from the start point contracted toward the lower bound
+            // (theta part only); the local bounds are widened to contain it
+            const arma::vec restart_theta = restarts.restart_theta(theta_start, theta_lower, theta_upper);
+            gamma_tmp.head(d) = restart_theta;
+            if (m_noise_model != NoiseModel::None)
+              gamma_tmp.at(d) = extra0[start_idx % extra0.n_elem];
+            if (Optim::reparametrize) {
+              if (m_noise_model == NoiseModel::Nugget)
+                gamma_tmp = nugget_reparam_to(gamma_tmp);
+              else if (m_noise_model == NoiseModel::Heterogeneous)
+                gamma_tmp = Optim::reparam_to(gamma_tmp);
+              else
+                gamma_tmp.head(d) = Optim::reparam_to(restart_theta);
+            }
+
+            gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
+            gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
           }
 
           // Final evaluation to update model
@@ -4201,18 +4308,18 @@ void Kriging::fit_impl(const arma::vec& y,
             result.theta = Optim::reparametrize ? Optim::reparam_from(best_gamma) : best_gamma;
           }
 
-          // Copy (not move) since m is a reference to preallocated memory
-          // Force DEEP copy to avoid any shared memory issues
-          result.L = arma::mat(m.L);          // Force copy constructor
-          result.R = arma::mat(m.R);          // Force copy constructor
-          result.Fstar = arma::mat(m.Fstar);  // Force copy constructor
-          result.Rstar = arma::mat(m.Rstar);  // Force copy constructor
-          result.Qstar = arma::mat(m.Qstar);  // Force copy constructor
-          result.Rinv = arma::mat(m.Rinv);    // Force copy constructor
-          result.Estar = arma::vec(m.Estar);  // Force copy constructor
-          result.ystar = arma::vec(m.ystar);  // Force copy constructor
-          result.SSEstar = m.SSEstar;
-          result.betahat = arma::vec(m.betahat);  // Force copy constructor
+          // Keep the model if this start is the best so far (no copy: the
+          // other starts' models are freed with their task)
+          {
+            std::lock_guard<std::mutex> lock(best_model_mutex);
+            if ((min_ofn_tmp < best_model_objective)
+                || (min_ofn_tmp == best_model_objective && best_model_idx >= 0
+                    && static_cast<int>(start_idx) < best_model_idx)) {
+              best_model = std::move(m);
+              best_model_objective = min_ofn_tmp;
+              best_model_idx = static_cast<int>(start_idx);
+            }
+          }
           result.success = true;
 
         } catch (const std::exception& e) {
@@ -4229,11 +4336,10 @@ void Kriging::fit_impl(const arma::vec& y,
       // Execute optimizations: the starts run concurrently in a thread pool
       // (TaskPool.hpp), which gives the cores to the starts first and the
       // remaining share to each start's BLAS / OpenMP calls; a single start
-      // runs inline with all of them. Each start works on its own
-      // preallocated KModel and the objectives are const. With MKL, BLAS calls
-      // from secondary threads may round differently from the calling
-      // thread's: BFGS20 matches the best of 20 BFGS1 up to that rounding
-      // (KrigingTest checks it to 1e-3 relative).
+      // runs inline with all of them. Each start works on its own KModel
+      // and the objectives are const. With MKL, BLAS calls from secondary
+      // threads may round differently from the calling thread's: BFGS20 matches the best of 20 BFGS1 up to that
+      // rounding (KrigingTest checks it to 1e-3 relative).
       std::vector<OptimizationResult> results(multistart);
       libKriging::detail::run_task_pool(
           multistart,
@@ -4282,29 +4388,34 @@ void Kriging::fit_impl(const arma::vec& y,
         m_est_theta = !theta_fixed;
         commit_approx(/*lmp_dof=*/true, best.extra_param);
       } else if (best_idx >= 0) {
+        if (best_idx != best_model_idx)
+          throw std::logic_error("Kriging::fit: best start " + std::to_string(best_idx) + " but best model from start "
+                                 + std::to_string(best_model_idx));
         const auto& best = results[best_idx];
+        Kriging::KModel& bm = best_model;
         m_theta = best.theta;  // copy
         m_est_theta = !theta_fixed;
         m_is_empty = false;
-        m_T = best.L;  // copy instead of move to avoid issues
-        m_R = best.R;
-        m_M = best.Fstar;
-        m_circ = best.Rstar;
-        m_star = best.Qstar;
-        m_Rinv = best.Rinv;
+        // moved: best_model is not used afterwards
+        m_T = std::move(bm.L);
+        m_R = std::move(bm.R);
+        m_M = std::move(bm.Fstar);
+        m_circ = std::move(bm.Rstar);
+        m_star = std::move(bm.Qstar);
+        m_Rinv = std::move(bm.Rinv);
 
         if (m_est_beta) {
-          m_beta = best.betahat;
-          m_z = best.Estar;
+          m_beta = std::move(bm.betahat);
+          m_z = std::move(bm.Estar);
         } else {
-          m_z = best.ystar - m_M * m_beta;
+          m_z = bm.ystar - m_M * m_beta;
         }
 
         if (m_noise_model == NoiseModel::Nugget) {
           m_alpha = best.extra_param;
           if (m_est_sigma2) {
             if (m_est_nugget) {
-              double total_var = best.SSEstar / n;
+              double total_var = bm.SSEstar / n;
               m_sigma2 = m_alpha * total_var;
               if (m_objective.compare("LMP") == 0)
                 m_sigma2 = m_sigma2 * n / (n - m_F.n_cols - 2);
@@ -4323,9 +4434,9 @@ void Kriging::fit_impl(const arma::vec& y,
             m_sigma2 = best.extra_param;
         } else {
           if (m_est_sigma2) {
-            m_sigma2 = best.SSEstar / n;
+            m_sigma2 = bm.SSEstar / n;
             if (m_objective.compare("LMP") == 0)
-              m_sigma2 = best.SSEstar / (n - m_F.n_cols);
+              m_sigma2 = bm.SSEstar / (n - m_F.n_cols);
           }
         }
 

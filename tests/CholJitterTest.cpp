@@ -84,8 +84,20 @@ TEST_CASE("fixed Cholesky jitter: the fit does not depend on the thread budget",
   Optim::set_num_threads_percent(saved_pct);
 
   INFO(c.kernel << " n " << c.n << " d " << c.d << " seed " << c.seed << "\ntheta\n" << theta << "LL " << ll.t());
+#if defined(__APPLE__)
+  // Accelerate (always linked by Armadillo on macOS): the budget controls
+  // neither its BLAS threads nor anything else on this path (single start, no
+  // OpenMP in the macOS builds), so the three fits are the same computation and
+  // their gap is Accelerate's run-to-run variation, amplified along a flat
+  // direction of the LL: gauss n 200 d 2 seed 1 gave theta 1.7e-4 with the LL
+  // equal to 5 digits (macOS-latest, #452). 1e-3 still separates the basins
+  // this test is about (31 % and 0.3 % without the jitter).
+  const double theta_tol = 1e-3;
+#else
+  const double theta_tol = 1e-4;
+#endif
   for (int i = 1; i < 3; ++i) {
-    CHECK(arma::max(arma::abs(theta.row(i) - theta.row(0)) / theta.row(0)) < 1e-4);
+    CHECK(arma::max(arma::abs(theta.row(i) - theta.row(0)) / theta.row(0)) < theta_tol);
     CHECK(std::abs(ll(i) - ll(0)) < 1e-4 * std::max(1.0, std::abs(ll(0))));
   }
 }

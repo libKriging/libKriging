@@ -10,9 +10,9 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
-unsigned int Random::seed = 123;
+thread_local unsigned int Random::seed = 123;
 
-std::mt19937 Random::engine(123);
+thread_local std::mt19937 Random::engine(123);
 
 LIBKRIGING_EXPORT void Random::reset_seed(unsigned int seed) {
   Random::seed = seed;

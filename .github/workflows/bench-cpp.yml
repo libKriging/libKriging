@@ -1,21 +1,29 @@
 name: C++ Kriging Benchmarks
 
 on:
+  # branches are benchmarked through their pull request (any base, as the
+  # former push trigger on every branch did); master on push
   push:
     branches:
       - master
-      - '*'
     tags:
       - 'bench*'
   pull_request:
     branches:
-      - master
+      - '*'
   workflow_dispatch:
     inputs:
       iterations:
         description: 'Number of iterations per test'
         required: false
         default: '10'
+
+# One run per pull request (or branch) and workflow: a new push to a pull
+# request cancels its run in progress; master pushes and scheduled runs are
+# never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   DEBUG_CI: false
