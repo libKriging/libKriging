@@ -11,8 +11,14 @@
 //   ll_upd / llfun_upd  the same after update(refit = false) with 10 points
 //   ll_i / ll_i_upd     candidate (i), logLikelihood() of the committed model, with
 //             a library carrying the study hook (LK_JR_HOOK=1; see ll_committed)
-// Variant (environment LK_JR=ii, same hook): commit with the search jitter.
 //   rmse / nlpd / cov95 test scores (500 points, noise-free truth), wall_s
+// Variant (environment LK_JR=ii, same hook): commit with the search jitter.
+// The study hook (measured on master 6e008b2, not committed) reads LK_JR:
+//   LinearAlgebra::model_chol_jitter(double kj): return kj if LK_JR == "ii";
+//   Kriging::logLikelihood(): if LK_JR == "i", evaluate with m_chol_jitter
+//     temporarily set to m_model_chol_jitter (the committed, exact diagonal);
+//   WarpKriging::logLikelihood(): if LK_JR == "i", return concentrated_ll()
+//     (the committed exact cache).
 // Models: kriging, none (WarpKriging, "none" warps), kuma (kumaraswamy warps),
 // mlp (MLPKriging({8}, 2, tanh), noise-free only), nested (NestedKriging, 4
 // groups, NK aggregation, noise-free only: scores only).
