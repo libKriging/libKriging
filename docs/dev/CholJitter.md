@@ -252,6 +252,64 @@ the long-range restart above (c = 2, on by default for a single start) gives BFG
 multistart remains the only reliable choice with many inactive inputs. Not measured: matern5_2,
 n > 2000, more than 2 sets at n 2000, a machine with more cores (budgets 100 / 200 % distinct).
 
+## One rule for every class (#465)
+
+Rule, for `Kriging`, `WarpKriging` / `MLPKriging` and `NestedKriging` (its submodels): the
+search and the objective accessors (`logLikelihood()`, `leaveOneOut()`, `logMargPost()`) use the
+search diagonal 1 + `J`, the committed model is exact, and an accessor always equals its
+objective function at the committed parameters (`logLikelihood() == logLikelihoodFun(theta())`):
+after `fit`, `update` (with or without refit) and `load` (`tests/JitterRuleTest.cpp`). Kriging
+and NestedKriging already followed it (T7 smoke profile, 400 fits: bit-identical); WarpKriging /
+MLPKriging returned the committed exact model's log-likelihood after `update(refit = false)` and
+for a file saved without `objective_ll`.
+
+Two other rules were measured and not kept (`bench-fit-protocol --candidates 1`: the model of
+each Kriging fit rebuilt at its theta with jitter 0 and J, checked against `logLikelihood()` and
+`predict`; `bench/thread-budget/jitter_rule_study.cpp` for the other classes, with a temporary
+study hook in the library, not committed):
+
+- (i) **`logLikelihood()` of the committed exact model.** It is not the quantity the fit
+  maximizes: theta is not its maximizer and it differs from the objective by up to 61 (LL, gauss,
+  n 200), 180 (LOO fit), 487 (matern5_2, n 1000) and 668 (gauss Branin, n 1000) units. Where R is
+  numerically singular it is rounding: the plain Cholesky fails on 30 of 120 gauss fits at
+  n 500 and at n 1000 (R has negative eigenvalues in floating point, the value then comes from
+  the stepwise `num_nugget` retry), and two exact evaluations (Cholesky, eigen-decomposition)
+  differ by up to 0.2 (n 200), 0.4 (matern5_2, n 1000) and 2.9 (LOO fit, n 200) units. With
+  warps that bring rows of Phi together it falls far below the objective: MLPKriging after
+  `update(refit = false)`, gauss / matern5_2, n 100-200: up to 907 / 587 units.
+- (ii) **Commit with the search jitter** (WarpKriging before #428). It costs the accuracy the
+  exact commit recovers: test RMSE ratio to the exact model, p90 / max, gauss LL n 200 1.64 / 2.44,
+  n 500 1.81 / 2.35, n 1000 2.37 / 2.69, LOO n 200 1.86 / 6.08; matern5_2 n 500 1.24 / 2.49;
+  NLPD p90 +0.8 to +1.05 (gauss n 200-1000); the median is 1 (hartmann6, sinhalf8 unchanged; Branin
+  and sin4 carry the cost: gauss Branin median ratio 1.69).
+
+| kernel | objective | n | fits | LL exact − LL(J), median / max | exact Cholesky fails | LL exact, Cholesky vs eigen, max | RMSE (ii) / exact, median / p90 / max | NLPD (ii) − exact, p90 | coverage 95 %, exact / (ii) |
+|---|---|---|---|---|---|---|---|---|---|
+| gauss | LL | 100 | 120 | 5e-08 / 2 | 0 | 6.5e-06 | 1 / 1.023 / 1.182 | 0.0493 | 0.917 / 0.919 |
+| gauss | LL | 200 | 120 | 3e-07 / 60.7 | 0 | 0.21 | 1 / 1.641 / 2.439 | 1.05 | 0.940 / 0.950 |
+| gauss | LL | 500 | 120 | 0.000108 / 240 | 30 | 2.3e-05 | 1 / 1.808 / 2.351 | 0.806 | 0.968 / 0.969 |
+| gauss | LL | 1000 | 120 | 0.00944 / 668 | 30 | 0.077 | 1 / 2.365 / 2.692 | 0.937 | 0.969 / 0.971 |
+| gauss | LMP | 100 | 120 | 2.6e-08 / 2.1 | 0 | 4.6e-06 | 1 / 1.023 / 1.188 | 0.0505 | 0.900 / 0.900 |
+| gauss | LMP | 200 | 120 | 4e-07 / 61.2 | 0 | 0.21 | 1 / 1.646 / 2.456 | 1.05 | 0.937 / 0.946 |
+| gauss | LOO | 100 | 120 | 0 / 22.5 | 0 | 0.00056 | 1 / 1.126 / 1.568 | 0.195 | 0.893 / 0.899 |
+| gauss | LOO | 200 | 120 | 5e-08 / 180 | 0 | 2.9 | 1 / 1.858 / 6.08 | 0.988 | 0.934 / 0.941 |
+| matern5_2 | LL | 100 | 120 | 1e-07 / 3.26 | 0 | 1.1e-05 | 1 / 1.001 / 1.09 | 0.00794 | 0.949 / 0.949 |
+| matern5_2 | LL | 200 | 120 | 0.0736 / 33.1 | 0 | 0.0039 | 1 / 1.105 / 1.334 | 0.235 | 0.976 / 0.977 |
+| matern5_2 | LL | 500 | 120 | 50.3 / 153 | 0 | 0.12 | 1 / 1.24 / 2.494 | 0.325 | 0.987 / 0.987 |
+| matern5_2 | LL | 1000 | 120 | 165 / 487 | 0 | 0.44 | 1 / 1 / 1.011 | 0.0121 | 0.987 / 0.987 |
+| matern5_2 | LMP | 100 | 120 | 4e-07 / 4.24 | 0 | 3.5e-05 | 1 / 1.002 / 1.093 | 0.02 | 0.945 / 0.944 |
+| matern5_2 | LMP | 200 | 120 | 1.24 / 33.9 | 0 | 0.0051 | 1 / 1.105 / 1.343 | 0.235 | 0.979 / 0.979 |
+| matern5_2 | LOO | 100 | 120 | 8.8e-06 / 5.48 | 0 | 5.2e-05 | 1 / 1.056 / 1.204 | 0.0905 | 0.940 / 0.940 |
+| matern5_2 | LOO | 200 | 120 | 0.48 / 73.5 | 0 | 0.014 | 1 / 1.227 / 1.585 | 0.403 | 0.978 / 0.979 |
+
+T7 data (functions sin4, hartmann6, branin4, sinhalf8, 30 sets each), noise-free, `BFGS4`;
+4-vCPU Intel Xeon VM @ 2.1 GHz, gcc 13.3, OpenBLAS 0.3.26 pthreads, Release (2026-11-12). With a nugget or a noise vector J = 0: the three rules coincide. The independent
+reconstruction agrees with `logLikelihood()` to 1e-4 except on one fit of 120 (matern5_2, sin4,
+n 1000, set 29, long-range theta): 123 units, the retry or the rounding of the objective itself
+at rcond 1e-14; not investigated here.
+
+WarpKriging / MLPKriging / NestedKriging: measurements in progress (`jitter_rule_study`), table to come.
+
 ## Open items
 
 - Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;
