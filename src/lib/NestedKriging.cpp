@@ -6,6 +6,8 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
 
+#include "OmpLoops.hpp"
+#include "ParallelFor.hpp"
 #include "ThreadBudget.hpp"
 
 #include <algorithm>
@@ -17,16 +19,6 @@
 
 #ifdef _OPENMP
 #include <omp.h>
-#endif
-
-// ThreadSanitizer reports false-positive races on OpenMP stack captures when
-// libgomp is not TSan-instrumented; disable the NK pair-loop parallelism there.
-#if defined(__SANITIZE_THREAD__)
-#define LK_NESTED_NO_OMP 1
-#elif defined(__has_feature)
-#if __has_feature(thread_sanitizer)
-#define LK_NESTED_NO_OMP 1
-#endif
 #endif
 
 // =============================================================================
@@ -484,29 +476,28 @@ std::tuple<arma::vec, arma::vec> NestedKriging::predict_nk(const arma::mat& X_n,
     // cross-covariances between submodel predictors, parallel over pairs
     arma::cube cross(p, p, qc, arma::fill::zeros);
     const arma::sword npairs = static_cast<arma::sword>(p * (p - 1) / 2);
-#if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
     const arma::uword pair_work = (p > 1) ? (m_X.n_rows * m_X.n_rows) / p * qc : 0;
-#pragma omp parallel for schedule(dynamic) \
-    num_threads(libKriging::detail::omp_threads()) if (npairs > 1 && pair_work >= 40000)
-#endif
-    for (arma::sword k = 0; k < npairs; ++k) {
-      // unrank pair index k -> (i, j), i < j
-      arma::uword i = 0, j = 0, c = static_cast<arma::uword>(k);
-      for (i = 0; i < p; ++i) {
-        const arma::uword row_len = p - 1 - i;
-        if (c < row_len) {
-          j = i + 1 + c;
-          break;
-        }
-        c -= row_len;
-      }
-      const arma::mat Rij = corrMat(m_X.rows(m_groups[i]), m_X.rows(m_groups[j]));  // n_i x n_j
-      const arma::rowvec cij = arma::sum(W[i] % (Rij * W[j]), 0);                   // 1 x qc
-      for (arma::uword t = 0; t < qc; ++t) {
-        cross(i, j, t) = cij(t);
-        cross(j, i, t) = cij(t);
-      }
-    }
+    libKriging::detail::parallel_for(
+        0, npairs, 1, libKriging::detail::omp_threads(), npairs > 1 && pair_work >= 40000, [&](long lo_, long hi_) {
+          for (arma::sword k = static_cast<arma::sword>(lo_); k < static_cast<arma::sword>(hi_); ++k) {
+            // unrank pair index k -> (i, j), i < j
+            arma::uword i = 0, j = 0, c = static_cast<arma::uword>(k);
+            for (i = 0; i < p; ++i) {
+              const arma::uword row_len = p - 1 - i;
+              if (c < row_len) {
+                j = i + 1 + c;
+                break;
+              }
+              c -= row_len;
+            }
+            const arma::mat Rij = corrMat(m_X.rows(m_groups[i]), m_X.rows(m_groups[j]));  // n_i x n_j
+            const arma::rowvec cij = arma::sum(W[i] % (Rij * W[j]), 0);                   // 1 x qc
+            for (arma::uword t = 0; t < qc; ++t) {
+              cross(i, j, t) = cij(t);
+              cross(j, i, t) = cij(t);
+            }
+          }
+        });
 
     // aggregate per point
     for (arma::uword t = 0; t < qc; ++t) {
