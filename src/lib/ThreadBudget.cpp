@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <csignal>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -278,7 +279,21 @@ int physical_cores() {
   return n;
 }
 
+// Set in a forked child only (async-signal-safe store from the atfork child
+// handler, Kriging.cpp), cleared by Optim::set_num_threads_percent.
+static volatile std::sig_atomic_t forked_child = 0;
+
+void set_forked_child() {
+  forked_child = 1;
+}
+
+void clear_forked_child() {
+  forked_child = 0;
+}
+
 int budget_full() {
+  if (forked_child)
+    return 1;
   double share = Optim::num_threads_percent;
   if (!(share > 0.0))
     share = 1.0;

@@ -3,13 +3,17 @@
 
 // Private (not installed) helper: LK_OMP_LOOPS is 1 when the OpenMP loops of
 // the library are compiled in. ThreadSanitizer reports false-positive races on
-// them (libgomp is not TSan-instrumented, so the implicit barrier closing a
-// parallel region is not seen): they are compiled out under TSan, as
-// NestedKriging's pair loop.
+// them with a runtime it cannot see through (libgomp is not TSan-instrumented,
+// so the implicit barrier closing a parallel region is not seen): they are
+// compiled out under TSan, as NestedKriging's pair loop, unless LK_TSAN_OPENMP
+// is defined (CMake: SANITIZE=THREAD with Clang and LLVM libomp, whose Archer
+// tool, libarcher, reports the OpenMP synchronization to TSan; #420).
 
 #if defined(_OPENMP)
 #define LK_OMP_LOOPS 1
-#if defined(__SANITIZE_THREAD__)
+#if defined(LK_TSAN_OPENMP)
+// TSan-aware OpenMP runtime: the loops stay in and are checked
+#elif defined(__SANITIZE_THREAD__)
 #undef LK_OMP_LOOPS
 #elif defined(__has_feature)
 #if __has_feature(thread_sanitizer)

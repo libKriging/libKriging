@@ -26,6 +26,15 @@ int physical_cores();
 /// count bounds the BLAS only. Optim::get_num_threads().
 int budget_full();
 
+/// Called by the pthread_atfork child handler (Kriging.cpp): budget_full() is 1
+/// in a forked child until Optim::set_num_threads_percent() is called in it,
+/// whatever the OpenMP runtime, also without OpenMP (where nothing else bounds
+/// the multistart pool of the child; #420).
+void set_forked_child();
+
+/// Clears the cap of set_forked_child() (Optim::set_num_threads_percent).
+void clear_forked_child();
+
 /// Budget of a call: budget_full() divided by the number of public calls
 /// running concurrently in other user threads (concurrent_calls(), counted by
 /// BudgetScope), at least 1; budget_full() inside a pool worker (its share is

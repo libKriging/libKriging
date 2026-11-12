@@ -122,6 +122,23 @@ jobs:
             # ctest alone takes most of the 30 min default: 29m12s passed and
             # one run cancelled at 30 min after all tests passed (#445)
             timeout_minutes: 60
+          # OpenMP loops checked by TSan: Clang + LLVM libomp + Archer (libarcher,
+          # in libomp-dev); the GCC job above compiles them out (#420). Ubuntu
+          # 24.04 for LLVM 18: up to LLVM 16 (22.04 ships 14 / 15) Archer does
+          # not detect TSan and stops, and every parallel region's fork / join is
+          # reported as a race. LIBKRIGING_REQUIRE_ARCHER fails the configure
+          # step instead of running without it.
+          - name: "Thread Sanitizer (Clang + Archer)"
+            os: ubuntu-24.04
+            extra_cmake_options: "-DLIBKRIGING_REQUIRE_ARCHER=ON"
+            mode: Debug
+            enable_python: off
+            enable_octave: off
+            enable_memcheck: off
+            force_update: on
+            sanitizer: thread
+            compiler: clang
+            timeout_minutes: 90
 
     steps:
       - uses: actions/checkout@v4
@@ -143,6 +160,10 @@ jobs:
           echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
           echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
           echo "SANITIZE=${{matrix.sanitizer}}"                  >> $GITHUB_ENV
+          echo "COMPILER=${{matrix.compiler}}"                   >> $GITHUB_ENV
+          if [ -n "${{matrix.extra_cmake_options}}" ]; then
+            echo "EXTRA_CMAKE_OPTIONS=${{matrix.extra_cmake_options}}" >> $GITHUB_ENV
+          fi
 
       - name: Define local variables Unix Like
         shell: bash
@@ -189,6 +210,10 @@ jobs:
           fi
           if [ "${ENABLE_MEMCHECK}" == "on" ]; then
             tools/linux-macos/apt-install.sh valgrind python3-setuptools
+          fi
+          if [ "${COMPILER}" == "clang" ]; then
+            # libclang-rt-*-dev: the TSan runtime (not a dependency of clang on 24.04)
+            tools/linux-macos/apt-install.sh clang libomp-dev libclang-rt-18-dev
           fi
         if: runner.os == 'Linux' # or use $RUNNER_OS
 

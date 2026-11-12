@@ -9,7 +9,8 @@
 // `chunk` indices, dynamically distributed over at most `nthreads` OpenMP
 // threads. The body runs once on the whole range, on the calling thread, when
 // `parallel` is false, nthreads <= 1, the range is a single chunk, or the
-// OpenMP loops are not compiled in (no OpenMP, or TSan: OmpLoops.hpp). The body
+// OpenMP loops are not compiled in (no OpenMP, or TSan without
+// LK_TSAN_OPENMP: OmpLoops.hpp). The body
 // must not throw and the sub-ranges must be independent (disjoint outputs; any
 // reduction is done by the caller after the loop, in a fixed order).
 

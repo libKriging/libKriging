@@ -236,6 +236,7 @@ LIBKRIGING_EXPORT void Optim::set_num_threads_percent(double x) {
   if (!(x >= 0.0))
     throw std::invalid_argument("set_num_threads_percent: expected x >= 0 (x <= 1: ratio, x > 1: percentage)");
   Optim::num_threads_percent = x;
+  libKriging::detail::clear_forked_child();  // a forked child may opt back in
 }
 
 LIBKRIGING_EXPORT double Optim::get_num_threads_percent() {

@@ -12,6 +12,25 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Thread Sanitizer on the OpenMP loops** (#420, leftover of #439): with Clang + LLVM libomp,
+  CMake finds Archer (`libarcher`) under `SANITIZE=THREAD` and defines `LK_TSAN_OPENMP`: the
+  OpenMP loops (`OmpLoops.hpp`, NestedKriging's pair loop) stay compiled in and run on 2 threads
+  under TSan (`tools/linux-macos/test.sh` loads Archer, `.tsan-suppressions-archer`); new CI job
+  "Thread Sanitizer (Clang + Archer)" on Ubuntu 24.04 (LLVM 18). CMake runs a small TSan +
+  OpenMP program to check that Archer is active (up to LLVM 16 it does not detect TSan and
+  stops, and every parallel region is then reported as a race): `LK_TSAN_OPENMP` only then;
+  `-DLIBKRIGING_REQUIRE_ARCHER=ON` (the CI job) fails the configure step otherwise. The GCC /
+  libgomp TSan job still compiles the loops out.
+- **Thread budget of 1 in forked children, whatever the OpenMP runtime** (#420): the
+  `pthread_atfork` child handler caps the budget at 1 (a plain store, no call into the OpenMP
+  runtime) until `Optim::set_num_threads_percent` is called in the child. Before, only the
+  OpenMP count bounded it there: builds without OpenMP (R on macOS, the "without OpenMP" CI
+  builds) ran the child's multistart pool on all the physical cores. The C++ and R fork tests
+  check the budget in the child, before and after a fit.
+- **Verbose output of the Kriging multistart** (#420): the log lines of the concurrent starts
+  (`Optim::set_log_level` > 0) are written under a mutex; Armadillo's `operator<<` changes the
+  stream's format flags, a data race between pool workers found by the Clang + Archer TSan job
+  (the GCC TSan job runs on 1 thread, i.e. a pool of 1 worker, and does not see it).
 - **MKL thread control** (#445, T5): with Intel MKL / oneMKL, each multistart worker sets its own
   MKL thread count to its share of the budget (`MKL_Set_Num_Threads_Local`), and each public
   method the calling thread's count to the budget, restored after (before: every worker kept
