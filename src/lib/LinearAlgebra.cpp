@@ -19,6 +19,7 @@
 
 #include "BlasThreads.hpp"
 #include "OmpLoops.hpp"
+#include "ParallelFor.hpp"
 #include "ThreadBudget.hpp"
 
 #include <cstdlib>
@@ -201,16 +202,19 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R,
   // triangular loop, from n = kOmpMinRows on (OmpLoops.hpp). The OpenMP thread
   // count of the calling thread is the budget (a parallel multistart worker
   // gets its share, see WarpKriging.cpp).
-#ifdef LK_OMP_LOOPS
-#pragma omp parallel for schedule(dynamic, 8) \
-    num_threads(libKriging::detail::omp_threads()) if (n >= libKriging::detail::kOmpMinRows)
-#endif
-  for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++) {
-    const arma::uword i = static_cast<arma::uword>(si);
-    for (arma::uword j = 0; j < i; j++) {
-      (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta);
-    }
-  }
+  libKriging::detail::parallel_for(
+      0,
+      static_cast<long>(n),
+      8,
+      libKriging::detail::omp_threads(),
+      n >= libKriging::detail::kOmpMinRows,
+      [&](long lo, long hi) {
+        for (arma::uword i = static_cast<arma::uword>(lo); i < static_cast<arma::uword>(hi); i++) {
+          for (arma::uword j = 0; j < i; j++) {
+            (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta);
+          }
+        }
+      });
   (*R) *= factor;  // !!! requires that diag is setup after
 
   if (diag.n_elem == 0) {
@@ -246,18 +250,22 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(
       = R_old;  // T_old * T_old.t();// hope that does not cost too much... (we dont save previous R)
   // t0 = Bench::toc(nullptr, "    _Cov: restore old",t0);
   // New rows only, independent as in cholCov
-#ifdef LK_OMP_LOOPS
-  // same amount of work as the full matrix at n = kOmpMinRows
+  // parallel from the same amount of work as the full matrix at n = kOmpMinRows
   const bool parallel_rows = static_cast<unsigned long long>(n - n_old) * n
                              >= libKriging::detail::kOmpMinRows * libKriging::detail::kOmpMinRows / 2;
-#pragma omp parallel for schedule(dynamic, 8) num_threads(libKriging::detail::omp_threads()) if (parallel_rows)
-#endif
-  for (arma::sword si = static_cast<arma::sword>(n_old); si < static_cast<arma::sword>(n); si++) {
-    const arma::uword i = static_cast<arma::uword>(si);
-    for (arma::uword j = 0; j < i; j++) {
-      (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta);
-    }
-  }
+  libKriging::detail::parallel_for(
+      static_cast<long>(n_old),
+      static_cast<long>(n),
+      8,
+      libKriging::detail::omp_threads(),
+      parallel_rows,
+      [&](long lo, long hi) {
+        for (arma::uword i = static_cast<arma::uword>(lo); i < static_cast<arma::uword>(hi); i++) {
+          for (arma::uword j = 0; j < i; j++) {
+            (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta);
+          }
+        }
+      });
   //(*R).submat(n_old, n_old, n-1, n-1) *= factor; // !!! requires that diag is setup after
   (*R).submat(n_old, 0, n - 1, n_old - 1) *= factor;
   (*R).submat(0, n_old, n - 1, n - 1) *= factor;
@@ -478,41 +486,22 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
   const double* X_mem = X.memptr();
   double* dX_mem = dX.memptr();
 
-#ifdef LK_OMP_LOOPS
-  if (n >= 200) {  // Only use OpenMP for large enough matrices
-    int optimal_threads = libKriging::detail::omp_threads();
-#pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if (n >= 200)
-    for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
-      for (arma::sword j = i + 1; j < static_cast<arma::sword>(n); j++) {
-        arma::uword ij = i * n + j;
-        arma::uword ji = j * n + i;
-        for (arma::uword k = 0; k < d; k++) {
-          // X is column-major: X(row, col) = X_mem[row + col * n_rows]
-          double diff = X_mem[i + k * n] - X_mem[j + k * n];
-          // dX is column-major: dX(row, col) = dX_mem[row + col * n_rows]
-          dX_mem[k + ij * d] = diff;
-          dX_mem[k + ji * d] = diff;
+  libKriging::detail::parallel_for(
+      0, static_cast<long>(n), 8, libKriging::detail::omp_threads(), n >= 200, [&](long lo, long hi) {
+        for (arma::uword i = static_cast<arma::uword>(lo); i < static_cast<arma::uword>(hi); i++) {
+          for (arma::uword j = i + 1; j < n; j++) {
+            arma::uword ij = i * n + j;
+            arma::uword ji = j * n + i;
+            for (arma::uword k = 0; k < d; k++) {
+              // X is column-major: X(row, col) = X_mem[row + col * n_rows]
+              double diff = X_mem[i + k * n] - X_mem[j + k * n];
+              // dX is column-major: dX(row, col) = dX_mem[row + col * n_rows]
+              dX_mem[k + ij * d] = diff;
+              dX_mem[k + ji * d] = diff;
+            }
+          }
         }
-      }
-    }
-  } else {
-  #endif
-    for (arma::uword i = 0; i < n; i++) {
-      for (arma::uword j = i + 1; j < n; j++) {
-        arma::uword ij = i * n + j;
-        arma::uword ji = j * n + i;
-        for (arma::uword k = 0; k < d; k++) {
-          // X is column-major: X(row, col) = X_mem[row + col * n_rows]
-          double diff = X_mem[i + k * n] - X_mem[j + k * n];
-          // dX is column-major: dX(row, col) = dX_mem[row + col * n_rows]
-          dX_mem[k + ij * d] = diff;
-          dX_mem[k + ji * d] = diff;
-        }
-      }
-    }
-#ifdef LK_OMP_LOOPS
-  }
-  #endif
+      });
 
   return dX;
 }
@@ -527,29 +516,15 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
 
   // First compute off-diagonal elements with OpenMP parallelization
   // Use dynamic scheduling for load balancing (lower triangle has uneven work)
-#ifdef LK_OMP_LOOPS
-  if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
-    // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int optimal_threads = libKriging::detail::omp_threads();
-#pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if (n >= 200)
-    for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
-      for (arma::sword j = 0; j < i; j++) {
-        double cov_val = Cov(dX.col(i * n + j), theta) * factor;
-        (*R).at(i, j) = (*R).at(j, i) = cov_val;
-      }
-    }
-  } else {
-  #endif
-    // Serial version for small matrices or when OpenMP is disabled
-    for (arma::uword i = 0; i < n; i++) {
-      for (arma::uword j = 0; j < i; j++) {
-        double cov_val = Cov(dX.col(i * n + j), theta) * factor;
-        (*R).at(i, j) = (*R).at(j, i) = cov_val;
-      }
-    }
-#ifdef LK_OMP_LOOPS
-  }
-  #endif
+  libKriging::detail::parallel_for(
+      0, static_cast<long>(n), 8, libKriging::detail::omp_threads(), n >= 200, [&](long lo, long hi) {
+        for (arma::uword i = static_cast<arma::uword>(lo); i < static_cast<arma::uword>(hi); i++) {
+          for (arma::uword j = 0; j < i; j++) {
+            double cov_val = Cov(dX.col(i * n + j), theta) * factor;
+            (*R).at(i, j) = (*R).at(j, i) = cov_val;
+          }
+        }
+      });
 
   // Then set diagonal
   if (diag.n_elem == 0) {
@@ -578,47 +553,26 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
 
   // First compute off-diagonal elements with block-based OpenMP parallelization
   // Use dynamic scheduling because lower triangle has uneven work distribution
-#ifdef LK_OMP_LOOPS
-  if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
-    // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int optimal_threads = libKriging::detail::omp_threads();
-#pragma omp parallel for schedule(dynamic, 4) num_threads(optimal_threads) if (n >= 200)
-    for (arma::sword bi = 0; bi < static_cast<arma::sword>(n); bi += BLOCK_SIZE) {
-      arma::uword block_end_i = (bi + BLOCK_SIZE < n) ? bi + BLOCK_SIZE : n;
-
-      // Pre-allocate diff vector once per thread (thread-local)
-      arma::vec diff(d);
-      double* diff_mem = diff.memptr();
-
-      for (arma::uword i = bi; i < block_end_i; i++) {
-        for (arma::uword j = 0; j < i; j++) {
-          for (arma::uword k = 0; k < d; k++) {
-            diff_mem[k] = X_mem[k + i * d] - X_mem[k + j * d];
+  libKriging::detail::parallel_for(
+      0,
+      static_cast<long>(n),
+      static_cast<long>(BLOCK_SIZE),
+      libKriging::detail::omp_threads(),
+      n >= 200,
+      [&](long lo, long hi) {
+        // diff: one vector per range (thread-local)
+        arma::vec diff(d);
+        double* diff_mem = diff.memptr();
+        for (arma::uword i = static_cast<arma::uword>(lo); i < static_cast<arma::uword>(hi); i++) {
+          for (arma::uword j = 0; j < i; j++) {
+            for (arma::uword k = 0; k < d; k++) {
+              diff_mem[k] = X_mem[k + i * d] - X_mem[k + j * d];
+            }
+            double cov_val = Cov(diff, theta) * factor;
+            (*R).at(i, j) = (*R).at(j, i) = cov_val;
           }
-          double cov_val = Cov(diff, theta) * factor;
-          (*R).at(i, j) = (*R).at(j, i) = cov_val;
         }
-      }
-    }
-  } else {
-  #endif
-    // Serial version for small matrices or when OpenMP is disabled
-    // Pre-allocate diff vector to avoid repeated allocations
-    arma::vec diff(d);
-    double* diff_mem = diff.memptr();
-
-    for (arma::uword i = 0; i < n; i++) {
-      for (arma::uword j = 0; j < i; j++) {
-        for (arma::uword k = 0; k < d; k++) {
-          diff_mem[k] = X_mem[k + i * d] - X_mem[k + j * d];
-        }
-        double cov_val = Cov(diff, theta) * factor;
-        (*R).at(i, j) = (*R).at(j, i) = cov_val;
-      }
-    }
-#ifdef LK_OMP_LOOPS
-  }
-  #endif
+      });
 
   // Then set diagonal
   if (diag.n_elem == 0) {
@@ -649,24 +603,19 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
 
   // Block-based parallelization for better cache locality
   // Rectangular matrices have uniform work distribution, use static scheduling
-#ifdef LK_OMP_LOOPS
-  arma::uword total_work = n1 * n2;
-  if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
-    // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int optimal_threads = libKriging::detail::omp_threads();
-#pragma omp parallel num_threads(optimal_threads) if (total_work >= 40000)
-    {
-      // Pre-allocate diff vector once per thread (thread-local)
-      arma::vec diff(d);
-      double* diff_mem = diff.memptr();
-
-      #pragma omp for schedule(static) collapse(2)
-      for (arma::sword bi = 0; bi < static_cast<arma::sword>(n1); bi += BLOCK_SIZE) {
-        for (arma::sword bj = 0; bj < static_cast<arma::sword>(n2); bj += BLOCK_SIZE) {
-          arma::uword block_end_i = (bi + BLOCK_SIZE < static_cast<arma::sword>(n1)) ? bi + BLOCK_SIZE : n1;
-          arma::uword block_end_j = (bj + BLOCK_SIZE < static_cast<arma::sword>(n2)) ? bj + BLOCK_SIZE : n2;
-
-          // Process block with good cache locality
+  // the grid of BLOCK_SIZE x BLOCK_SIZE blocks, flattened (was collapse(2)); each
+  // range allocates its own diff vector
+  const arma::uword total_work = n1 * n2;
+  const arma::uword nbj = (n2 + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  const arma::uword nblocks = ((n1 + BLOCK_SIZE - 1) / BLOCK_SIZE) * nbj;
+  libKriging::detail::parallel_for(
+      0, static_cast<long>(nblocks), 1, libKriging::detail::omp_threads(), total_work >= 40000, [&](long lo, long hi) {
+        arma::vec diff(d);
+        double* diff_mem = diff.memptr();
+        for (arma::uword b = static_cast<arma::uword>(lo); b < static_cast<arma::uword>(hi); b++) {
+          const arma::uword bi = (b / nbj) * BLOCK_SIZE, bj = (b % nbj) * BLOCK_SIZE;
+          const arma::uword block_end_i = std::min(bi + BLOCK_SIZE, n1);
+          const arma::uword block_end_j = std::min(bj + BLOCK_SIZE, n2);
           for (arma::uword i = bi; i < block_end_i; i++) {
             for (arma::uword j = bj; j < block_end_j; j++) {
               for (arma::uword k = 0; k < d; k++) {
@@ -676,26 +625,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
             }
           }
         }
-      }
-    }
-  } else {
-  #endif
-    // Serial version for small matrices or when OpenMP is disabled
-    // Pre-allocate diff vector to avoid repeated allocations
-    arma::vec diff(d);
-    double* diff_mem = diff.memptr();
-
-    for (arma::uword i = 0; i < n1; i++) {
-      for (arma::uword j = 0; j < n2; j++) {
-        for (arma::uword k = 0; k < d; k++) {
-          diff_mem[k] = X1_mem[k + i * d] - X2_mem[k + j * d];
-        }
-        (*R).at(i, j) = Cov(diff, theta) * factor;
-      }
-    }
-#ifdef LK_OMP_LOOPS
-  }
-  #endif
+      });
 }
 
 // Efficient computation of trace(A * B) = sum_i sum_j A(i,j) * B(j,i)

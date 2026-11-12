@@ -14,7 +14,7 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
-#include "OmpLoops.hpp"
+#include "ParallelFor.hpp"
 
 #include <array>
 #include <cmath>
@@ -105,7 +105,7 @@ void with_dln(const std::string& covType, const arma::vec& theta, Body&& body) {
 // per-pair weights (pairs j < i) and D_k(i, j) = dlnCov/dtheta_k(dX_ij),
 // writes out[l * d + k] = sum_{j < i} W(i, j)[l] * D_k(i, j).
 // The sum is taken row by row (j ascending), then over the rows (i ascending),
-// whatever `threads` (rows spread over that many OpenMP threads when > 1): the
+// whatever `threads` (rows spread over that many threads when > 1, ParallelFor.hpp): the
 // result depends neither on the thread count nor on the n from which the
 // caller goes parallel (kOmpMinRows, OS dependent), tested by
 // tests/GradientThreadsTest.cpp. Extra memory: NW * d * n doubles (row partial
@@ -131,12 +131,10 @@ void sum_pairs_dln(const arma::mat& dX,
           acc[l * d + k] += w[l] * D.at(k);
     }
   };
-#ifdef LK_OMP_LOOPS
-#pragma omp parallel for schedule(dynamic, 8) num_threads(threads) if (threads > 1)
-#endif
-  for (arma::sword si = 0; si < static_cast<arma::sword>(n); si++)
-    add_row(static_cast<arma::uword>(si));
-  (void)threads;
+  parallel_for(0, static_cast<long>(n), 8, threads, threads > 1, [&](long lo, long hi) {
+    for (long i = lo; i < hi; i++)
+      add_row(static_cast<arma::uword>(i));
+  });
   for (arma::uword r = 0; r < NW * d; r++)
     out[r] = 0.0;
   for (arma::uword i = 0; i < n; i++)

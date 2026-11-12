@@ -21,6 +21,7 @@
 #if !defined(_WIN32) && defined(_POSIX_VERSION)
 #include <sys/wait.h>
 #include <unistd.h>
+#include "test_fork_exit.hpp"
 #define LK_TEST_FORK 1
 #endif
 
@@ -218,7 +219,7 @@ TEST_CASE("fork() quiesces the child only and restores the parent's thread count
     if (MKL_Get_Max_Threads)
       ok = ok && MKL_Get_Max_Threads() <= 1;
 #endif
-    _exit(ok ? 0 : 1);
+    lk_test_fork_child_exit(ok ? 0 : 1);
   }
   REQUIRE(pid > 0);
   int status = 0;
