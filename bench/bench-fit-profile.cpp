@@ -70,6 +70,10 @@ int main(int argc, char* argv[]) {
 
   std::cout << "\n=== TOTAL FIT TIME ===\n";
   std::cout << "Total: " << std::fixed << std::setprecision(2) << total_ms << " ms\n";
+  std::cout << "LL: " << std::setprecision(10) << kr.logLikelihood() << "\ntheta:";
+  for (arma::uword k = 0; k < kr.theta().n_elem; ++k)
+    std::cout << " " << std::setprecision(8) << kr.theta()(k);
+  std::cout << "\n";
   std::cout << "\nTo profile LinearAlgebra calls, use:\n";
   std::cout << "  valgrind --tool=callgrind ./bench-fit-profile " << n_train << " " << d << "\n";
   std::cout << "  callgrind_annotate callgrind.out.<pid> | grep 'LinearAlgebra::'\n";
