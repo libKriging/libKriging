@@ -83,7 +83,8 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
   workers); kept for WarpKriging (`Optim::thread_start_delay_ms`).
 
 Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
-= 200 on Linux, 800 elsewhere until measured (`src/lib/OmpLoops.hpp`), a
+= 200 on Linux and with MSVC on Windows (#473), 800 elsewhere until measured
+(macOS, MinGW: Octave / R on Windows; `src/lib/OmpLoops.hpp`), a
 performance setting only once #441 is merged (section 4); `n >= 200`
 (`compute_dX`, `covMat_sym_*`); `n_o × n_n >= 40000` (predict / simulate `R_on`,
 `covMat_rect`, Vecchia, NestedKriging).
@@ -425,8 +426,10 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
   (runners are too noisy for pass / fail on timings) (#421).
 - Other BLAS (FlexiBLAS, BLIS; Accelerate): sections 5 and 8 (#422). MKL driven
   since #445, checked in CI since T9.
-- macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then;
-  performance only with #441).
+- macOS (#416) and MinGW on Windows (Octave, R): measure `kOmpMinRows` there
+  (800 until then; performance only with #441). MSVC on Windows: 200 since #473
+  (#473; measurements in `docs/dev/rationalization/Windows-results.md` on the
+  `windows-session-1` branch, section 2).
 - Concurrent calls (3.1): Armadillo's RNG (WarpKriging warp initialization,
   subset-of-data selection) is global where Armadillo disables `thread_local`
   (MinGW, GCC on macOS); Accelerate's count not driven
