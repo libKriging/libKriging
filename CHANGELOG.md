@@ -19,8 +19,9 @@ past release, see the corresponding entry on the
   function at the committed parameters (`logLikelihood() == logLikelihoodFun(theta())`). Kriging
   and NestedKriging already did (no change of their results). WarpKriging / MLPKriging: after
   `update(refit = false)`, and for a file saved without `objective_ll`, `logLikelihood()` returned
-  the log-likelihood of the committed exact model, another quantity (MLP gauss, n 100-200: up to
-  900 units below the objective); it is now the objective there too. Fits, predictions and the
+  the log-likelihood of the committed exact model, another quantity (MLPKriging gauss /
+  matern5_2, n 100-200: up to 907 / 812 units from the objective); it is now the objective there
+  too. Fits, predictions and the
   value after `fit` / `update(refit = true)` / `load` are unchanged. Rules (i) "logLikelihood() of
   the exact model" and (ii) "commit with the search jitter" were measured and not kept
   (`docs/dev/CholJitter.md`, one rule for every class). Migration: code that read

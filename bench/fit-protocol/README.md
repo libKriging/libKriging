@@ -7,6 +7,11 @@ results and decisions: [docs/dev/rationalization/T7-benchmark-base.md](../../doc
   Settings that are not arguments come from the environment as for any libKriging program
   (`LK_LONG_RANGE_RESTART`, `LK_CHOL_JITTER`, `LK_NUM_THREADS_PERCENT`, ...): their effective
   values are in the `settings` column.
+- `--candidates 1` adds, for the noise-free fits, the columns of the jitter-rule study of #465
+  (the model rebuilt at the fitted theta with jitter 0 and J: its log-likelihood, a check by
+  eigen-decomposition, rcond, test RMSE / NLPD / coverage; `docs/dev/CholJitter.md`, one rule
+  for every class). Every run now also writes `nlpd` and `cov95` (95 % interval coverage) of the
+  committed model.
 - `run.py`: runs a profile (`smoke`, `reference`, `full`) for a list of variants (environment +
   optimizers), one process per chunk, one CSV per (variant, chunk), resumable; writes
   `machine.txt`; `--merge x.csv.gz`, `--summary`.

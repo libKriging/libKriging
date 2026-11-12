@@ -308,7 +308,65 @@ reconstruction agrees with `logLikelihood()` to 1e-4 except on one fit of 120 (m
 n 1000, set 29, long-range theta): 123 units, the retry or the rounding of the objective itself
 at rcond 1e-14; not investigated here.
 
-WarpKriging / MLPKriging / NestedKriging: measurements in progress (`jitter_rule_study`), table to come.
+Other classes (`jitter_rule_study`: Kriging, WarpKriging with `"none"` and `"kumaraswamy"` warps,
+MLPKriging({8}, 2, tanh), NestedKriging 4 groups; gauss, matern5_2, matern3_2; noise-free and a
+known noise variance (0.05 sd(y))^2; the four T7 functions, n 100 and 200, 10 sets, `BFGS4`;
+`update(refit = false)` with 10 points). "upd" is the value after that update; `llfun` is
+`logLikelihoodFun(theta())`; "before #465" is the committed library's `logLikelihood()`:
+
+| model | kernel | noise | fits | upd: abs(LL before #465 − llfun), median / max | (i) at fit: LL exact − objective, min / max | (i) upd: LL exact − objective, min / max | Kriging's objective − this one at the same theta, max |
+|---|---|---|---|---|---|---|---|
+| none | gauss | hetero | 80 | 0.0204 / 3.66 | -4.39e-05 / 3.19e-05 | -3.66 / -4.26e-05 | 4.4e-05 |
+| none | gauss | none | 80 | 5e-07 / 73.7 | -0.493 / 59.8 | -0.807 / 73.7 | 0 |
+| none | matern3_2 | hetero | 80 | 0.0284 / 1.07 | -8.89e-05 / 0.000603 | -1.07 / 0.347 | 0.0006 |
+| none | matern3_2 | none | 80 | 6.02e-05 / 0.106 | 0 / 0.0916 | -1e-08 / 0.106 | 0.092 |
+| none | matern5_2 | hetero | 80 | 0.0289 / 2.44 | -0.000195 / 0.000379 | -2.44 / 0.337 | 0.00038 |
+| none | matern5_2 | none | 80 | 4.35e-05 / 39.6 | 0 / 33.1 | -3e-08 / 39.6 | 0 |
+| kuma | gauss | hetero | 80 | 0.0172 / 8.75 | -0.0021 / 0.000933 | -8.75 / 0.0424 | — |
+| kuma | gauss | none | 80 | 1.31e-06 / 66.1 | -55.6 / 40.3 | -66.1 / 41.6 | — |
+| kuma | matern3_2 | hetero | 80 | 0.0235 / 7.64 | -8e-07 / 0.000619 | -7.64 / 0.435 | — |
+| kuma | matern3_2 | none | 80 | 0.000205 / 0.172 | 0 / 0.145 | -1.2e-07 / 0.172 | — |
+| kuma | matern5_2 | hetero | 80 | 0.0229 / 14.1 | -0.000172 / 0.000459 | -14.1 / 0.354 | — |
+| kuma | matern5_2 | none | 80 | 0.000355 / 34.8 | 0 / 28.8 | -4.39 / 34.8 | — |
+| mlp | gauss | none | 80 | 27.2 / 907 | -12.3 / 56.5 | -907 / 57.3 | — |
+| mlp | matern3_2 | none | 80 | 0.0354 / 170 | -155 / 4.74 | -170 / 1.04 | — |
+| mlp | matern5_2 | none | 80 | 98.9 / 812 | -90.6 / 4e-07 | -812 / 5 | — |
+
+Rule (ii) on the same data (5 sets; theta identical in every pair: the search does not change):
+
+| model | kernel | noise | pairs | RMSE (ii) / exact, median / p90 / max | NLPD (ii) − exact, p90 / max | coverage 95 %, exact / (ii) |
+|---|---|---|---|---|---|---|
+| none | gauss | hetero | 40 | 1 / 1 / 1 | 0 / 1e-07 | 0.935 / 0.935 |
+| none | gauss | none | 40 | 1 / 1.158 / 2.439 | 0.32 / 1.2 | 0.937 / 0.941 |
+| none | matern3_2 | hetero | 40 | 1 / 1 / 1 | 2e-07 / 4e-06 | 0.976 / 0.976 |
+| none | matern3_2 | none | 40 | 1 / 1 / 1 | 0.0002 / 0.00106 | 0.980 / 0.980 |
+| none | matern5_2 | hetero | 40 | 1 / 1 / 1 | 4e-08 / 1e-05 | 0.959 / 0.959 |
+| none | matern5_2 | none | 40 | 1 / 1.062 / 1.334 | 0.127 / 0.482 | 0.972 / 0.972 |
+| kuma | gauss | hetero | 40 | 1 / 1 / 1 | 0 / 1e-06 | 0.897 / 0.897 |
+| kuma | gauss | none | 40 | 1 / 1.004 / 1.052 | 0 / 0.187 | 0.851 / 0.885 |
+| kuma | matern3_2 | hetero | 40 | 1 / 1 / 1 | 2e-06 / 1e-05 | 0.971 / 0.971 |
+| kuma | matern3_2 | none | 40 | 1 / 1 / 1.001 | 0.00025 / 0.00174 | 0.974 / 0.974 |
+| kuma | matern5_2 | hetero | 40 | 1 / 1 / 1 | 0 / 1e-06 | 0.944 / 0.944 |
+| kuma | matern5_2 | none | 40 | 1 / 1.006 / 1.045 | 0.0393 / 0.224 | 0.948 / 0.953 |
+| mlp | gauss | none | 40 | 0.9965 / 1.017 / 1.354 | 0.0401 / 0.406 | 0.954 / 0.952 |
+| mlp | matern3_2 | none | 40 | 1 / 1 / 1.029 | 0 / 0.00043 | 0.952 / 0.955 |
+| mlp | matern5_2 | none | 40 | 1 / 1 / 1.046 | 0 / 0.0345 | 0.961 / 0.961 |
+| nested | gauss | none | 40 | 1 / 1 / 1.006 | 2e-05 / 0.0113 | 0.628 / 0.628 |
+| nested | matern3_2 | none | 40 | 1 / 1 / 1 | 0 / 0 | 0.823 / 0.823 |
+| nested | matern5_2 | none | 40 | 1 / 1 / 1 | 3.1e-05 / 0.00011 | 0.746 / 0.746 |
+
+- Before #465, WarpKriging / MLPKriging changed the meaning of `logLikelihood()` after
+  `update(refit = false)`: MLPKriging gauss / matern5_2 then reported a value 27 / 99 units
+  (median) and up to 907 / 812 units away from the objective; Kriging re-evaluated the objective.
+- (i) moves the value of every class wherever J > 0 and R is near singular (Kriging gauss up to
+  60, kumaraswamy gauss −56 to +40, MLP −155 to +57 at the fit) and makes it a function of the
+  rounding (above).
+- (ii) costs WarpKriging `"none"` what it costs Kriging (gauss: RMSE x 2.4 at worst, NLPD +1.2);
+  kumaraswamy, MLP and NestedKriging lose little (RMSE <= x 1.35, NLPD <= +0.41): their stdev is
+  dominated by the warps / the aggregation.
+- The `N` floor of the WarpKriging search: Kriging's objective at the same theta differs by up to
+  0.09 (matern3_2, noise-free) and 6e-4 (with noise); 0 for gauss / matern5_2 noise-free (same J).
+
 
 ## Open items
 
