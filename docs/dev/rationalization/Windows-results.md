@@ -4,7 +4,7 @@ Session on a physical Windows machine for #473 (part of #464, takes over the TOD
 of #417). Branch `windows-session-1` from `origin/master` 6e008b24. Raw numbers,
 commands and conclusions; the summary goes on #473.
 
-Status: in progress (sections 0, 1 partly done).
+Status: sections 0–2 done for MSVC; MinGW, R and section 3 not done (see "Not done").
 
 Conventions: no `OMP_NUM_THREADS` / `OPENBLAS_NUM_THREADS` in the environment
 unless stated; `OPENBLAS_L2_SIZE=2048` (`tools/windows/loadenv.sh`) always.
@@ -293,3 +293,63 @@ C++ (`build-omp200`, MSVC Release, full tree):
   `LK_NUM_THREADS_PERCENT=50`: `BlasThreadsTest` 40/40 pass (1.80–2.00 s),
   `ConcurrentCallsTest` 40/40 the same two failures (0.55–0.65 s). No hang, no
   timing outlier: identical to threshold 800 (1.1).
+
+Python (`build-py-omp200`: MSVC Debug as the CI job, threshold 200, no
+`OMP_NUM_THREADS`):
+
+- Python suite (`ctest -L Python`) × 5: 19 passed + 2 skipped (scikit-learn)
+  each time, 32.8–33.6 s. Three Python tests cross the threshold (n = 200, 200,
+  400: `pylibkriging_nested_test.py`, `test_new_features.py`,
+  `threading_test.py`).
+- #354 reproducer × 20: 20 passed, 1.08–1.13 s.
+- Stress: 200 `BFGS4` fits + predict (n = 300, d = 4, matern5_2, 250 prediction
+  points) in one Python process: 85.9 s, per fit median 0.370 s (0.317–1.321). No
+  hang.
+
+### 2.5 One BLAS thread for small problems
+
+The sweep (2.2) shows OpenBLAS at 1 thread beating 10 below n ≈ 800. Full fits,
+threshold-200 build, default (rule off: SMT headroom) vs `LK_BLAS_THREADS_MIN_N=500`,
+5 runs, `bench/thread-budget/windows-msvc-smalln.csv`:
+
+| n | optim | default ms (min–max) | 1 BLAS thread | gain | CPU ms | LL default / 1 thread |
+|---|---|---|---|---|---|---|
+| 200 | BFGS | 215.6 (197.0–225.3) | 135.5 (125.6–146.9) | ×1.59 | 2484 → 1703 | 104.9913221612 / 105.0070262614 |
+| 200 | BFGS4 | 115.7 (115.3–120.2) | 104.7 (101.0–112.0) | ×1.10 | 2125 → 2016 | 106.3404412663 / …657 |
+| 300 | BFGS | 185.8 (169.9–190.6) | 123.2 (111.7–164.6) | ×1.51 | 2203 → 1578 | 336.4893950428 / …49941 |
+| 300 | BFGS4 | 314.8 (313.3–326.4) | 291.1 (284.3–298.9) | ×1.08 | 3125 → 2875 | 336.4893920341 / …20145 |
+| 400 | BFGS | 260.9 (255.4–269.3) | 216.1 (183.6–233.5) | ×1.21 | 3125 → 2484 | 683.3786642404 / …39158 |
+| 400 | BFGS4 | 329.4 (315.6–332.8) | 306.4 (301.0–315.0) | ×1.08 | 3641 → 3484 | 683.3786728010 / …29527 |
+
+At threshold 800 (master vs the PR build, 5 runs): BFGS ×1.38 / ×1.33 / ×1.16,
+BFGS4 ×1.09 / ×1.12 / ×1.06 at n = 200 / 300 / 400. Opposite to Linux, where with
+SMT the BLAS at the budget won at every size: **PR #478** (rule always on with
+MSVC).
+
+## Decisions and PRs
+
+| # | PR | What | Based on |
+|---|---|---|---|
+| 1 | #474 | public objective functions open a `BudgetScope`; tests compare to a tolerance when the BLAS count can change | 1.1, 1.2 |
+| 2 | #475 | Windows: cores of the affinity mask | 2.1 |
+| 3 | #476 | `kOmpMinRows` 200 with MSVC (MinGW, macOS keep 800) | 2.2–2.4 |
+| 4 | #477 (on #474) | Windows Python CI without `OMP_NUM_THREADS=1`; `ConcurrentCallsTest` full-budget tolerance 1e-4 → 2e-3 | 1.1, 2.4 |
+| 5 | #478 | small-problem rule always on with MSVC | 2.2, 2.5 |
+
+Proposals without PR:
+
+- Python OpenBLAS lookup: no change (1.3).
+- `BlasBackendTest` and `bench-threads`: add the `GetProcAddress` path on Windows
+  (1.4), so that `LK_EXPECT_BLAS` and the sweep's `blas_threads` column work there.
+- `pylibkriging` holds the GIL in fit / predict / simulate: releasing it would
+  make Python threads really concurrent (1.3; not Windows-specific).
+
+## Not done
+
+- MinGW build (Octave toolchain; Rtools45 is installed): no sweep, threshold and
+  hang behaviour of libgomp on Windows unmeasured; the Octave job keeps
+  `OMP_NUM_THREADS=1`, MinGW keeps threshold 800 and the former small-problem rule.
+- R binding build and tests.
+- Section 3 (optional): MKL on Windows (`LK_EXPECT_BLAS=mkl` needs 1.4 first),
+  Octave package.
+- SMT off; several processor groups.
