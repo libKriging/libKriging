@@ -189,7 +189,7 @@ mandatory; measurements go in the task's log `docs/dev/rationalization/T<n>-*.md
 | # | Subject | Decision |
 |---|---|---|
 | D1 | Runners of `blas-backends.yml` (T9) | GitHub-hosted only (`ubuntu-24.04`, `macos-15`); no self-hosted runner |
-| D2 | `ConcurrentCallsTest` full-budget tolerance (T6, T9) | 1e-4 on theta (was 1e-10, provisional 1e-3); the budget-1 bit-identical case is kept |
+| D2 | `ConcurrentCallsTest` full-budget tolerance (T6, T9) | 2e-3 on every compared quantity since #473 (1e-4 before: 8.1e-4 measured on Windows / OpenBLAS 0.3.33 with 20 threads; was 1e-10, provisional 1e-3); the budget-1 bit-identical case is kept |
 | D3 | `fork()` case under ASan / LSan (T6) | The case is excluded from the ASan / LSan jobs (declared exclusion); the child keeps its fit everywhere it runs |
 | D4 | MLPKriging calibration folds (T8) | Revised 2026-11-05: K = 3 everywhere (the MLPKriging default optimizer stays single-start `BFGS`, T3 does not change it, so K = 5 kept no gain); accepted cost: NLPD +0.56 [+0.20, +0.97] for multistart `BFGSn` fits, whose users are advised to set K = 5; the removal of the >= 1 clamp is kept |
 | D5 | Intermittent Nystrom test | New task T10 |

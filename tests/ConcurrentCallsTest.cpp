@@ -368,20 +368,23 @@ TEST_CASE("Concurrent fit / predict / simulate from user threads", "[threads][co
   // (FAQ, reproducibility); a fit amplifies it through the optimizer's
   // stopping point in the flat part of the likelihood. Bit-identical results
   // when no count can change (no OpenBLAS / MKL, or loaded with 1 thread: the
-  // ctest variant ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1), else 1e-4
+  // ctest variant ConcurrentCallsTest/OPENBLAS_NUM_THREADS=1), else 2e-3
   // relative on every compared quantity (decision D2, docs/dev/Rationalization.md
-  // section 3). Largest difference measured over all of them (theta, sigma2,
-  // objective, predictions, simulations): 4e-14 (Intel Xeon 4 cores), 4.6e-7 to
-  // 7.0e-7 (CI runners: Linux Coverage, Octave Linux, Windows), 6.6e-7 (AMD
-  // EPYC 9V74 2 cores, gauss single start), 7.2e-5 (i9-10900K 10 cores,
-  // matern5_2 BFGS4); T6 / T9 logs. Races (RNG, shared state) give differences
+  // section 3; 1e-4 until #473). Largest difference measured over all of them
+  // (theta, sigma2, objective, predictions, simulations): 4e-14 (Intel Xeon 4
+  // cores), 4.6e-7 to 7.0e-7 (CI runners: Linux Coverage, Octave Linux, Windows),
+  // 6.6e-7 (AMD EPYC 9V74 2 cores, gauss single start), 7.2e-5 (i9-10900K 10
+  // cores, Linux, matern5_2 BFGS4); 8.1e-4 (same i9-10900K, Windows MSVC,
+  // OpenBLAS 0.3.33 loaded with 20 threads, matern5_2 BFGS4: sigma2 8.1e-4,
+  // stdev 2.1e-4, theta 1.9e-4, objective 2.5e-9, deterministic; #473); T6 / T9
+  // logs. Races (RNG, shared state) give differences
   // of order 1 (other starts), and are checked bit for bit by the budget-1 case
   // above.
   const bool count_can_change = blas_count() > 1 || mkl_count() > 1;
   WARN("BLAS counts read by the test: OpenBLAS "
        << blas_count() << ", MKL " << mkl_count()
-       << (count_can_change ? ": tolerance 1e-4" : ": bit-identical required"));
-  concurrent_vs_sequential(100, count_can_change ? 1e-4 : 0.0);
+       << (count_can_change ? ": tolerance 2e-3" : ": bit-identical required"));
+  concurrent_vs_sequential(100, count_can_change ? 2e-3 : 0.0);
 }
 
 TEST_CASE("Optim::get_num_threads is not divided between concurrent calls", "[threads][concurrent]") {
