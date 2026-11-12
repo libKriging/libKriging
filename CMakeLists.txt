@@ -432,7 +432,13 @@ if (ENABLE_MEMCHECK)
     set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} -v") # verbose run with details
     # set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} -q") # for quiet runs
     # set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} --gen-suppressions=all --num-callers=8") # for setting up suppressions
-    set(MEMORYCHECK_SUPPRESSIONS_FILE "${PROJECT_SOURCE_DIR}/.valgrind-suppressions")
+    # A cache entry, not a normal variable: include(CTest) declares
+    # MEMORYCHECK_SUPPRESSIONS_FILE as an empty cache entry, which (policy
+    # CMP0126 OLD under cmake_minimum_required 3.13) removed the normal
+    # variable at the first configure: DartConfiguration.tcl had an empty
+    # MemoryCheckSuppressionFile and valgrind never read this file.
+    set(MEMORYCHECK_SUPPRESSIONS_FILE "${PROJECT_SOURCE_DIR}/.valgrind-suppressions" CACHE FILEPATH
+        "File that contains suppressions for the memory checker")
     MESSAGE(STATUS "Memcheck on tests enabled")
 endif()
 

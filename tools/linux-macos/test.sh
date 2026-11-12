@@ -56,17 +56,20 @@ fi
 if [[ "$ENABLE_COVERAGE" == "on" ]]; then
     cmake --build . --target coverage --config "${MODE}"
 elif [[ "$ENABLE_MEMCHECK" == "on" ]]; then
-    ctest -C "${MODE}" ${CTEST_FLAGS} -T memcheck || {
-      rc=$?
-      # the "definitely lost" records of the failing tests (the summary only counts them)
-      for f in Testing/Temporary/MemoryChecker.*.log; do
-        if grep -q "definitely lost in" "$f"; then
-          echo "==== $f"
-          grep -B2 -A40 "definitely lost in" "$f"
-        fi
-      done
-      exit $rc
-    }
+    rc=0
+    ctest -C "${MODE}" ${CTEST_FLAGS} -T memcheck || rc=$?
+    # The records behind the "Defects" counts of the summary (which only counts
+    # them), printed whether the tests pass or not: leak records of every kind
+    # CTest counts and valgrind errors, each up to the blank line ending it.
+    for f in Testing/Temporary/MemoryChecker.*.log; do
+      if grep -qE "blocks are (definitely lost|possibly lost|still reachable) in loss record|^==[0-9]+== (Invalid |Conditional jump|Use of uninitialised|Syscall param|Mismatched |Source and destination overlap)" "$f"; then
+        echo "==== $f ($(grep -m1 -o 'Command: .*' "$f" | cut -c1-200))"
+        awk '/^==[0-9]+== .*(blocks are (definitely lost|possibly lost|still reachable) in loss record|Invalid |Conditional jump|Use of uninitialised|Syscall param|Mismatched |Source and destination overlap)/ {p=1}
+             p {print}
+             /^==[0-9]+== $/ {p=0}' "$f"
+      fi
+    done
+    [[ $rc -eq 0 ]] || exit $rc
 else
     CTEST_EXCLUDE_FLAGS=()
     if [[ -n "${CTEST_EXCLUDE}" ]]; then
