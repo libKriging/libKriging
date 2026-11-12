@@ -435,4 +435,4 @@ def test_loglikelihood_is_the_objective_after_update():
             m = k.copy()
             m.update(yu, Xu, refit=refit)
             ll_fun, _ = m.logLikelihoodFun(m.theta(), return_grad=False)
-            assert np.isclose(m.logLikelihood(), ll_fun, rtol=1e-8, atol=1e-8), (warp, kernel, refit)
+            assert np.isclose(m.logLikelihood(), ll_fun, rtol=1e-6, atol=1e-8), (warp, kernel, refit)

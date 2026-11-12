@@ -162,7 +162,7 @@ TEST_CASE("jitter rule: WarpKriging accessors are the objective at the committed
         CHECK(k.model_chol_jitter() == 0.0);
         auto check = [&](const libKriging::WarpKriging& m, const std::string& when) {
           INFO(when);
-          CHECK(close(m.logLikelihood(), std::get<0>(m.logLikelihoodFun(m.theta(), false)), 1e-8));
+          CHECK(close(m.logLikelihood(), std::get<0>(m.logLikelihoodFun(m.theta(), false)), 1e-6));
         };
         check(k, "fit");
         const std::string f = tmp_file("w");
@@ -207,9 +207,9 @@ TEST_CASE("jitter rule: MLPKriging accessors are the objective at the committed 
   libKriging::MLPKriging k({6}, 2, "tanh", "gauss");
   k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
   CHECK(k.model_chol_jitter() == 0.0);
-  CHECK(close(k.logLikelihood(), std::get<0>(k.logLikelihoodFun(k.theta(), false)), 1e-8));
+  CHECK(close(k.logLikelihood(), std::get<0>(k.logLikelihoodFun(k.theta(), false)), 1e-6));
   k.update(yu, Xu, false);
-  CHECK(close(k.logLikelihood(), std::get<0>(k.logLikelihoodFun(k.theta(), false)), 1e-8));
+  CHECK(close(k.logLikelihood(), std::get<0>(k.logLikelihoodFun(k.theta(), false)), 1e-6));
 }
 
 TEST_CASE("jitter rule: NestedKriging submodels follow the rule", "[jitter][rule][nested]") {

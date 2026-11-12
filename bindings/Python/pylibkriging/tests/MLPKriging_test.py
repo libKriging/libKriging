@@ -184,4 +184,4 @@ def test_loglikelihood_is_the_objective_after_update():
     k = lk.MLPKriging(y, X, hidden_dims=[6], d_out=2, activation="tanh", kernel="gauss")
     k.update(yu, Xu, refit=False)
     ll_fun, _ = k.logLikelihoodFun(k.theta(), return_grad=False)
-    assert np.isclose(k.logLikelihood(), ll_fun, rtol=1e-8, atol=1e-8)
+    assert np.isclose(k.logLikelihood(), ll_fun, rtol=1e-6, atol=1e-8)

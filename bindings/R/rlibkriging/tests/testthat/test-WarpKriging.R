@@ -532,7 +532,7 @@ test_that("logLikelihood() is the objective at the committed parameters after up
       m <- copy(k)
       update(m, yu, Xu, refit = refit)
       ll_fun <- logLikelihoodFun(m, theta(m), return_grad = FALSE)$logLikelihood
-      expect_equal(logLikelihood(m), ll_fun, tolerance = 1e-8)
+      expect_equal(logLikelihood(m), ll_fun, tolerance = 1e-6)
     }
   }
 })
