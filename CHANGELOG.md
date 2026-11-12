@@ -12,6 +12,11 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Thread budget under a CPU affinity mask on Windows** (#473): the physical cores are counted
+  among the CPUs of the process affinity mask (`start /affinity`, job objects,
+  `SetProcessAffinityMask`), as on Linux. Before, every core of the machine counted: a process
+  restricted to one core of a 10-core i9-10900K got a budget of 10 threads. A process spread over
+  several processor groups still counts every core. New test `AffinityTest` (Windows, Linux).
 - **Thread Sanitizer on the OpenMP loops** (#420, leftover of #439): with Clang + LLVM libomp,
   CMake finds Archer (`libarcher`) under `SANITIZE=THREAD` and defines `LK_TSAN_OPENMP`: the
   OpenMP loops (`OmpLoops.hpp`, NestedKriging's pair loop) stay compiled in and run on 2 threads

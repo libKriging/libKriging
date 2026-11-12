@@ -392,6 +392,12 @@ target_include_directories(GradientThreadsTest PRIVATE ${PROJECT_SOURCE_DIR}/src
 add_dependencies(all_test_binaries GradientThreadsTest)
 catch_discover_tests(GradientThreadsTest)
 
+# own executable: the core count is read at the first call of the library
+add_executable(AffinityTest AffinityTest.cpp)
+target_link_libraries(AffinityTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries AffinityTest)
+catch_discover_tests(AffinityTest)
+
 add_executable(BlasThreadsTest BlasThreadsTest.cpp)
 target_link_libraries(BlasThreadsTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries BlasThreadsTest)
