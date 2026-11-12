@@ -56,8 +56,10 @@ diverges again (up to 93 %).
   is never 0 (no NaN NLPD) and the stdev derivative is defined, 0, where the variance is at the
   floor (it was NaN, 0/0). At the design points of an exact Kriging model the stdev is then
   ~sigma x 3e-8 instead of 0 or ~1e-8 at random.
-- `logLikelihood()` returns the optimized objective; both jitters are saved in the JSON (absent →
-  former behaviour), so a later `set_chol_jitter` does not change a fitted model.
+- `logLikelihood()` (and `leaveOneOut()`, `logMargPost()`) returns the objective at the committed
+  parameters, on the search diagonal, in every class (#465, [one rule](#one-rule-for-every-class-465));
+  both jitters are saved in the JSON (absent → former behaviour), so a later `set_chol_jitter`
+  does not change a fitted model.
 - `update_simulate` adds no jitter on the new observations, so that an update point on the
   simulation design is reproduced exactly.
 
@@ -266,16 +268,17 @@ n > 2000, more than 2 sets at n 2000, a machine with more cores (budgets 100 / 2
 
 # Jitter of each class and method
 
-State after the WarpKriging alignment (2026-10-22).
+State after the jitter rule of #465 (2026-11).
 
-Rule: the search adds `J`; the committed model is exact for Kriging, at most `N` for WarpKriging;
-an approximate method keeps the diagonal of its objective.
+Rule: the search and the objective accessors use the search diagonal 1 + `J`; the committed
+model is exact; an approximate method keeps the diagonal of its objective. Measurements and the
+candidates rejected: [One rule for every class](#one-rule-for-every-class-465) below.
 
 ## The three mechanisms
 
 | name | value | where it is set | nature |
 |---|---|---|---|
-| search jitter `J` | `kernel_chol_jitter(kernel)`: gauss 1e-9, matern5_2 1e-10, others 0; `set_chol_jitter(x)` / `LK_CHOL_JITTER` | `Kriging::m_chol_jitter`, `WarpKriging::m_chol_jitter`, saved in the JSON | fixed, the same at every theta |
+| search jitter `J` | `kernel_chol_jitter(kernel)`: gauss 1e-9, matern5_2 1e-10, others 0; `set_chol_jitter(x)` / `LK_CHOL_JITTER`. WarpKriging / MLPKriging: at least `N` (below) | `Kriging::m_chol_jitter`, `WarpKriging::m_chol_jitter`, saved in the JSON | fixed, the same at every theta |
 | `num_nugget` `N` | 1e-10 (`set_num_nugget`) | `LinearAlgebra::num_nugget` | fixed constant |
 | retry | `N`·10^k, k = 0..10, added by `safe_chol_lower` when the Cholesky fails or rcond < 1e-18 | `LinearAlgebra::safe_chol_lower_retry` | stepwise: depends on whether a Cholesky fails, so on rounding (the discontinuity the search jitter removes) |
 
@@ -318,41 +321,41 @@ for the objective, the committed model, `predict`, `simulate`, `update` and `upd
 ## WarpKriging, MLPKriging
 
 `MLPKriging` is a facade over `WarpKriging(mlp_joint)`: same rules. Two values, as Kriging:
-`m_chol_jitter` (search: `J` if > 0, else `N`) and `m_model_chol_jitter` (committed model:
-min(`m_chol_jitter`, `N`)); `m_cache_jitter` is the one of the current cache (the search's while
-optimizing). Observation noise adds to either.
+`m_chol_jitter` (search: `J` if > 0, else `N`, with or without observation noise) and
+`m_model_chol_jitter` (committed model: 0, exact, since #428); `m_cache_jitter` is the one of the
+current cache (the search's while optimizing). Observation noise adds to either.
 
 | method | diagonal |
 |---|---|
 | fit / `update(refit = true)` objective, every start (the parallel clones too), `logLikelihoodFun` | 1 + `m_chol_jitter` |
-| `logLikelihood()` | the optimized objective (saved as `objective_ll`); after `update(refit = false)`, the committed model's own |
-| committed model (`commit_model_chol_jitter`), `predict`, `simulate`, `update(refit = false)` | 1 + min(`m_chol_jitter`, `N`): gauss 1e-10 |
+| `logLikelihood()` | the objective at the committed parameters, `logLikelihoodFun(theta())` (sigma2 profiled, with noise too): kept from the search (`objective_ll` in the JSON), re-evaluated after `update(refit = false)` and for a file without it (#465; it was the committed exact model's LL there before) |
+| committed model (`commit_model_chol_jitter`), `predict`, `simulate`, `update(refit = false)` | 1 (exact); the predicted variance is floored (`predict_impl`) |
 | `update_simulate` | `R_uu` exact (1, or 1 + noise / sigma2) |
 | `simulate` conditional covariance | 0 + retry (`simulate_impl`, as Kriging) |
 | `load` of a file without `model_chol_jitter` | `m_chol_jitter` (one jitter for both, as saved) |
 
-Not exact, unlike Kriging: an exact factorization lost the predictive variance where warps bring
-training rows together in the feature space (Kumaraswamy, saturated tanh MLP: stdev 0, NaN stdev
-derivative and NLPD in WarpKrigingPerWarpTest / WarpKrigingCollapseTest). Interpolation error on the
-python-sdist data: warping `"none"` 1.0e-5 (5.6e-5 with `J` = 1e-9), Kumaraswamy 1.1e-6.
+The `N` floor of the search (kernels with `J` = 0, and with observation noise, where Kriging adds
+nothing) is the one class difference left: Embedding / Ordinal / collapsing warps make rows of Phi
+coincide, R singular at every theta. It makes `logLikelihood()` of a WarpKriging with `"none"`
+warps differ from Kriging's at the same theta (measured below: up to 0.09 at n 100, matern3_2).
 
 ## NestedKriging
 
 | step | diagonal |
 |---|---|
 | fit of the common prior | `Kriging` (or `WarpKriging` when warped) on the data: rules above |
-| submodels (`optim = "none"`) | their committed model: Kriging 1 (exact), WarpKriging 1 + min(`J`, `N`) |
+| submodels (`optim = "none"`) | their committed model: 1 (exact), Kriging and WarpKriging; their `logLikelihood()` follows their class |
 | `precompute_nk` group factors | the submodel's committed diagonal (`safe_chol_lower`) |
 | `predict`, PoE family (PoE, gPoE, BCM, rBCM) | each submodel's `predict` |
-| `predict`, NK aggregation | group factors as above; aggregation matrix `K_M` + `N` (`solve`, `pinv` fallback, no retry) |
+| `predict`, NK aggregation | group factors as above; aggregation matrix `K_M` + 1e-10 (`NestedKriging::jitter`, a constant, not `N`; `solve`, `pinv` fallback, no retry) |
 
-No `simulate` / `update`.
+No `simulate` / `update`, no `logLikelihood()` of the aggregate (the submodels' follow the rule).
 
 ## Inconsistencies left
 
-1. **WarpKriging / MLPKriging** commit with `N` instead of exactly (see above; a deliberate
-   difference, decided 2026-10-23), and their `update_simulate` is exact while `update` keeps `N` (a 1e-10 relative
-   difference).
+1. **WarpKriging / MLPKriging** search with at least `N` (kernels with `J` = 0, observation
+   noise), Kriging with `J` only (see above). Their committed model is exact since #428 and their
+   `logLikelihood()` is the objective since #465, as Kriging's.
 2. **`simulate` conditional covariance** (Kriging and WarpKriging, exact method) still relies on the
    stepwise retry: at points close to the design (or close to each other) the covariance is singular
    and the added nugget, `N`·10^k, could depend on which Cholesky fails, so on rounding. Measured
@@ -364,5 +367,6 @@ No `simulate` / `update`.
    most 4e-11 relative across budgets. In practice the retry acts as a fixed `N` here. A fixed floor
    (as `simulateNystrom`'s eigenvalue floor) would remove the residual risk: rcond values of 2e-18,
    next to the 1e-18 threshold of the rcond check, were seen (gauss n = 10). Not changed.
-3. **NestedKriging NK aggregation** adds `N` to `K_M` regardless of the kernel (no `J`, no retry, `pinv`
-   fallback): fine for stability, noted for completeness.
+3. **NestedKriging NK aggregation** adds the constant 1e-10 to `K_M` regardless of the kernel (no `J`,
+   not `N`: `set_num_nugget` does not change it; no retry, `pinv` fallback): fine for stability,
+   noted for completeness.

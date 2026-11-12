@@ -518,3 +518,21 @@ test_that("update(refit=FALSE) keeps hyper-parameters fixed; noise_u round-trips
   expect_error(update(copy(kn), yu, Xu, refit = FALSE), regexp = "noise")
   expect_no_error(update(copy(kn), yu, Xu, refit = FALSE, noise_u = rep(1e-4, 2)))
 })
+
+test_that("logLikelihood() is the objective at the committed parameters after update (#465)", {
+  # It was the committed exact model's log-likelihood after update(refit=FALSE).
+  set.seed(3)
+  X <- matrix(runif(60), ncol = 2)
+  fx <- function(X) sin(6 * X[, 1]) + cos(4 * X[, 2])
+  y <- fx(X)
+  Xu <- matrix(runif(8), ncol = 2); yu <- fx(Xu)
+  for (cfg in list(c("none", "gauss"), c("kumaraswamy", "matern3_2"))) {
+    k <- WarpKriging(y, X, warping = cfg[1], kernel = cfg[2])
+    for (refit in c(FALSE, TRUE)) {
+      m <- copy(k)
+      update(m, yu, Xu, refit = refit)
+      ll_fun <- logLikelihoodFun(m, theta(m), return_grad = FALSE)$logLikelihood
+      expect_equal(logLikelihood(m), ll_fun, tolerance = 1e-8)
+    }
+  }
+})

@@ -2085,7 +2085,12 @@ double WarpKriging::concentrated_ll() const {
 double WarpKriging::logLikelihood() const {
   if (!m_fitted)
     throw std::runtime_error("WarpKriging: model not fitted");
-  return std::isnan(m_objective_ll) ? concentrated_ll() : m_objective_ll;
+  // The objective at the committed parameters, as Kriging::logLikelihood():
+  // logLikelihood() == logLikelihoodFun(theta()) (docs/dev/CholJitter.md, one
+  // rule for every class). Kept from the search (fit, update(refit = true)),
+  // re-evaluated when there was none (update(refit = false), a file saved
+  // without it): the committed cache is exact, not the objective's diagonal.
+  return std::isnan(m_objective_ll) ? std::get<0>(logLikelihoodFun(m_theta, false)) : m_objective_ll;
 }
 
 double WarpKriging::committed_chol_jitter() const {
@@ -3498,7 +3503,7 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
         [&]() { return make_Model(m_theta, m_sigma2); });
 
     m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
-    // no search here: logLikelihood() is the committed model's own
+    // no search here: logLikelihood() re-evaluates the objective on demand
     m_objective_ll = arma::datum::nan;
   }
 }
