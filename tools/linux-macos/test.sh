@@ -61,15 +61,25 @@ elif [[ "$ENABLE_MEMCHECK" == "on" ]]; then
     # The records behind the "Defects" counts of the summary (which only counts
     # them), printed whether the tests pass or not: leak records of every kind
     # CTest counts and valgrind errors, each up to the blank line ending it.
+    defects=0
     for f in Testing/Temporary/MemoryChecker.*.log; do
       if grep -qE "blocks are (definitely lost|possibly lost|still reachable) in loss record|^==[0-9]+== (Invalid |Conditional jump|Use of uninitialised|Syscall param|Mismatched |Source and destination overlap)" "$f"; then
         echo "==== $f ($(grep -m1 -o 'Command: .*' "$f" | cut -c1-200))"
         awk '/^==[0-9]+== .*(blocks are (definitely lost|possibly lost|still reachable) in loss record|Invalid |Conditional jump|Use of uninitialised|Syscall param|Mismatched |Source and destination overlap)/ {p=1}
              p {print}
              /^==[0-9]+== $/ {p=0}' "$f"
+        defects=$((defects + 1))
       fi
     done
     [[ $rc -eq 0 ]] || exit $rc
+    # Zero threshold: every record of the runtime and of the test harness is
+    # either fixed or suppressed with its reason in .valgrind-suppressions; a
+    # new one (a leak, or a library upgrade bringing a benign one) fails the
+    # job until it is fixed or classified there.
+    if [[ $defects -gt 0 ]]; then
+      echo "Memcheck: records in ${defects} test log(s) (printed above); fix them or add a commented suppression to .valgrind-suppressions"
+      exit 1
+    fi
 else
     CTEST_EXCLUDE_FLAGS=()
     if [[ -n "${CTEST_EXCLUDE}" ]]; then
