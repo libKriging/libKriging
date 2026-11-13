@@ -412,7 +412,7 @@ TEST_CASE("BFGS4 with 1 or 4 workers reaches the same optimum", "[backend]") {
 
 // Shared reference values (Linux x86_64, OpenBLAS 0.3.26 at 1 thread; T9 log):
 // 200 <= n < 800 is where T5 found the fitted model to depend on the OS
-// (OpenMP threshold 200 on Linux, 800 elsewhere). Single start "BFGS", so the
+// (OpenMP threshold 200 on Linux, 800 elsewhere at the time; 200 with MSVC since #473). Single start "BFGS", so the
 // starting point does not depend on the RNG. Two levels:
 // - the log-likelihood and its gradient at a fixed theta (no optimizer): only
 //   the rounding of the BLAS / libm differs between platforms;

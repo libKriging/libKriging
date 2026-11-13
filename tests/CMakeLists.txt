@@ -391,6 +391,16 @@ target_link_libraries(GradientThreadsTest LINK_PUBLIC Kriging Catch2)
 target_include_directories(GradientThreadsTest PRIVATE ${PROJECT_SOURCE_DIR}/src/lib)
 add_dependencies(all_test_binaries GradientThreadsTest)
 catch_discover_tests(GradientThreadsTest)
+# bit-identical end-to-end gradients whatever the budget when the BLAS count
+# cannot change (the library sets it to the budget: #473)
+add_test(NAME GradientThreadsTest/BLAS_NUM_THREADS=1 COMMAND GradientThreadsTest "LL / LMP theta gradients do not depend on the OpenMP thread count")
+set_tests_properties(GradientThreadsTest/BLAS_NUM_THREADS=1 PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1;MKL_NUM_THREADS=1")
+
+# own executable: the core count is read at the first call of the library
+add_executable(AffinityTest AffinityTest.cpp)
+target_link_libraries(AffinityTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries AffinityTest)
+catch_discover_tests(AffinityTest)
 
 add_executable(BlasThreadsTest BlasThreadsTest.cpp)
 target_link_libraries(BlasThreadsTest LINK_PUBLIC Kriging Catch2)
