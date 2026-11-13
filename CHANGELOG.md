@@ -12,6 +12,11 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Thread budget under a CPU affinity mask on Windows** (#473): the physical cores are counted
+  among the CPUs of the process affinity mask (`start /affinity`, job objects,
+  `SetProcessAffinityMask`), as on Linux. Before, every core of the machine counted: a process
+  restricted to one core of a 10-core i9-10900K got a budget of 10 threads. A process spread over
+  several processor groups still counts every core. New test `AffinityTest` (Windows, Linux).
 - **Objective evaluations run at the thread budget** (#473): the public objective functions of
   `Kriging` (`logLikelihood()`, `leaveOneOut()`, `logMargPost()`, with or without a method, their
   `*Fun`, `*VecchiaFun`, `*NystromFun`, `leaveOneOutVec`) and `WarpKriging::logLikelihoodFun`

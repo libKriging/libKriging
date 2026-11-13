@@ -32,7 +32,8 @@ share  = Optim::set_num_threads_percent(x) / LK_NUM_THREADS_PERCENT=x
   of the CPUs in the affinity mask, capped by the cgroup CPU quota (Linux sysfs;
   cgroup v2 `cpu.max` or v1 `cpu.cfs_quota_us` / `cpu.cfs_period_us`, the smallest
   quota of the process's cgroup and of its visible ancestors);
-  `hw.physicalcpu` (macOS); `GetLogicalProcessorInformationEx` (Windows);
+  `hw.physicalcpu` (macOS); `GetLogicalProcessorInformationEx` (Windows, cores of the
+  process affinity mask when the process is in one processor group);
   `std::thread::hardware_concurrency()` if unreadable.
 - Never more than the calling thread's OpenMP limit (`OMP_NUM_THREADS`,
   `omp_set_num_threads`).
