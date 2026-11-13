@@ -12,6 +12,12 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Windows: BLAS thread counts read by `BlasBackendTest` and the thread benchmarks** (#473):
+  PE / COFF has no weak symbols, so `openblas_get_num_threads`, `MKL_Get_Max_Threads`, ... are
+  looked up at run time in the loaded modules (`tests/blas_symbols_win.hpp`, any DLL name).
+  `BlasBackendTest` now detects the backend (`dgemm_` provider) and runs its OpenBLAS / MKL
+  cases on Windows; `bench-threads`, `bench-threads-ops` and `bench-blas-threads` report
+  `blas_kind` / `blas_threads` (was -1), and `bench-blas-threads` the CPU time (was 0).
 - **OpenMP threshold 200 with MSVC on Windows** (#473): `kOmpMinRows` (covariance matrix and
   log-likelihood gradient loops) goes from 800 to 200 in MSVC builds, as on Linux. Measured on an
   i9-10900K (10 cores / 20 threads, `vcomp`, OpenBLAS 0.3.33) at the thread budget: one LL +
