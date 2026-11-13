@@ -8,6 +8,7 @@
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
 #include "SeparableDln.hpp"  // private (src/lib)
+#include "blas_counts.hpp"
 #include <array>
 #include <cmath>
 #include <string>
@@ -23,14 +24,16 @@
 //    kOmpMinRows (200 on Linux, 800 elsewhere, OmpLoops.hpp): the gradients
 //    depend neither on the thread count nor on kOmpMinRows, hence not on the OS.
 // 2. End to end: the same bits with a 1-thread budget and with the whole
-//    budget, below and above kOmpMinRows. Only the OpenMP loops are bounded
-//    (Optim::set_num_threads_percent); the BLAS count is left as it is. The
-//    gradients also go through the BLAS / LAPACK (R^-1, triangular solves),
-//    outside this guarantee: with Apple Accelerate (thread count not settable
-//    by the library, on macOS CI two identical calls differ), or a BLAS found
-//    to give different bits for two identical calls (e.g. MKL without CNR),
-//    the comparison falls back to 1e-10 relative (case 1 keeps the bitwise
-//    check of the pair sums).
+//    budget, below and above kOmpMinRows. The gradients also go through the
+//    BLAS / LAPACK (R^-1, triangular solves), whose count follows the budget
+//    (Optim::set_num_threads_percent) and which may round differently with it
+//    (MKL; OpenBLAS 0.3.33 on Windows, #473): with a BLAS loaded with more than
+//    1 thread, with Apple Accelerate (thread count not settable by the
+//    library, on macOS CI two identical calls differ), or a BLAS found to give
+//    different bits for two identical calls (e.g. MKL without CNR), the
+//    comparison falls back to 1e-10 relative (case 1 keeps the bitwise check of
+//    the pair sums; GradientThreadsTest/BLAS_NUM_THREADS=1 the bitwise
+//    end-to-end check).
 
 namespace {
 
@@ -110,14 +113,16 @@ TEST_CASE("LL / LMP theta gradients do not depend on the OpenMP thread count", "
   // reproducible from one call to the next (macOS CI, n = 100)
   const bool blas_reproducible = false;
 #else
-  const bool blas_reproducible = bitwise_equal(g1, gradients(k, gamma));
+  const bool blas_reproducible = !lk_test::blas_count_can_change() && bitwise_equal(g1, gradients(k, gamma));
 #endif
 
   Optim::set_num_threads_percent(0);  // whole budget
   INFO("thread budget: " << Optim::get_num_threads());
   const std::vector<arma::vec> gn = gradients(k, gamma);
   if (!blas_reproducible)
-    WARN("two identical gradient calls differ (BLAS / LAPACK not reproducible): compared to 1e-10 relative");
+    WARN(
+        "BLAS count may change with the budget, or two identical gradient calls differ: compared to 1e-10 "
+        "relative");
   require_equal(g1, gn, blas_reproducible ? 0.0 : 1e-10);
   for (const auto& g : g1)
     REQUIRE(g.is_finite());

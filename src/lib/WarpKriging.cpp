@@ -2107,6 +2107,7 @@ void WarpKriging::commit_model_chol_jitter() {
 }
 
 std::tuple<double, arma::vec> WarpKriging::logLikelihoodFun(const arma::vec& theta, bool return_grad) const {
+  libKriging::detail::BudgetScope budget_scope(m_y.n_elem);  // BLAS at the thread budget for the call
   auto* self = const_cast<WarpKriging*>(this);
   arma::vec old_theta = m_theta;
   const double old_cache_jitter = m_cache_jitter;

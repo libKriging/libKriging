@@ -17,6 +17,16 @@ past release, see the corresponding entry on the
   `SetProcessAffinityMask`), as on Linux. Before, every core of the machine counted: a process
   restricted to one core of a 10-core i9-10900K got a budget of 10 threads. A process spread over
   several processor groups still counts every core. New test `AffinityTest` (Windows, Linux).
+- **Objective evaluations run at the thread budget** (#473): the public objective functions of
+  `Kriging` (`logLikelihood()`, `leaveOneOut()`, `logMargPost()`, with or without a method, their
+  `*Fun`, `*VecchiaFun`, `*NystromFun`, `leaveOneOutVec`) and `WarpKriging::logLikelihoodFun`
+  (so `MLPKriging`'s) open the same budget scope as fit / predict / simulate / update: OpenBLAS
+  at the budget (or 1 thread below `Optim::blas_threads_min_n`), MKL per thread, restored after.
+  Before, they ran at whatever count OpenBLAS had: the logical CPUs it was loaded with, or the
+  count another thread's call had set, so the same call on the same model could round
+  differently depending on the concurrent calls (1–2 ulp on `leaveOneOut()`,
+  `ConcurrentCallsTest` budget-1 case on Windows with OpenBLAS 0.3.33 loaded with 20 threads).
+  Migration: none; values may change in the last bits with a multithreaded OpenBLAS.
 - **Thread Sanitizer on the OpenMP loops** (#420, leftover of #439): with Clang + LLVM libomp,
   CMake finds Archer (`libarcher`) under `SANITIZE=THREAD` and defines `LK_TSAN_OPENMP`: the
   OpenMP loops (`OmpLoops.hpp`, NestedKriging's pair loop) stay compiled in and run on 2 threads

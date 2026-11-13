@@ -73,7 +73,9 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
   (or the budget outside the pool). The library never changes the OpenMP ICV of a
   thread (except around `fork()`, see section 7).
 - BLAS: the OpenBLAS count is process-global. Each public fit / predict /
-  simulate / update sets it to the budget for the call, the pool to the share
+  simulate / update, and each public objective evaluation (`logLikelihood()`,
+  `leaveOneOut()`, `logMargPost()`, the `*Fun` and `leaveOneOutVec` of every
+  method), sets it to the budget for the call, the pool to the share
   for its lifetime, and both restore it; an OpenBLAS loaded with fewer threads
   (`OPENBLAS_NUM_THREADS`) is left as it is. The MKL count is set per thread
   (`MKL_Set_Num_Threads_Local`): in the calling thread for the call, in each
