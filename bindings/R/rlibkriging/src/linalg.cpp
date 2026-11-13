@@ -7,6 +7,8 @@
 
 #include "libKriging/LinearAlgebra.hpp"
 
+//' @rdname linalg_settings
+//' @export
 // [[Rcpp::export]]
 double linalg_get_num_nugget() {
   LinearAlgebra* la = new LinearAlgebra();
@@ -14,6 +16,8 @@ double linalg_get_num_nugget() {
   return impl_ptr->get_num_nugget();
 }
 
+//' @rdname linalg_settings
+//' @export
 // [[Rcpp::export]]
 void linalg_set_num_nugget(double nugget) {
   LinearAlgebra* la = new LinearAlgebra();
@@ -23,16 +27,22 @@ void linalg_set_num_nugget(double nugget) {
 
 // Fixed Cholesky jitter of noise-free fits: < 0 automatic per kernel (default),
 // 0 disabled (former behaviour), > 0 this value for every kernel
+//' @rdname linalg_settings
+//' @export
 // [[Rcpp::export]]
 double linalg_get_chol_jitter() {
   return LinearAlgebra::get_chol_jitter();
 }
 
+//' @rdname linalg_settings
+//' @export
 // [[Rcpp::export]]
 void linalg_set_chol_jitter(double jitter) {
   LinearAlgebra::set_chol_jitter(jitter);
 }
 
+//' @rdname linalg_settings
+//' @export
 // [[Rcpp::export]]
 void linalg_check_chol_rcond(bool cr) {
   LinearAlgebra* la = new LinearAlgebra();
@@ -40,6 +50,8 @@ void linalg_check_chol_rcond(bool cr) {
   impl_ptr->check_chol_rcond(cr);
 }
 
+//' @rdname linalg_settings
+//' @export
 // [[Rcpp::export]]
 bool linalg_chol_rcond_checked() {
   LinearAlgebra* la = new LinearAlgebra();
@@ -54,6 +66,8 @@ arma::mat linalg_chol_safe(arma::mat X) {
   return impl_ptr->safe_chol_lower(X);
 }
 
+//' @rdname linalg_settings
+//' @export
 // [[Rcpp::export]]
 void linalg_set_chol_warning(bool warn) {
   LinearAlgebra* la = new LinearAlgebra();
