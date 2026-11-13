@@ -12,6 +12,13 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **R: global settings exported**, as in the other bindings: the `Optim` settings
+  (`optim_set_num_threads_percent`, `optim_get_num_threads`, `optim_set_thread_pool_size`,
+  `optim_set_max_iteration`, ...) and the `LinearAlgebra` settings (`linalg_set_chol_jitter`,
+  `linalg_set_num_nugget`, `linalg_set_chol_warning`, `linalg_check_chol_rcond`, ...) are
+  exported from `rlibkriging` instead of being reached through `rlibkriging:::` (which still
+  works). Documented in `R/settings.R`; the other `linalg_*` and the `random_*` helpers stay
+  internal, as in Python.
 - **Thread Sanitizer on the OpenMP loops** (#420, leftover of #439): with Clang + LLVM libomp,
   CMake finds Archer (`libarcher`) under `SANITIZE=THREAD` and defines `LK_TSAN_OPENMP`: the
   OpenMP loops (`OmpLoops.hpp`, NestedKriging's pair loop) stay compiled in and run on 2 threads
