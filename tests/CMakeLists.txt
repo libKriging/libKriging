@@ -392,6 +392,11 @@ target_include_directories(GradientThreadsTest PRIVATE ${PROJECT_SOURCE_DIR}/src
 add_dependencies(all_test_binaries GradientThreadsTest)
 catch_discover_tests(GradientThreadsTest)
 
+add_executable(ParallelTest ParallelTest.cpp)
+target_link_libraries(ParallelTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries ParallelTest)
+catch_discover_tests(ParallelTest)
+
 add_executable(BlasThreadsTest BlasThreadsTest.cpp)
 target_link_libraries(BlasThreadsTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries BlasThreadsTest)

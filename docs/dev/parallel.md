@@ -41,14 +41,25 @@ share  = Optim::set_num_threads_percent(x) / LK_NUM_THREADS_PERCENT=x
   still get the whole budget.
 - `Optim::get_num_threads()` returns the resolved budget.
 
-API (C++; Python / Octave `Optim.<same name>`, R `optim_<same name>`, Julia
-`jlibkriging.Optim.<same name>`):
+API: `Parallel` (C++ `libKriging/Parallel.hpp`; Python / Octave `Parallel.<same name>`,
+R `parallel_<same name>`, Julia `jlibkriging.Parallel.<same name>`). The thread settings
+of `Optim` (`Optim::set_num_threads_percent`, ...) are the same settings, kept for
+compatibility.
 
 ```cpp
-Optim::set_num_threads_percent(50);   // or 0.5: half of the physical cores
-Optim::get_num_threads_percent();     // the setting
-Optim::get_num_threads();             // resolved budget, e.g. 5 on 10 cores
-Optim::set_thread_pool_size(n);       // optional cap on the multistart workers
+// budget
+Parallel::set_num_threads_percent(50);  // or 0.5: half of the physical cores
+Parallel::get_num_threads_percent();    // the setting
+Parallel::get_num_threads();            // resolved budget, e.g. 5 on 10 cores
+// how it is distributed (no separate OpenMP / BLAS thread count: they would
+// let the levels together exceed the budget)
+Parallel::set_thread_pool_size(n);      // optional cap on the multistart workers
+Parallel::set_blas_threads_min_n(n);    // small-problem BLAS rule (section 3.1): -1 auto, 0 off
+Parallel::set_omp_min_rows(n);          // OpenMP threshold of the covariance / gradient loops
+// read only, per level
+Parallel::blas_backend();               // "mkl", "openblas", "accelerate" or "unknown"
+Parallel::blas_num_threads();           // its current thread count (0: unknown)
+Parallel::omp_enabled();                // OpenMP loops compiled in
 ```
 
 ## 3. Sharing the budget: multistart first
@@ -84,7 +95,8 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
 
 Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
 = 200 on Linux, 800 elsewhere until measured (`src/lib/OmpLoops.hpp`), a
-performance setting only once #441 is merged (section 4); `n >= 200`
+performance setting only once #441 is merged (section 4), set at run time by
+`Parallel::set_omp_min_rows` or `LK_OMP_MIN_ROWS`; `n >= 200`
 (`compute_dX`, `covMat_sym_*`); `n_o × n_n >= 40000` (predict / simulate `R_on`,
 `covMat_rect`, Vecchia, NestedKriging).
 
@@ -408,6 +420,8 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 | `LK_NUM_THREADS_PERCENT` | libKriging | budget share (x <= 1 ratio, x > 1 percentage) |
 | `LK_THREAD_POOL_SIZE` | libKriging | cap on the multistart workers |
 | `LK_THREAD_START_DELAY_MS` | libKriging | WarpKriging start stagger (10 ms) |
+| `LK_BLAS_THREADS_MIN_N` | libKriging | small-problem BLAS rule (-1 automatic, 0 off, n > 0 threshold) |
+| `LK_OMP_MIN_ROWS` | libKriging at load | OpenMP threshold of the covariance / gradient loops (`Parallel::set_omp_min_rows`) |
 | `LK_CHOL_JITTER` | libKriging at load | fixed Cholesky jitter of noise-free fits (< 0 per kernel, default; 0 off; > 0 value), see 8.6 |
 | `LK_BENCH_WARMUP_MS` | benchmarks | busy-wait before measuring (300 ms, see 6.2) |
 | `OMP_NUM_THREADS` | OpenMP runtime | caps the budget |

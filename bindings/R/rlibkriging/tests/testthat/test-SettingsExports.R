@@ -35,3 +35,36 @@ test_that("The thread budget is set without :::", {
   optim_set_num_threads_percent(default_percent)
   expect_equal(optim_get_num_threads(), full)
 })
+
+parallel_names <- c(
+  "get_num_threads_percent", "set_num_threads_percent", "get_num_threads",
+  "get_thread_pool_size", "set_thread_pool_size",
+  "get_thread_start_delay_ms", "set_thread_start_delay_ms",
+  "get_blas_threads_min_n", "set_blas_threads_min_n",
+  "get_omp_min_rows", "set_omp_min_rows",
+  "blas_backend", "blas_num_threads", "omp_enabled")
+
+test_that("Parallel settings are exported and share Optim's", {
+  exported <- getNamespaceExports("rlibkriging")
+  for (f in paste0("parallel_", parallel_names))
+    expect_true(f %in% exported, info = f)
+  library(rlibkriging)
+  orig <- list(parallel_get_num_threads_percent(), parallel_get_thread_pool_size(),
+               parallel_get_blas_threads_min_n(), parallel_get_omp_min_rows())
+  parallel_set_num_threads_percent(0.5)
+  expect_equal(optim_get_num_threads_percent(), 0.5)
+  expect_equal(parallel_get_num_threads(), optim_get_num_threads())
+  parallel_set_thread_pool_size(3)
+  expect_equal(optim_get_thread_pool_size(), 3)
+  parallel_set_blas_threads_min_n(0)
+  expect_equal(parallel_get_blas_threads_min_n(), 0)
+  parallel_set_omp_min_rows(300)
+  expect_equal(parallel_get_omp_min_rows(), 300)
+  expect_true(parallel_blas_backend() %in% c("mkl", "openblas", "accelerate", "unknown"))
+  expect_true(parallel_blas_num_threads() >= 0)
+  expect_true(is.logical(parallel_omp_enabled()))
+  parallel_set_num_threads_percent(orig[[1]])
+  parallel_set_thread_pool_size(orig[[2]])
+  parallel_set_blas_threads_min_n(orig[[3]])
+  parallel_set_omp_min_rows(orig[[4]])
+})

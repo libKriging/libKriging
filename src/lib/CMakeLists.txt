@@ -7,6 +7,7 @@ add_library(Kriging
         demo/DemoArmadilloClass.cpp include/libKriging/demo/DemoArmadilloClass.hpp
         Trend.cpp include/libKriging/Trend.hpp
         Optim.cpp include/libKriging/Optim.hpp
+        Parallel.cpp include/libKriging/Parallel.hpp
         Random.cpp include/libKriging/Random.hpp
         LinearAlgebra.cpp include/libKriging/LinearAlgebra.hpp
         LinearAlgebraCheck.cpp
