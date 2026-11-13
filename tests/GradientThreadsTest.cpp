@@ -120,8 +120,9 @@ TEST_CASE("LL / LMP theta gradients do not depend on the OpenMP thread count", "
   INFO("thread budget: " << Optim::get_num_threads());
   const std::vector<arma::vec> gn = gradients(k, gamma);
   if (!blas_reproducible)
-    WARN("BLAS count may change with the budget, or two identical gradient calls differ: compared to 1e-10 "
-         "relative");
+    WARN(
+        "BLAS count may change with the budget, or two identical gradient calls differ: compared to 1e-10 "
+        "relative");
   require_equal(g1, gn, blas_reproducible ? 0.0 : 1e-10);
   for (const auto& g : g1)
     REQUIRE(g.is_finite());
