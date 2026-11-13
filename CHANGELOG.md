@@ -12,6 +12,12 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Windows: BLAS thread counts read by `BlasBackendTest` and the thread benchmarks** (#473):
+  PE / COFF has no weak symbols, so `openblas_get_num_threads`, `MKL_Get_Max_Threads`, ... are
+  looked up at run time in the loaded modules (`tests/blas_symbols_win.hpp`, any DLL name).
+  `BlasBackendTest` now detects the backend (`dgemm_` provider) and runs its OpenBLAS / MKL
+  cases on Windows; `bench-threads`, `bench-threads-ops` and `bench-blas-threads` report
+  `blas_kind` / `blas_threads` (was -1), and `bench-blas-threads` the CPU time (was 0).
 - **Thread Sanitizer on the OpenMP loops** (#420, leftover of #439): with Clang + LLVM libomp,
   CMake finds Archer (`libarcher`) under `SANITIZE=THREAD` and defines `LK_TSAN_OPENMP`: the
   OpenMP loops (`OmpLoops.hpp`, NestedKriging's pair loop) stay compiled in and run on 2 threads
