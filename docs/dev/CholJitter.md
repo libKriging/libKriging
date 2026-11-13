@@ -506,6 +506,50 @@ So no time argument either way (the test costs a few %); the decision is on the 
 which move in opposite directions noise-free (better without the test) and with a nugget (worse
 without it). A uniform "retry only on a failing Cholesky" is not supported by these numbers.
 
+#### A test bounded by the diagonal (study mode)
+
+`LinearAlgebra::set_chol_rcond_bound(mode)` (default 0, unchanged; `bench-fit-protocol
+--rcond-bound`): `cholCov` skips the rcond test when the diagonal shift delta of
+`factor * C + diag(d)` already bounds the 1-norm reciprocal condition number,
+delta / (sqrt(n) (max d + factor (n − 1))) >= `min_rcond`. Mode 1: constant shift on a unit
+correlation only (the search jitter J, WarpKriging's floor); mode 2: any shift (nugget
+1 − alpha, heterogeneous noise). The other `safe_chol_lower` callers (block update,
+`simulate`, NestedKriging) keep the test. With J 1e-10 the bound is 3e-15 at n 1000: the test is
+always skipped in the noise-free search; the exact committed model (J = 0) has no bound and keeps
+it.
+
+Same protocol as above (`BFGS4`, 10 sets x 4 functions), against the current behaviour and the
+test off:
+
+| mode | kernel | noise | n | theta = current / = test off | LL − current: median / min / max | RMSE / current: median / max, > 1.1 / < 0.9 | NLPD median: current / mode / test off | wall total: current / mode / test off (s) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | gauss | none | 200-1000 | 120 / 120 | 0 | 1 | identical | 276 / 295 / 266 |
+| 1 | matern5_2 | none | 200, 500 | 80 / 80 | 0 | 1 | identical | 52.9 / 63.8 / 51.6 |
+| 1 | matern5_2 | none | 1000 | 16 / **40** | 0 / −0.014 / +35.3 | 1 / 2.48, 8 / 0 | −4.81 / **−4.24** / −5.43 | 249 / 178 / 175 |
+| 1 | gauss, matern5_2 | nugget | 200 | 24 / — | identical (J = 0 with a noise model) | | | |
+| 2 | gauss | nugget | 200-1000 | 120 / 108 | 0 | 1 | identical | 405 / 394 / 390 |
+| 2 | matern5_2 | nugget | 200, 500 | 79 / 64 | 0 / −0.44 / 0 | 1 | identical | 119 / 127 / 111 |
+| 2 | matern5_2 | nugget | 1000 | 37 / 18 | 0 / −30.2 / +5.46 | 1 / 1.1, 0 / 0 | identical | 401 / 403 / 375 |
+
+- Mode 1 makes the noise-free search that of the test off (theta identical on 160 of 160 fits)
+  and removes its time cost (matern5_2 n 1000: 249 → 178 s). But the predictions get **worse**
+  than now on 8 fits of 40 (RMSE up to × 2.48, NLPD median −4.81 → −4.24), never better: the
+  committed model keeps the test, and the retry nugget (1e-10) it adds costs more at the
+  longer-range theta now found. Against the test off, RMSE median × 1.34.
+- Wall times: the mode runs came after the others, and on fits with an identical theta mode 1
+  is 7-20 % slower than the current behaviour although it skips the test: run-to-run drift of
+  the same order as the cost of the test, consistent with the timing section above.
+- Mode 2 with a nugget: almost the current behaviour, not that of the test off (the degradation
+  of the test off, above, does not appear): where the search went astray without the test,
+  1 − alpha is too small for the bound, which keeps the test. Neither gain nor loss.
+- Bounding the search alone is therefore not enough: the decision concerns the committed model
+  too. The combination "bound J in the search, no rcond test on the exact noise-free committed
+  model (retry on a failing Cholesky only), test kept with a noise model" is, noise-free, the
+  "test off" row above (same search theta 160 / 160, same committed factorization), and with a
+  noise model the current behaviour: measured gains noise-free (matern5_2 n 1000 RMSE median
+  × 0.66, LL never worse than −0.014), no change with a nugget. Not measured: matern3_2 / exp,
+  WarpKriging, NestedKriging, `simulate`, update.
+
 
 ## Open items
 
