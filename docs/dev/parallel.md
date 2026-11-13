@@ -32,7 +32,8 @@ share  = Optim::set_num_threads_percent(x) / LK_NUM_THREADS_PERCENT=x
   of the CPUs in the affinity mask, capped by the cgroup CPU quota (Linux sysfs;
   cgroup v2 `cpu.max` or v1 `cpu.cfs_quota_us` / `cpu.cfs_period_us`, the smallest
   quota of the process's cgroup and of its visible ancestors);
-  `hw.physicalcpu` (macOS); `GetLogicalProcessorInformationEx` (Windows);
+  `hw.physicalcpu` (macOS); `GetLogicalProcessorInformationEx` (Windows, cores of the
+  process affinity mask when the process is in one processor group);
   `std::thread::hardware_concurrency()` if unreadable.
 - Never more than the calling thread's OpenMP limit (`OMP_NUM_THREADS`,
   `omp_set_num_threads`).
@@ -72,7 +73,9 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
   (or the budget outside the pool). The library never changes the OpenMP ICV of a
   thread (except around `fork()`, see section 7).
 - BLAS: the OpenBLAS count is process-global. Each public fit / predict /
-  simulate / update sets it to the budget for the call, the pool to the share
+  simulate / update, and each public objective evaluation (`logLikelihood()`,
+  `leaveOneOut()`, `logMargPost()`, the `*Fun` and `leaveOneOutVec` of every
+  method), sets it to the budget for the call, the pool to the share
   for its lifetime, and both restore it; an OpenBLAS loaded with fewer threads
   (`OPENBLAS_NUM_THREADS`) is left as it is. The MKL count is set per thread
   (`MKL_Set_Num_Threads_Local`): in the calling thread for the call, in each
@@ -110,7 +113,8 @@ from several user threads (Python `ThreadPoolExecutor`, joblib threads,
   BLAS at the share of the most constrained one (never more than the budget;
   no oversubscription from one call restoring the count of another).
   Side effect of the small-problem rule (#436, section 3): a call on a small
-  problem (`n < Optim::blas_threads_min_n`, automatic threshold 500) requests 1
+  problem (`n < Optim::blas_threads_min_n`, automatic threshold 500: without SMT
+  headroom, and always with MSVC on Windows since #473) requests 1
   BLAS thread, so while it runs it also sets the process-wide OpenBLAS count to
   1 for the concurrent calls on big problems. Their results are unchanged (up
   to the rounding above); their BLAS throughput drops for that time. To avoid

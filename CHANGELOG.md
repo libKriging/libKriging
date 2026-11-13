@@ -20,6 +20,29 @@ past release, see the corresponding entry on the
   bit-identical (the gradients sum in one order whatever the threshold, #441). No hang with the C++
   and Python suites without `OMP_NUM_THREADS=1`. MinGW builds (Octave, R on Windows) and macOS
   keep 800 until measured. Migration: none.
+- **One OpenBLAS thread below 500 observations with MSVC on Windows** (#473): the automatic
+  small-problem rule (`Optim::blas_threads_min_n` = -1, #436) applies in MSVC builds even when the
+  machine has SMT headroom (on Linux it stays off there: the BLAS at the budget was faster). Measured
+  on an i9-10900K (10 cores / 20 threads, OpenBLAS 0.3.33): full fits at n = 200 / 300 / 400 ×1.59 /
+  ×1.51 / ×1.21 faster with `BFGS`, ×1.10 / ×1.08 / ×1.08 with `BFGS4`, with less CPU time and the
+  same optimum (to 1e-9 in LL, except one `BFGS` path at n = 200); per evaluation ×1.4–1.5 at
+  n = 200–400. Migration: `Optim::set_blas_threads_min_n(0)` or `LK_BLAS_THREADS_MIN_N=0` restores
+  the former behaviour; results may change in the last bits (the BLAS count changes).
+- **Thread budget under a CPU affinity mask on Windows** (#473): the physical cores are counted
+  among the CPUs of the process affinity mask (`start /affinity`, job objects,
+  `SetProcessAffinityMask`), as on Linux. Before, every core of the machine counted: a process
+  restricted to one core of a 10-core i9-10900K got a budget of 10 threads. A process spread over
+  several processor groups still counts every core. New test `AffinityTest` (Windows, Linux).
+- **Objective evaluations run at the thread budget** (#473): the public objective functions of
+  `Kriging` (`logLikelihood()`, `leaveOneOut()`, `logMargPost()`, with or without a method, their
+  `*Fun`, `*VecchiaFun`, `*NystromFun`, `leaveOneOutVec`) and `WarpKriging::logLikelihoodFun`
+  (so `MLPKriging`'s) open the same budget scope as fit / predict / simulate / update: OpenBLAS
+  at the budget (or 1 thread below `Optim::blas_threads_min_n`), MKL per thread, restored after.
+  Before, they ran at whatever count OpenBLAS had: the logical CPUs it was loaded with, or the
+  count another thread's call had set, so the same call on the same model could round
+  differently depending on the concurrent calls (1–2 ulp on `leaveOneOut()`,
+  `ConcurrentCallsTest` budget-1 case on Windows with OpenBLAS 0.3.33 loaded with 20 threads).
+  Migration: none; values may change in the last bits with a multithreaded OpenBLAS.
 - **Thread Sanitizer on the OpenMP loops** (#420, leftover of #439): with Clang + LLVM libomp,
   CMake finds Archer (`libarcher`) under `SANITIZE=THREAD` and defines `LK_TSAN_OPENMP`: the
   OpenMP loops (`OmpLoops.hpp`, NestedKriging's pair loop) stay compiled in and run on 2 threads
