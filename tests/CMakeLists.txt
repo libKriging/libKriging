@@ -391,6 +391,10 @@ target_link_libraries(GradientThreadsTest LINK_PUBLIC Kriging Catch2)
 target_include_directories(GradientThreadsTest PRIVATE ${PROJECT_SOURCE_DIR}/src/lib)
 add_dependencies(all_test_binaries GradientThreadsTest)
 catch_discover_tests(GradientThreadsTest)
+# bit-identical end-to-end gradients whatever the budget when the BLAS count
+# cannot change (the library sets it to the budget: #473)
+add_test(NAME GradientThreadsTest/BLAS_NUM_THREADS=1 COMMAND GradientThreadsTest "LL / LMP theta gradients do not depend on the OpenMP thread count")
+set_tests_properties(GradientThreadsTest/BLAS_NUM_THREADS=1 PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1;MKL_NUM_THREADS=1")
 
 add_executable(BlasThreadsTest BlasThreadsTest.cpp)
 target_link_libraries(BlasThreadsTest LINK_PUBLIC Kriging Catch2)
