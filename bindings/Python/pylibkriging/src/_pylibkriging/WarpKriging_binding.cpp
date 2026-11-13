@@ -74,7 +74,9 @@ PyWarpKriging::PyWarpKriging(const py::array_t<double>& y,
   m_internal = std::make_unique<lk::WarpKriging>(warping, kernel);
   auto [wparams, tuning] = split_warp_parameters(parameters);
   merge_noise_arg(wparams, noise);
-  m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning, method);
+  without_gil(m_call, [&] {
+    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning, method);
+  });
 }
 
 PyWarpKriging::~PyWarpKriging() {}
@@ -96,13 +98,16 @@ void PyWarpKriging::fit(const py::array_t<double>& y,
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   auto [wparams, tuning] = split_warp_parameters(parameters);
   merge_noise_arg(wparams, noise);
-  m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning, method);
+  without_gil(m_call, [&] {
+    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning, method);
+  });
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
 PyWarpKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
-  auto [mean, stdev, cov, mean_deriv, stdev_deriv] = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
+  auto [mean, stdev, cov, mean_deriv, stdev_deriv]
+      = without_gil(m_call, [&] { return m_internal->predict(mat_X, return_stdev, return_cov, return_deriv); });
   return std::make_tuple(vec_to_arr(mean),
                          vec_to_arr(stdev),
                          carma::mat_to_arr(cov, true),
@@ -133,7 +138,9 @@ py::array_t<double> PyWarpKriging::simulate(const int nsim,
                                             const bool will_update,
                                             const py::object& with_noise) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
-  auto result = m_internal->simulate(nsim, seed, mat_X, will_update, with_noise_variances(with_noise));
+  const arma::vec noise_variances = with_noise_variances(with_noise);
+  auto result
+      = without_gil(m_call, [&] { return m_internal->simulate(nsim, seed, mat_X, will_update, noise_variances); });
   return carma::mat_to_arr(result, true);
 }
 
@@ -145,7 +152,7 @@ py::array_t<double> PyWarpKriging::update_simulate(const py::array_t<double>& y_
   arma::vec vec_noise_u;
   if (!noise_u.is_none())
     vec_noise_u = to_owned_col(noise_u);
-  auto result = m_internal->update_simulate(mat_y, mat_X, vec_noise_u);
+  auto result = without_gil(m_call, [&] { return m_internal->update_simulate(mat_y, mat_X, vec_noise_u); });
   return carma::mat_to_arr(result, true);
 }
 
@@ -157,9 +164,9 @@ void PyWarpKriging::update(const py::array_t<double>& y_u,
   arma::mat mat_X = carma::arr_to_mat<double>(X_u);
   if (!noise_u.is_none()) {
     arma::vec vec_noise_u = to_owned_col(noise_u);
-    m_internal->update(mat_y, mat_X, refit, vec_noise_u);
+    without_gil(m_call, [&] { m_internal->update(mat_y, mat_X, refit, vec_noise_u); });
   } else {
-    m_internal->update(mat_y, mat_X, refit);
+    without_gil(m_call, [&] { m_internal->update(mat_y, mat_X, refit); });
   }
 }
 

@@ -126,7 +126,8 @@ struct CallCount {
   unsigned generation = 0;
 };
 
-/// Entry-point guard of the public fit / predict / simulate / update methods:
+/// Entry-point guard of the public fit / predict / simulate / update methods and
+/// of the public objective evaluations (logLikelihood(), *Fun, ...):
 /// counts the call, then requests OpenBLAS at blas_threads_for(budget_total())
 /// and sets the calling thread's MKL at mkl_threads_for(budget_total())
 /// (OpenBLAS defaults to the logical CPUs, which costs 1.3-2x on a

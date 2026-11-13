@@ -46,7 +46,7 @@ class Parallel {
   LIBKRIGING_EXPORT static int get_blas_threads_min_n();
   /// Number of rows from which the covariance and gradient loops run on the
   /// OpenMP threads (below: serial). Default: the platform value of the build
-  /// (200 on Linux, 800 elsewhere unless measured), or LK_OMP_MIN_ROWS. A
+  /// (200 on Linux and with MSVC, 800 elsewhere until measured), or LK_OMP_MIN_ROWS. A
   /// performance setting: the results do not depend on it.
   LIBKRIGING_EXPORT static void set_omp_min_rows(int n);
   LIBKRIGING_EXPORT static int get_omp_min_rows();
