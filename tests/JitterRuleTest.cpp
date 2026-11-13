@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <tuple>
 #include <vector>
 // clang-format on
 
@@ -226,4 +227,53 @@ TEST_CASE("jitter rule: NestedKriging submodels follow the rule", "[jitter][rule
   // the aggregate interpolates the design (exact committed submodels)
   const arma::vec yp = std::get<0>(nk.predict(X, false));
   CHECK(arma::abs(yp - y).max() < 1e-5 * arma::abs(y).max());
+}
+
+TEST_CASE("rcond test bounded by the diagonal (study mode, #465)", "[jitter][rcond]") {
+  // matern5_2 correlation, n = 200 points of [0,1]^2, long range: with a
+  // diagonal shift delta the 1-norm rcond is >= delta / (sqrt(n) (max diag +
+  // factor (n - 1))), here 3.5e-17 >= min_rcond (1e-18), while the rcond
+  // estimate of the Cholesky factor can be lower (6e-19 with OpenBLAS).
+  const arma::uword n = 200;
+  arma::arma_rng::set_seed(1);
+  const arma::mat X = arma::randu(n, 2);
+  const arma::mat dX = LinearAlgebra::compute_dX(X);
+  auto cov = [](const arma::vec& d, const arma::vec& t) {
+    const arma::vec h = arma::abs(d) / t * std::sqrt(5.0);
+    double p = 1;
+    for (const double v : h)
+      p *= (1 + v + v * v / 3) * std::exp(-v);
+    return p;
+  };
+  const arma::vec theta(2, arma::fill::value(3.0));
+  const int saved = LinearAlgebra::get_chol_rcond_bound();
+  auto chol_with = [&](int mode, double factor, double d) {
+    LinearAlgebra::set_chol_rcond_bound(mode);
+    arma::mat R(n, n);
+    arma::mat L = LinearAlgebra::cholCov(&R, dX, theta, cov, factor, arma::vec(n, arma::fill::value(d)));
+    arma::mat Lp;
+    const bool ok = arma::chol(Lp, R, "lower");
+    return std::make_tuple(L, Lp, ok);
+  };
+  {  // jitter: constant shift on the unit diagonal, modes 1 and 2 skip the test
+    const auto [L0, Lp, ok] = chol_with(0, 1.0, 1.0 + 1e-13);
+    REQUIRE(ok);
+    INFO("rcond estimate " << LinearAlgebra::rcond_chol(Lp));
+    if (LinearAlgebra::rcond_chol(Lp) < 1e-18)
+      CHECK(!arma::approx_equal(L0, Lp, "absdiff", 0.0));  // mode 0 retries
+    for (const int mode : {1, 2}) {
+      const auto [L, Lq, ok2] = chol_with(mode, 1.0, 1.0 + 1e-13);
+      CHECK(arma::approx_equal(L, Lq, "absdiff", 0.0));  // plain Cholesky, no retry
+    }
+  }
+  {  // nugget-like: factor < 1, unit diagonal; only mode 2 uses the bound
+    const double alpha = 1.0 - 1e-13;
+    const auto [L0, Lp, ok] = chol_with(0, alpha, 1.0);
+    const auto [L1, Lp1, ok1] = chol_with(1, alpha, 1.0);
+    CHECK(arma::approx_equal(L0, L1, "absdiff", 0.0));
+    const auto [L2, Lp2, ok2] = chol_with(2, alpha, 1.0);
+    if (ok2)
+      CHECK(arma::approx_equal(L2, Lp2, "absdiff", 0.0));
+  }
+  LinearAlgebra::set_chol_rcond_bound(saved);
 }
