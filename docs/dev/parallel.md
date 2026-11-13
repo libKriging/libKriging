@@ -32,7 +32,8 @@ share  = Optim::set_num_threads_percent(x) / LK_NUM_THREADS_PERCENT=x
   of the CPUs in the affinity mask, capped by the cgroup CPU quota (Linux sysfs;
   cgroup v2 `cpu.max` or v1 `cpu.cfs_quota_us` / `cpu.cfs_period_us`, the smallest
   quota of the process's cgroup and of its visible ancestors);
-  `hw.physicalcpu` (macOS); `GetLogicalProcessorInformationEx` (Windows);
+  `hw.physicalcpu` (macOS); `GetLogicalProcessorInformationEx` (Windows, cores of the
+  process affinity mask when the process is in one processor group);
   `std::thread::hardware_concurrency()` if unreadable.
 - Never more than the calling thread's OpenMP limit (`OMP_NUM_THREADS`,
   `omp_set_num_threads`).
@@ -72,7 +73,9 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
   (or the budget outside the pool). The library never changes the OpenMP ICV of a
   thread (except around `fork()`, see section 7).
 - BLAS: the OpenBLAS count is process-global. Each public fit / predict /
-  simulate / update sets it to the budget for the call, the pool to the share
+  simulate / update, and each public objective evaluation (`logLikelihood()`,
+  `leaveOneOut()`, `logMargPost()`, the `*Fun` and `leaveOneOutVec` of every
+  method), sets it to the budget for the call, the pool to the share
   for its lifetime, and both restore it; an OpenBLAS loaded with fewer threads
   (`OPENBLAS_NUM_THREADS`) is left as it is. The MKL count is set per thread
   (`MKL_Set_Num_Threads_Local`): in the calling thread for the call, in each
@@ -83,7 +86,8 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
   workers); kept for WarpKriging (`Optim::thread_start_delay_ms`).
 
 Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
-= 200 on Linux, 800 elsewhere until measured (`src/lib/OmpLoops.hpp`), a
+= 200 on Linux and with MSVC on Windows (#473), 800 elsewhere until measured
+(macOS, MinGW: Octave / R on Windows; `src/lib/OmpLoops.hpp`), a
 performance setting only once #441 is merged (section 4); `n >= 200`
 (`compute_dX`, `covMat_sym_*`); `n_o × n_n >= 40000` (predict / simulate `R_on`,
 `covMat_rect`, Vecchia, NestedKriging).
@@ -116,7 +120,8 @@ from several user threads (Python `ThreadPoolExecutor`, joblib threads,
   BLAS at the share of the most constrained one (never more than the budget;
   no oversubscription from one call restoring the count of another).
   Side effect of the small-problem rule (#436, section 3): a call on a small
-  problem (`n < Optim::blas_threads_min_n`, automatic threshold 500) requests 1
+  problem (`n < Optim::blas_threads_min_n`, automatic threshold 500: without SMT
+  headroom, and always with MSVC on Windows since #473) requests 1
   BLAS thread, so while it runs it also sets the process-wide OpenBLAS count to
   1 for the concurrent calls on big problems. Their results are unchanged (up
   to the rounding above); their BLAS throughput drops for that time. To avoid
@@ -432,8 +437,10 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
   (runners are too noisy for pass / fail on timings) (#421).
 - Other BLAS (FlexiBLAS, BLIS; Accelerate): sections 5 and 8 (#422). MKL driven
   since #445, checked in CI since T9.
-- macOS (#416) and Windows (#417): measure `kOmpMinRows` there (800 until then;
-  performance only with #441).
+- macOS (#416) and MinGW on Windows (Octave, R): measure `kOmpMinRows` there
+  (800 until then; performance only with #441). MSVC on Windows: 200 since #473
+  (#473; measurements in `docs/dev/rationalization/Windows-results.md` on the
+  `windows-session-1` branch, section 2).
 - Concurrent calls (3.1): Armadillo's RNG (WarpKriging warp initialization,
   subset-of-data selection) is global where Armadillo disables `thread_local`
   (MinGW, GCC on macOS); Accelerate's count not driven
