@@ -12,6 +12,14 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **One OpenBLAS thread below 500 observations with MSVC on Windows** (#473): the automatic
+  small-problem rule (`Optim::blas_threads_min_n` = -1, #436) applies in MSVC builds even when the
+  machine has SMT headroom (on Linux it stays off there: the BLAS at the budget was faster). Measured
+  on an i9-10900K (10 cores / 20 threads, OpenBLAS 0.3.33): full fits at n = 200 / 300 / 400 ×1.59 /
+  ×1.51 / ×1.21 faster with `BFGS`, ×1.10 / ×1.08 / ×1.08 with `BFGS4`, with less CPU time and the
+  same optimum (to 1e-9 in LL, except one `BFGS` path at n = 200); per evaluation ×1.4–1.5 at
+  n = 200–400. Migration: `Optim::set_blas_threads_min_n(0)` or `LK_BLAS_THREADS_MIN_N=0` restores
+  the former behaviour; results may change in the last bits (the BLAS count changes).
 - **Thread budget under a CPU affinity mask on Windows** (#473): the physical cores are counted
   among the CPUs of the process affinity mask (`start /affinity`, job objects,
   `SetProcessAffinityMask`), as on Linux. Before, every core of the machine counted: a process

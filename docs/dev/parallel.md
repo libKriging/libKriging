@@ -112,7 +112,8 @@ from several user threads (Python `ThreadPoolExecutor`, joblib threads,
   BLAS at the share of the most constrained one (never more than the budget;
   no oversubscription from one call restoring the count of another).
   Side effect of the small-problem rule (#436, section 3): a call on a small
-  problem (`n < Optim::blas_threads_min_n`, automatic threshold 500) requests 1
+  problem (`n < Optim::blas_threads_min_n`, automatic threshold 500: without SMT
+  headroom, and always with MSVC on Windows since #473) requests 1
   BLAS thread, so while it runs it also sets the process-wide OpenBLAS count to
   1 for the concurrent calls on big problems. Their results are unchanged (up
   to the rounding above); their BLAS throughput drops for that time. To avoid

@@ -463,8 +463,17 @@ int scope_blas_threads(unsigned long long n) {
     // its own call (T6 shared count state); the decision of a call must not
     // depend on the other calls running (T9 log, section 0)
     const int blas = target > 0 ? target : initial_blas_threads();
+#if defined(_MSC_VER)
+    // Windows / MSVC (vcomp, OpenBLAS's Win32 thread server): one BLAS thread
+    // is faster below the threshold even with SMT headroom (i9-10900K, 10
+    // cores / 20 threads, OpenBLAS 0.3.33: full fits x1.21-1.59 BFGS, x1.08-1.10
+    // BFGS4 at n = 200-400, same optimum, less CPU; #473)
+    if (blas > 1)
+      min_n = kAutoBlasMinN;
+#else
     if (blas > 1 && blas + budget > logical_cpus())
       min_n = kAutoBlasMinN;
+#endif
   }
   // A request like any other: it goes through the shared count state of the
   // ScopedBlasThreads (smallest live request in effect, the last scope restores
