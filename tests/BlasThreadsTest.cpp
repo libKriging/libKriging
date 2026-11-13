@@ -7,6 +7,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/Optim.hpp"
 #include "libKriging/WarpKriging.hpp"
+#include "blas_counts.hpp"
 #include <algorithm>
 #include <atomic>
 #include <cstdlib>
@@ -239,8 +240,7 @@ TEST_CASE("fork() quiesces the child only and restores the parent's thread count
 #ifdef _OPENMP
 // The OpenMP loops (covariance matrix, log-likelihood gradient) write
 // independent entries or reduce in a fixed order: the objective, its gradient
-// and an updated model do not depend on the OpenMP thread count (the BLAS
-// thread count is left unchanged).
+// and an updated model do not depend on the OpenMP thread count.
 TEST_CASE("Objective, gradient and update do not depend on the OpenMP thread count", "[threads]") {
   const int initial = omp_get_max_threads();
   arma::vec y;
@@ -259,23 +259,20 @@ TEST_CASE("Objective, gradient and update do not depend on the OpenMP thread cou
     return std::make_tuple(ll, arma::vec(grad), k.logLikelihood());
   };
   // The budget follows the OpenMP limit, and so does the BLAS count the library
-  // sets (blas_threads_for / mkl_threads_for). OpenBLAS's results did not
-  // change with its count here; MKL's do (n = 900, relative: ll 1.5e-11,
-  // gradient 1.1e-9, updated ll 3.7e-10; T9 log):
-  // with an MKL loaded with more than 1 thread only the rounding is compared,
-  // bit-identity is required by BlasThreadsTest/BLAS_NUM_THREADS=1 (MKL and
-  // OpenBLAS loaded with 1 thread: the BLAS count cannot change).
-#ifdef LK_TEST_MKL
-  const bool blas_count_changes = MKL_Get_Max_Threads && MKL_Get_Max_Threads() > 1;
-#else
-  const bool blas_count_changes = false;
-#endif
+  // sets for every public call, the objective functions included
+  // (blas_threads_for / mkl_threads_for). The BLAS may round differently with
+  // its count: MKL (n = 900, relative: ll 1.5e-11, gradient 1.1e-9, updated ll
+  // 3.7e-10; T9 log), OpenBLAS 0.3.33 on Windows (ll 2.7e-10, updated ll
+  // 6.3e-10; #473). With a BLAS loaded with more than 1 thread only the rounding
+  // is compared, bit-identity is required by BlasThreadsTest/BLAS_NUM_THREADS=1
+  // (MKL and OpenBLAS loaded with 1 thread: the BLAS count cannot change).
+  const bool blas_count_changes = lk_test::blas_count_can_change();
   const auto [ll1, grad1, llu1] = run(1);
   const auto [ll4, grad4, llu4] = run(4);
   omp_set_num_threads(initial);
 
   if (blas_count_changes) {
-    WARN("MKL loaded with more than 1 thread: its results depend on its thread count, compared to 1e-8");
+    WARN("BLAS loaded with more than 1 thread: its results may depend on its thread count, compared to 1e-8");
     CHECK(std::abs(ll1 - ll4) <= 1e-8 * std::abs(ll4));
     CHECK(arma::norm(grad1 - grad4, "inf") <= 1e-8 * arma::norm(grad4, "inf"));
     CHECK(std::abs(llu1 - llu4) <= 1e-8 * std::abs(llu4));
@@ -413,8 +410,9 @@ TEST_CASE("predict, simulate and update leave the caller's BLAS / OpenMP thread 
 
 // The budget changes only how many threads run the computations: the
 // objective, its gradient and an updated model agree to rounding for budgets
-// of 1 to 2x the cores (bit-identical with OpenBLAS here; another BLAS may
-// split its sums by thread).
+// of 1 to 2x the cores. The BLAS count follows the budget, and a BLAS may split
+// its sums by thread (MKL; OpenBLAS 0.3.33 on Windows: 2.8e-10 relative on ll,
+// #473): 1e-12 relative when its count cannot change, 1e-8 otherwise.
 TEST_CASE("Objective, gradient and update do not depend on the thread budget", "[threads]") {
   BudgetGuard guard;
   arma::vec y;
@@ -432,13 +430,14 @@ TEST_CASE("Objective, gradient and update do not depend on the thread budget", "
     k.update(y.tail(300), X.tail_rows(300), false);
     return std::make_tuple(ll, arma::vec(grad), k.logLikelihood());
   };
+  const double tol = lk_test::blas_count_can_change() ? 1e-8 : 1e-12;
   const auto [ll0, grad0, llu0] = run(1e-6);  // 1 thread
   for (const double percent : {20.0, 50.0, 100.0, 200.0}) {
     const auto [ll, grad, llu] = run(percent);
-    INFO("budget " << Optim::get_num_threads() << " threads");
-    CHECK(std::abs(ll - ll0) <= 1e-12 * std::abs(ll0));
-    CHECK(arma::norm(grad - grad0) <= 1e-12 * arma::norm(grad0));
-    CHECK(std::abs(llu - llu0) <= 1e-12 * std::abs(llu0));
+    INFO("budget " << Optim::get_num_threads() << " threads, tolerance " << tol);
+    CHECK(std::abs(ll - ll0) <= tol * std::abs(ll0));
+    CHECK(arma::norm(grad - grad0) <= tol * arma::norm(grad0));
+    CHECK(std::abs(llu - llu0) <= tol * std::abs(llu0));
   }
 }
 

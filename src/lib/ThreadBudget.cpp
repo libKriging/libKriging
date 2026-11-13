@@ -184,7 +184,15 @@ int physical_cores_os() {
   return n;
 }
 #elif defined(_WIN32)
+// Cores with at least one logical CPU in the process affinity mask (start
+// /affinity, job objects, SetProcessAffinityMask), as sched_getaffinity on
+// Linux. A process spread over several processor groups (> 64 logical CPUs,
+// Windows 11 / Server 2022 default) has no single mask: every core counts.
 int physical_cores_os() {
+  DWORD_PTR process_mask = 0, system_mask = 0;
+  USHORT group = 0, group_count = 1;
+  const bool masked = GetProcessGroupAffinity(GetCurrentProcess(), &group_count, &group) && group_count == 1
+                      && GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask) && process_mask != 0;
   DWORD len = 0;
   GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len);
   if (len == 0)
@@ -196,8 +204,13 @@ int physical_cores_os() {
   int n = 0;
   for (DWORD off = 0; off < len;) {
     auto* p = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data() + off);
-    if (p->Relationship == RelationProcessorCore)
-      ++n;
+    if (p->Relationship == RelationProcessorCore) {
+      bool allowed = !masked;
+      for (WORD g = 0; !allowed && g < p->Processor.GroupCount; ++g)
+        allowed = p->Processor.GroupMask[g].Group == group && (p->Processor.GroupMask[g].Mask & process_mask) != 0;
+      if (allowed)
+        ++n;
+    }
     off += p->Size;
   }
   return n;
