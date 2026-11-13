@@ -133,7 +133,8 @@ class Optim {
   // compete with the OpenMP team for the cores. -1 = automatic (default, env
   // LK_BLAS_THREADS_MIN_N): threshold 500 when the BLAS threads and the
   // OpenMP team outnumber the logical CPUs (no SMT headroom: VMs, CI runners),
-  // off otherwise; 0 = off; n > 0 = threshold n. See REPORT-blas-threads.md.
+  // off otherwise, except with MSVC on Windows where it is always 500 (#473);
+  // 0 = off; n > 0 = threshold n. See REPORT-blas-threads.md.
   static int blas_threads_min_n;
   LIBKRIGING_EXPORT static void set_blas_threads_min_n(int min_n);
   LIBKRIGING_EXPORT static int get_blas_threads_min_n();

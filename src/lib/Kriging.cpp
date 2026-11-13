@@ -753,6 +753,7 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodFun(const arma::vec& _theta,
                                                                           const bool _grad,
                                                                           const bool _bench) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   const arma::vec gamma_n = gamma_from_original(_theta);
   auto res = eval_objective(gamma_n.n_elem, _grad, _bench, [&](arma::vec* g, std::map<std::string, double>* b) {
     return _logLikelihood(gamma_n, g, nullptr, b);
@@ -886,6 +887,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutFun(const arma::vec& _theta,
                                                                         const bool _grad,
                                                                         const bool _bench) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   const arma::vec theta_n = gamma_from_original(_theta);
   auto res = eval_objective(theta_n.n_elem, _grad, _bench, [&](arma::vec* g, std::map<std::string, double>* b) {
     return _leaveOneOut(theta_n, g, nullptr, nullptr, b);
@@ -901,6 +903,7 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutFun(const ar
 }
 
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::leaveOneOutVec(const arma::vec& _theta) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   arma::mat yhat = arma::mat(m_y.n_elem, 2, arma::fill::none);
   _leaveOneOut(gamma_from_original(_theta), nullptr, &yhat, nullptr, nullptr);
   arma::vec mean = yhat.col(0);
@@ -1088,6 +1091,7 @@ double Kriging::_logMargPostAt(const arma::vec& gamma_n,
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostFun(const arma::vec& _theta,
                                                                         const bool _grad,
                                                                         const bool _bench) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   const arma::vec gamma_n = gamma_from_original(_theta);
   const arma::uword n_params
       = (m_noise_model == NoiseModel::Nugget && gamma_n.n_elem == m_X.n_cols) ? gamma_n.n_elem + 1 : gamma_n.n_elem;
@@ -1105,15 +1109,18 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostFun(const ar
 // committed (internal-scale) parameters, then apply the same value offset as
 // the public *Fun: logLikelihood() == logLikelihoodFun(theta()) etc.
 LIBKRIGING_EXPORT double Kriging::logLikelihood() {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   return _logLikelihood(current_gamma(), nullptr, nullptr, nullptr) + ll_offset();
 }
 
 LIBKRIGING_EXPORT double Kriging::leaveOneOut() {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   const double loo = _leaveOneOut(m_theta, nullptr, nullptr, nullptr, nullptr);
   return m_normalize ? loo * m_scaleY * m_scaleY : loo;
 }
 
 LIBKRIGING_EXPORT double Kriging::logMargPost() {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   return _logMargPostAt(m_theta, nullptr, nullptr) + lmp_offset();
 }
 
@@ -1608,6 +1615,7 @@ void check_vecchia_m(const ApproxMethod& am, arma::uword fitted_m, const char* w
 }  // namespace
 
 LIBKRIGING_EXPORT double Kriging::logLikelihood(const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "logLikelihood");
   switch (am.kind) {
     case ApproxMethod::Vecchia:
@@ -1632,6 +1640,7 @@ LIBKRIGING_EXPORT double Kriging::logLikelihood(const std::string& method) {
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodVecchiaFun(const arma::vec& theta,
                                                                                  bool return_grad) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   if (m_vecchia_m == 0)
     throw std::runtime_error("logLikelihoodVecchiaFun: model was not fitted with method=\"vecchia(m)\"");
   if (theta.n_elem != m_X.n_cols && !(m_noise_model != NoiseModel::None && theta.n_elem == m_X.n_cols + 1))
@@ -2306,6 +2315,7 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _gamma,
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodNystromFun(const arma::vec& gamma,
                                                                                  bool return_grad) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   if (m_nystrom_k == 0)
     throw std::runtime_error("logLikelihoodNystromFun: model was not fitted with method=\"nystrom(k)\"");
   if (gamma.n_elem != m_X.n_cols && gamma.n_elem != gamma_dim())
@@ -3209,25 +3219,30 @@ std::tuple<double, arma::vec> Kriging::approx_objective_fun(bool loo,
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutVecchiaFun(const arma::vec& theta,
                                                                                bool return_grad) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   return approx_objective_fun(true, true, theta, return_grad, "leaveOneOutVecchiaFun");
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutNystromFun(const arma::vec& theta,
                                                                                bool return_grad) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   return approx_objective_fun(true, false, theta, return_grad, "leaveOneOutNystromFun");
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostVecchiaFun(const arma::vec& theta,
                                                                                bool return_grad) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   return approx_objective_fun(false, true, theta, return_grad, "logMargPostVecchiaFun");
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostNystromFun(const arma::vec& theta,
                                                                                bool return_grad) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   return approx_objective_fun(false, false, theta, return_grad, "logMargPostNystromFun");
 }
 
 LIBKRIGING_EXPORT double Kriging::leaveOneOut(const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "leaveOneOut");
   switch (am.kind) {
     case ApproxMethod::Vecchia:
@@ -3247,6 +3262,7 @@ LIBKRIGING_EXPORT double Kriging::leaveOneOut(const std::string& method) {
 }
 
 LIBKRIGING_EXPORT double Kriging::logMargPost(const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "logMargPost");
   switch (am.kind) {
     case ApproxMethod::Vecchia:
@@ -3267,6 +3283,7 @@ LIBKRIGING_EXPORT double Kriging::logMargPost(const std::string& method) {
 
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::leaveOneOutVec(const arma::vec& theta,
                                                                            const std::string& method) {
+  libKriging::detail::BudgetScope budget_scope(m_X.n_rows);  // BLAS at the thread budget for the call
   const ApproxMethod am = parse_approx_method(method, "leaveOneOutVec");
   bool vecchia = true;
   switch (am.kind) {

@@ -29,7 +29,7 @@ This page collects questions about libKriging development
  |---|---|---|
  | C++ | `Optim::set_num_threads_percent(50)` | `Optim::get_num_threads()` |
  | Python | `lk.Optim.set_num_threads_percent(50)` | `lk.Optim.get_num_threads()` |
- | R | `rlibkriging:::optim_set_num_threads_percent(50)` | `rlibkriging:::optim_get_num_threads()` |
+ | R | `optim_set_num_threads_percent(50)` | `optim_get_num_threads()` |
  | Octave | `Optim.set_num_threads_percent(50)` | `Optim.get_num_threads()` |
 
  An explicit limit is never exceeded: `OMP_NUM_THREADS` (or `omp_set_num_threads` in the calling

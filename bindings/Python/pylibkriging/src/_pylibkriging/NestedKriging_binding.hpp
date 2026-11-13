@@ -12,6 +12,8 @@
 #include <tuple>
 #include <vector>
 
+#include "call_guard.hpp"
+
 namespace py = pybind11;
 
 class PyNestedKriging {
@@ -75,6 +77,7 @@ class PyNestedKriging {
 
  private:
   std::unique_ptr<NestedKriging> m_internal;
+  mutable CallMutex m_call;  // serializes the calls on this object (call_guard.hpp)
 };
 
 #endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_NESTEDKRIGING_BINDING_HPP

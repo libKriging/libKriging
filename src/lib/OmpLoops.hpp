@@ -33,12 +33,16 @@ namespace detail {
 /// 200 <= n < 800 (docs/dev/rationalization/T5-omp-threshold-blas.md). With
 /// BLAS and OpenMP both at the thread budget (physical cores, ThreadBudget.hpp)
 /// the loops pay off from n = 200 on Linux (i9-10900K, OpenBLAS pthreads / OpenMP, libgomp:
-/// x3 at n = 200-500, bench/thread-budget/RESULTS.md; Xeon 4 cores: T5 log).
-/// Elsewhere (libomp, Accelerate, Windows OpenBLAS) not measured yet: kept at
-/// 800, see #416 (macOS) and #417 (Windows). LK_OMP_MIN_ROWS overrides it at
-/// compile time.
+/// x3 at n = 200-500, bench/thread-budget/RESULTS.md; Xeon 4 cores: T5 log) and
+/// with MSVC on Windows (same CPU, vcomp, OpenBLAS 0.3.33: x1.5-1.6 per
+/// evaluation at n = 200-400, x1.12-1.20 per fit at n = 500, no hang with the
+/// Python suite; #473, branch windows-session-1:
+/// docs/dev/rationalization/Windows-results.md).
+/// Elsewhere (libomp / Accelerate on macOS, MinGW / libgomp on Windows: Octave,
+/// R) not measured yet: kept at 800, see #416 (macOS). LK_OMP_MIN_ROWS overrides
+/// it at compile time.
 #ifndef LK_OMP_MIN_ROWS
-#if defined(__linux__)
+#if defined(__linux__) || defined(_MSC_VER)
 #define LK_OMP_MIN_ROWS 200
 #else
 #define LK_OMP_MIN_ROWS 800
