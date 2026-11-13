@@ -90,6 +90,13 @@ performance setting only once #441 is merged (section 4); `n >= 200`
 
 ### 3.1 Concurrent calls from user threads
 
+Python: `fit`, `predict`, `simulate`, `update` and `update_simulate` of every model
+class release the GIL during the libKriging call
+(`bindings/Python/pylibkriging/src/_pylibkriging/call_guard.hpp`): calls on different
+models from a `ThreadPoolExecutor` run at the same time (8 fits on 4 threads, Windows
+10 cores: x3.5 at n = 150, x4.4 at n = 500, #473), and calls on the same model object
+are serialized by a per-object mutex. Before, the GIL serialized every call.
+
 Public calls (fit / predict / simulate / update / ...) may run at the same time
 from several user threads (Python `ThreadPoolExecutor`, joblib threads,
 `std::thread`), each on its own model object

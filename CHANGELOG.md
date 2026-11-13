@@ -12,6 +12,12 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Python: the GIL is released during fit / predict / simulate / update** (#473): the
+  `Kriging`, `WarpKriging`, `MLPKriging` and `NestedKriging` methods convert their arguments
+  with the GIL, run the libKriging call without it and convert the results with it again
+  (`call_guard.hpp`). Calls on different models from Python threads now run at the same time
+  and share the thread budget (docs/dev/parallel.md 3.1); calls on the same model object are
+  serialized by a per-object mutex (the GIL did it before). New `gil_release_test.py`.
 - **Thread Sanitizer on the OpenMP loops** (#420, leftover of #439): with Clang + LLVM libomp,
   CMake finds Archer (`libarcher`) under `SANITIZE=THREAD` and defines `LK_TSAN_OPENMP`: the
   OpenMP loops (`OmpLoops.hpp`, NestedKriging's pair loop) stay compiled in and run on 2 threads
