@@ -12,6 +12,12 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Python: the GIL is released during fit / predict / simulate / update** (#473): the
+  `Kriging`, `WarpKriging`, `MLPKriging` and `NestedKriging` methods convert their arguments
+  with the GIL, run the libKriging call without it and convert the results with it again
+  (`call_guard.hpp`). Calls on different models from Python threads now run at the same time
+  and share the thread budget (docs/dev/parallel.md 3.1); calls on the same model object are
+  serialized by a per-object mutex (the GIL did it before). New `gil_release_test.py`.
 - **Windows: BLAS thread counts read by `BlasBackendTest` and the thread benchmarks** (#473):
   PE / COFF has no weak symbols, so `openblas_get_num_threads`, `MKL_Get_Max_Threads`, ... are
   looked up at run time in the loaded modules (`tests/blas_symbols_win.hpp`, any DLL name).
