@@ -43,6 +43,12 @@ and it has no conflict. Use squash merges (`--squash --delete-branch`), the
 history of master, and merge one PR at a time, bringing the next branches up
 to date with master (merge commit, no force-push) before merging them.
 Never merge with failing or pending checks, and never with `--admin`.
+One exception to the pending checks: when the only commits since the last
+fully green CI run of the PR are merges of master whose sole conflict was in
+`CHANGELOG.md` (resolved by keeping both entries, every other file merged
+without conflict), the PR may be merged without waiting for the new run.
+Say so in a PR comment, and if the run on master after the merge fails, fix
+it first.
 
 ## Known pitfalls
 
