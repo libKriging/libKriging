@@ -305,8 +305,7 @@ study hook in the library, not committed):
 T7 data (functions sin4, hartmann6, branin4, sinhalf8, 30 sets each), noise-free, `BFGS4`;
 4-vCPU Intel Xeon VM @ 2.1 GHz, gcc 13.3, OpenBLAS 0.3.26 pthreads, Release (2026-11-12). With a nugget or a noise vector J = 0: the three rules coincide. The independent
 reconstruction agrees with `logLikelihood()` to 1e-4 except on one fit of 120 (matern5_2, sin4,
-n 1000, set 29, long-range theta): 123 units, the retry or the rounding of the objective itself
-at rcond 1e-14; not investigated here.
+n 1000, set 29): 123 units, the rcond test of the retry (below).
 
 Other classes (`jitter_rule_study`: Kriging, WarpKriging with `"none"` and `"kumaraswamy"` warps,
 MLPKriging({8}, 2, tanh), NestedKriging 4 groups; gauss, matern5_2, matern3_2; noise-free and a
@@ -367,9 +366,120 @@ Rule (ii) on the same data (5 sets; theta identical in every pair: the search do
 - The `N` floor of the WarpKriging search: Kriging's objective at the same theta differs by up to
   0.09 (matern3_2, noise-free) and 6e-4 (with noise); 0 for gauss / matern5_2 noise-free (same J).
 
+### The num_nugget floor of the WarpKriging search: removal measured
+
+Variant "no floor" (study hook `LK_JR=nofloor`, `jitter_rule_study`): WarpKriging searches with
+Kriging's jitter, `kernel_chol_jitter` noise-free and 0 with a noise vector, instead of at least
+`N`. It changes the search only where the floor acts: matern3_2 / exp (noise-free and noise),
+gauss / matern5_2 with noise. Models: `"none"` warps, kumaraswamy, MLPKriging, `"none"` plus a
+categorical(3,2) or ordinal(4) column (`cat`, `ord`), and `disc`: discrete inputs only,
+categorical(4,2) x ordinal(5), 20 combinations for n 100-200, so duplicated rows and R exactly
+singular at every theta (the case the floor was put for). The four T7 functions, n 100 and 200,
+5 sets (gauss / matern5_2 with noise: 3), `BFGS4`, 4 threads; the same at 1 thread
+(`LK_NUM_THREADS_PERCENT=25`) for matern3_2 / exp.
+
+| model | kernel | noise | sets | theta identical | abs dLL median / max | RMSE no floor / floor, median / max | NLPD diff, max abs | coverage 95 %, floor / no floor |
+|---|---|---|---|---|---|---|---|---|
+| none | exp | hetero | 40 | 37 | 1e-07 / 8.2e-07 | 1 / 1 | -1e-07 | 0.987 / 0.987 |
+| kuma | exp | hetero | 40 | 5 | 0.0014 / 0.936 | 1 / 1.025 | 0.0202 | 0.985 / 0.984 |
+| cat | exp | hetero | 40 | 25 | 1e-07 / 1.71e-05 | 1 / 1 | 2.4e-05 | 0.986 / 0.986 |
+| ord | exp | hetero | 40 | 22 | 1e-07 / 3.8e-06 | 1 / 1 | -0.00011 | 0.985 / 0.985 |
+| disc | exp | hetero | 40 | 1 | 1.4e-05 / 0.187 | 1 / 1 | -0.00997 | 0.971 / 0.971 |
+| none | matern3_2 | hetero | 40 | 17 | 2.1e-06 / 0.000603 | 1 / 1 | -1e-06 | 0.976 / 0.976 |
+| kuma | matern3_2 | hetero | 40 | 3 | 0.00039 / 1.22 | 1 / 1.107 | 0.188 | 0.971 / 0.970 |
+| cat | matern3_2 | hetero | 40 | 1 | 1.8e-05 / 0.00913 | 1 / 1.001 | 0.00132 | 0.974 / 0.974 |
+| ord | matern3_2 | hetero | 40 | 6 | 3.4e-06 / 0.000711 | 1 / 1 | 0.00013 | 0.972 / 0.972 |
+| disc | matern3_2 | hetero | 40 | 0 | 0.0019 / 0.247 | 0.9998 / 1.005 | -0.0115 | 0.954 / 0.954 |
+| none | exp | none | 40 | 40 | 1e-07 / 1.15e-06 | 1 / 1 | 0 | 0.987 / 0.987 |
+| kuma | exp | none | 40 | 13 | 0.0013 / 0.477 | 1 / 1.025 | -0.012 | 0.984 / 0.984 |
+| mlp | exp | none | 40 | 0 | 13 / 58.9 | 0.9931 / 1.556 | 0.637 | 0.946 / 0.953 |
+| cat | exp | none | 40 | 38 | 1e-07 / 9.91e-07 | 1 / 1 | 2e-08 | 0.986 / 0.986 |
+| ord | exp | none | 40 | 38 | 1e-07 / 1e-06 | 1 / 1 | 0 | 0.985 / 0.985 |
+| disc | exp | none | 40 | 40 | 0 / 0 | 1 / 1 | 0 | 1.000 / 1.000 |
+| none | matern3_2 | none | 40 | 12 | 5.1e-05 / 0.0917 | 1 / 1 | -0.00041 | 0.980 / 0.980 |
+| kuma | matern3_2 | none | 40 | 0 | 0.0023 / 0.508 | 1 / 1.002 | -0.0448 | 0.974 / 0.975 |
+| mlp | matern3_2 | none | 40 | 0 | 14 / 167 | 0.9991 / 2.184 | -4.86 | 0.952 / 0.956 |
+| cat | matern3_2 | none | 40 | 7 | 5.4e-05 / 0.0745 | 1 / 1.002 | 0.00037 | 0.977 / 0.977 |
+| ord | matern3_2 | none | 40 | 12 | 5.3e-05 / 0.0756 | 1 / 1 | -0.00043 | 0.971 / 0.971 |
+| disc | matern3_2 | none | 40 | 40 | 0 / 0 | 1 / 1 | 0 | 1.000 / 1.000 |
+| none | gauss | hetero | 24 | 8 | 5.4e-07 / 3.19e-05 | 1 / 1 | 7e-05 | 0.935 / 0.935 |
+| kuma | gauss | hetero | 24 | 0 | 0.0027 / 0.467 | 1 / 1.009 | -0.0412 | 0.896 / 0.897 |
+| cat | gauss | hetero | 24 | 1 | 2.8e-06 / 0.00109 | 1 / 1 | 0.00112 | 0.914 / 0.914 |
+| ord | gauss | hetero | 24 | 5 | 6.4e-06 / 16 | 1 / 1.17 | 0.217 | 0.909 / 0.910 |
+| disc | gauss | hetero | 24 | 0 | 0.00029 / 0.00245 | 1 / 1.005 | 0.0104 | 0.930 / 0.930 |
+| none | matern5_2 | hetero | 24 | 11 | 5.6e-06 / 0.00411 | 1 / 1.006 | 0.00473 | 0.964 / 0.964 |
+| kuma | matern5_2 | hetero | 24 | 0 | 0.0018 / 1.15 | 1 / 1.012 | -0.0466 | 0.953 / 0.953 |
+| cat | matern5_2 | hetero | 24 | 0 | 0.00011 / 0.122 | 1 / 1.003 | 0.00885 | 0.949 / 0.949 |
+| ord | matern5_2 | hetero | 24 | 2 | 8.9e-06 / 0.000418 | 1 / 1 | 4e-05 | 0.957 / 0.957 |
+| disc | matern5_2 | hetero | 24 | 0 | 0.00035 / 0.0766 | 1 / 1.081 | 0.0689 | 0.938 / 0.938 |
+
+- `disc` noise-free: bit-identical. With duplicated rows and J = 0 the Cholesky fails at every
+  evaluation and the retry adds `N` at its first level: the retry already acts as the floor.
+- `"none"`, `cat`, `ord`, `disc` with noise: |dLL| <= 0.25 but one `ord` gauss fit (16, RMSE
+  x 1.17); kumaraswamy: |dLL| <= 1.2, RMSE <= x 1.11.
+- MLPKriging (noise-free, exp / matern3_2): median |dLL| 13-14, up to 167, RMSE median x 0.99-1.00,
+  up to x 2.2, both ways (exp: 22 better, 18 worse; matern3_2: 11 better, 28 worse, median dLL
+  -7.5): the Adam path changes with any perturbation; no systematic effect shown.
+- 1 thread vs 4 threads: 0 divergence of 786 configurations with and without the floor (low power
+  here: these kernels are well conditioned at n <= 200).
+- Fit time: no systematic difference (runs measured under load, comparable to each other only).
+
+No measured gain or loss from removing the floor, except MLPKriging, which moves both ways. Kept
+for now (decision pending, #465); its only measured cost is the comparability of
+`logLikelihood()` with Kriging (up to 0.09, above).
+
+### The rcond test of the Cholesky retry (the anomaly above)
+
+`safe_chol_lower` retries (`N`·10^k) when the Cholesky fails **or** when `rcond(L)^2 < 1e-18`
+(`LinearAlgebra::min_rcond`). The second test uses a 1-norm estimate, pessimistic by about 4
+orders of magnitude here. The fit of the anomaly (matern5_2, sin4, n 1000, set 29): R + J I has
+rcond 1.25e-14 (548 eigenvalues below 10 J, the smallest J itself) and the plain Cholesky
+succeeds, but the estimate is 1.11e-18. At the fitted theta the test fires, the retry adds 1e-10
+and the objective drops by 123:
+
+| theta x | 0.99 | 0.999 | 1.000 | 1.001 | 1.01 |
+|---|---|---|---|---|---|
+| objective | 3924.41 | 3925.09 | 3801.81 | 3801.63 | 3799.91 |
+
+The optimizer stops on that jump. With the test off (`LinearAlgebra::check_chol_rcond(false)`:
+retry only when the Cholesky fails) the same fit ends at a smooth interior maximum, 3926.28,
+the objective continuous around it. So the fixed jitter does not remove the discontinuity when
+lambda_max / J reaches ~1e13 (matern5_2, J 1e-10, n 1000): the rcond test brings it back, not a
+failing Cholesky.
+
+T7 base, noise-free LL, `BFGS4`, 30 sets x 4 functions, test on (current) vs off
+(`bench-fit-protocol --rcond-check 0`):
+
+| kernel | n | fits | theta identical | LL (no test) − LL (test), median / min / max | better > 1 / worse < −1 | RMSE ratio no test / test, median / min / max | > 1.1 / < 0.9 | wall median, test / no test (s) |
+|---|---|---|---|---|---|---|---|---|
+| gauss | 200 | 120 | 120 | 0 / 0 / 0 | 0 / 0 | 1 / 0.9226 / 1 | 0 / 0 | 0.213 / 0.273 |
+| gauss | 500 | 120 | 120 | 0 / 0 / 0 | 0 / 0 | 1 / 1 / 1 | 0 / 0 | 1.27 / 1.46 |
+| gauss | 1000 | 120 | 120 | 0 / 0 / 0 | 0 / 0 | 1 / 0.8007 / 1 | 0 / 1 | 6.97 / 7.31 |
+| matern5_2 | 200 | 120 | 120 | 0 / 0 / 0 | 0 / 0 | 1 / 1 / 1 | 0 / 0 | 0.242 / 0.392 |
+| matern5_2 | 500 | 120 | 120 | 0 / 0 / 0 | 0 / 0 | 1 / 0.3973 / 1 | 0 / 25 | 1.61 / 1.57 |
+| matern5_2 | 1000 | 120 | 52 | 0 / -0.0138 / 124 | 13 / 0 | 0.9998 / 0.2338 / 1 | 0 / 60 | 7.68 / 5.45 |
+
+- The test also hits the **committed model**, said to be exact (J = 0): where R has rcond
+  ~1e-15 the Cholesky succeeds but the test adds a retry nugget. matern5_2 n 500: 26 fits of 120,
+  RMSE median 0.00159 → 0.00103, NLPD −4.56 → −5.22 without the test, coverage unchanged; the
+  library's prediction then matches an independent exact reconstruction to 8.6e-6 (0.022 with the
+  test). n 1000: 69 fits move, RMSE median 0.000211 → 0.000108, NLPD −5.19 → −5.82; the LL is better
+  by > 1 on 13 fits (up to 124), never worse than −0.014.
+- gauss: almost nothing (3 fits at n 1000, 1 at n 200 where the coverage of the exact model is
+  0.85 against 0.94): from n 500 the exact gauss Cholesky fails outright (30 of 120 fits) and the
+  retry happens with or without the test.
+- Not measured: the test on the other paths (matern3_2 / exp, nugget, noise, `simulate`,
+  WarpKriging, NestedKriging, the approximate methods). Decision pending (#465): retry only on a
+  failing Cholesky, or a less pessimistic test (e.g. bounded by J).
+
 
 ## Open items
 
+- The rcond test of the Cholesky retry (`rcond(L)^2 < 1e-18`) breaks the continuity the jitter
+  gives (matern5_2, n 1000) and the exactness of the committed model (matern5_2, n >= 500):
+  measured above; retry only on a failing Cholesky, or a test bounded by J, to be decided (#465).
+- The `N` floor of the WarpKriging / MLPKriging search: removal measured above, no gain or loss
+  but MLPKriging moving both ways; kept, to be decided (#465).
 - Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;
   matern5_2 ≈ 1 (#425).
 - A jitter growing with n (#426): measured, no gain over the constant (above); the large-n failures
