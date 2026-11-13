@@ -64,6 +64,11 @@ catch_discover_tests(CholJitterTest)
 add_test(NAME CholJitterTest/LK_CHOL_JITTER COMMAND CholJitterTest "[.env]")
 set_tests_properties(CholJitterTest/LK_CHOL_JITTER PROPERTIES ENVIRONMENT "LK_CHOL_JITTER=0")
 
+add_executable(JitterRuleTest JitterRuleTest.cpp)
+target_link_libraries(JitterRuleTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries JitterRuleTest)
+catch_discover_tests(JitterRuleTest)
+
 add_executable(LongRangeRestartTest LongRangeRestartTest.cpp)
 target_link_libraries(LongRangeRestartTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries LongRangeRestartTest)

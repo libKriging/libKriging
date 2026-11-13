@@ -418,3 +418,21 @@ def test_simulate_with_noise_variances():
         k.simulate(10, 7, Xn, with_noise=np.array([0.1, np.nan, 0.1]))
     with pytest.raises(ValueError):
         k.simulate(10, 7, Xn, with_noise=True)  # no fitted-nugget shortcut
+
+
+def test_loglikelihood_is_the_objective_after_update():
+    # #465: logLikelihood() is the objective at the committed parameters,
+    # logLikelihoodFun(theta()), also after update(refit=False) (it was the
+    # committed exact model's log-likelihood there, another quantity).
+    rng = np.random.default_rng(3)
+    X = rng.random((30, 2))
+    y = np.sin(6 * X[:, 0]) + np.cos(4 * X[:, 1])
+    Xu = rng.random((4, 2))
+    yu = np.sin(6 * Xu[:, 0]) + np.cos(4 * Xu[:, 1])
+    for warp, kernel in [("none", "gauss"), ("kumaraswamy", "matern3_2")]:
+        k = lk.WarpKriging(y, X, [warp, warp], kernel)
+        for refit in (False, True):
+            m = k.copy()
+            m.update(yu, Xu, refit=refit)
+            ll_fun, _ = m.logLikelihoodFun(m.theta(), return_grad=False)
+            assert np.isclose(m.logLikelihood(), ll_fun, rtol=1e-6, atol=1e-8), (warp, kernel, refit)
