@@ -19,7 +19,10 @@ continuous (`fit_repro_study.cpp`, table in parallel.md 8.6).
 ## Values per kernel
 
 `LinearAlgebra::kernel_chol_jitter`: gauss 1e-9, matern5_2 1e-10, others 0 (they never reach the
-near-singular region). `set_chol_jitter(x)` / `LK_CHOL_JITTER`: x < 0 per kernel (default), 0 off,
+near-singular region). J is added to the diagonal of the **correlation** matrix (R + J I, diagonal
+1 + J; `LinearAlgebra::cholCov`), sigma2 being profiled apart: in covariance units the jitter is
+sigma2 J, a relative nugget (noise-to-signal ratio J, alpha = 1 / (1 + J)), invariant to the scale
+of y and to `normalize`. "Diagonal 1 + J" below means that matrix. `set_chol_jitter(x)` / `LK_CHOL_JITTER`: x < 0 per kernel (default), 0 off,
 x > 0 that value. Noise-free fits only (nugget and noise models keep their own diagonal).
 
 gauss, 240 data sets (Branin 50, sin n 50–500 d 2–8, Hartmann6 60 / 300), with the starting points
