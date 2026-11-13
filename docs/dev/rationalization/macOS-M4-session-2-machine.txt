@@ -1,0 +1,16 @@
+# machine
+ProductName:		macOS
+ProductVersion:		15.7.4
+BuildVersion:		24G517
+Mac16,12
+Apple M4
+10
+10
+4
+6
+17179869184
+Apple clang version 17.0.0 (clang-1700.0.13.5)
+cmake version 4.4.0
+libomp: libomp 22.1.8
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=21626979)	72%; discharging; 20:00 remaining present: true

@@ -1,0 +1,6 @@
+n=500 omp vs seq: IDENTICAL (   94832 numbers); md5 6115310f34b36efd7a34ad0649d5f183
+n=500 omp200 vs seq: IDENTICAL (   94832 numbers); md5 6115310f34b36efd7a34ad0649d5f183
+n=500 gcd vs seq: IDENTICAL (   94832 numbers); md5 6115310f34b36efd7a34ad0649d5f183
+n=1500 omp vs seq: IDENTICAL (   94832 numbers); md5 dab1ef1dabc3dd973a5541ecb4caa0f3
+n=1500 omp200 vs seq: IDENTICAL (   94832 numbers); md5 dab1ef1dabc3dd973a5541ecb4caa0f3
+n=1500 gcd vs seq: IDENTICAL (   94832 numbers); md5 dab1ef1dabc3dd973a5541ecb4caa0f3
