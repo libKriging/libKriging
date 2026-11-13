@@ -5,11 +5,15 @@
 set -uo pipefail
 OUT=${1:?out dir}; LOG=${2:?log}
 mkdir -p "$OUT"
-declare -A BENCH=(
-  [seq]=/Users/richet/lk-m4/build-seq/bench [omp]=/Users/richet/lk-m4/build-omp/bench
-  [omp200]=/Users/richet/lk-m4/build-omp200/bench [omp50]=/Users/richet/lk-m4/build-omp50/bench
-  [gcd]=/Users/richet/lk-gcd/build-gcd/bench [gcd200]=/Users/richet/lk-gcd/build-gcd200/bench
-  [nocheck]=/Users/richet/lk-nocheck/build-nocheck/bench )
+bdir() { # build name -> its bench directory (bash 3.2 on macOS has no associative arrays)
+  case "$1" in
+    seq) echo /Users/richet/lk-m4/build-seq/bench;; omp) echo /Users/richet/lk-m4/build-omp/bench;;
+    omp200) echo /Users/richet/lk-m4/build-omp200/bench;; omp50) echo /Users/richet/lk-m4/build-omp50/bench;;
+    gcd) echo /Users/richet/lk-gcd/build-gcd/bench;; gcd200) echo /Users/richet/lk-gcd/build-gcd200/bench;;
+    nocheck) echo /Users/richet/lk-nocheck/build-nocheck/bench;;
+    *) echo "unknown build $1" >&2; return 1;;
+  esac
+}
 ROUNDS=${ROUNDS:-5}
 log() { echo "$(date -u +%FT%TZ) $*" >> "$LOG"; }
 ac_ok() { pmset -g batt | head -1 | grep -q "AC Power"; }
@@ -27,7 +31,8 @@ wait_ready() {
 }
 snapshot() { { echo "## $1 $(date -u +%FT%TZ)"; pmset -g batt | head -2; pmset -g therm 2>&1 | head -3; pmset -g | grep -i lowpowermode; } >> "$OUT/macOS-M4-session-2-conditions.txt"; }
 # time -l: "  real  user  sys" on the first line
-timed() { # timed <outfile-prefix> cmd...  -> sets T_REAL T_CPU T_FIT
+timed() { # timed <tag> cmd...  -> sets T_REAL T_CPU T_FIT (the tag is only a label)
+  shift
   local tf; tf=$(mktemp); local of; of=$(mktemp)
   /usr/bin/time -l "$@" > "$of" 2> "$tf"
   local l; l=$(grep -m1 " real " "$tf"); T_REAL=$(echo "$l" | awk '{print $1}'); T_CPU=$(echo "$l" | awk '{print $3+$5}')
@@ -38,12 +43,12 @@ timed() { # timed <outfile-prefix> cmd...  -> sets T_REAL T_CPU T_FIT
 log "start (waiting for AC power and an idle machine)"; wait_ready; snapshot start
 
 # ---------- A. per evaluation (section 2, Q4 break-even, Q10 baseline) ----------
-HDR=$("${BENCH[seq]}/bench-threads" 10 2 1 matern5_2 --header | head -1)
+HDR=$("$(bdir seq)/bench-threads" 10 2 1 matern5_2 --header | head -1)
 F="$OUT/macOS-M4-session-2-eval.csv"; echo "build,round,$HDR" > "$F"
 for r in $(seq 1 $ROUNDS); do wait_ready
   for n in 100 150 200 400 800 1500; do for b in seq gcd gcd200 omp omp200 omp50; do
     ac_ok || wait_ready
-    echo "$b,$r,$("${BENCH[$b]}/bench-threads" $n 4 9 matern5_2 | tail -1)" >> "$F"
+    echo "$b,$r,$("$(bdir $b)/bench-threads" $n 4 9 matern5_2 | tail -1)" >> "$F"
   done; done; log "A round $r done"
 done; snapshot after-A
 
@@ -51,9 +56,9 @@ done; snapshot after-A
 F="$OUT/macOS-M4-session-2-fits.csv"; echo "build,round,n,optim,fit_ms,proc_real_s,proc_cpu_s" > "$F"
 for r in $(seq 1 $ROUNDS); do wait_ready
   for b in seq gcd gcd200 omp omp200; do   # baseline process cost (n = 10): data, warm-up busy-wait, start-up
-    ac_ok || wait_ready; timed x "${BENCH[$b]}/bench-fit-profile" 10 4 BFGS; echo "$b,$r,10,BFGS,$T_FIT,$T_REAL,$T_CPU" >> "$F"; done
+    ac_ok || wait_ready; timed x "$(bdir $b)/bench-fit-profile" 10 4 BFGS; echo "$b,$r,10,BFGS,$T_FIT,$T_REAL,$T_CPU" >> "$F"; done
   for n in 200 500 1000 1500; do for o in BFGS BFGS4; do for b in seq gcd gcd200 omp omp200; do
-    ac_ok || wait_ready; timed x "${BENCH[$b]}/bench-fit-profile" $n 4 $o; echo "$b,$r,$n,$o,$T_FIT,$T_REAL,$T_CPU" >> "$F"
+    ac_ok || wait_ready; timed x "$(bdir $b)/bench-fit-profile" $n 4 $o; echo "$b,$r,$n,$o,$T_FIT,$T_REAL,$T_CPU" >> "$F"
   done; done; done; log "B round $r done"
 done; snapshot after-B
 
@@ -61,7 +66,7 @@ done; snapshot after-B
 F="$OUT/macOS-M4-session-2-q9-pcores.csv"; echo "build,round,n,optim,percent,fit_ms,proc_real_s,proc_cpu_s" > "$F"
 for r in $(seq 1 $ROUNDS); do wait_ready
   for n in 500 1500; do for o in BFGS BFGS4; do for p in 40 100; do for b in omp gcd200 seq; do
-    ac_ok || wait_ready; LK_NUM_THREADS_PERCENT=$p timed x "${BENCH[$b]}/bench-fit-profile" $n 4 $o; echo "$b,$r,$n,$o,$p,$T_FIT,$T_REAL,$T_CPU" >> "$F"
+    ac_ok || wait_ready; LK_NUM_THREADS_PERCENT=$p timed x "$(bdir $b)/bench-fit-profile" $n 4 $o; echo "$b,$r,$n,$o,$p,$T_FIT,$T_REAL,$T_CPU" >> "$F"
   done; done; done; done; log "C round $r done"
 done; snapshot after-C
 
@@ -70,7 +75,7 @@ F="$OUT/macOS-M4-session-2-q10-blocktime.csv"; echo "build,blocktime,round,$HDR"
 for r in $(seq 1 $ROUNDS); do wait_ready
   for n in 100 150 200 400 800; do for bt in default 0; do
     ac_ok || wait_ready
-    if [ $bt = default ]; then row=$("${BENCH[omp200]}/bench-threads" $n 4 9 matern5_2 | tail -1); else row=$(KMP_BLOCKTIME=0 "${BENCH[omp200]}/bench-threads" $n 4 9 matern5_2 | tail -1); fi
+    if [ $bt = default ]; then row=$("$(bdir omp200)/bench-threads" $n 4 9 matern5_2 | tail -1); else row=$(KMP_BLOCKTIME=0 "$(bdir omp200)/bench-threads" $n 4 9 matern5_2 | tail -1); fi
     echo "omp200,$bt,$r,$row" >> "$F"
   done; done; log "D round $r done"
 done; snapshot after-D
@@ -80,7 +85,7 @@ F="$OUT/macOS-M4-session-2-q5-veclib.csv"; echo "build,round,n,optim,veclib,fit_
 for r in $(seq 1 $ROUNDS); do wait_ready
   for n in 800 1500; do for o in BFGS BFGS4 BFGS10; do for v in default 1; do for b in seq omp; do
     ac_ok || wait_ready
-    if [ $v = default ]; then timed x "${BENCH[$b]}/bench-fit-profile" $n 4 $o; else VECLIB_MAXIMUM_THREADS=1 timed x "${BENCH[$b]}/bench-fit-profile" $n 4 $o; fi
+    if [ $v = default ]; then timed x "$(bdir $b)/bench-fit-profile" $n 4 $o; else VECLIB_MAXIMUM_THREADS=1 timed x "$(bdir $b)/bench-fit-profile" $n 4 $o; fi
     echo "$b,$r,$n,$o,$v,$T_FIT,$T_REAL,$T_CPU" >> "$F"
   done; done; done; done; log "E round $r done"
 done; snapshot after-E
@@ -89,7 +94,7 @@ done; snapshot after-E
 F="$OUT/macOS-M4-session-2-q8-potri-check.csv"; echo "build,round,n,optim,fit_ms,proc_real_s,proc_cpu_s" > "$F"
 for r in $(seq 1 $ROUNDS); do wait_ready
   for n in 800 1500; do for o in BFGS BFGS4; do for b in seq nocheck; do
-    ac_ok || wait_ready; timed x "${BENCH[$b]}/bench-fit-profile" $n 4 $o; echo "$b,$r,$n,$o,$T_FIT,$T_REAL,$T_CPU" >> "$F"
+    ac_ok || wait_ready; timed x "$(bdir $b)/bench-fit-profile" $n 4 $o; echo "$b,$r,$n,$o,$T_FIT,$T_REAL,$T_CPU" >> "$F"
   done; done; done; log "F round $r done"
 done; snapshot end
 log "ALL DONE"; touch "$OUT/.bench-done"
