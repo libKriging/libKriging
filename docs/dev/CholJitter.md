@@ -471,9 +471,40 @@ T7 base, noise-free LL, `BFGS4`, 30 sets x 4 functions, test on (current) vs off
 - gauss: almost nothing (3 fits at n 1000, 1 at n 200 where the coverage of the exact model is
   0.85 against 0.94): from n 500 the exact gauss Cholesky fails outright (30 of 120 fits) and the
   retry happens with or without the test.
-- Not measured: the test on the other paths (matern3_2 / exp, nugget, noise, `simulate`,
-  WarpKriging, NestedKriging, the approximate methods). Decision pending (#465): retry only on a
-  failing Cholesky, or a less pessimistic test (e.g. bounded by J).
+- Not measured: the test on the other paths (matern3_2 / exp, `simulate`, WarpKriging,
+  NestedKriging, the approximate methods). Decision pending (#465): retry only on a failing
+  Cholesky, or a less pessimistic test (e.g. bounded by J).
+
+#### Time cost of the test
+
+The question "would a retry on a failing Cholesky only cost more time?" has its premise
+inverted: a failing Cholesky is detected for free (`chol` returns false); the rcond test is the
+added cost. `rcond_chol` takes `L` by value (a copy) and holds a global mutex
+(`rcond_mutex`); `arma::rcond` detects the triangular `L` (LAPACK `dtrcon`, O(n²)).
+
+Microbenchmark, one factorization, OpenBLAS 1 thread: rcond test / Cholesky = 1.1 (n 100),
+1.9 (200), 1.3 (500), 0.9 (1000), 0.7 (2000); 4 concurrent workers (the multistart case):
+1.7-2.9 (the mutex serializes); 4 BLAS threads: 0.3-1.5. So the test costs about as much as the
+Cholesky it checks, but the Cholesky is a minor part of an evaluation (the gradient is O(d n³)).
+
+End to end, `bench-fit-protocol`, T7, gauss / matern5_2, noise none / nugget, `BFGS` and
+`BFGS4`, n 200 / 500 / 1000, 10 sets (n 1000: 8, the run stopped at its time limit), machine
+idle, runs in the order on, off, on again (noise reference):
+
+- fits ending at the same theta (761 of 893): off / on median 0.88-1.03 per configuration,
+  pooled wall time off / mean(on, on again) 0.93. The two "on" runs differ by a median
+  1.03-1.15, so the gain of removing the test is a few % and of the order of the noise.
+- fits ending elsewhere: the trajectory changes, so the time is that of another fit.
+  matern5_2 n 1000 noise-free: 49 fits, total wall 334 s → 172 s (median ratio 0.67), LL never
+  worse than −0.01, better up to 119, RMSE median × 0.66.
+- **nugget**: matern5_2 n 500, 33 fits move, LL median **−39** (−253 … +133), RMSE median
+  **× 1.23** (0.66 … 2.23) without the test, deterministic (on / on again identical). n 1000:
+  44 fits move, LL median 0, down to −133, RMSE median × 1.00 (up to × 1.33). Removing the test
+  is not a gain on the nugget path: there the retry acts as a regularization of the search.
+
+So no time argument either way (the test costs a few %); the decision is on the fitted models,
+which move in opposite directions noise-free (better without the test) and with a nugget (worse
+without it). A uniform "retry only on a failing Cholesky" is not supported by these numbers.
 
 
 ## Open items
