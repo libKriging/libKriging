@@ -21,7 +21,12 @@
 //     (the committed exact cache).
 // Models: kriging, none (WarpKriging, "none" warps), kuma (kumaraswamy warps),
 // mlp (MLPKriging({8}, 2, tanh), noise-free only), nested (NestedKriging, 4
-// groups, NK aggregation, noise-free only: scores only).
+// groups, NK aggregation, noise-free only: scores only), cat / ord (WarpKriging,
+// "none" warps plus one categorical(3,2) / ordinal(4) column whose levels add an
+// effect to y), disc (discrete inputs only, categorical(4,2) x ordinal(5):
+// duplicated rows, R exactly singular: the case of the num_nugget search floor).
+// Variant LK_JR=nofloor (same hook): WarpKriging searches with Kriging's jitter
+// (kernel_chol_jitter noise-free, 0 with a noise vector), without the floor.
 // Usage: jitter_rule_study <models> <kernels> <noises> <functions> <ns> <sets> <optim>
 //   comma-separated lists; noise: none, hetero (known noise variance
 //   (0.05 sd(y))^2, y perturbed accordingly)
@@ -147,6 +152,12 @@ int main(int argc, char** argv) {
         const arma::mat Xu(10, d, arma::fill::randu);
         const arma::vec yu0 = f(fam, Xu, freq);
         const arma::vec epsu = arma::randn<arma::vec>(10);
+        // discrete column of the models cat / ord: level in 0..L-1, effect added to y
+        arma::arma_rng::set_seed(4000 + s);
+        const arma::vec ulev = arma::randu<arma::vec>(n), ulev_t = arma::randu<arma::vec>(500),
+                        ulev_u = arma::randu<arma::vec>(10);
+        const arma::vec ulev2 = arma::randu<arma::vec>(n), ulev2_t = arma::randu<arma::vec>(500),
+                        ulev2_u = arma::randu<arma::vec>(10);
         for (const auto& noise : noises) {
           const bool het = noise == "hetero";
           const double nsd = 0.05 * arma::stddev(y0);
@@ -162,6 +173,8 @@ int main(int argc, char** argv) {
               double ll = NAN, llfun = NAN, llk = NAN, llu = NAN, llfu = NAN, wall = NAN, lli = NAN, lliu = NAN;
               arma::vec th, m, sd;
               std::string status = "ok";
+              arma::vec yt_used = yt;
+              arma::mat Xt_used = Xt;
               const auto t0 = std::chrono::steady_clock::now();
               try {
                 if (model == "kriging") {
@@ -194,7 +207,7 @@ int main(int argc, char** argv) {
                   auto run = [&](auto& k, auto&& do_fit) {
                     do_fit();
                     wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-                    auto p = k.predict(Xt, true, false, false);
+                    auto p = k.predict(Xt_used, true, false, false);
                     m = std::get<0>(p), sd = std::get<1>(p), th = k.theta();
                     ll = k.logLikelihood();
                     lli = ll_committed(k, hook && !jr);
@@ -224,15 +237,66 @@ int main(int argc, char** argv) {
                     lliu = ll_committed(k, hook && !jr);
                     llfu = std::get<0>(k.logLikelihoodFun(k.theta(), false));
                   } else {
-                    WarpKriging k(std::vector<std::string>(d, model == "kuma" ? "kumaraswamy" : "none"), kernel);
+                    if (model == "disc") {
+                      // discrete inputs only: categorical(4,2) x ordinal(5), 20 combinations,
+                      // duplicated rows (R exactly singular), y a function of the levels
+                      const double sdy = arma::stddev(y0);
+                      auto mk = [&](const arma::vec& u1, const arma::vec& u2) {
+                        return arma::mat(arma::join_rows(arma::floor(4 * u1), arma::floor(5 * u2)));
+                      };
+                      auto g = [&](const arma::mat& Z) {
+                        arma::vec v(Z.n_rows);
+                        for (arma::uword i = 0; i < Z.n_rows; ++i)
+                          v(i) = sdy * (std::sin(1.7 * Z(i, 0) + 0.3) + 0.25 * Z(i, 1) * (1 + 0.5 * Z(i, 0)));
+                        return v;
+                      };
+                      const arma::mat Z = mk(ulev, ulev2), Zt = mk(ulev_t, ulev2_t), Zu = mk(ulev_u, ulev2_u);
+                      const arma::vec yz = g(Z) + (het ? arma::vec(nsd * eps) : arma::vec(n, arma::fill::zeros));
+                      const arma::vec yzu = g(Zu) + (het ? arma::vec(nsd * epsu) : arma::vec(10, arma::fill::zeros));
+                      yt_used = g(Zt);
+                      Xt_used = Zt;
+                      WarpKriging k({"categorical(4,2)", "ordinal(5)"}, kernel);
+                      WarpKriging::Parameters pa;
+                      if (het)
+                        pa.noise = nv;
+                      run(k, [&] { k.fit(yz, Z, Trend::RegressionModel::Constant, false, optim, "LL", pa); });
+                      k.update(yzu, Zu, false, het ? nvu : arma::vec());
+                      llu = k.logLikelihood();
+                      lliu = ll_committed(k, hook && !jr);
+                      llfu = std::get<0>(k.logLikelihoodFun(k.theta(), false));
+                    } else {
+                    const bool disc = model == "cat" || model == "ord";
+                    std::vector<std::string> warps(d, model == "kuma" ? "kumaraswamy" : "none");
+                    if (disc)
+                      warps.push_back(model == "cat" ? "categorical(3,2)" : "ordinal(4)");
+                    WarpKriging k(warps, kernel);
                     WarpKriging::Parameters pa;
                     if (het)
                       pa.noise = nv;
-                    run(k, [&] { k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", pa); });
-                    k.update(yu, Xu, false, het ? nvu : arma::vec());
+                    if (disc) {
+                      // 3 unordered levels (effects 0, 0.8, -0.5 sd(y0)) or 4 ordered ones (0.4 level sd(y0))
+                      const double L = model == "cat" ? 3 : 4, sdy = arma::stddev(y0);
+                      auto lev = [&](const arma::vec& u) { return arma::vec(arma::floor(L * u)); };
+                      auto eff = [&](const arma::vec& l) {
+                        arma::vec e = l;
+                        e.transform([&](double v) { return model == "cat" ? (v == 1 ? 0.8 : v == 2 ? -0.5 : 0.0) * sdy : 0.4 * v * sdy; });
+                        return e;
+                      };
+                      const arma::vec l = lev(ulev), lt = lev(ulev_t), lu = lev(ulev_u);
+                      const arma::mat Xd = arma::join_rows(X, l), Xtd = arma::join_rows(Xt, lt), Xud = arma::join_rows(Xu, lu);
+                      const arma::vec yd = y + eff(l), yud = yu + eff(lu);
+                      yt_used = yt + eff(lt);
+                      Xt_used = Xtd;
+                      run(k, [&] { k.fit(yd, Xd, Trend::RegressionModel::Constant, false, optim, "LL", pa); });
+                      k.update(yud, Xud, false, het ? nvu : arma::vec());
+                    } else {
+                      run(k, [&] { k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", pa); });
+                      k.update(yu, Xu, false, het ? nvu : arma::vec());
+                    }
                     llu = k.logLikelihood();
                     lliu = ll_committed(k, hook && !jr);
                     llfu = std::get<0>(k.logLikelihoodFun(k.theta(), false));
+                    }
                   }
                 }
               } catch (const std::exception& e) {
@@ -246,10 +310,10 @@ int main(int argc, char** argv) {
                 ths += b;
               }
               double rmse = NAN, nlpd = NAN, cov = NAN;
-              if (m.n_elem == yt.n_elem) {
-                const arma::vec e = m - yt;
-                rmse = std::sqrt(arma::mean(arma::square(e))) / arma::stddev(yt);
-                if (sd.n_elem == yt.n_elem) {
+              if (m.n_elem == yt_used.n_elem) {
+                const arma::vec e = m - yt_used;
+                rmse = std::sqrt(arma::mean(arma::square(e))) / arma::stddev(yt_used);
+                if (sd.n_elem == yt_used.n_elem) {
                   nlpd = arma::mean(0.5 * arma::log(2 * M_PI * arma::square(sd)) + 0.5 * arma::square(e / sd));
                   cov = arma::mean(arma::conv_to<arma::vec>::from(arma::abs(e) <= 1.959964 * sd));
                 }

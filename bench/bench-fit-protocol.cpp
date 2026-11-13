@@ -21,6 +21,7 @@
 //   --variant    ""                  label of the settings (default: built from them)
 //   --header     1                   0: no CSV header (to append)
 //   --candidates 0                   1: jitter-rule candidate columns (#465, noise-free fits; see rebuild())
+//   --rcond-check 1                  0: no Cholesky retry on a low rcond estimate, only on failure
 // Functions (on [0, 1]^d; "<family><d>" or "<family>_<d>", d defaults to the
 // active dimension):
 //   sin<d>     sum_j sin(2 pi f_j x_j), f_j ~ U[0.5, 3] (all inputs active)
@@ -219,7 +220,13 @@ std::string settings_label() {
   else
     std::snprintf(jit, sizeof jit, "%g", c);
   std::snprintf(
-      b, sizeof b, "lrr=%g,jitter=%s,pct=%g", Optim::get_long_range_restart(), jit, Optim::get_num_threads_percent());
+      b,
+      sizeof b,
+      "lrr=%g,jitter=%s,pct=%g%s",
+      Optim::get_long_range_restart(),
+      jit,
+      Optim::get_num_threads_percent(),
+      LinearAlgebra::chol_rcond_checked() ? "" : ",rcond=0");
   return b;
 }
 
@@ -238,7 +245,8 @@ int main(int argc, char** argv) {
                                             {"noise-sd", "0.05"},
                                             {"variant", ""},
                                             {"header", "1"},
-                                            {"candidates", "0"}};
+                                            {"candidates", "0"},
+                                            {"rcond-check", "1"}};
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "-h" || a == "--help" || a.rfind("--", 0) != 0 || i + 1 >= argc || !opt.count(a.substr(2))) {
@@ -254,6 +262,9 @@ int main(int argc, char** argv) {
   const int nsets = std::atoi(opt["sets"].c_str()), first = std::atoi(opt["first-set"].c_str());
   const arma::uword ntest = std::strtoul(opt["ntest"].c_str(), nullptr, 10);
   const double noise_sd = std::atof(opt["noise-sd"].c_str());
+  // 0: safe_chol_lower retries (num_nugget x 10^k) only when the Cholesky fails, not
+  // when its rcond estimate is below LinearAlgebra::min_rcond (study of #465)
+  LinearAlgebra::check_chol_rcond(opt["rcond-check"] != "0");
   const std::string settings = settings_label();
   const std::string variant_base = opt["variant"].empty() ? settings : opt["variant"];
   const bool candidates = opt["candidates"] != "0";
