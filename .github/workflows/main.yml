@@ -108,6 +108,7 @@ jobs:
             mode: Debug
             enable_python: on
             python-version: "3.12"
+            macos_libomp: on # the only macOS job with libomp: the others stay sequential, so both paths are covered
           - name: "Python (3.10) Windows Debug"
             os: windows-latest
             mode: Debug
@@ -226,6 +227,15 @@ jobs:
             echo "BUILD_NAME=linux-macos"    >> $GITHUB_ENV
           fi
         if: runner.os != 'Windows'
+
+      - name: Install libomp (macOS, libomp job)
+        shell: bash
+        run: |
+          # Homebrew's libomp is keg-only: CMake finds it only with OpenMP_ROOT. Without it every macOS build
+          # is sequential (OpenMP not found), so the libomp paths (fork handlers, OpenMP loops, thresholds) are never run.
+          brew install libomp
+          echo "EXTRA_CMAKE_OPTIONS=-DOpenMP_ROOT=$(brew --prefix libomp)" >> $GITHUB_ENV
+        if: matrix.macos_libomp == 'on'
 
       - name: Define local variables Windows
         shell: bash

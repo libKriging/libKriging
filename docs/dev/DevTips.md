@@ -144,3 +144,10 @@ target_link_libraries(myapp PRIVATE libKriging::Kriging)
 Point CMake to the installation with `-DCMAKE_PREFIX_PATH=<prefix>`. The
 dependencies (Armadillo, lbfgsb_cpp) are installed under the same prefix and
 found automatically.
+
+A libKriging built with OpenMP makes its consumers call `find_package(OpenMP)` too
+(`find_dependency(OpenMP)` in `libKrigingConfig.cmake`). Where OpenMP is not found by default,
+the consumer needs the same hint as the build: on macOS with Homebrew's keg-only `libomp`,
+`-DOpenMP_ROOT=$(brew --prefix libomp)` in the consumer project as well (the `cmake_package` test
+forwards the hints of its own build). A libKriging built without OpenMP (the default on macOS) has
+no such requirement.
