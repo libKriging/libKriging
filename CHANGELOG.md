@@ -12,6 +12,14 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **OpenMP threshold 200 with MSVC on Windows** (#473): `kOmpMinRows` (covariance matrix and
+  log-likelihood gradient loops) goes from 800 to 200 in MSVC builds, as on Linux. Measured on an
+  i9-10900K (10 cores / 20 threads, `vcomp`, OpenBLAS 0.3.33) at the thread budget: one LL +
+  gradient evaluation ×1.6 faster at n = 200 and ×1.5 at n = 400, full fits ×1.20 (`BFGS`) /
+  ×1.12 (`BFGS4`) at n = 500 for ×1.5–2.3 more CPU time, unchanged at n = 2000; the fitted model is
+  bit-identical (the gradients sum in one order whatever the threshold, #441). No hang with the C++
+  and Python suites without `OMP_NUM_THREADS=1`. MinGW builds (Octave, R on Windows) and macOS
+  keep 800 until measured. Migration: none.
 - **One OpenBLAS thread below 500 observations with MSVC on Windows** (#473): the automatic
   small-problem rule (`Optim::blas_threads_min_n` = -1, #436) applies in MSVC builds even when the
   machine has SMT headroom (on Linux it stays off there: the BLAS at the budget was faster). Measured

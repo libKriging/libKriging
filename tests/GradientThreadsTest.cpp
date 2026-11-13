@@ -21,7 +21,7 @@
 // 1. White box: their pair sums (sum_pairs_dln, src/lib/SeparableDln.hpp) are
 //    taken row by row, then over the rows in order, and give the same bits for
 //    any thread count, 1 being the sequential path the gradients take below
-//    kOmpMinRows (200 on Linux, 800 elsewhere, OmpLoops.hpp): the gradients
+//    kOmpMinRows (200 on Linux and MSVC, 800 elsewhere, OmpLoops.hpp): the gradients
 //    depend neither on the thread count nor on kOmpMinRows, hence not on the OS.
 // 2. End to end: the same bits with a 1-thread budget and with the whole
 //    budget, below and above kOmpMinRows. The gradients also go through the
@@ -76,7 +76,7 @@ void require_equal(const std::vector<arma::vec>& a, const std::vector<arma::vec>
 }  // namespace
 
 TEST_CASE("LL / LMP theta gradients do not depend on the OpenMP thread count", "[gradient][threads]") {
-  // below / just above kOmpMinRows (200 Linux, 800 elsewhere): not larger, the
+  // below / just above kOmpMinRows (200 Linux / MSVC, 800 elsewhere): not larger, the
   // case must stay short under valgrind (Memcheck CI, ctest timeout 1500 s)
   const arma::uword n = GENERATE(arma::uword(100), static_cast<arma::uword>(libKriging::detail::kOmpMinRows + 10));
   const std::string kernel = GENERATE("gauss", "exp", "matern3_2", "matern5_2");
