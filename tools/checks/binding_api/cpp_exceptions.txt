@@ -68,10 +68,6 @@ LinearAlgebra	woodbury_logdet	internal numerical kernels, not user API
 LinearAlgebra	woodbury_solve	internal numerical kernels, not user API
 Optim	parse_method	internal helpers of the optimizer
 Optim	theta_bounds	internal helpers of the optimizer
-Optim	get_long_range_restart	PENDING (#435): optimizer settings, to expose or to decide
-Optim	set_long_range_restart	PENDING (#435): optimizer settings, to expose or to decide
-Optim	get_max_long_range_restart	PENDING (#435): optimizer settings, to expose or to decide
-Optim	set_max_long_range_restart	PENDING (#435): optimizer settings, to expose or to decide
 Optim	get_blas_threads_min_n	small-problem BLAS rule (#436): LK_BLAS_THREADS_MIN_N applies to every binding
 Optim	set_blas_threads_min_n	small-problem BLAS rule (#436): LK_BLAS_THREADS_MIN_N applies to every binding
 MLPKriging	var_scale	PENDING (#435): variance calibration factor, to expose or to decide

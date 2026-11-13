@@ -184,8 +184,8 @@ class Kriging : public KrigingImpl {
    * @param X is n*d matrix of input
    * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
    * @param optim 'BFGSk' (L-BFGS-B from k starting points run in parallel,
-   *        the best kept; default 'BFGS4', 'BFGS' = 'BFGS1': a single start,
-   *        with the long-range restart of Optim::long_range_restart), or
+   *        the best kept; default 'BFGS4', 'BFGS' = 'BFGS1': a single start;
+   *        'BFGS2' rather than a single start when time is short, #466), or
    *        'none' to keep parameters unchanged. The default was 'BFGS' up to
    *        1.2 (docs/dev/rationalization/T3-default-multistart.md).
    * @param objective is the criterion: 'LL' (log-likelihood, default), 'LOO'

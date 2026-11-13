@@ -12,6 +12,22 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Long-range restart removed** (#466, 2.0): `Optim::set_long_range_restart` /
+  `get_long_range_restart`, `Optim::set_max_long_range_restart` / `get_max_long_range_restart`
+  and the environment variables `LK_LONG_RANGE_RESTART` / `LK_MAX_LONG_RANGE_RESTART` (now
+  ignored) are removed, with the criterion of `Kriging::fit_impl`. Measured on the T7 base (3120
+  data sets, `docs/dev/rationalization/long-range-restart-466.md`): `"BFGS2"` has the miss rate of
+  the restarted single start on noise-free LL (13 % against 14 %) at 1/1.3-1/2.0 its wall time
+  and 1/1.5-1/2.3 its CPU time (4 cores), and fewer misses everywhere else; on the default path
+  (`"BFGS4"`) the restart only acted on nugget fits, through their noise-free warm start, for no
+  measurable gain (2 : 5 discordant sets of 1200) at x 1.15-1.31 their time. Changed results:
+  - nugget fits (any `"BFGS*"`, default included) take 13-24 % less time, same miss rate;
+  - an explicit single start (`optim = "BFGS"`) returns what it returned with
+    `LK_LONG_RANGE_RESTART=0`: half the time on noise-free LL, more misses (14 % → 26 % of the
+    benchmark sets on noise-free LL, + 2-6 points with a nugget).
+  Migration: use `"BFGS2"` where `"BFGS"` relied on the restart (same quality, lower cost), the
+  default `"BFGS4"` or more for a reliable optimum; drop `Optim::set_long_range_restart(...)`
+  calls (compile error) and the environment variables (no effect).
 - **Thread Sanitizer on the OpenMP loops** (#420, leftover of #439): with Clang + LLVM libomp,
   CMake finds Archer (`libarcher`) under `SANITIZE=THREAD` and defines `LK_TSAN_OPENMP`: the
   OpenMP loops (`OmpLoops.hpp`, NestedKriging's pair loop) stay compiled in and run on 2 threads
@@ -118,7 +134,7 @@ past release, see the corresponding entry on the
   (built with the other benchmarks) fits >= 30 seeded data sets per configuration (gauss /
   matern5_2, noise-free / nugget, LL / LOO / LMP, test functions with and without inactive
   inputs, n 100-1000) with the optimizers given as arguments and the settings of the
-  environment (`LK_LONG_RANGE_RESTART`, `LK_CHOL_JITTER`, `LK_NUM_THREADS_PERCENT`); `run.py`
+  environment (`LK_CHOL_JITTER`, `LK_NUM_THREADS_PERCENT`, ...); `run.py`
   runs a profile (`smoke`: ~2 min, `reference`, `full`), `summarize.py` reports the miss rate
   with Wilson 95 % intervals, test RMSE, wall and CPU time. Reference results (4-core machine)
   committed in `bench/fit-protocol/results/`; see
@@ -145,7 +161,7 @@ past release, see the corresponding entry on the
   (Python `pylibkriging.linearalgebra_check` dict, R exported `linearalgebra_check` list,
   Octave `[ok, backend, report] = linearalgebra_check()`, Julia named tuple). See
   [docs/dev/FAQ.md](docs/dev/FAQ.md) ([#429](https://github.com/libKriging/libKriging/issues/429)).
-- **Long-range restart**: a noise-free LL fit with a single BFGS start (`"BFGS"`) is
+- **Long-range restart** (removed again before 2.0, #466: see `Changed`): a noise-free LL fit with a single BFGS start (`"BFGS"`) is
   restarted when it converges with max_j theta_j / maxdX_j > `Optim::set_long_range_restart(c)`
   (default 2, `LK_LONG_RANGE_RESTART`, 0 off), at most `Optim::set_max_long_range_restart(m)`
   times per start (default 2, `LK_MAX_LONG_RANGE_RESTART`), the best solution kept. The failed

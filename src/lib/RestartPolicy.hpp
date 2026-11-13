@@ -21,8 +21,6 @@ namespace detail {
 ///  - stopped in <= 2 iterations (start point strangely optimal, or a corner of
 ///    the bounds where the gradient points outward),
 ///  - ended at the lower bound of a free theta,
-///  - ended at a long-range local optimum (decided by the caller; at most
-///    max_long_range_restart of these restarts),
 ///  - is worse than the best run so far by more than the optimizer's own
 ///    tolerance factr * epsmch (if worse_criterion), unless this run was itself
 ///    started only because the previous one was worse: a worse restart does not
@@ -34,13 +32,12 @@ namespace detail {
 /// true, start the next run from restart_theta(...).
 class RestartPolicy {
  public:
-  enum Reason : unsigned { None = 0, Abnormal = 1, FewIterations = 2, AtLowerBound = 4, LongRange = 8, Worse = 16 };
+  enum Reason : unsigned { None = 0, Abnormal = 1, FewIterations = 2, AtLowerBound = 4, Worse = 16 };
 
   struct Config {
     int max_restart = 0;
     double factr = 1e7;  // L-BFGS-B factr: "no improvement" below factr * epsmch is no change
     bool worse_criterion = false;
-    int max_long_range_restart = 0;
   };
 
   explicit RestartPolicy(const Config& config) : m_config(config) {}
@@ -63,8 +60,7 @@ class RestartPolicy {
 
   /// Decides on a restart after the last recorded run; on true, the retry
   /// number is incremented (restart_theta then gives the restart point).
-  /// long_range: the caller's long-range criterion (ignored past max_long_range_restart).
-  bool restart(const std::string& task, int num_iters, bool at_lower_bound, bool long_range = false) {
+  bool restart(const std::string& task, int num_iters, bool at_lower_bound) {
     if (m_retry >= m_config.max_restart)
       return false;
     unsigned reasons = None;
@@ -74,14 +70,10 @@ class RestartPolicy {
       reasons |= FewIterations;
     if (at_lower_bound)
       reasons |= AtLowerBound;
-    if (long_range && m_long_range_restarts < m_config.max_long_range_restart)
-      reasons |= LongRange;
     if (m_config.worse_criterion && m_worse && m_last_reasons != Worse)
       reasons |= Worse;
     if (reasons == None)
       return false;
-    if (reasons & LongRange)
-      m_long_range_restarts++;
     m_last_reasons = reasons;
     m_retry++;
     return true;
@@ -121,12 +113,10 @@ class RestartPolicy {
   double best() const { return m_best; }
   /// Best value before the last record().
   double previous_best() const { return m_previous_best; }
-  bool long_range_allowed() const { return m_long_range_restarts < m_config.max_long_range_restart; }
 
  private:
   Config m_config;
   int m_retry = 0;
-  int m_long_range_restarts = 0;
   unsigned m_last_reasons = None;
   bool m_worse = false;
   double m_best = std::numeric_limits<double>::infinity();

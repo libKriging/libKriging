@@ -174,6 +174,13 @@ Median per-set RMSE ratio to 1e-9 (pct 100), where the rules differ:
 
 ### Plateau or local optimum: long-range restart
 
+**Removed in 2.0** ([#466](https://github.com/libKriging/libKriging/issues/466),
+`docs/dev/rationalization/long-range-restart-466.md`): on the T7 base, `"BFGS2"` has the miss rate
+of the restarted single start on noise-free LL (13 % against 14 %, 960 sets) at 1/1.3-1/2.0 its wall
+time, and on the default `"BFGS4"` the restart only acted on the noise-free warm start of the nugget
+fits, for no measurable gain at x 1.15-1.31 their time. The diagnosis below (long-range local optima
+of a single start, not plateaus) stands; the remedy is a multistart. Historical record:
+
 The traces of the single-start fits (every objective evaluation printed by a temporary probe, not
 kept, sin d 4 n 500 / 1000, Hartmann6 n 1000, J 1e-9, 22 fits) show no plateau:
 the failed fits (LL 400–2150 below BFGS10) converge normally (gradient falling geometrically,
@@ -245,7 +252,7 @@ single start. Not measured by the tables above: matern5_2; nugget / noise models
 C++ suite, 220 tests, and the Python tests pass with and without the criterion).
 
 Decision: keep the constant per kernel. The robustness at large n belongs to the starts (#418):
-the long-range restart above (c = 2, on by default for a single start) gives BFGS10's optimum on
+the long-range restart above (c = 2, on by default for a single start; removed in 2.0, #466) gave BFGS10's optimum on
 120 of 122 sets at 1.1–2 x the single-start time (BFGS10: 3–8 x), x 2–3 with inactive inputs; a
 multistart remains the only reliable choice with many inactive inputs. Not measured: matern5_2,
 n > 2000, more than 2 sets at n 2000, a machine with more cores (budgets 100 / 200 % distinct).
@@ -255,8 +262,9 @@ n > 2000, more than 2 sets at n 2000, a machine with more cores (budgets 100 / 2
 - Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;
   matern5_2 ≈ 1 (#425).
 - A jitter growing with n (#426): measured, no gain over the constant (above); the large-n failures
-  are long-range local optima of the single start, not plateaus; the long-range restart (default
-  c = 2) fixes most of them; many inactive inputs still need a multistart (#418).
+  are long-range local optima of the single start, not plateaus; a multistart (`"BFGS2"` at the
+  cost of the former long-range restart, the default `"BFGS4"`) fixes most of them; many inactive
+  inputs still need a larger multistart (#418, #466).
 - A fixed floor for the `simulate` conditional covariance instead of the retry (inconsistency 2,
   #427).
 - A floor on the predicted variance, then an exact committed WarpKriging model (#428).
