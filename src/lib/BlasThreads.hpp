@@ -54,6 +54,14 @@ void set_mkl_threads_global(int n);
 /// initializes them (T6 / T9). Defined in Kriging.cpp.
 void touch_mkl_entry_points();
 
+/// In a fork() child on macOS 15+, applies BLASSetThreading(single-threaded) to the calling thread
+/// (no-op elsewhere, and in a process that was not forked). Accelerate's threading mode is per
+/// thread: the child handler sets it for the forking thread only, so each thread created later in
+/// the child (the multistart pool workers) calls this first: in Accelerate's default mode its large
+/// BLAS / LAPACK calls use libdispatch, which does not survive fork() without exec. Defined in
+/// Kriging.cpp.
+void accelerate_single_thread_here();
+
 /// Serializes arma::rcond (LinearAlgebra::rcond_chol). Also held by the fork
 /// handlers, so that the child of a fork() made while another thread is in
 /// rcond_chol does not inherit it locked. Defined in LinearAlgebra.cpp.
