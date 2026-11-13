@@ -106,17 +106,29 @@ LIBKRIGING_EXPORT bool LinearAlgebra::chol_rcond_checked() {
   return LinearAlgebra::chol_rcond_check;
 };
 
+int LinearAlgebra::chol_rcond_bound = 0;
+
+LIBKRIGING_EXPORT void LinearAlgebra::set_chol_rcond_bound(int mode) {
+  LinearAlgebra::chol_rcond_bound = mode;
+};
+
+LIBKRIGING_EXPORT int LinearAlgebra::get_chol_rcond_bound() {
+  return LinearAlgebra::chol_rcond_bound;
+};
+
 int LinearAlgebra::max_inc_choldiag = 10;
 
 // Recursive turn-around for ill-condition of correlation matrix. Used in *Kriging::fit & *Kriging::simulate
 //' @ref: Andrianakis, I. and Challenor, P. G. (2012). The effect of the nugget on Gaussian pro-cess emulators of
 // computer models. Comput. Stat. Data Anal., 56(12):4215–4228.
-arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
+arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond, double rcond_lower_bound) {
   arma::mat L = arma::mat(X.n_rows, X.n_cols, arma::fill::none);
   // auto t0 = Bench::tic();
   bool ok = arma::chol(L, X, "lower");
   // t0 = Bench::toc(nullptr, "        arma::chol" ,t0);
-  bool wrong_rcond = LinearAlgebra::chol_rcond_check;
+  // the test is redundant when the conditioning is already bounded from the
+  // diagonal (chol_rcond_bound, set by cholCov)
+  bool wrong_rcond = LinearAlgebra::chol_rcond_check && !(rcond_lower_bound >= LinearAlgebra::min_rcond);
   if (ok) {
     // wrong_rcond = wrong_rcond && (LinearAlgebra::rcond_approx_chol(L) < LinearAlgebra::min_rcond_approx);
     ////t0 = Bench::toc(nullptr, "        rcond_approx" ,t0);
@@ -132,7 +144,7 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
                                + std::to_string(LinearAlgebra::num_nugget));
     } else {
       X.diag() += LinearAlgebra::num_nugget * std::pow(10, inc_cond);
-      return LinearAlgebra::safe_chol_lower_retry(X, inc_cond + 1);
+      return LinearAlgebra::safe_chol_lower_retry(X, inc_cond + 1, rcond_lower_bound);
     }
     // t0 = Bench::toc(nullptr, "        inc_cond" ,t0);
   } else {
@@ -226,8 +238,23 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R,
 
   // Cholesky decompostion of covariance matrix
 
-  arma::mat L
-      = LinearAlgebra::safe_chol_lower(*R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
+  // Lower bound of the 1-norm reciprocal condition number of
+  // factor * C + diag(d), C a correlation matrix (unit diagonal, |C_ij| <= 1):
+  // lambda_min >= delta = min(d) - factor, ||A||_1 <= max(d) + factor (n - 1),
+  // ||A^-1||_1 <= sqrt(n) / delta (chol_rcond_bound, study of #465).
+  double rcond_lower_bound = 0.0;
+  if (LinearAlgebra::chol_rcond_bound > 0 && n > 0) {
+    const double dmin = (diag.n_elem == 0) ? 1.0 : diag.min();
+    const double dmax = (diag.n_elem == 0) ? 1.0 : diag.max();
+    const bool jitter_only = (factor == 1.0) && (dmin == dmax);
+    if (LinearAlgebra::chol_rcond_bound >= 2 || jitter_only) {
+      const double delta = dmin - factor;
+      if (delta > 0.0)
+        rcond_lower_bound = delta / (std::sqrt(static_cast<double>(n)) * (dmax + factor * (n - 1)));
+    }
+  }
+  arma::mat L = LinearAlgebra::safe_chol_lower_retry(
+      *R, 0, rcond_lower_bound);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
   // t0 = Bench::toc(nullptr, "    Chol",t0);
 
   return L;

@@ -45,10 +45,19 @@ class LinearAlgebra {
   static bool chol_rcond_check;
   LIBKRIGING_EXPORT static void check_chol_rcond(bool c);
   LIBKRIGING_EXPORT static bool chol_rcond_checked();
+  // Study of #465: skip the rcond test of the retry when a lower bound of the
+  // 1-norm reciprocal condition number, known from the diagonal of the
+  // matrix built by cholCov, is already >= min_rcond. 0: off (default);
+  // 1: only for a constant diagonal shift on a unit-scaled correlation
+  // (the search jitter J, or WarpKriging's floor); 2: any diagonal shift
+  // (also the nugget / heterogeneous noise models).
+  static int chol_rcond_bound;
+  LIBKRIGING_EXPORT static void set_chol_rcond_bound(int mode);
+  LIBKRIGING_EXPORT static int get_chol_rcond_bound();
 
   static int max_inc_choldiag;
   LIBKRIGING_EXPORT static arma::mat safe_chol_lower(arma::mat X);
-  static arma::mat safe_chol_lower_retry(arma::mat X, int warn);
+  static arma::mat safe_chol_lower_retry(arma::mat X, int warn, double rcond_lower_bound = 0.0);
 
   static double min_rcond;
   LIBKRIGING_EXPORT static double rcond_chol(arma::mat chol);
