@@ -131,7 +131,6 @@ arma::vec f(const std::string& family, const arma::mat& X, const arma::rowvec& f
   return y;
 }
 
-
 // Predictive scores on the test set (noise-free truth yt): RMSE over sd(yt),
 // mean negative log predictive density, coverage of the 95 % interval.
 struct Scores {
@@ -163,12 +162,7 @@ struct Rebuilt {
   arma::vec m, sd;
 };
 
-Rebuilt rebuild(Kriging& k,
-                const arma::mat& X,
-                const arma::vec& y,
-                const arma::mat& Xt,
-                double jit,
-                bool lmp) {
+Rebuilt rebuild(Kriging& k, const arma::mat& X, const arma::vec& y, const arma::mat& Xt, double jit, bool lmp) {
   Rebuilt out;
   const arma::uword n = X.n_rows;
   const double s2c = k.sigma2();
@@ -198,7 +192,9 @@ Rebuilt rebuild(Kriging& k,
       const double b = arma::sum(v1 % (V.t() * y) / lam) / arma::sum(v1 % v1 / lam);
       const arma::vec ve2 = V.t() * (y - b);
       const double sse_e = arma::sum(ve2 % ve2 / lam);
-      out.ll_eig = arma::any(lam <= 0) ? NAN : -0.5 * n * std::log(2 * M_PI * sse_e / n) - 0.5 * arma::sum(arma::log(lam)) - 0.5 * n;
+      out.ll_eig = arma::any(lam <= 0)
+                       ? NAN
+                       : -0.5 * n * std::log(2 * M_PI * sse_e / n) - 0.5 * arma::sum(arma::log(lam)) - 0.5 * n;
     }
   }
   const double s2 = lmp ? sse / (n - 1) : sse / n;
@@ -219,14 +215,13 @@ std::string settings_label() {
     std::snprintf(jit, sizeof jit, "auto");
   else
     std::snprintf(jit, sizeof jit, "%g", c);
-  std::snprintf(
-      b,
-      sizeof b,
-      "lrr=%g,jitter=%s,pct=%g%s",
-      Optim::get_long_range_restart(),
-      jit,
-      Optim::get_num_threads_percent(),
-      LinearAlgebra::chol_rcond_checked() ? "" : ",rcond=0");
+  std::snprintf(b,
+                sizeof b,
+                "lrr=%g,jitter=%s,pct=%g%s",
+                Optim::get_long_range_restart(),
+                jit,
+                Optim::get_num_threads_percent(),
+                LinearAlgebra::chol_rcond_checked() ? "" : ",rcond=0");
   return b;
 }
 
@@ -279,9 +274,10 @@ int main(int argc, char** argv) {
     std::printf(
         "variant,optim,settings,num_threads,kernel,noise,objective,function,d,n,set,status,objective_value,ll,"
         "theta,nugget_ratio,rmse,wall_s,cpu_s,nlpd,cov95%s\n",
-        candidates ? ",ll_exact,ll_exact_eig,ll_search_eig,exact_chol_ok,rcond_exact,rcond_search,rmse_cj,nlpd_cj,cov95_cj,"
-                     "ll_check,pred_check"
-                   : "");
+        candidates
+            ? ",ll_exact,ll_exact_eig,ll_search_eig,exact_chol_ok,rcond_exact,rcond_search,rmse_cj,nlpd_cj,cov95_cj,"
+              "ll_check,pred_check"
+            : "");
   for (const auto& fname : functions) {
     const Function fun = parse_function(fname);
     for (const auto& ns_ : ns) {
@@ -369,30 +365,32 @@ int main(int argc, char** argv) {
                   status = "error";
                   std::fprintf(stderr, "  error: %s\n", e.what());
                 }
-                std::printf("\"%s:%s\",%s,\"%s\",%d,%s,%s,%s,%s,%llu,%llu,%d,%s,%.10g,%.10g,%s,%.6g,%.6g,%.4g,%.4g,%.6g,%.4g%s\n",
-                            optim.c_str(),
-                            variant_base.c_str(),
-                            optim.c_str(),
-                            settings.c_str(),
-                            Optim::get_num_threads(),
-                            kernel.c_str(),
-                            noise.c_str(),
-                            objective.c_str(),
-                            fname.c_str(),
-                            (unsigned long long)fun.d,
-                            (unsigned long long)n,
-                            s,
-                            status.c_str(),
-                            obj,
-                            ll,
-                            theta.c_str(),
-                            nug,
-                            rmse,
-                            wall,
-                            cpu,
-                            sc.nlpd,
-                            sc.cov95,
-                            cand.c_str());
+                std::printf(
+                    "\"%s:%s\",%s,\"%s\",%d,%s,%s,%s,%s,%llu,%llu,%d,%s,%.10g,%.10g,%s,%.6g,%.6g,%.4g,%.4g,%.6g,%.4g%"
+                    "s\n",
+                    optim.c_str(),
+                    variant_base.c_str(),
+                    optim.c_str(),
+                    settings.c_str(),
+                    Optim::get_num_threads(),
+                    kernel.c_str(),
+                    noise.c_str(),
+                    objective.c_str(),
+                    fname.c_str(),
+                    (unsigned long long)fun.d,
+                    (unsigned long long)n,
+                    s,
+                    status.c_str(),
+                    obj,
+                    ll,
+                    theta.c_str(),
+                    nug,
+                    rmse,
+                    wall,
+                    cpu,
+                    sc.nlpd,
+                    sc.cov95,
+                    cand.c_str());
                 std::fflush(stdout);
               }
             }

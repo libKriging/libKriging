@@ -77,8 +77,7 @@ TEST_CASE("jitter rule: Kriging accessors are the objective at the committed par
   sin_data(12, 5, 2, Xu, yu);
   const arma::vec noise(X.n_rows, arma::fill::value(1e-3)), noise_u(Xu.n_rows, arma::fill::value(1e-3));
   for (const std::string kernel : {"gauss", "matern5_2", "matern3_2"})
-    for (const auto nm :
-         {Kriging::NoiseModel::None, Kriging::NoiseModel::Nugget, Kriging::NoiseModel::Heterogeneous})
+    for (const auto nm : {Kriging::NoiseModel::None, Kriging::NoiseModel::Nugget, Kriging::NoiseModel::Heterogeneous})
       for (const std::string objective : {"LL", "LOO", "LMP"}) {
         if (nm != Kriging::NoiseModel::None && objective != "LL")
           continue;  // LOO / LMP accessors: noise-free (LOO is not supported with a noise model)
@@ -89,8 +88,7 @@ TEST_CASE("jitter rule: Kriging accessors are the objective at the committed par
         else
           k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", objective, Kriging::Parameters{});
         // search jitter: the kernel's, noise-free only; committed model exact
-        CHECK(k.chol_jitter()
-              == (nm == Kriging::NoiseModel::None ? LinearAlgebra::kernel_chol_jitter(kernel) : 0.0));
+        CHECK(k.chol_jitter() == (nm == Kriging::NoiseModel::None ? LinearAlgebra::kernel_chol_jitter(kernel) : 0.0));
         CHECK(k.model_chol_jitter() == 0.0);
         check_kriging(k, nm, "fit");
 

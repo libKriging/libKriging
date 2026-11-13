@@ -104,7 +104,6 @@ static void parse(const std::string& name, std::string& fam, arma::uword& d) {
   throw std::invalid_argument("unknown function " + name);
 }
 
-
 // Candidate (i), logLikelihood() of the committed model: read through a study
 // hook (LK_JR=i, a temporary patch of the library, not committed) toggled
 // around the call; NaN with the committed library (no hook, same value as ll).
@@ -131,7 +130,8 @@ int main(int argc, char** argv) {
   const std::string variant = jr ? jr : "current";
   const bool hook = std::getenv("LK_JR_HOOK") != nullptr;  // library built with the study hook
   std::printf(
-      "variant,model,kernel,noise,function,d,n,set,status,ll,llfun,llk,ll_upd,llfun_upd,ll_i,ll_i_upd,theta,rmse,nlpd,cov95,wall_s\n");
+      "variant,model,kernel,noise,function,d,n,set,status,ll,llfun,llk,ll_upd,llfun_upd,ll_i,ll_i_upd,theta,rmse,nlpd,"
+      "cov95,wall_s\n");
   for (const auto& fname : functions) {
     std::string fam;
     arma::uword d;
@@ -168,8 +168,14 @@ int main(int argc, char** argv) {
             for (const auto& model : models) {
               if (het && (model == "nested" || model == "mlp"))
                 continue;  // no noise channel
-              std::fprintf(stderr, "FIT %s %s %s %s n=%llu set=%d\n", model.c_str(), kernel.c_str(), noise.c_str(),
-                           fname.c_str(), (unsigned long long)n, s);
+              std::fprintf(stderr,
+                           "FIT %s %s %s %s n=%llu set=%d\n",
+                           model.c_str(),
+                           kernel.c_str(),
+                           noise.c_str(),
+                           fname.c_str(),
+                           (unsigned long long)n,
+                           s);
               double ll = NAN, llfun = NAN, llk = NAN, llu = NAN, llfu = NAN, wall = NAN, lli = NAN, lliu = NAN;
               arma::vec th, m, sd;
               std::string status = "ok";
@@ -186,7 +192,9 @@ int main(int argc, char** argv) {
                   wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
                   auto p = k.predict(Xt, true, false, false);
                   m = std::get<0>(p), sd = std::get<1>(p), th = k.theta();
-                  auto gam = [&]() { return het ? arma::vec(arma::join_cols(k.theta(), arma::vec{k.sigma2()})) : k.theta(); };
+                  auto gam = [&]() {
+                    return het ? arma::vec(arma::join_cols(k.theta(), arma::vec{k.sigma2()})) : k.theta();
+                  };
                   ll = k.logLikelihood();
                   lli = ll_committed(k, hook && !jr);
                   llfun = std::get<0>(k.logLikelihoodFun(gam(), false, false));
@@ -265,37 +273,40 @@ int main(int argc, char** argv) {
                       lliu = ll_committed(k, hook && !jr);
                       llfu = std::get<0>(k.logLikelihoodFun(k.theta(), false));
                     } else {
-                    const bool disc = model == "cat" || model == "ord";
-                    std::vector<std::string> warps(d, model == "kuma" ? "kumaraswamy" : "none");
-                    if (disc)
-                      warps.push_back(model == "cat" ? "categorical(3,2)" : "ordinal(4)");
-                    WarpKriging k(warps, kernel);
-                    WarpKriging::Parameters pa;
-                    if (het)
-                      pa.noise = nv;
-                    if (disc) {
-                      // 3 unordered levels (effects 0, 0.8, -0.5 sd(y0)) or 4 ordered ones (0.4 level sd(y0))
-                      const double L = model == "cat" ? 3 : 4, sdy = arma::stddev(y0);
-                      auto lev = [&](const arma::vec& u) { return arma::vec(arma::floor(L * u)); };
-                      auto eff = [&](const arma::vec& l) {
-                        arma::vec e = l;
-                        e.transform([&](double v) { return model == "cat" ? (v == 1 ? 0.8 : v == 2 ? -0.5 : 0.0) * sdy : 0.4 * v * sdy; });
-                        return e;
-                      };
-                      const arma::vec l = lev(ulev), lt = lev(ulev_t), lu = lev(ulev_u);
-                      const arma::mat Xd = arma::join_rows(X, l), Xtd = arma::join_rows(Xt, lt), Xud = arma::join_rows(Xu, lu);
-                      const arma::vec yd = y + eff(l), yud = yu + eff(lu);
-                      yt_used = yt + eff(lt);
-                      Xt_used = Xtd;
-                      run(k, [&] { k.fit(yd, Xd, Trend::RegressionModel::Constant, false, optim, "LL", pa); });
-                      k.update(yud, Xud, false, het ? nvu : arma::vec());
-                    } else {
-                      run(k, [&] { k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", pa); });
-                      k.update(yu, Xu, false, het ? nvu : arma::vec());
-                    }
-                    llu = k.logLikelihood();
-                    lliu = ll_committed(k, hook && !jr);
-                    llfu = std::get<0>(k.logLikelihoodFun(k.theta(), false));
+                      const bool disc = model == "cat" || model == "ord";
+                      std::vector<std::string> warps(d, model == "kuma" ? "kumaraswamy" : "none");
+                      if (disc)
+                        warps.push_back(model == "cat" ? "categorical(3,2)" : "ordinal(4)");
+                      WarpKriging k(warps, kernel);
+                      WarpKriging::Parameters pa;
+                      if (het)
+                        pa.noise = nv;
+                      if (disc) {
+                        // 3 unordered levels (effects 0, 0.8, -0.5 sd(y0)) or 4 ordered ones (0.4 level sd(y0))
+                        const double L = model == "cat" ? 3 : 4, sdy = arma::stddev(y0);
+                        auto lev = [&](const arma::vec& u) { return arma::vec(arma::floor(L * u)); };
+                        auto eff = [&](const arma::vec& l) {
+                          arma::vec e = l;
+                          e.transform([&](double v) {
+                            return model == "cat" ? (v == 1 ? 0.8 : v == 2 ? -0.5 : 0.0) * sdy : 0.4 * v * sdy;
+                          });
+                          return e;
+                        };
+                        const arma::vec l = lev(ulev), lt = lev(ulev_t), lu = lev(ulev_u);
+                        const arma::mat Xd = arma::join_rows(X, l), Xtd = arma::join_rows(Xt, lt),
+                                        Xud = arma::join_rows(Xu, lu);
+                        const arma::vec yd = y + eff(l), yud = yu + eff(lu);
+                        yt_used = yt + eff(lt);
+                        Xt_used = Xtd;
+                        run(k, [&] { k.fit(yd, Xd, Trend::RegressionModel::Constant, false, optim, "LL", pa); });
+                        k.update(yud, Xud, false, het ? nvu : arma::vec());
+                      } else {
+                        run(k, [&] { k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", pa); });
+                        k.update(yu, Xu, false, het ? nvu : arma::vec());
+                      }
+                      llu = k.logLikelihood();
+                      lliu = ll_committed(k, hook && !jr);
+                      llfu = std::get<0>(k.logLikelihoodFun(k.theta(), false));
                     }
                   }
                 }
@@ -318,10 +329,29 @@ int main(int argc, char** argv) {
                   cov = arma::mean(arma::conv_to<arma::vec>::from(arma::abs(e) <= 1.959964 * sd));
                 }
               }
-              std::printf("%s,%s,%s,%s,%s,%llu,%llu,%d,%s,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%s,%.6g,%.6g,%.4g,%.4g\n",
-                          variant.c_str(), model.c_str(), kernel.c_str(), noise.c_str(), fname.c_str(),
-                          (unsigned long long)d, (unsigned long long)n, s, status.c_str(), ll, llfun, llk, llu, llfu, lli, lliu,
-                          ths.c_str(), rmse, nlpd, cov, wall);
+              std::printf(
+                  "%s,%s,%s,%s,%s,%llu,%llu,%d,%s,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%.10g,%s,%.6g,%.6g,%.4g,%.4g\n",
+                  variant.c_str(),
+                  model.c_str(),
+                  kernel.c_str(),
+                  noise.c_str(),
+                  fname.c_str(),
+                  (unsigned long long)d,
+                  (unsigned long long)n,
+                  s,
+                  status.c_str(),
+                  ll,
+                  llfun,
+                  llk,
+                  llu,
+                  llfu,
+                  lli,
+                  lliu,
+                  ths.c_str(),
+                  rmse,
+                  nlpd,
+                  cov,
+                  wall);
               std::fflush(stdout);
             }
         }
