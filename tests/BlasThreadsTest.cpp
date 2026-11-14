@@ -191,7 +191,8 @@ TEST_CASE("WarpKriging parallel multistart fit restores the BLAS / OpenMP thread
   CHECK(after.omp == guard.set.omp);
 }
 
-#ifdef LK_TEST_FORK
+// Apple only: the bug is Accelerate's, and fits in forked children do not belong in the Linux sanitizer jobs
+#if defined(LK_TEST_FORK) && defined(__APPLE__)
 // Accelerate's threading mode is per thread (BLASSetThreading): the child handler makes the forking
 // thread single-threaded, and the threads that the multistart pool creates afterwards in the child
 // have to do the same. Before, the children of a parent that had already used Accelerate's thread
@@ -231,7 +232,9 @@ TEST_CASE("fork(): multistart fits in the children of a warmed-up parent", "[thr
     CHECK(WEXITSTATUS(status) == 0);
   }
 }
+#endif
 
+#ifdef LK_TEST_FORK
 TEST_CASE("fork() quiesces the child only and restores the parent's thread counts", "[threads]") {
   ThreeThreads guard;
   if (!readable(guard.set)) {
