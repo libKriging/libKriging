@@ -501,8 +501,7 @@ function test_parallel_settings()
     end
     restore_parallel(orig);
 
-    fprintf(' PASSED
-');
+    fprintf(' PASSED\n');
 end
 
 function restore_parallel(orig)
