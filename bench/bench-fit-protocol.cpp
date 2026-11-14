@@ -23,7 +23,8 @@
 //   --candidates 0                   1: jitter-rule candidate columns (#465, noise-free fits; see rebuild())
 //   --rcond-check 1                  0: no Cholesky retry on a low rcond estimate, only on failure
 //   --rcond-bound 0                  1: skip that test when the search jitter bounds rcond; 2: any diagonal shift;
-//                                    3: no test noise-free (search and committed model), kept with a noise model
+//                                    3: no test noise-free (search and committed model), kept with a noise model;
+//                                    4: 2, and no test on the noise-free committed model
 // Functions (on [0, 1]^d; "<family><d>" or "<family>_<d>", d defaults to the
 // active dimension):
 //   sin<d>     sum_j sin(2 pi f_j x_j), f_j ~ U[0.5, 3] (all inputs active)
@@ -228,7 +229,8 @@ std::string settings_label() {
                     ? ""
                     : (LinearAlgebra::get_chol_rcond_bound() == 1   ? ",rcond_bound=J"
                        : LinearAlgebra::get_chol_rcond_bound() == 2 ? ",rcond_bound=diag"
-                                                                    : ",rcond=noise-only"));
+                       : LinearAlgebra::get_chol_rcond_bound() == 3 ? ",rcond=noise-only"
+                                                                    : ",rcond_bound=diag+committed"));
   return b;
 }
 

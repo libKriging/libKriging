@@ -9,6 +9,7 @@
 //         search with J and the exact committed model), kept with a noise model
 //   J     set_chol_rcond_bound(1): test skipped when the search jitter bounds rcond
 //   diag  set_chol_rcond_bound(2): test skipped when any diagonal shift bounds rcond
+//   diagc set_chol_rcond_bound(4): diag, and no test on the noise-free committed model
 // For every model x kernel x noise x function x n x data set (the T7 data of
 // bench/bench-fit-protocol.cpp), one fit, then:
 //   ll, theta, rmse / nlpd / cov95 (500 test points, noise-free truth), wall_s
@@ -160,6 +161,8 @@ int main(int argc, char** argv) {
     LinearAlgebra::set_chol_rcond_bound(1);
   else if (variant == "diag")
     LinearAlgebra::set_chol_rcond_bound(2);
+  else if (variant == "diagc")
+    LinearAlgebra::set_chol_rcond_bound(4);
   else if (variant != "on") {
     std::fprintf(stderr, "unknown LK_RCOND %s\n", variant.c_str());
     return 1;

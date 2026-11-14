@@ -605,6 +605,7 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta, std::map<std::string
 
 Kriging::KModel Kriging::make_committed_Model(const arma::vec& theta, double extra_param) const {
   KModel m = allocate_KModel();
+  LinearAlgebra::CommittedCholScope committed;  // rcond test of the retry, study mode 4 (#465)
   populate_Model_jitter(
       m, theta, extra_param, (m_noise_model == NoiseModel::None) ? m_model_chol_jitter : 0.0, nullptr);
   return m;
