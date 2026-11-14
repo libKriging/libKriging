@@ -14,6 +14,8 @@ output directory. Machine of the published numbers: `machine.txt`.
   <ns> <sets> <optim>` (usage in the file); its `ll_i` columns and `LK_JR=ii` need a library
   carrying the temporary study hook described there (not committed), else they are NaN / the
   committed rule.
+- rcond test of the Cholesky retry (#465): `LK_RCOND=on|off|nf|J|diag rcond_study <models> <kernels>
+  <noises> <functions> <ns> <sets> <optim> [first_set]` (variants and columns in the file).
 - Study drivers (`*_study.cpp`, `*_probe.cpp`, `unstable_ll_profile.cpp`) are not built by
   CMake: compile them with the flags of `bench-fit-profile` from
   `<build-dir>/compile_commands.json`, then link with
