@@ -66,6 +66,18 @@ a long run mostly overfits the training points: on `Branin(Wx)` in 10D
 start gave the same Q² as 20, at 15–20 times the cost, with a more
 overconfident predictive variance. `max_iter_bfgs` overrides it.
 
+`MLPKriging` runs 4 such starts by default (`optim = "BFGS4"`, since 2.0;
+the starts after the first draw random θ and network weights, and run in
+parallel). A single start (`"BFGS"`, the 1.x default) stops at a poor mean
+on most problems: on the 15-function benchmark of
+`docs/dev/rationalization/mlp-default-467.md` (600 cases) its test Q² is
+below 0.5 on 69 % of the cases, against 29 % with `"BFGS4"` and 25 % with
+`"BFGS10"`; on `Branin(Wx)` in 10D (#407) the median Q² is −6.0 (tanh) /
+−2.5 (selu) against 0.983 / 0.993. `"BFGS4"` costs 1.6 times the CPU time
+of the 1.x default on one core (5 calibration folds both) and 1.04 times its
+wall time on 4 cores. `WarpKriging` keeps `"BFGS"`: pass `"BFGS4"` with an
+`mlp_joint` warping.
+
 ### Calibration of the predictive variance
 
 Maximising the likelihood over many weights also learns features in which
@@ -77,7 +89,7 @@ at fixed features sees it, since the features were fitted to the left-out
 point too.
 
 After the fit, the predictive variance is therefore calibrated by K-fold
-cross-validation (K = 3): the model is refitted on each K−1 folds from
+cross-validation (K = 5): the model is refitted on each K−1 folds from
 the starting point (θ₀, W₀) of the optimiser start that gave the fit,
 with the same single-start optimiser and budget, and predicts the held-out
 fold. With eᵢ the held-out residuals and sᵢ² their predictive variances,
@@ -94,12 +106,14 @@ unchanged; c is reported by `var_scale()` and in `summary()`, kept by
 the model. It costs K single-start fits, run concurrently in the
 multistart thread pool (`Optim::set_thread_pool_size`). The tuning parameter
 `calibration_folds` sets K (`0` disables the calibration); it is not
-applied with per-observation noise, nor when n < 2K. K = 3 by default: for
-the single-start default fit it gives the same coverage and NLPD as K = 5 at
-about 0.57 times the CPU time. With a multistart `"BFGSn"`, set
-`calibration_folds = "5"` explicitly: each fold is refitted from the one
-winning start on 2/3 of the data, which overstates the error of the
-best-of-n fit (test NLPD +0.56 vs K = 5, 95 % CI [+0.20, +0.97], T8).
+applied with per-observation noise, nor when n < 2K. K = 5 by default
+(#467). Fewer folds widen the intervals with a multistart: each fold is
+refitted from the one winning start on (K−1)/K of the data, which
+overstates the error of the best-of-n fit. For the default `"BFGS4"`,
+K = 3 raises the test NLPD by 0.15 (median of 600 paired cases, 95 % CI
+[0.10, 0.20]; coverage 0.971 against 0.961) for 0.75 times the CPU time;
+for a single start (`"BFGS"`) K = 3 and K = 5 give the same coverage and
+NLPD (T8), K = 3 at 0.57 times the CPU time.
 
 ## Simple example
 

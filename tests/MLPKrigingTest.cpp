@@ -235,18 +235,25 @@ static void test_default_optim_branin() {
   m_default.fit(y, X);
   MLPKriging m_multi({8}, 2, "tanh", "matern5_2");
   m_multi.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS3");
+  MLPKriging m_single({8}, 2, "tanh", "matern5_2");
+  m_single.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS");
 
   const double q2_default = q2(m_default);
   const double q2_multi = q2(m_multi);
+  const double q2_single = q2(m_single);
   std::cout << "  default optim=" << m_default.optim() << "  Q2=" << q2_default << "  LL=" << m_default.logLikelihood()
             << std::endl;
   std::cout << "  BFGS3             Q2=" << q2_multi << "  LL=" << m_multi.logLikelihood() << std::endl;
+  std::cout << "  BFGS              Q2=" << q2_single << "  LL=" << m_single.logLikelihood() << std::endl;
 
-  if (m_default.optim() != "BFGS")
-    throw std::runtime_error("MLPKriging default optim should be \"BFGS\", got \"" + m_default.optim() + "\"");
+  // "BFGS4" since 2.0 (#467); "BFGS" (single start) up to 1.x.
+  if (m_default.optim() != "BFGS4")
+    throw std::runtime_error("MLPKriging default optim should be \"BFGS4\", got \"" + m_default.optim() + "\"");
   if (!(q2_default > 0.95))
     throw std::runtime_error("MLPKriging default fit on Branin: Q2 = " + std::to_string(q2_default) + " <= 0.95");
-  // No LL ordering between BFGS3 and the single start: the first multistart
+  if (!(q2_single > 0.95))
+    throw std::runtime_error("MLPKriging BFGS fit on Branin: Q2 = " + std::to_string(q2_single) + " <= 0.95");
+  // No LL ordering between a multistart and the single start: the first multistart
   // start begins from the same point, but runs on a clone in a worker thread
   // and, over hundreds of iterations of a non-convex problem, round-off differences
   // (BLAS kernels, buffer alignment) can lead it to another local optimum
