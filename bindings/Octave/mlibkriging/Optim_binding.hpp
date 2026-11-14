@@ -40,4 +40,21 @@ void chol_rcond_checked(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs
 void check(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace LinearAlgebraBinding
 
+namespace ParallelBinding {
+void get_num_threads_percent(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_num_threads_percent(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_num_threads(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_thread_pool_size(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_thread_pool_size(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_thread_start_delay_ms(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_thread_start_delay_ms(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_blas_threads_min_n(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_blas_threads_min_n(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_omp_min_rows(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_omp_min_rows(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void blas_backend(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void blas_num_threads(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void omp_enabled(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+}  // namespace ParallelBinding
+
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_OPTIM_BINDING_HPP

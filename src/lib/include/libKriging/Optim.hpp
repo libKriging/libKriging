@@ -104,6 +104,7 @@ class Optim {
   LIBKRIGING_EXPORT static void set_thread_start_delay_ms(int delay_ms);
   LIBKRIGING_EXPORT static int get_thread_start_delay_ms();
 
+  // Thread settings: also in Parallel (Parallel.hpp), which gathers them.
   // Thread budget of the library: the share of the physical cores it uses,
   // x <= 1 a ratio (0.5), x > 1 a percentage (50), 0 = automatic = 100 %.
   // Default from LK_NUM_THREADS_PERCENT. Never more than an explicit

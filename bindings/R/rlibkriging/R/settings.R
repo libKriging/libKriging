@@ -44,3 +44,33 @@ NULL
 #' @examples
 #' linalg_get_chol_jitter()
 NULL
+
+#' Thread budget of the library and its distribution
+#'
+#' Process-wide thread settings of libKriging, the same as the \code{Parallel}
+#' static methods of the Python, Octave / MATLAB and Julia bindings
+#' (\code{parallel_<name>} in R for \code{Parallel.<name>}); see
+#' docs/dev/parallel.md. One budget bounds the multistart workers, the OpenMP
+#' loops and the BLAS threads together; the other settings only shape how it is
+#' distributed. The \code{optim_*} thread settings are the same settings. Set
+#' them before the calls.
+#'
+#' \code{parallel_set_num_threads_percent(x)}: share of the physical cores,
+#' \code{x <= 1} a ratio, \code{x > 1} a percentage, \code{0} automatic
+#' (100 \%); \code{parallel_get_num_threads()} the resulting number of threads.
+#' \code{parallel_set_thread_pool_size}: multistart workers (0 automatic).
+#' \code{parallel_set_blas_threads_min_n}: small-problem BLAS rule (-1
+#' automatic, 0 off, n > 0 threshold). \code{parallel_set_omp_min_rows}: rows
+#' from which the covariance / gradient loops run on OpenMP threads.
+#' \code{parallel_blas_backend()}, \code{parallel_blas_num_threads()},
+#' \code{parallel_omp_enabled()}: read only, the state of each level.
+#'
+#' @name parallel_settings
+#' @return The getters return the current value; the setters return
+#'   \code{NULL} invisibly.
+#' @examples
+#' parallel_set_num_threads_percent(0.5)
+#' parallel_get_num_threads()
+#' parallel_blas_backend()
+#' parallel_set_num_threads_percent(0)
+NULL

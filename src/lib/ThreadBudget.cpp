@@ -3,11 +3,13 @@
 #include "libKriging/Optim.hpp"
 
 #include "BlasThreads.hpp"
+#include "OmpLoops.hpp"
 
 #include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <csignal>
+#include <cstdlib>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -283,6 +285,30 @@ void apply_locked(BlasCountState& s) {
 }
 
 }  // namespace
+
+namespace {
+// OpenMP threshold in effect: kOmpMinRows (build), LK_OMP_MIN_ROWS (environment,
+// read at load), Parallel::set_omp_min_rows. Relaxed: a performance setting,
+// configuration-before-use as the other settings.
+std::atomic<unsigned long long> g_omp_min_rows{[] {
+  const char* v = std::getenv("LK_OMP_MIN_ROWS");
+  if (v != nullptr && *v != '\0') {
+    char* end = nullptr;
+    const long long n = std::strtoll(v, &end, 10);
+    if (end != v && n >= 0)
+      return static_cast<unsigned long long>(n);
+  }
+  return kOmpMinRows;
+}()};
+}  // namespace
+
+unsigned long long omp_min_rows() {
+  return g_omp_min_rows.load(std::memory_order_relaxed);
+}
+
+void set_omp_min_rows(unsigned long long n) {
+  g_omp_min_rows.store(n, std::memory_order_relaxed);
+}
 
 int physical_cores() {
   static const int n = [] {

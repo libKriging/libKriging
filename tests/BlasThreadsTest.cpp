@@ -10,6 +10,7 @@
 #include "blas_counts.hpp"
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdlib>
 #include <string>
 #include <thread>
@@ -189,6 +190,49 @@ TEST_CASE("WarpKriging parallel multistart fit restores the BLAS / OpenMP thread
   CHECK(after.blas == guard.set.blas);
   CHECK(after.omp == guard.set.omp);
 }
+
+// Apple only: the bug is Accelerate's, and fits in forked children do not belong in the Linux sanitizer jobs
+#if defined(LK_TEST_FORK) && defined(__APPLE__)
+// Accelerate's threading mode is per thread (BLASSetThreading): the child handler makes the forking
+// thread single-threaded, and the threads that the multistart pool creates afterwards in the child
+// have to do the same. Before, the children of a parent that had already used Accelerate's thread
+// pool were killed by SIGSEGV in their first BFGS4 fit on macOS 15 (R mclapply; Linux: no effect).
+TEST_CASE("fork(): multistart fits in the children of a warmed-up parent", "[threads]") {
+  arma::vec y;
+  arma::mat X;
+  data(y, X, 500);
+  {  // parent: large multistart fit, Accelerate / OpenMP / OpenBLAS thread pools alive
+    Kriging warm(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS4");
+  }
+  const int n_children = 3;
+  pid_t pids[n_children];
+  for (int c = 0; c < n_children; ++c) {
+    pids[c] = fork();
+    if (pids[c] == 0) {
+      int code = 0;
+      try {
+        arma::vec yc;
+        arma::mat Xc;
+        data(yc, Xc, 120);
+        Kriging k(yc, Xc, "gauss", Trend::RegressionModel::Constant, false, "BFGS4");  // pool threads in the child
+        if (!std::isfinite(k.logLikelihood()))
+          code = 2;
+      } catch (...) {
+        code = 3;
+      }
+      lk_test_fork_child_exit(code);
+    }
+    REQUIRE(pids[c] > 0);
+  }
+  for (int c = 0; c < n_children; ++c) {
+    int status = 0;
+    REQUIRE(waitpid(pids[c], &status, 0) == pids[c]);
+    INFO("child " << c << (WIFSIGNALED(status) ? " killed by signal " + std::to_string(WTERMSIG(status)) : ""));
+    CHECK(WIFEXITED(status));
+    CHECK(WEXITSTATUS(status) == 0);
+  }
+}
+#endif
 
 #ifdef LK_TEST_FORK
 TEST_CASE("fork() quiesces the child only and restores the parent's thread counts", "[threads]") {

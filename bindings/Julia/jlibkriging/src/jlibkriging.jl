@@ -1812,7 +1812,7 @@ chol_rcond_checked() = ccall(dlsym(_lk(), :lk_linalg_chol_rcond_checked), Cint, 
     jlibkriging.Optim
 
 Global optimizer settings, as `Optim` in C++ / Python / Octave (R:
-`rlibkriging:::optim_<name>`): `jlibkriging.Optim.set_max_iteration(50)`.
+`optim_<name>`): `jlibkriging.Optim.set_max_iteration(50)`.
 Not exported, not to clash with the Optim.jl package.
 """
 module Optim
@@ -1847,6 +1847,40 @@ get_num_threads_percent() = ccall(dlsym(_lk(), :lk_optim_get_num_threads_percent
 get_num_threads() = Int(ccall(dlsym(_lk(), :lk_optim_get_num_threads), Cint, ()))
 
 end # module Optim
+
+"""
+    jlibkriging.Parallel
+
+Thread budget of libKriging and how it is distributed between its levels
+(multistart workers, OpenMP loops, BLAS threads), as `Parallel` in C++ /
+Python / Octave (R: `parallel_<name>`), docs/dev/parallel.md:
+`jlibkriging.Parallel.set_num_threads_percent(50)`. Optim's thread settings are
+the same settings. Julia's own threads and OpenBLAS are not driven by these.
+"""
+module Parallel
+
+import ..jlibkriging: _lk, _check_error
+using Libdl: dlsym
+
+# thread budget: x <= 1 ratio, x > 1 percentage of the physical cores, 0 automatic (100 %)
+set_num_threads_percent(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_parallel_set_num_threads_percent), Cint, (Cdouble,), x))
+get_num_threads_percent() = ccall(dlsym(_lk(), :lk_parallel_get_num_threads_percent), Cdouble, ())
+get_num_threads() = Int(ccall(dlsym(_lk(), :lk_parallel_get_num_threads), Cint, ()))
+# how the budget is distributed
+set_thread_pool_size(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_parallel_set_thread_pool_size), Cint, (Cint,), x))
+get_thread_pool_size() = Int(ccall(dlsym(_lk(), :lk_parallel_get_thread_pool_size), Cint, ()))
+set_thread_start_delay_ms(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_parallel_set_thread_start_delay_ms), Cint, (Cint,), x))
+get_thread_start_delay_ms() = Int(ccall(dlsym(_lk(), :lk_parallel_get_thread_start_delay_ms), Cint, ()))
+set_blas_threads_min_n(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_parallel_set_blas_threads_min_n), Cint, (Cint,), x))
+get_blas_threads_min_n() = Int(ccall(dlsym(_lk(), :lk_parallel_get_blas_threads_min_n), Cint, ()))
+set_omp_min_rows(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_parallel_set_omp_min_rows), Cint, (Cint,), x))
+get_omp_min_rows() = Int(ccall(dlsym(_lk(), :lk_parallel_get_omp_min_rows), Cint, ()))
+# read only, per level
+blas_backend() = unsafe_string(ccall(dlsym(_lk(), :lk_parallel_blas_backend), Cstring, ()))
+blas_num_threads() = Int(ccall(dlsym(_lk(), :lk_parallel_blas_num_threads), Cint, ()))
+omp_enabled() = ccall(dlsym(_lk(), :lk_parallel_omp_enabled), Cint, ()) != 0
+
+end # module Parallel
 
 export Kriging, WarpKriging, MLPKriging, NestedKriging
 export get_chol_jitter, set_chol_jitter, get_num_nugget, set_num_nugget, linearalgebra_check

@@ -947,12 +947,12 @@ void KrigingImpl::print_bench(const std::map<std::string, double>& bench) {
 }
 
 namespace {
-// Threads of the gradient pair loops: the budget from n = kOmpMinRows on, 1
+// Threads of the gradient pair loops: the budget from n = omp_min_rows() on, 1
 // below. A performance setting only: the sums do not depend on it
 // (SeparableDln.hpp, sum_pairs_dln).
 int pair_loop_threads(arma::uword n) {
 #ifdef LK_OMP_LOOPS
-  if (n >= libKriging::detail::kOmpMinRows)
+  if (n >= libKriging::detail::omp_min_rows())
     return libKriging::detail::omp_threads();
 #endif
   (void)n;

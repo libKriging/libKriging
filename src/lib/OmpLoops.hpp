@@ -38,17 +38,30 @@ namespace detail {
 /// evaluation at n = 200-400, x1.12-1.20 per fit at n = 500, no hang with the
 /// Python suite; #473, branch windows-session-1:
 /// docs/dev/rationalization/Windows-results.md).
-/// Elsewhere (libomp / Accelerate on macOS, MinGW / libgomp on Windows: Octave,
-/// R) not measured yet: kept at 800, see #416 (macOS). LK_OMP_MIN_ROWS overrides
-/// it at compile time.
+/// and with libomp / Accelerate on macOS (Apple M4, 10 cores, Homebrew libomp, full
+/// power; a build without OpenMP, the macOS default, has no such loops): x1.6-1.8
+/// per evaluation at n = 200-400 against sequential loops, x1.3-1.4 per
+/// single-start (BFGS) fit at n = 200-500, nothing measurable on the multistart
+/// (BFGS4) default, whose pool already uses the cores; outputs bitwise identical
+/// to the sequential build. The loops already pay off at n = 100-150 (x1.2-1.5), so
+/// 200 is conservative (#452, #472, macOS-M4-session-2-results.md on the
+/// macos-m4-session-2 branch).
+/// Elsewhere (MinGW / libgomp on Windows: Octave, R) not measured yet: kept at
+/// 800. LK_OMP_MIN_ROWS overrides it at compile time.
 #ifndef LK_OMP_MIN_ROWS
-#if defined(__linux__) || defined(_MSC_VER)
+#if defined(__linux__) || defined(_MSC_VER) || defined(__APPLE__)
 #define LK_OMP_MIN_ROWS 200
 #else
 #define LK_OMP_MIN_ROWS 800
 #endif
 #endif
 constexpr unsigned long long kOmpMinRows = LK_OMP_MIN_ROWS;
+
+/// Threshold in effect (rows): kOmpMinRows unless set at run time by
+/// LK_OMP_MIN_ROWS (environment, read once) or Parallel::set_omp_min_rows.
+/// Defined in ThreadBudget.cpp.
+unsigned long long omp_min_rows();
+void set_omp_min_rows(unsigned long long n);
 }  // namespace detail
 }  // namespace libKriging
 
