@@ -38,11 +38,18 @@ namespace detail {
 /// evaluation at n = 200-400, x1.12-1.20 per fit at n = 500, no hang with the
 /// Python suite; #473, branch windows-session-1:
 /// docs/dev/rationalization/Windows-results.md).
-/// Elsewhere (libomp / Accelerate on macOS, MinGW / libgomp on Windows: Octave,
-/// R) not measured yet: kept at 800, see #416 (macOS). LK_OMP_MIN_ROWS overrides
-/// it at compile time.
+/// and with libomp / Accelerate on macOS (Apple M4, 10 cores, Homebrew libomp; a
+/// build without OpenMP, the macOS default, has no such loops): x2.1 per
+/// evaluation at n = 200-400 against sequential loops, x1.2-1.5 per fit at
+/// n = 200-500, outputs bitwise identical to the sequential build; the loops
+/// already pay off at n = 100-150 (x1.4-1.9), so 200 is conservative (#452, #472,
+/// docs/dev/rationalization/macOS-Accelerate-results.md and
+/// macOS-M4-session-2-results.md on the macos-accelerate / macos-m4-session-2
+/// branches).
+/// Elsewhere (MinGW / libgomp on Windows: Octave, R) not measured yet: kept at
+/// 800. LK_OMP_MIN_ROWS overrides it at compile time.
 #ifndef LK_OMP_MIN_ROWS
-#if defined(__linux__) || defined(_MSC_VER)
+#if defined(__linux__) || defined(_MSC_VER) || defined(__APPLE__)
 #define LK_OMP_MIN_ROWS 200
 #else
 #define LK_OMP_MIN_ROWS 800
