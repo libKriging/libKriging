@@ -22,9 +22,11 @@
 #include "ParallelFor.hpp"
 #include "ThreadBudget.hpp"
 
+#include <atomic>
 #include <cstdlib>
 #include <mutex>
 #include <random>
+#include <stdexcept>
 #include <string>
 
 arma::solve_opts::opts LinearAlgebra::default_solve_opts = arma::solve_opts::fast + arma::solve_opts::no_approx;
@@ -109,6 +111,30 @@ LIBKRIGING_EXPORT double LinearAlgebra::cg_auto_precond_min_captured = [] {
 }();
 LIBKRIGING_EXPORT void LinearAlgebra::set_cg_auto_precond(bool on) {
   LinearAlgebra::cg_auto_precond = on;
+}
+
+namespace {
+std::atomic<int> g_iterative_dense_max_mb{[] {
+  const char* e = std::getenv("LK_ITERATIVE_DENSE_MAX_MB");
+  if (e == nullptr)
+    return 6144;
+  try {
+    const int v = std::stoi(e);
+    return v >= 0 ? v : 6144;
+  } catch (const std::exception&) {
+    return 6144;
+  }
+}()};
+}  // namespace
+
+LIBKRIGING_EXPORT void LinearAlgebra::set_iterative_dense_max_mb(int mb) {
+  if (mb < 0)
+    throw std::invalid_argument("set_iterative_dense_max_mb: expected mb >= 0");
+  g_iterative_dense_max_mb.store(mb, std::memory_order_relaxed);
+}
+
+LIBKRIGING_EXPORT int LinearAlgebra::get_iterative_dense_max_mb() {
+  return g_iterative_dense_max_mb.load(std::memory_order_relaxed);
 }
 
 LIBKRIGING_EXPORT void LinearAlgebra::set_cg_warning(bool warn) {

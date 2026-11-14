@@ -3525,7 +3525,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // design (docs/math/lliterative_vs_cholesky.ipynb measured the O(n) path);
   // the budget keeps it to n where O(n^2) storage is unremarkable next to
   // what a dense fit would need. Override the 6 GiB default with
-  // LK_ITERATIVE_DENSE_MAX_MB=0 (force matrix-free) or a larger value.
+  // LinearAlgebra::set_iterative_dense_max_mb (0: always matrix-free).
   arma::mat R_dense;
   std::vector<arma::mat> dR_dense;
   bool dense = false;
@@ -3699,13 +3699,8 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // above) when the CPU path will run them -- skipped entirely if a GPU
   // backend is bound (it has its own device matvecs).
   if (!slq_on_gpu) {
-    std::size_t budget_mb = 6144;
-    if (const char* e = std::getenv("LK_ITERATIVE_DENSE_MAX_MB")) {
-      try {
-        budget_mb = static_cast<std::size_t>(std::stoull(e));
-      } catch (...) { /* keep default */
-      }
-    }
+    // host-memory budget (LinearAlgebra::set_iterative_dense_max_mb)
+    const std::size_t budget_mb = static_cast<std::size_t>(LinearAlgebra::get_iterative_dense_max_mb());
     const bool want_dR = (grad_out != nullptr);
     const double blocks = 1.0 + (want_dR ? static_cast<double>(dimX) : 0.0);
     const double need_mb = blocks * static_cast<double>(n) * static_cast<double>(n) * 8.0 / (1024.0 * 1024.0);

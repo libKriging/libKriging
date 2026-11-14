@@ -15,6 +15,14 @@ find_dependency(lbfgsb_cpp)
 if (@OpenMP_CXX_FOUND@)
     find_dependency(OpenMP COMPONENTS CXX)
 endif ()
+# GPU backends (method "iterative"): static CUDA runtime of a static
+# libKriging.a, HIP runtime
+if (@LIBKRIGING_CONFIG_NEEDS_CUDATOOLKIT@)
+    find_dependency(CUDAToolkit)
+endif ()
+if (@LIBKRIGING_CONFIG_NEEDS_HIP@)
+    find_dependency(hip)
+endif ()
 
 include("${CMAKE_CURRENT_LIST_DIR}/libKrigingTargets.cmake")
 

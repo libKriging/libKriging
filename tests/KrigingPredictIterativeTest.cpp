@@ -6,31 +6,11 @@
 
 #include <catch2/catch.hpp>
 #include "libKriging/Kriging.hpp"
+#include "libKriging/LinearAlgebra.hpp"
 // clang-format on
 
-// Cross-platform environment variable functions (mirrors the same helper in
-// KrigingIterativeTest.cpp).
-#ifdef _WIN32
-#include <cstdlib>
 #include <string>
 #include <tuple>
-inline int setenv_portable(const char* name, const char* value, int overwrite) {
-  if (!overwrite && std::getenv(name) != nullptr) {
-    return 0;
-  }
-  return _putenv_s(name, value);
-}
-inline int unsetenv_portable(const char* name) {
-  return _putenv_s(name, "");
-}
-#else
-inline int setenv_portable(const char* name, const char* value, int overwrite) {
-  return setenv(name, value, overwrite);
-}
-inline int unsetenv_portable(const char* name) {
-  return unsetenv(name);
-}
-#endif
 
 static double f2d(double x1, double x2) {
   return std::sin(3.0 * x1) + std::cos(5.0 * x2) + x1 * x2;
@@ -108,7 +88,7 @@ TEST_CASE("predict method iterative: the dense fast path matches the matrix-free
   // For a separable kernel and small enough n, predictIterative_impl
   // materializes R once (KrigingImpl::build_separable_cov, shared with
   // Kriging::_logLikelihoodIterative) and solves via BLAS-3 R*V instead of
-  // the matrix-free per-pair matvec. LK_ITERATIVE_DENSE_MAX_MB=0 forces the
+  // the matrix-free per-pair matvec. LinearAlgebra::set_iterative_dense_max_mb(0) forces the
   // matrix-free path. Same theta, same CG budget => the two must agree
   // tightly (the only difference is BLAS vs pair-loop summation order).
   arma::mat X;
@@ -120,7 +100,7 @@ TEST_CASE("predict method iterative: the dense fast path matches the matrix-free
   arma::vec yt;
   make_data(15, Xt, yt, 456);
 
-  const char* old_env = std::getenv("LK_ITERATIVE_DENSE_MAX_MB");
+  const int old_dense_mb = LinearAlgebra::get_iterative_dense_max_mb();
 
   // Both paths must be compared at CONVERGED solves: two non-converged
   // iterates sharing a residual norm need not share digits beyond it. The
@@ -128,26 +108,23 @@ TEST_CASE("predict method iterative: the dense fast path matches the matrix-free
   // here) and the stdev solves run at sqrt(tol), so the comparison uses a
   // tol at the round-off floor (5th field of the spec) and a generous
   // iteration budget (10 n, 4th field) instead.
-  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);  // force matrix-free
+  LinearAlgebra::set_iterative_dense_max_mb(0);  // force matrix-free
   auto [m_mf, s_mf] = pit(k, Xt, true, "iterative(30,0,20,10,1e-14)");
 
-  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);  // allow dense
+  LinearAlgebra::set_iterative_dense_max_mb(4096);  // allow dense
   auto [m_de, s_de] = pit(k, Xt, true, "iterative(30,0,20,10,1e-14)");
 
   // and the preconditioned solve too
   auto [m_mf_pc, s_mf_pc] = ([&] {
-    setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);
+    LinearAlgebra::set_iterative_dense_max_mb(0);
     return pit(k, Xt, true, "iterative(30,20,20,10,1e-14)");
   })();
   auto [m_de_pc, s_de_pc] = ([&] {
-    setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);
+    LinearAlgebra::set_iterative_dense_max_mb(4096);
     return pit(k, Xt, true, "iterative(30,20,20,10,1e-14)");
   })();
 
-  if (old_env)
-    setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", old_env, 1);
-  else
-    unsetenv_portable("LK_ITERATIVE_DENSE_MAX_MB");
+  LinearAlgebra::set_iterative_dense_max_mb(old_dense_mb);
 
   INFO("max |mean diff| = " << arma::abs(m_mf - m_de).max());
   INFO("max |stdev diff| = " << arma::abs(s_mf - s_de).max());

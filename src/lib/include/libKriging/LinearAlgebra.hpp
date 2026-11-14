@@ -66,6 +66,16 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static double cg_auto_precond_min_captured;
   LIBKRIGING_EXPORT static void set_cg_auto_precond(bool on);
 
+  // Host-memory budget, in MiB, of the dense fast path of the iterative
+  // method on the CPU: below it, the n x n correlation matrix (and its d
+  // theta-derivatives for a gradient) is built once per evaluation and every
+  // CG / Lanczos product is a BLAS-3 R*V; above it (or 0), the products are
+  // matrix-free (O(n) memory, covariance evaluated per pair and per product).
+  // Default 6144, or LK_ITERATIVE_DENSE_MAX_MB. The GPU budget is
+  // Gpu::set_dense_max_mb.
+  LIBKRIGING_EXPORT static void set_iterative_dense_max_mb(int mb);
+  LIBKRIGING_EXPORT static int get_iterative_dense_max_mb();
+
   // Shared by every conjugateGradient(Batched) implementation -- CPU and
   // every GPU backend (CUDA/HIP/SYCL/Metal) -- so the same message/format
   // is used everywhere a CG solve can silently under-converge. Prints

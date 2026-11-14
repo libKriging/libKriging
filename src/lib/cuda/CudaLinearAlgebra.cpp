@@ -209,18 +209,12 @@ cublasHandle_t cublasHandle() {
 // matvecs become a single cublasDgemm per iteration: cheap FLOPs against an
 // already-evaluated matrix, instead of re-evaluating exp()/log1p() for
 // every (i,j) pair every single time. Gated by a device-memory budget
-// (LK_ITERATIVE_CUDA_DENSE_MAX_MB, default 4096 MiB; 0 forces the
+// (Gpu::set_dense_max_mb, default 4096 MiB; 0 forces the
 // matrix-free kernels above, e.g. for n past the budget). Independent of
 // the CPU path's LK_ITERATIVE_DENSE_MAX_MB (host RAM and device VRAM are
 // different budgets on the same machine).
 bool denseFitsBudget(double need_mb) {
-  std::size_t budget_mb = 4096;
-  if (const char* e = std::getenv("LK_ITERATIVE_CUDA_DENSE_MAX_MB")) {
-    try {
-      budget_mb = static_cast<std::size_t>(std::stoull(e));
-    } catch (...) { /* keep default */
-    }
-  }
+  const std::size_t budget_mb = static_cast<std::size_t>(Gpu::get_dense_max_mb());  // Gpu::set_dense_max_mb
   return budget_mb > 0 && need_mb <= static_cast<double>(budget_mb);
 }
 
@@ -235,7 +229,7 @@ bool denseFitsBudget(double need_mb) {
 // to conjugateGradient's own matvec rather than the SLQ Lanczos recursion
 // too (not yet extended there).
 bool mixedPrecisionEnabled() {
-  return std::getenv("LK_ITERATIVE_CUDA_MIXED_PRECISION") != nullptr;
+  return Gpu::get_mixed_precision();  // Gpu::set_mixed_precision
 }
 
 // Device-resident cache of the materialized dense R for the LAST
@@ -968,7 +962,7 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // objective is slow is "did CG converge, or did it run to max_iter?".
   // Reaching max_iter means every later quantity (Hutchinson trace, mean,
   // variance) is built on an unconverged solve.
-  if (std::getenv("LK_ITERATIVE_VERBOSE") != nullptr) {
+  if (Gpu::get_verbose()) {  // Gpu::set_verbose
     // tol is now per-column (mBCG fusion can mix e.g. cg_tol and
     // probes_cg_tol in one call) -- print the range rather than a single
     // value; min==max for every non-fused call site.

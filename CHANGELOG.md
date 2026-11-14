@@ -25,6 +25,14 @@ past release, see the corresponding entry on the
   `MLPKriging`. `Kriging::logLikelihoodIterativeFun`, `iterative_nprobe`, `is_iterative_light`,
   `iterative_cg_converged`. The matrix-vector products run under the thread budget with a
   result independent of the number of threads.
+- **GPU backends of the iterative method** (CUDA, HIP, SYCL, Metal; from libKriging/libKriging#371):
+  CMake options `ENABLE_<CUDA|HIP|SYCL|METAL>_ITERATIVE` (`ON` / `OFF` / `AUTO`, default `OFF`:
+  CPU-only default build and packages) and `ENABLE_GPU_ITERATIVE` (`AUTO` / `OFF` for the four),
+  resolved by `cmake/gpu.cmake`. `Gpu` settings on the model of `Parallel` (`libKriging/Gpu.hpp`):
+  `set_enabled`, `set_dense_max_mb`, `set_mixed_precision`, `set_verbose`, read only
+  `compiled_backends`, `available`, `active_backend`; `LinearAlgebra::set_iterative_dense_max_mb`
+  for the CPU dense fast path. `find_package(libKriging CONFIG)` finds the CUDA toolkit of a
+  static CUDA build and the HIP runtime.
 - **`Parallel`: the thread settings in one place, in every binding** (TODO of #480): C++
   `libKriging/Parallel.hpp`, Python / Octave `Parallel.*`, Julia `jlibkriging.Parallel.*`, R
   `parallel_*`. Budget (`set_num_threads_percent`, `get_num_threads`), its distribution

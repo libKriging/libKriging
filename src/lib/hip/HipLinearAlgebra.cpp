@@ -74,20 +74,14 @@ bool covKindFromString(const std::string& covType, CovKind* out) {
 // launch call per iteration: cheap FMA against an already-evaluated matrix
 // (no BLAS -- see the file header), instead of re-evaluating exp()/log1p()
 // for every (i,j) pair every single time.
-// Gated by a device-memory budget (LK_ITERATIVE_HIP_DENSE_MAX_MB, default
+// Gated by a device-memory budget (Gpu::set_dense_max_mb, default
 // 4096 MiB; 0 forces the matrix-free kernels above, e.g. for n past the
 // budget). Independent of the CPU path's LK_ITERATIVE_DENSE_MAX_MB (host
 // RAM and device VRAM are different budgets on the same machine) and of
 // CUDA's own LK_ITERATIVE_CUDA_DENSE_MAX_MB. Mirrors
 // CudaLinearAlgebra.cpp's denseFitsBudget() exactly.
 bool denseFitsBudget(double need_mb) {
-  std::size_t budget_mb = 4096;
-  if (const char* e = std::getenv("LK_ITERATIVE_HIP_DENSE_MAX_MB")) {
-    try {
-      budget_mb = static_cast<std::size_t>(std::stoull(e));
-    } catch (...) { /* keep default */
-    }
-  }
+  const std::size_t budget_mb = static_cast<std::size_t>(Gpu::get_dense_max_mb());  // Gpu::set_dense_max_mb
   return budget_mb > 0 && need_mb <= static_cast<double>(budget_mb);
 }
 

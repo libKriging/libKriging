@@ -79,7 +79,7 @@ struct IBuf {
 // Mechanical port of CudaLinearAlgebra.cpp's/HipLinearAlgebra.cpp's
 // DenseCovCache: process-wide, single-entry cache keyed by VALUE (not
 // pointer -- callers pass temporaries and Armadillo reuses freed memory),
-// gated by a device-memory budget (LK_ITERATIVE_METAL_DENSE_MAX_MB,
+// gated by a device-memory budget (Gpu::set_dense_max_mb,
 // default 4096 MiB; 0 forces the matrix-free kernel). Only R is cached
 // (not the dRmulBatched dR/dtheta_k blocks -- used once per gradient
 // eval, nothing to amortize).
@@ -139,13 +139,7 @@ DenseCovCache& covCacheBind(const arma::mat& Xt, const arma::vec& theta, int kin
 }
 
 bool denseFitsBudget(double need_mb) {
-  std::size_t budget_mb = 4096;
-  if (const char* e = std::getenv("LK_ITERATIVE_METAL_DENSE_MAX_MB")) {
-    try {
-      budget_mb = static_cast<std::size_t>(std::stoull(e));
-    } catch (...) { /* keep default */
-    }
-  }
+  const std::size_t budget_mb = static_cast<std::size_t>(Gpu::get_dense_max_mb());  // Gpu::set_dense_max_mb
   return budget_mb > 0 && need_mb <= static_cast<double>(budget_mb);
 }
 

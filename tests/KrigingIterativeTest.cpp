@@ -4,7 +4,9 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
+#include "libKriging/Gpu.hpp"
 #include "libKriging/Kriging.hpp"
+#include "libKriging/LinearAlgebra.hpp"
 // clang-format on
 
 #ifdef _OPENMP
@@ -413,7 +415,7 @@ TEST_CASE("iterative(m,precond_rank): the Nystrom preconditioner is applied to t
 TEST_CASE("iterative: the dense fast path matches the matrix-free path", "[iterative][kriging][intensive]") {
   // For a separable kernel and small enough n, _logLikelihoodIterative
   // materializes R (and the dR/dtheta_k blocks) once and runs every matvec
-  // as a BLAS-3 R*V. LK_ITERATIVE_DENSE_MAX_MB=0 forces the strictly
+  // as a BLAS-3 R*V. LinearAlgebra::set_iterative_dense_max_mb(0) forces the strictly
   // matrix-free per-pair path instead. Same probes, same theta => the two
   // must agree on both the concentrated log-likelihood and its gradient to
   // well within the SLQ/Hutchinson stochastic-estimator noise (the only
@@ -436,36 +438,30 @@ TEST_CASE("iterative: the dense fast path matches the matrix-free path", "[itera
   make_data(160, X, y);
   const arma::vec theta{0.25, 0.3};
 
-  const char* old_env = std::getenv("LK_ITERATIVE_DENSE_MAX_MB");
+  const int old_dense_mb = LinearAlgebra::get_iterative_dense_max_mb();
 
-  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);  // force matrix-free
+  LinearAlgebra::set_iterative_dense_max_mb(0);  // force matrix-free
   auto [ll_mf, g_mf]
       = make_fixed_theta_iterative(y, X, "iterative(30,0,24,40,1e-10)").logLikelihoodIterativeFun(theta, true);
 
-  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);  // allow dense
+  LinearAlgebra::set_iterative_dense_max_mb(4096);  // allow dense
   auto [ll_de, g_de]
       = make_fixed_theta_iterative(y, X, "iterative(30,0,24,40,1e-10)").logLikelihoodIterativeFun(theta, true);
 
-  if (old_env)
-    setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", old_env, 1);
-  else
-    unsetenv_portable("LK_ITERATIVE_DENSE_MAX_MB");
+  LinearAlgebra::set_iterative_dense_max_mb(old_dense_mb);
 
   INFO("ll matrix-free = " << ll_mf << ", ll dense = " << ll_de);
   CHECK(std::abs(ll_mf - ll_de) < 1e-6 * std::abs(ll_mf) + 1e-6);
   CHECK(arma::abs(g_mf - g_de).max() < 1e-5 * arma::abs(g_mf).max() + 1e-5);
 
   // and the preconditioned path (whitened SLQ + separate probe solve) too
-  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);
+  LinearAlgebra::set_iterative_dense_max_mb(0);
   const double llp_mf = std::get<0>(
       make_fixed_theta_iterative(y, X, "iterative(30,40,24,50,1e-10)").logLikelihoodIterativeFun(theta, false));
-  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);
+  LinearAlgebra::set_iterative_dense_max_mb(4096);
   const double llp_de = std::get<0>(
       make_fixed_theta_iterative(y, X, "iterative(30,40,24,50,1e-10)").logLikelihoodIterativeFun(theta, false));
-  if (old_env)
-    setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", old_env, 1);
-  else
-    unsetenv_portable("LK_ITERATIVE_DENSE_MAX_MB");
+  LinearAlgebra::set_iterative_dense_max_mb(old_dense_mb);
   CHECK(std::abs(llp_mf - llp_de) < 1e-6 * std::abs(llp_mf) + 1e-6);
 }
 
@@ -725,4 +721,34 @@ TEST_CASE("iterative honors optim=none identically to optim=BFGS", "[iterative][
   CHECK(m_cg.is_finite());
   CHECK(s_cg.is_finite());
   CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), false), std::runtime_error);
+}
+
+TEST_CASE("Gpu settings: CPU-only build reports no backend, settings validated", "[iterative][gpu]") {
+  // the default build compiles no GPU backend (ENABLE_*_ITERATIVE=OFF)
+  if (Gpu::compiled_backends().empty()) {
+    CHECK_FALSE(Gpu::available());
+    CHECK(Gpu::active_backend() == "none");
+    Gpu::set_enabled(true);  // no device: stays on the CPU path, no failure
+    CHECK(Gpu::active_backend() == "none");
+  }
+  const bool enabled = Gpu::get_enabled();
+  Gpu::set_enabled(false);
+  CHECK_FALSE(Gpu::get_enabled());
+  CHECK(Gpu::active_backend() == "none");
+  Gpu::set_enabled(enabled);
+
+  const int mb = Gpu::get_dense_max_mb();
+  Gpu::set_dense_max_mb(0);
+  CHECK(Gpu::get_dense_max_mb() == 0);
+  CHECK_THROWS_AS(Gpu::set_dense_max_mb(-1), std::invalid_argument);
+  Gpu::set_dense_max_mb(mb);
+
+  const bool mp = Gpu::get_mixed_precision();
+  Gpu::set_mixed_precision(!mp);
+  CHECK(Gpu::get_mixed_precision() == !mp);
+  Gpu::set_mixed_precision(mp);
+
+  const int host_mb = LinearAlgebra::get_iterative_dense_max_mb();
+  CHECK_THROWS_AS(LinearAlgebra::set_iterative_dense_max_mb(-1), std::invalid_argument);
+  CHECK(LinearAlgebra::get_iterative_dense_max_mb() == host_mb);
 }

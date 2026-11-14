@@ -660,13 +660,8 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
   // ever needed here, so unlike _logLikelihoodIterative this never
   // materializes the dR/dtheta_k blocks.
   if (!gpuCgSolve) {
-    std::size_t budget_mb = 6144;
-    if (const char* e = std::getenv("LK_ITERATIVE_DENSE_MAX_MB")) {
-      try {
-        budget_mb = static_cast<std::size_t>(std::stoull(e));
-      } catch (...) { /* keep default */
-      }
-    }
+    // host-memory budget (LinearAlgebra::set_iterative_dense_max_mb)
+    const std::size_t budget_mb = static_cast<std::size_t>(LinearAlgebra::get_iterative_dense_max_mb());
     const double need_mb = static_cast<double>(n) * static_cast<double>(n) * 8.0 / (1024.0 * 1024.0);
     if (budget_mb > 0 && need_mb <= static_cast<double>(budget_mb))
       dense = build_separable_cov(m_covType, Xt, theta, R_dense, nullptr);
