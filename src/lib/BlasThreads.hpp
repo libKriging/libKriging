@@ -54,13 +54,18 @@ void set_mkl_threads_global(int n);
 /// initializes them (T6 / T9). Defined in Kriging.cpp.
 void touch_mkl_entry_points();
 
-/// In a fork() child on macOS 15+, applies BLASSetThreading(single-threaded) to the calling thread
-/// (no-op elsewhere, and in a process that was not forked). Accelerate's threading mode is per
-/// thread: the child handler sets it for the forking thread only, so each thread created later in
-/// the child (the multistart pool workers) calls this first: in Accelerate's default mode its large
-/// BLAS / LAPACK calls use libdispatch, which does not survive fork() without exec. Defined in
+/// Applies BLASSetThreading(single-threaded) to the calling thread on macOS 15+ (no-op elsewhere):
+/// - in a fork() child, whatever the argument: the child handler sets it for the forking thread only
+///   (Accelerate's mode is per thread), so each thread created later in the child (the multistart pool
+///   workers) calls this first: in Accelerate's default mode its large BLAS / LAPACK calls use
+///   libdispatch, which does not survive fork() without exec;
+/// - for a worker of a pool with several workers (`pool_with_several_workers`): the workers already use
+///   the cores, and Accelerate's own threads on top of them oversubscribe (Apple M4: multistart fits
+///   ×1.5-1.9 faster, 3.5-4x less CPU, same optimum as VECLIB_MAXIMUM_THREADS=1; single-start fits
+///   keep Accelerate's threads). LK_ACCELERATE_POOL_SINGLE=0 turns this case off.
+/// The calling thread only: the thread that called run_task_pool keeps its own mode. Defined in
 /// Kriging.cpp.
-void accelerate_single_thread_here();
+void accelerate_single_thread_here(bool pool_with_several_workers = false);
 
 /// Serializes arma::rcond (LinearAlgebra::rcond_chol). Also held by the fork
 /// handlers, so that the child of a fork() made while another thread is in
