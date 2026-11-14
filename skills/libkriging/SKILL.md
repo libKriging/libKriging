@@ -1,6 +1,6 @@
 ---
 name: libkriging
-description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, Vecchia, Nystrom (method="vecchia"/"nystrom", or the deprecated LLVecchia/LLNystrom objectives), or any of the libKriging bindings above.
+description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, Vecchia, Nystrom, iterative / matrix-free / CG / GPU (method="vecchia"/"nystrom"/"iterative", or the deprecated LLVecchia/LLNystrom objectives), or any of the libKriging bindings above.
 ---
 
 # libKriging usage
@@ -60,7 +60,7 @@ Ask, in order:
    [Scalability.md](../../docs/math/Scalability.md) for the full method
    inventory and combinability notes.)
    → Keep `Kriging` (not `WarpKriging` / `MLPKriging`: they accept
-   `method` but only implement `"exact"`), any `objective`
+   a fit `method` but only implement `"exact"`), any `objective`
    (`"LL"` by default; `"LOO"` and `"LMP"` have approximate versions too,
    noise-free only; `"LL"` also with a noise model),
    but switch the fit `method` to one of the two scalable approximations
@@ -84,12 +84,23 @@ Ask, in order:
      the latent process, no `with_noise`; a heterogeneous model's `update`
      needs the new points' `noise`). See
      [Nystrom.md](../../docs/math/Nystrom.md).
+   - **No approximation of the covariance, only of the solver** →
+     `method="iterative"` or `"iterative(m,...)"` (default `m=30` probes):
+     conjugate-gradient solves and a stochastic (SLQ) log-determinant, no
+     O(n³) factorization, O(n²) per product; GPU-accelerated in the
+     `-gpu` builds (`Gpu` settings). Objective `"LL"` and noise model None
+     only (others raise); no `simulate`. Fields of the spec: `iterative(m,
+     precond_rank, lanczos_steps, cg_max_iter_mult, cg_tol, probes_cg_tol)`,
+     trailing ones optional. `predict(..., method="iterative")` also works
+     on an exact fit and on `WarpKriging` / `MLPKriging`. See
+     [Iterative.md](../../docs/math/Iterative.md).
    - The method is explicit at every later step, never inferred from the
      fit: `predict` / `simulate` / `logLikelihood` / `leaveOneOut` /
      `leaveOneOutVec` / `logMargPost` take
-     `method="exact"` (default), `"vecchia"` / `"vecchia(m)"` or
-     `"nystrom"`. A Vecchia or Nystrom fit holds no exact factorization,
-     so pass `method="vecchia"` / `"nystrom"` there (or `k.method()` as
+     `method="exact"` (default), `"vecchia"` / `"vecchia(m)"`,
+     `"nystrom"` or `"iterative"` (`predict` / `logLikelihood` only). A
+     Vecchia, Nystrom or iterative fit holds no exact factorization, so
+     pass `method="vecchia"` / `"nystrom"` / `"iterative"` there (or `k.method()` as
      is) — `"exact"` raises; approximate methods give mean / stdev only.
      For the exact model at the fitted θ, make a separate exact fit with
      `optim="none"` and that `theta` (`is_theta_estim` false). `update`

@@ -185,3 +185,15 @@ default MLE fit, plus the `knots` non-stationary warp vs
 `Kriging(objective = "LMP")`) are complete, executable, worked examples in
 R — including an argument-correspondence table with the competitor
 package.
+
+## Iterative (matrix-free) method and GPU
+
+```r
+k <- Kriging(y, X, "matern5_2", method = "iterative(30)")   # objective "LL", noise None only
+p <- predict(k, Xnew, return_stdev = TRUE, method = "iterative")
+logLikelihood(k, method = "iterative")
+# spec: iterative(m, precond_rank, lanczos_steps, cg_max_iter_mult, cg_tol, probes_cg_tol)
+gpu_active_backend()      # "none" with the CRAN package (CPU only)
+gpu_set_enabled(FALSE)
+linalg_set_iterative_dense_max_mb(0)   # CPU matrix-free products
+```

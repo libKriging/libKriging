@@ -176,3 +176,15 @@ jlibkriging.method(nk), objective(nk)
 then contrasts `jlibkriging`'s fixed named-kernel catalogue with
 `GaussianProcesses.jl`'s composable kernel API (`k1 + k2`, `k1 * k2`),
 including a full argument-correspondence table.
+
+## Iterative (matrix-free) method and GPU
+
+```julia
+k = Kriging(y, X, "matern5_2"; method="iterative(30)")   # objective "LL", noise None only
+p = predict(k, Xnew; return_stdev=true, method="iterative")
+log_likelihood(k; method="iterative")
+# spec: iterative(m, precond_rank, lanczos_steps, cg_max_iter_mult, cg_tol, probes_cg_tol)
+jlibkriging.Gpu.active_backend()   # "none" in a CPU-only build
+jlibkriging.Gpu.set_enabled(false)
+set_iterative_dense_max_mb(0)      # CPU matrix-free products
+```

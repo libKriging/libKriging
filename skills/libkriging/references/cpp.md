@@ -194,3 +194,19 @@ C++ Kriging library), but every worked example under `docs/comparisons/`
 core C++ API through its R/Python/Julia bindings — read them for
 end-to-end usage patterns (fit → predict → simulate → save/load) even
 when writing pure C++ code.
+
+## Iterative (matrix-free) method and GPU
+
+```cpp
+#include "libKriging/Gpu.hpp"
+// CG solves + SLQ log-determinant: no O(n^3) factorization; objective "LL", noise None only
+Kriging k("matern5_2");
+k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "iterative(30)");
+// spec: iterative(m, precond_rank, lanczos_steps, cg_max_iter_mult, cg_tol, probes_cg_tol), trailing fields optional
+auto [mean, stdev, c, dm, ds] = k.predict(Xnew, true, false, false, "iterative");  // explicit method
+double ll = k.logLikelihood("iterative");
+// also on an exact fit, and on WarpKriging / MLPKriging: predict(X, true, false, false, "iterative(30,50)")
+Gpu::active_backend();        // "none" in the default (CPU-only) build
+Gpu::set_enabled(false);      // CPU path even when a device is available
+LinearAlgebra::set_iterative_dense_max_mb(0);  // CPU: matrix-free products (default: dense R below 6 GiB)
+```

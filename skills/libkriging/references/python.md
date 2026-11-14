@@ -215,3 +215,15 @@ Worked, end-to-end examples fitting the *same* Branin 2D function with
 hyperparameters vs `objective="LMP"`). Each notebook also ends with an
 argument-correspondence table between `pylibkriging` and the competitor's
 API.
+
+## Iterative (matrix-free) method and GPU
+
+```python
+k = lk.Kriging(y, X, "matern5_2", method="iterative(30)")   # objective "LL", noise None only
+mean, stdev, _, _, _ = k.predict(Xnew, True, False, False, method="iterative")
+k.logLikelihood("iterative")
+# spec: iterative(m, precond_rank, lanczos_steps, cg_max_iter_mult, cg_tol, probes_cg_tol)
+lk.Gpu.active_backend()   # "none" with the CPU wheels; pip install pylibkriging-gpu for GPU backends
+lk.Gpu.set_enabled(False)
+lk.LinearAlgebra.set_iterative_dense_max_mb(0)   # CPU matrix-free products
+```

@@ -24,6 +24,7 @@ Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab a
 - **Fit objectives**: log-likelihood (`LL`), leave-one-out (`LOO`), log-marginal-posterior (`LMP`), computed exactly (`method="exact"`, default) or, for `LL`, with the scalable approximations `method="vecchia(m)"` (Vecchia) and `method="nystrom(k)"` (Nystrom low-rank).
 - **Input warpings** (`WarpKriging`, one per input column): affine, boxcox, kumaraswamy, neural_mono, knots, mlp, categorical, ordinal; `mlp_joint` (a joint feature map over all inputs) through `MLPKriging`.
 - **Large designs**: `NestedKriging`, the `vecchia(m)` and `nystrom(k)` fit methods, and `subsetOfData` (k-means pre-fit row selection); see [docs/math/Scalability.md](docs/math/Scalability.md).
+- **Matrix-free fit and prediction**: `method="iterative(m)"` (conjugate gradient, stochastic log-determinant), on the CPU or on a GPU (CUDA, HIP/ROCm; SYCL and Metal) when libKriging is compiled with one — see [CPU or GPU](#cpu-or-gpu).
 - **Operations**: fit, predict, simulate, update, save/load, and cross-language model exchange.
 - **Bindings**: Python, R, Octave, Matlab, Julia — see [bindings/README.md](bindings/README.md) for the full method reference.
 - **Python**: scikit-learn compatible estimators (`pylibkriging.sklearn`) for all four Kriging classes, usable in `Pipeline`/`GridSearchCV`.
@@ -39,6 +40,7 @@ Table of contents
   - [JLibKriging for Julia](#jlibkriging-for-julia)
   - [Expected demo results](#expected-demo-results)
   - [Tested installation](#tested-installation)
+  - [CPU or GPU](#cpu-or-gpu)
 - [Compilation](#compilation)
   - [Requirements (more details)](#requirements-more-details)
   - [Get the code](#get-the-code)
@@ -316,6 +318,31 @@ Continuous integration (`main.yml`, libKriging 1.2) builds and tests each bindin
   (MinGW-64). See [the releases page](https://github.com/libKriging/libKriging/releases).
 
 * Julia ≥ 1.10 is required.
+
+## CPU or GPU
+
+The default build and the binary packages (PyPI wheels, CRAN, release archives) are **CPU only**. GPU support is a
+separate "`-gpu`" variant, compiled on your machine with every GPU backend found there (CUDA; HIP/ROCm; SYCL and
+Metal), a plain CPU build when there is none:
+
+| Binding | CPU (default packages) | GPU (compiled on your machine) |
+|:--|:--|:--|
+| Python | `pip install pylibkriging` | `pip install pylibkriging-gpu` |
+| R | `install.packages('rlibkriging')` | `tools/install-gpu.sh r` |
+| Octave / MATLAB | release archive `mLibKriging_<version>_<platform>` | `tools/install-gpu.sh octave` (or `matlab`) |
+| Julia | [JLibKriging.jl](https://github.com/libKriging/JLibKriging.jl) | `tools/install-gpu.sh julia` |
+| C++ | release archive | `tools/install-gpu.sh` (then `find_package(libKriging CONFIG)`) |
+
+`tools/install-gpu.sh` runs from the `libKriging-gpu_<version>_src.tar.gz` asset of each
+[release](https://github.com/libKriging/libKriging/releases) (the sources with their submodules) or from a clone with
+submodules (`--help` for options). Both GPU routes need a C++17 compiler, CMake, BLAS/LAPACK and the GPU toolkit (e.g.
+the CUDA toolkit with `nvcc`); the two Python variants install the same `pylibkriging` module: install one or the
+other. A CUDA build has no load-time dependency on the CUDA toolkit and runs the CPU path without a GPU.
+
+Only the iterative method (`method="iterative(...)"`) uses the GPU. The `Gpu` settings report and switch it at run time
+in every binding (`Gpu.active_backend()`, `Gpu.set_enabled(false)`; R `gpu_active_backend()`; or the environment
+variable `LK_ITERATIVE_GPU=0`). Build options: `-DENABLE_GPU_ITERATIVE=AUTO` (detect every backend) or
+`-DENABLE_<CUDA|HIP|SYCL|METAL>_ITERATIVE=ON`, see [GPU backends](docs/dev/AllCMakeOptions.md#gpu-backends).
 
 # Compilation
 

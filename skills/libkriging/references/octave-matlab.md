@@ -168,3 +168,15 @@ positional-argument-style API), following the same pattern as
 `libKriging_vs_DiceKriging.ipynb`: fit the competitor, mimic it with
 libKriging, then highlight one competitor-specific feature (e.g. DACE's
 regression/correlation model grid) against a matching libKriging option.
+
+## Iterative (matrix-free) method and GPU
+
+```matlab
+k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "iterative(30)");
+[m, s] = k.predict(Xn, true, false, false, "iterative");   % objective "LL", noise None only
+ll = k.logLikelihood("iterative");
+% spec: iterative(m, precond_rank, lanczos_steps, cg_max_iter_mult, cg_tol, probes_cg_tol)
+Gpu.active_backend()        % "none" in a CPU-only build
+Gpu.set_enabled(false)
+LinearAlgebra.set_iterative_dense_max_mb(0)   % CPU matrix-free products
+```
