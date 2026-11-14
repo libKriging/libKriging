@@ -280,6 +280,7 @@ void restore_blas_threads(const BlasThreadState& s) {
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <csignal>
 #if defined(__APPLE__) && defined(__has_include)
 #if __has_include(<vecLib/thread_api.h>)
 #include <vecLib/thread_api.h>
@@ -305,6 +306,10 @@ bool omp_runtime_forks_itself = false;
 // build linked to another BLAS (ALLOW_OPENBLAS_MACOS) still links. Null when
 // no Accelerate is loaded in the process.
 int (*accelerate_set_threading)(int) = nullptr;
+// Set by the child handler once BLASSetThreading(single) is applied to the forking thread. The mode is
+// per thread: threads created afterwards in the child (the multistart pool) start in Accelerate's
+// default multithreaded mode and have to apply it themselves (accelerate_single_thread_here).
+volatile std::sig_atomic_t accelerate_single_in_child = 0;
 #endif
 
 // The library's mutexes are locked in prepare and unlocked in both processes:
@@ -339,8 +344,10 @@ void libkriging_atfork_child() {
   // survive fork() without exec: a forked R worker (mclapply) segfaults on its first large
   // factorization. VECLIB_MAXIMUM_THREADS is read once, already in the parent: use the API.
   if (accelerate_set_threading) {
-    if (__builtin_available(macOS 15.0, *))
+    if (__builtin_available(macOS 15.0, *)) {
       accelerate_set_threading(static_cast<int>(BLAS_THREADING_SINGLE_THREADED));
+      accelerate_single_in_child = 1;
+    }
   }
 #endif
   libKriging::detail::rcond_mutex().unlock();
@@ -379,6 +386,25 @@ struct ForkSafeRegistrar {
 static ForkSafeRegistrar fork_safe_registrar;
 
 }  // namespace
+
+namespace libKriging {
+namespace detail {
+void accelerate_single_thread_here() {
+#if defined(LK_ACCELERATE_THREADING_API)
+  if (accelerate_single_in_child && accelerate_set_threading) {
+    if (__builtin_available(macOS 15.0, *))
+      accelerate_set_threading(static_cast<int>(BLAS_THREADING_SINGLE_THREADED));
+  }
+#endif
+}
+}  // namespace detail
+}  // namespace libKriging
+#else   // no pthread_atfork: no fork child
+namespace libKriging {
+namespace detail {
+void accelerate_single_thread_here() {}
+}  // namespace detail
+}  // namespace libKriging
 #endif  // !_WIN32 && _POSIX_VERSION
 
 // =============================================================================
