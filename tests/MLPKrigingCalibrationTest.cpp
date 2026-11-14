@@ -111,9 +111,9 @@ TEST_CASE("MLPKriging predictive variance is calibrated (#407)", "[mlp][calibrat
   CHECK(sc.q2 == Approx(sr.q2).epsilon(1e-10));
   CHECK(cal.var_scale() > 1.0);
 
-  // Default number of folds: 3 (T8, decision D4 revised).
+  // Default number of folds: 5 (#467; 3 in T8 D4 before the BFGS4 default).
   MLPKriging cal_k({8}, 2, "tanh", "matern5_2");
-  cal_k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", {{"calibration_folds", "3"}});
+  cal_k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", {{"calibration_folds", "5"}});
   CHECK(cal_k.var_scale() == cal.var_scale());
 
   CHECK(sc.coverage > 0.8);

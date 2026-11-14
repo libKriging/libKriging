@@ -176,10 +176,10 @@ kink at `z=0` can make the likelihood surface locally jagged for a
 gradient-based optimizer — the analytic gradient is still correct, this is
 an optimization-landscape issue, not a bug.
 
-`MLPKriging`'s predictive stdev is calibrated by a 3-fold cross-validation
+`MLPKriging`'s predictive stdev is calibrated by a 5-fold cross-validation
 after the fit (`var_scale()`, shown in `summary()`; the mean and
-`logLikelihood()` are unchanged; ~2.2x the CPU time of the single-start fit
-alone): without it, the many network weights
+`logLikelihood()` are unchanged; the 5 refits are single starts, run in
+parallel): without it, the many network weights
 overfit the training points and the 95 % intervals can cover ~1 % of new
 points (#407). Pass `calibration_folds = "0"` in `parameters` to skip it
 (e.g. when only the mean matters and fit time is critical).
@@ -189,13 +189,15 @@ starts in parallel; #467). The former single start (`"BFGS"`) stopped at a
 poor mean on most problems: test Q² < 0.5 on 69 % of the cases of the
 15-function MLP benchmark against 29 % for `"BFGS4"` and 25 % for
 `"BFGS10"`, and Q² −6 / −2.5 (tanh / selu) against 0.98 / 0.99 on the
-projected-Branin 10D case of #407, for x 2.1 the CPU time on one core and
-x 1.1 the wall time on 4 cores
+projected-Branin 10D case of #407, for x 1.6 the CPU time of the 1.x
+default on one core and x 1.04 its wall time on 4 cores (5 calibration
+folds both)
 (docs/dev/rationalization/mlp-default-467.md). Pass `"BFGS"` only to
 reproduce a 1.x fit; recommend `"BFGS10"` for a hard fit (high dimension,
-Q² on held-out data below expectations). With the multistart default,
-`calibration_folds = "5"` gives narrower intervals than the default 3
-(median test NLPD −0.15, x 1.33 the CPU time). `WarpKriging` keeps
+Q² on held-out data below expectations). `calibration_folds` defaults to 5
+(2.0; 3 was tried during 2.0 development): with the multistart default, 3
+folds widen the intervals more (median test NLPD +0.15) for 0.75x the CPU
+time; pass `"3"` only when fit time matters more. `WarpKriging` keeps
 `"BFGS"` for every warping: with an `mlp_joint` warping (the code path of
 `MLPKriging`) pass `optim = "BFGS4"` explicitly.
 

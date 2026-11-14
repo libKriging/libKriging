@@ -5,11 +5,13 @@ Issue: [#467](https://github.com/libKriging/libKriging/issues/467) (part of #464
 
 ## Status
 
-Done (pending review). Decision: the default optimizer of `MLPKriging` becomes `"BFGS4"` (was
-`"BFGS"`) in C++ and every binding (Python, sklearn wrapper, R, Octave / MATLAB, Julia).
-`WarpKriging` keeps `"BFGS"` for every warping, `mlp_joint` included (documented: pass
-`"BFGS4"`). `calibration_folds` stays 3 (decision D4 of T8); the measured gain of K = 5 with the
-new default is reported below for the maintainer to decide.
+Done. Decision: the default optimizer of `MLPKriging` becomes `"BFGS4"` (was `"BFGS"`) in C++
+and every binding (Python, sklearn wrapper, R, Octave / MATLAB, Julia). `WarpKriging` keeps
+`"BFGS"` for every warping, `mlp_joint` included (documented: pass `"BFGS4"`).
+`calibration_folds` goes back to 5 (maintainer decision on the measurements below, revising
+T8 D4), the 1.x value: against the 1.x default (`"BFGS"`, K = 5) the 2.0 default (`"BFGS4"`,
+K = 5) costs x 1.60 the CPU time on one core (649 s vs 406 s, 600 fits) and x 1.04 the wall
+time on 4 cores (18.9 s vs 18.2 s).
 
 ## Protocol
 
@@ -155,14 +157,12 @@ K = 5 with `"BFGS4"`: NLPD 2.78 → 2.06 (tanh), 1.84 → 1.34 (selu), coverage 
    docs (skill, `Warping-MLPJoint.md`, C++ reference) tell to pass `"BFGS4"` with `mlp_joint`.
    Follow-up for the maintainer: measure the other warpings on the same protocol before
    changing the `WarpKriging` default.
-3. **`calibration_folds` stays 3** (T8, decision D4 revised: K = 3 everywhere, no rule
-   depending on the optimizer). Measured with the new default: K = 5 lowers the test NLPD by
-   0.15 (median, CI [0.10, 0.20], better on 64 % of the cases; coverage 0.961 vs 0.971) for x 1.33
-   CPU (x 1.28 wall on 4 cores); the T8 reason for K = 3 (the cost of the single-start default)
-   no longer applies to the default path. Not changed here, as D4 was a maintainer decision; the
-   options are (a) keep K = 3 and document K = 5 (done), (b) K = 5 everywhere (the single start,
-   now explicit, then costs x 1.76 for a −0.03 NLPD), (c) a rule depending on the optimizer
-   (rejected in D4). The change is one line (`m_calibration_folds`).
+3. **`calibration_folds` = 5** (maintainer decision, revising T8 D4 "K = 3 everywhere"). With
+   the new default, K = 5 lowers the test NLPD by 0.15 (median, CI [0.10, 0.20], better on 64 %
+   of the cases; coverage 0.961 vs 0.971) for x 1.33 CPU (x 1.28 wall on 4 cores); the T8 reason
+   for K = 3 (the cost of the single-start default) no longer applies to the default path. One
+   value for every optimizer (no rule depending on it, as in D4): an explicit single start pays
+   x 1.76 for −0.03 NLPD, and can pass `calibration_folds = "3"`.
 4. **Not experimental.** The default fit is usable (above), but the class is no general
    replacement for `Kriging`: even with `"BFGS10"`, plain `Kriging` has a test Q² higher by
    more than 0.05 on 41 % of the cases (45 % with `"BFGS4"`), at a tenth of the cost; `MLPKriging`

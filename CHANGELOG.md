@@ -19,13 +19,13 @@ past release, see the corresponding entry on the
   projected-Branin 10D case of #407 (10 designs), `docs/dev/rationalization/mlp-default-467.md`:
   test Q² < 0.5 on 68.5 % of the cases with the single start against 29.3 % with `"BFGS4"`
   (25.3 % with `"BFGS10"`), #407 median Q² −6.0 / −2.5 (tanh / selu) against 0.983 / 0.993, for
-  x 2.1 the CPU time on one core (calibration included) and x 1.1 the wall time on 4 cores.
-  Changed results: every `MLPKriging` fit without an explicit `optim` (different mean, variance
-  factor and `logLikelihood()`). `WarpKriging` keeps `"BFGS"` for every warping, `mlp_joint`
-  included (pass `"BFGS4"` there). `calibration_folds` stays 3; with `"BFGS4"`,
-  `calibration_folds = "5"` gives narrower intervals (median test NLPD −0.15) for x 1.33 the CPU
-  time. Migration: pass `optim = "BFGS"` to get the 1.x fit back; `"BFGS10"` for a hard fit.
-  Saved models are loaded unchanged (`update(refit = true)` stays a warm-started single start).
+  x 1.6 the CPU time of the 1.x default (`"BFGS"`, 5 folds) on one core and x 1.04 its wall time
+  on 4 cores (calibration included). Changed results: every `MLPKriging` fit without an explicit
+  `optim` (different mean, variance factor and `logLikelihood()`). `WarpKriging` keeps `"BFGS"`
+  for every warping, `mlp_joint` included (pass `"BFGS4"` there). `calibration_folds` stays 5
+  (the 1.x value; see the T8 entry below). Migration: pass `optim = "BFGS"` to get the 1.x fit
+  back; `"BFGS10"` for a hard fit. Saved models are loaded unchanged (`update(refit = true)`
+  stays a warm-started single start).
 - **Long-range restart removed** (#466, 2.0): `Optim::set_long_range_restart` /
   `get_long_range_restart`, `Optim::set_max_long_range_restart` / `get_max_long_range_restart`
   and the environment variables `LK_LONG_RANGE_RESTART` / `LK_MAX_LONG_RANGE_RESTART` (now
@@ -150,12 +150,12 @@ past release, see the corresponding entry on the
   may end at a slightly different point (4 of 1728 measured Kriging fits, |ΔLL| <= 1.1e-5, 12 %
   fewer restarts; 216 WarpKriging fits unchanged). `AdamBFGS::inner_restart` now decides the restart itself
   (it receives the run's result, end and start points; `AdamBFGS::max_restart` is removed).
-- **MLPKriging variance calibration** (T8): `calibration_folds` defaults to 3 instead of 5. For
-  the default single-start fit, the calibrated fit takes x2.2 the CPU time of the uncalibrated
-  fit instead of x4.0 on 1 core (wall x1.8 instead of x2.4 on 4 cores), with the same 95 %
-  coverage (0.965 vs 0.957 on 135 fits) and test NLPD (+0.08, 95 % CI [-0.30, 0.45]). With a
-  multistart `"BFGSn"`, 3 folds widen the intervals more (test NLPD +0.56, CI [+0.20, +0.97], 45
-  `BFGS4` fits): set `calibration_folds = "5"` explicitly there. The factor is also no longer
+- **MLPKriging variance calibration** (T8, #467): `calibration_folds` keeps its 1.x default 5.
+  T8 lowered it to 3 for the single-start default (same coverage and test NLPD at x 0.57 the CPU
+  time of the calibrated fit); with the `"BFGS4"` default (#467) 3 folds widen the intervals more
+  (median test NLPD +0.15, 95 % CI [+0.10, +0.20], 600 paired cases; coverage 0.971 against 0.961)
+  for x 0.75 the CPU time, so 5 was restored. Pass `calibration_folds = "3"` to trade interval
+  width for fit time. The factor is no longer
   clamped to >= 1 (`var_scale()` = mean squared standardised held-out residual, the
   maximum-likelihood scale; the clamp was never active on the 260 K = 5 fits measured).
   Models saved before keep their number of folds. See
