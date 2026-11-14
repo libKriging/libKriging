@@ -9,6 +9,7 @@
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/LinearAlgebra.hpp>
 #include <libKriging/Optim.hpp>
+#include <libKriging/Parallel.hpp>
 #include <mutex>
 #include <unordered_set>
 #include <vector>
@@ -690,6 +691,25 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def_static("get_num_threads_percent", &Optim::get_num_threads_percent)
       .def_static("set_num_threads_percent", &Optim::set_num_threads_percent, py::arg("percent"))
       .def_static("get_num_threads", &Optim::get_num_threads);
+
+  // Parallel class - thread budget of the library and how it is distributed
+  // between its levels (multistart workers, OpenMP loops, BLAS threads):
+  // docs/dev/parallel.md. Optim's thread settings are the same settings.
+  py::class_<Parallel>(m, "Parallel")
+      .def_static("get_num_threads_percent", &Parallel::get_num_threads_percent)
+      .def_static("set_num_threads_percent", &Parallel::set_num_threads_percent, py::arg("percent"))
+      .def_static("get_num_threads", &Parallel::get_num_threads)
+      .def_static("get_thread_pool_size", &Parallel::get_thread_pool_size)
+      .def_static("set_thread_pool_size", &Parallel::set_thread_pool_size, py::arg("pool_size"))
+      .def_static("get_thread_start_delay_ms", &Parallel::get_thread_start_delay_ms)
+      .def_static("set_thread_start_delay_ms", &Parallel::set_thread_start_delay_ms, py::arg("delay_ms"))
+      .def_static("get_blas_threads_min_n", &Parallel::get_blas_threads_min_n)
+      .def_static("set_blas_threads_min_n", &Parallel::set_blas_threads_min_n, py::arg("min_n"))
+      .def_static("get_omp_min_rows", &Parallel::get_omp_min_rows)
+      .def_static("set_omp_min_rows", &Parallel::set_omp_min_rows, py::arg("n"))
+      .def_static("blas_backend", &Parallel::blas_backend)
+      .def_static("blas_num_threads", &Parallel::blas_num_threads)
+      .def_static("omp_enabled", &Parallel::omp_enabled);
 
   // LinearAlgebra class - static settings of the Cholesky factorizations
   // (fixed jitter of noise-free fits: < 0 automatic per kernel, 0 disabled,

@@ -11,6 +11,18 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Added
+- **`Parallel`: the thread settings in one place, in every binding** (TODO of #480): C++
+  `libKriging/Parallel.hpp`, Python / Octave `Parallel.*`, Julia `jlibkriging.Parallel.*`, R
+  `parallel_*`. Budget (`set_num_threads_percent`, `get_num_threads`), its distribution
+  (`set_thread_pool_size`, `set_thread_start_delay_ms`, `set_blas_threads_min_n`, until now
+  C++ / environment only, and `set_omp_min_rows`, new), and the state of each level, read only
+  (`blas_backend`, `blas_num_threads`, `omp_enabled`). No separate OpenMP / BLAS thread count:
+  one budget bounds them together. Optim's thread settings stay, as the same settings.
+- **OpenMP threshold at run time**: `kOmpMinRows` stays the build default; `LK_OMP_MIN_ROWS` in
+  the environment or `Parallel::set_omp_min_rows` set it without recompiling (a performance
+  setting: the results do not depend on it, #441).
+
 ### Changed
 - **Long-range restart removed** (#466, 2.0): `Optim::set_long_range_restart` /
   `get_long_range_restart`, `Optim::set_max_long_range_restart` / `get_max_long_range_restart`

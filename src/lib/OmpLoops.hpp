@@ -49,6 +49,12 @@ namespace detail {
 #endif
 #endif
 constexpr unsigned long long kOmpMinRows = LK_OMP_MIN_ROWS;
+
+/// Threshold in effect (rows): kOmpMinRows unless set at run time by
+/// LK_OMP_MIN_ROWS (environment, read once) or Parallel::set_omp_min_rows.
+/// Defined in ThreadBudget.cpp.
+unsigned long long omp_min_rows();
+void set_omp_min_rows(unsigned long long n);
 }  // namespace detail
 }  // namespace libKriging
 

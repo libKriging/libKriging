@@ -68,8 +68,8 @@ LinearAlgebra	woodbury_logdet	internal numerical kernels, not user API
 LinearAlgebra	woodbury_solve	internal numerical kernels, not user API
 Optim	parse_method	internal helpers of the optimizer
 Optim	theta_bounds	internal helpers of the optimizer
-Optim	get_blas_threads_min_n	small-problem BLAS rule (#436): LK_BLAS_THREADS_MIN_N applies to every binding
-Optim	set_blas_threads_min_n	small-problem BLAS rule (#436): LK_BLAS_THREADS_MIN_N applies to every binding
+Optim	get_blas_threads_min_n	small-problem BLAS rule (#436): exposed as Parallel.get_blas_threads_min_n
+Optim	set_blas_threads_min_n	small-problem BLAS rule (#436): exposed as Parallel.set_blas_threads_min_n
 MLPKriging	var_scale	PENDING (#435): variance calibration factor, to expose or to decide
 WarpKriging	var_scale	PENDING (#435): variance calibration factor, to expose or to decide
 WarpKriging	joint_warp	internal access to the warp object

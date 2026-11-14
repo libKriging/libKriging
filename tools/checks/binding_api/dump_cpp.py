@@ -29,6 +29,7 @@ CLASSES = [
     ("MLPKriging", "MLPKriging.hpp", "MLPKriging"),
     ("NestedKriging", "NestedKriging.hpp", "NestedKriging"),
     ("Optim", "Optim.hpp", "Optim"),
+    ("Parallel", "Parallel.hpp", "Parallel"),
     ("LinearAlgebra", "LinearAlgebra.hpp", "LinearAlgebra"),
     ("Random", "Random.hpp", "Random"),
     ("Covariance", "Covariance.hpp", "Covariance"),

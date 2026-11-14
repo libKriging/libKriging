@@ -398,6 +398,11 @@ target_link_libraries(AffinityTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries AffinityTest)
 catch_discover_tests(AffinityTest)
 
+add_executable(ParallelTest ParallelTest.cpp)
+target_link_libraries(ParallelTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries ParallelTest)
+catch_discover_tests(ParallelTest)
+
 add_executable(BlasThreadsTest BlasThreadsTest.cpp)
 target_link_libraries(BlasThreadsTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries BlasThreadsTest)

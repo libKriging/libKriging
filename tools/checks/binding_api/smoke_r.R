@@ -23,7 +23,7 @@ check <- function(label, expr) {
 
 # optim_* / linalg_* functions of the namespace
 fn <- function(scope, name) {
-  prefix <- c(Optim = "optim_", LinearAlgebra = "linalg_")[[scope]]
+  prefix <- c(Optim = "optim_", Parallel = "parallel_", LinearAlgebra = "linalg_")[[scope]]
   get(paste0(prefix, name), envir = asNamespace("rlibkriging"))
 }
 
