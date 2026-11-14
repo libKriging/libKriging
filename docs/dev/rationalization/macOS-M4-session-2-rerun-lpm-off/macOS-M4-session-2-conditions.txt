@@ -1,0 +1,49 @@
+## start 2026-11-14T09:18:29Z
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=21626979)	59%; discharging; 20:00 remaining present: true
+Note: No thermal warning level has been recorded
+Note: No performance warning level has been recorded
+Note: No CPU power status has been recorded
+ lowpowermode         0
+## after-A 2026-11-14T09:20:36Z
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=21626979)	58%; discharging; 20:00 remaining present: true
+Note: No thermal warning level has been recorded
+Note: No performance warning level has been recorded
+Note: No CPU power status has been recorded
+ lowpowermode         0
+## after-B 2026-11-14T09:26:26Z
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=21626979)	55%; discharging; 20:00 remaining present: true
+Note: No thermal warning level has been recorded
+Note: No performance warning level has been recorded
+Note: No CPU power status has been recorded
+ lowpowermode         0
+## after-C 2026-11-14T09:30:42Z
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=21626979)	53%; discharging; 20:00 remaining present: true
+Note: No thermal warning level has been recorded
+Note: No performance warning level has been recorded
+Note: No CPU power status has been recorded
+ lowpowermode         0
+## after-D 2026-11-14T09:31:19Z
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=21626979)	53%; discharging; 20:00 remaining present: true
+Note: No thermal warning level has been recorded
+Note: No performance warning level has been recorded
+Note: No CPU power status has been recorded
+ lowpowermode         0
+## after-E 2026-11-14T09:37:44Z
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=21626979)	50%; discharging; 20:00 remaining present: true
+Note: No thermal warning level has been recorded
+Note: No performance warning level has been recorded
+Note: No CPU power status has been recorded
+ lowpowermode         0
+## end 2026-11-14T09:39:46Z
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=21626979)	49%; discharging; 20:00 remaining present: true
+Note: No thermal warning level has been recorded
+Note: No performance warning level has been recorded
+Note: No CPU power status has been recorded
+ lowpowermode         0

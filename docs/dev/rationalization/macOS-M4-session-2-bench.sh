@@ -18,14 +18,16 @@ ROUNDS=${ROUNDS:-5}
 log() { echo "$(date -u +%FT%TZ) $*" >> "$LOG"; }
 # ALLOW_BATTERY=1: measure on battery (the conditions file records it); otherwise wait for mains power
 ac_ok() { [ -n "${ALLOW_BATTERY:-}" ] || pmset -g batt | head -1 | grep -q "AC Power"; }
+# REQUIRE_LPM_OFF=1: do not measure while macOS Low Power Mode is on (pmset -g: lowpowermode 1)
+lpm_ok() { [ -z "${REQUIRE_LPM_OFF:-}" ] || [ "$(pmset -g | awk '/lowpowermode/{print $2}')" = "0" ]; }
 idle_ok() {
   local idle; idle=$(top -l 2 -s 3 -n 0 | grep "CPU usage" | tail -1 | sed -E 's/.* ([0-9.]+)% idle.*/\1/')
   awk -v i="${idle:-0}" 'BEGIN{exit !(i>=88)}'
 }
 wait_ready() {
   local msg=0
-  until ac_ok && idle_ok; do
-    if [ $msg -eq 0 ]; then log "waiting: AC=$(ac_ok && echo yes || echo NO) idle_ok=$(idle_ok && echo yes || echo NO)"; msg=1; fi
+  until ac_ok && lpm_ok && idle_ok; do
+    if [ $msg -eq 0 ]; then log "waiting: AC=$(ac_ok && echo yes || echo NO) lowpower_off=$(lpm_ok && echo yes || echo NO) idle_ok=$(idle_ok && echo yes || echo NO)"; msg=1; fi
     sleep 30
   done
   [ $msg -eq 1 ] && log "ready"
