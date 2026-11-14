@@ -52,14 +52,17 @@ classMLPKriging <- function(obj) {
 #' @param kernel covariance kernel: "gauss", "matern3_2", "matern5_2", "exp"
 #' @param regmodel trend: "constant", "linear", "quadratic"
 #' @param normalize logical; normalise inputs?
-#' @param optim optimiser (default "BFGS")
+#' @param optim optimiser (default \code{"BFGS4"}: 4 random starts run in
+#'   parallel, the best kept; it was \code{"BFGS"}, a single start, up to 1.x,
+#'   #467). \code{"BFGS10"} for a harder fit, \code{"BFGS"} for the 1.x
+#'   single start.
 #' @param objective "LL" (log-likelihood)
 #' @param parameters optional named list of tuning parameters, e.g.
 #'   \code{list(max_iter_adam = "300", adam_lr = "0.001", max_iter_bfgs = "50")};
-#'   \code{calibration_folds} (default \code{"3"}, \code{"0"} to disable) sets
-#'   the K-fold calibration of the predictive variance; with a multistart
-#'   \code{optim = "BFGSn"}, \code{calibration_folds = "5"} is advised (3 folds
-#'   widen the intervals more there).
+#'   \code{calibration_folds} (default \code{"5"}, \code{"0"} to disable) sets
+#'   the K-fold calibration of the predictive variance; \code{"3"} costs about
+#'   0.75x the fit time with the default \code{"BFGS4"} but widens the
+#'   intervals more.
 #' @param method covariance method: only \code{"exact"} is implemented for
 #'   MLPKriging (same argument as \code{\link{Kriging}}).
 #'
@@ -80,7 +83,7 @@ MLPKriging <- function(y, X, hidden_dims,
                        kernel = "gauss",
                        regmodel = "constant",
                        normalize = FALSE,
-                       optim = "BFGS",
+                       optim = "BFGS4",
                        objective = "LL",
                        parameters = NULL,
                        method = "exact") {
@@ -122,7 +125,7 @@ summary.MLPKriging <- function(object, ...) {
 #' @param X numeric matrix of inputs (n x d)
 #' @param regmodel trend: "constant", "linear", "quadratic"
 #' @param normalize logical; normalise inputs?
-#' @param optim optimiser
+#' @param optim optimiser (default \code{"BFGS4"}, see \code{\link{MLPKriging}})
 #' @param objective "LL" (log-likelihood)
 #' @param parameters optional named list of tuning parameters
 #' @param method covariance method: only \code{"exact"} is implemented.
@@ -135,7 +138,7 @@ summary.MLPKriging <- function(object, ...) {
 fit.MLPKriging <- function(object, y, X,
                            regmodel = "constant",
                            normalize = FALSE,
-                           optim = "BFGS",
+                           optim = "BFGS4",
                            objective = "LL",
                            parameters = NULL,
                            method = "exact", ...) {

@@ -64,7 +64,7 @@ class MLPKriging {
                                const std::string& kernel,
                                const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                                bool normalize = false,
-                               const std::string& optim = "BFGS",
+                               const std::string& optim = "BFGS4",
                                const std::string& objective = "LL",
                                const std::map<std::string, std::string>& parameters = {},
                                const std::string& method = "exact");
@@ -77,7 +77,7 @@ class MLPKriging {
                              const arma::mat& X,
                              const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                              bool normalize = false,
-                             const std::string& optim = "BFGS",
+                             const std::string& optim = "BFGS4",
                              const std::string& objective = "LL",
                              const std::map<std::string, std::string>& parameters = {},
                              const std::string& method = "exact");

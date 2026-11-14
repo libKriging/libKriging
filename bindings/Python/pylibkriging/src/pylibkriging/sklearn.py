@@ -384,7 +384,10 @@ class MLPKrigingRegressor(_BaseKrigingEstimator):
     kernel : str, default="gauss"
     regmodel : str, default="constant"
     normalize : bool, default=False
-    optim : str, default="BFGS"
+    optim : str, default="BFGS4"
+        4 random starts run in parallel, the best kept (the default of
+        `MLPKriging` since 2.0; it was ``"BFGS"``, a single start, up to
+        1.x, which stops at a poor mean on most problems, #467).
     objective : str, default="LL"
     parameters : dict or None, default=None
 
@@ -403,7 +406,7 @@ class MLPKrigingRegressor(_BaseKrigingEstimator):
 
     def __init__(self, hidden_dims=(8,), d_out=2, activation="selu",
                  kernel="gauss", regmodel="constant", normalize=False,
-                 optim="BFGS", objective="LL", parameters=None):
+                 optim="BFGS4", objective="LL", parameters=None):
         self.hidden_dims = hidden_dims
         self.d_out = d_out
         self.activation = activation
