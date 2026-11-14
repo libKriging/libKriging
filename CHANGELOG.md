@@ -12,6 +12,19 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- **Fit / predict method `"iterative"`** (matrix-free, from libKriging/libKriging#371): `method =
+  "iterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)"` (trailing
+  fields optional, `"iterative"` = `"iterative(30)"`) at `fit`, `predict`, `logLikelihood` and
+  `update`, next to `"exact"`, `"vecchia(m)"` and `"nystrom(k)"`. Conjugate-gradient solves, a
+  stochastic Lanczos quadrature estimate of log|R| with m probes and a Hutchinson gradient: no
+  O(n^3) factorization, O(n^2) per matrix-vector product (dense R kept below a memory budget, else
+  matrix-free). Objective `"LL"` and noise model None only: LOO / LMP, a nugget or a
+  heterogeneous noise, `simulate` and `update_simulate` raise an explicit error. The spec is
+  stored by `save` (probes and preconditioner landmarks rebuilt at `load`).
+  `predict(..., method = "iterative(...)")` also applies to an exact fit and to `WarpKriging` /
+  `MLPKriging`. `Kriging::logLikelihoodIterativeFun`, `iterative_nprobe`, `is_iterative_light`,
+  `iterative_cg_converged`. The matrix-vector products run under the thread budget with a
+  result independent of the number of threads.
 - **`Parallel`: the thread settings in one place, in every binding** (TODO of #480): C++
   `libKriging/Parallel.hpp`, Python / Octave `Parallel.*`, Julia `jlibkriging.Parallel.*`, R
   `parallel_*`. Budget (`set_num_threads_percent`, `get_num_threads`), its distribution

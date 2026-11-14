@@ -101,6 +101,10 @@ class MLPKriging {
                                                                                               bool return_deriv
                                                                                               = false) const;
 
+  /// Prediction with an explicit method: "exact" or "iterative(...)" (see WarpKriging::predict)
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
+  predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv, const std::string& method) const;
+
   /** Conditional simulations at X_n (forwards to WarpKriging::simulate).
    * @param with_noise optional observation-noise VARIANCES in raw y-space
    *        (empty, a scalar or one per row of X_n; as Kriging / WarpKriging

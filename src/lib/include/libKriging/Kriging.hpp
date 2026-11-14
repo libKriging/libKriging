@@ -200,7 +200,13 @@ class Kriging : public KrigingImpl {
    *        'vecchia'/'vecchia(m)' (Vecchia approximation with m conditioning
    *        neighbors, default 30: O(n m^3), no O(n^2) matrix; see
    *        docs/math/Vecchia.md) or 'nystrom'/'nystrom(k)' (rank-k Nystrom
-   *        approximation, default 50: O(n k^2); see docs/math/Nystrom.md).
+   *        approximation, default 50: O(n k^2); see docs/math/Nystrom.md)
+   *        or 'iterative'/'iterative(m,precond_rank,lanczos_steps,
+   *        cg_max_iter_mult,cg_tol,probes_cg_tol)' (matrix-free: conjugate
+   *        gradient solves, stochastic Lanczos log-determinant with m probes,
+   *        default 30, O(n^2) per matrix-vector product, no O(n^3)
+   *        factorization; trailing fields may be omitted, see
+   *        docs/math/Iterative.md).
    *        An approximate fit keeps no exact factorization: predict /
    *        simulate / logLikelihood then need the same method, and the
    *        exact model at the fitted theta is a separate fit
@@ -210,7 +216,8 @@ class Kriging : public KrigingImpl {
    *        log det R and R^-1). With objective 'LL', both 'vecchia(m)'
    *        (response Vecchia) and 'nystrom(k)' support every noise model
    *        (None, Nugget, Heterogeneous); 'LOO' / 'LMP' with an approximate
-   *        method require noise model None: other combinations raise
+   *        method require noise model None. 'iterative' is implemented for
+   *        objective 'LL' and noise model None only. Other combinations raise
    *        std::invalid_argument.
    */
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
@@ -403,6 +410,40 @@ class Kriging : public KrigingImpl {
   /// True when the current fit is a Nystrom (no exact O(n^3) factorization) fit
   [[nodiscard]] bool is_nystrom_light() const { return m_nystrom_light; }
 
+  /** Matrix-free approximated log-likelihood at given theta (fit method
+   * "iterative(...)"): conjugate-gradient solves for beta / sigma2 and a
+   * stochastic Lanczos quadrature (SLQ) estimate of log|R| on the fixed probes
+   * of the fit. Requires the model to have been fitted with method
+   * "iterative" or "iterative(...)"; noise model None only.
+   * @return (ll, gradient) ; gradient empty if return_grad=false. Gradient via
+   *         the envelope theorem and a Hutchinson trace estimate sharing the
+   *         SLQ probes (docs/math/Iterative.md). */
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodIterativeFun(const arma::vec& theta, bool return_grad);
+
+  /// Parsed "iterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)"
+  struct IterativeSpec {
+    arma::uword nprobe = 30;           ///< SLQ / Hutchinson probes
+    arma::uword precond_rank = 0;      ///< Nystrom CG preconditioner rank (0 = none)
+    arma::uword lanczos_steps = 20;    ///< SLQ Lanczos steps per probe
+    arma::uword cg_max_iter_mult = 2;  ///< CG budget per solve = cg_max_iter_mult * n
+    double cg_tol = 1e-4;              ///< [F|y] CG relative-residual tolerance
+    double probes_cg_tol = 0.0;        ///< gradient probes CG tolerance (0 = cg_tol)
+    arma::uword nfields = 1;           ///< number of fields given (canonical string)
+  };
+  /// Parse "iterative" or "iterative(...)"; throws std::invalid_argument on a malformed spec
+  LIBKRIGING_EXPORT static IterativeSpec parse_iterative_method(const std::string& method);
+  /// Canonical method string of a spec ("iterative" -> "iterative(30)")
+  LIBKRIGING_EXPORT static std::string iterative_method_string(const IterativeSpec& spec);
+
+  /// Number of SLQ / Hutchinson probes of the fit (0 = not fitted with method "iterative")
+  [[nodiscard]] arma::uword iterative_nprobe() const { return m_iterative_nprobe; }
+  /// True when the current fit is an iterative (no exact O(n^3) factorization) fit
+  [[nodiscard]] bool is_iterative_light() const { return m_iterative_light; }
+  /// True when every CG solve of the last iterative evaluation reached its tolerance
+  [[nodiscard]] bool iterative_cg_converged() const { return m_iterative_last_cg_unconverged == 0; }
+  /// Number of right-hand sides whose CG solve did not reach its tolerance in the last evaluation
+  [[nodiscard]] arma::uword iterative_cg_n_unconverged() const { return m_iterative_last_cg_unconverged; }
+
   /** Nystrom (global low-rank) prediction: uses the committed rank-k factors
    * (U, D) from the method="nystrom(k)" fit via the Woodbury identity instead of the
    * exact O(n^2) triangular solve — O(n*k*q) instead of O(n^2*q) for q
@@ -437,8 +478,12 @@ class Kriging : public KrigingImpl {
                                                                                               bool return_deriv);
   /** Prediction with an explicit method: "exact" (predict above), "vecchia"
    * or "vecchia(m)" (predictVecchia, m = 0 -> vecchia_neighbors() or 30),
-   * "nystrom" (predictNystrom, requires a method="nystrom" fit). The approximate
-   * methods return mean / stdev only: return_cov / return_deriv raise. */
+   * "nystrom" (predictNystrom, requires a method="nystrom" fit), "iterative"
+   * or "iterative(...)" (matrix-free conjugate gradient, no O(n^3)
+   * factorization: available on any fit with noise model None; the
+   * preconditioner rank, the CG budget and the cg_tol field, if given, are
+   * the fitted ones, or those of the given spec; default CG tolerance 1e-8). The approximate methods return mean /
+   * stdev only: return_cov / return_deriv raise. */
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
   predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv, const std::string& method);
 
@@ -687,6 +732,48 @@ class Kriging : public KrigingImpl {
   /// factors of Rhat, profiled by the Nystrom likelihood at gamma.
   void commit_nystrom(const arma::vec& gamma);
   bool m_nystrom_light = false;  ///< true whenever m_nystrom_k > 0 (no exact factorization ever exists)
+
+  // --- Iterative (matrix-free) likelihood (method="iterative(...)") --------
+  // CG solves + SLQ log-determinant + Hutchinson gradient on probes drawn once
+  // per fit (fixed seed): the objective stays smooth in theta. No exact
+  // factorization is ever built (see docs/math/Iterative.md).
+  void set_iterative_spec(const IterativeSpec& spec);
+  void make_iterative_probes();
+  void make_iterative_precond_landmarks();
+  double _logLikelihoodIterative(const arma::vec& _theta,
+                                 arma::vec* grad_out = nullptr,
+                                 arma::vec* beta_out = nullptr,
+                                 double* sigma2_out = nullptr,
+                                 const arma::mat* RinvFY_x0 = nullptr,
+                                 arma::mat* RinvFY_out = nullptr,
+                                 const arma::mat* W_x0 = nullptr,
+                                 arma::mat* W_out = nullptr) const;
+  /// Commit beta / sigma2 at m_theta from the iterative likelihood (and the
+  /// R^-1 [F | y] warm-start cache of predict / update)
+  void commit_iterative();
+  /// Matrix-free predict (method "iterative"): CG budget / preconditioner from spec
+  std::tuple<arma::vec, arma::vec> predictIterative(const arma::mat& X_n,
+                                                    bool return_stdev,
+                                                    const IterativeSpec& spec) const;
+  void updateIterative(const arma::vec& y_u, const arma::mat& X_u, bool refit);
+  bool iterative_cache_valid() const {
+    return m_iterative_RinvFY_cache.n_rows == m_X.n_rows && m_iterative_RinvFY_cache.n_cols == m_F.n_cols + 1
+           && m_iterative_RinvFY_cache_theta.n_elem == m_theta.n_elem
+           && arma::approx_equal(m_iterative_RinvFY_cache_theta, m_theta, "absdiff", 0.0);
+  }
+  arma::uword m_iterative_nprobe = 0;  ///< number of SLQ / Hutchinson probes (0 = mode off)
+  arma::mat m_iterative_probes;
+  arma::uword m_iterative_cg_max_iter_mult = 2;
+  double m_iterative_cg_tol = 1e-4;
+  double m_iterative_probes_cg_tol = 1e-4;
+  arma::uword m_iterative_lanczos_steps = 20;
+  arma::uword m_iterative_precond_rank = 0;
+  arma::uvec m_iterative_precond_landmarks;
+  mutable arma::uword m_iterative_last_cg_unconverged = 0;
+  /// R^-1 [F | y] at m_iterative_RinvFY_cache_theta (CG warm start, not saved)
+  arma::mat m_iterative_RinvFY_cache;
+  arma::vec m_iterative_RinvFY_cache_theta;
+  bool m_iterative_light = false;  ///< true whenever m_iterative_nprobe > 0 (no exact factorization ever exists)
 
   // --- LOO / LMP with an approximate method (see docs/math/LOO.md, LMP.md) ---
   /// Leave-one-out under the Vecchia (vecchia=true) or Nystrom joint law at

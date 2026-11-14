@@ -3258,6 +3258,42 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
                       jac_fn);
 }
 
+std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::predict(
+    const arma::mat& X_n,
+    bool return_stdev,
+    bool return_cov,
+    bool return_deriv,
+    const std::string& method) const {
+  if (method == "exact")
+    return predict(X_n, return_stdev, return_cov, return_deriv);
+  if (method != "iterative" && method.rfind("iterative(", 0) != 0)
+    throw std::invalid_argument("predict: unknown method '" + method
+                                + "': expected \"exact\", \"iterative\" or \"iterative(...)\"");
+  const Kriging::IterativeSpec spec = Kriging::parse_iterative_method(method);
+  libKriging::detail::BudgetScope budget_scope(m_y.n_elem);  // BLAS at the thread budget for the call
+  if (!m_fitted)
+    throw std::runtime_error("predict: model not fitted");
+  if (return_cov || return_deriv)
+    throw std::invalid_argument("predict: return_cov / return_deriv are only available with method \"exact\"");
+  if (!m_noise.is_empty())
+    throw std::invalid_argument("predict: method \"iterative\" is only available without per-point noise");
+  validate_discrete_columns(X_n, "predict");
+  // same feature map as the exact predict (no Jacobian: no derivatives)
+  auto phi_fn = [this](const arma::mat& Xnorm) -> arma::mat { return apply_warping(Xnorm); };
+  const bool precond = spec.precond_rank > 0;
+  auto [mean, stdev] = predictIterative_impl(X_n,
+                                             return_stdev,
+                                             spec.cg_max_iter_mult * m_X.n_rows,
+                                             (spec.nfields >= 5) ? spec.cg_tol : 1e-8,
+                                             precond,
+                                             precond ? spec.precond_rank : 50,
+                                             phi_fn);
+  // calibrated predictive variance (m_var_scale), as the exact predict
+  if (return_stdev)
+    stdev *= std::sqrt(m_var_scale);
+  return {mean, stdev, arma::mat(), arma::mat(), arma::mat()};
+}
+
 // -------------------------------------------------------------------------
 //  simulate()  — consistent with Kriging::simulate
 //

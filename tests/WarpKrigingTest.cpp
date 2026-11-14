@@ -221,6 +221,53 @@ static void test_continuous_kumaraswamy() {
 // ==========================================================================
 //  Test 3: categorical-only
 // ==========================================================================
+// ==========================================================================
+//  predict(..., method "iterative(...)") matches the exact predict
+//  (matrix-free CG on the warped inputs vs Cholesky)
+// ==========================================================================
+static void test_predict_iterative() {
+  std::cout << "=== WarpKriging: predict method iterative matches predict() ===" << std::endl;
+
+  arma::vec X_train = arma::linspace(0.01, 0.99, 8);
+  arma::mat X_mat(X_train.n_elem, 1);
+  X_mat.col(0) = X_train;
+  arma::vec y(X_train.n_elem);
+  for (arma::uword i = 0; i < X_train.n_elem; ++i)
+    y(i) = f1d(X_train(i));
+
+  // theta seeded at a moderate value: a free fit on this small noise-free
+  // data drifts toward a large theta (near-singular R), unrelated to CG
+  WarpKriging model({"kumaraswamy"}, "gauss");
+  WarpKriging::Parameters params;
+  params.theta = arma::vec{0.3};
+  model.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", params);
+
+  arma::vec x_pred = arma::linspace(0.01, 0.99, 20);
+  arma::mat xp(20, 1);
+  xp.col(0) = x_pred;
+
+  auto [mean_ex, stdev_ex, _cov, _md, _sd] = model.predict(xp, true, false);
+  // converged CG (250 n iterations, tol 1e-12): the formulas, not the default budget, are checked
+  auto [mean_cg, stdev_cg, _c2, _m2, _s2] = model.predict(xp, true, false, false, "iterative(30,0,20,250,1e-12)");
+
+  double mean_err = arma::abs(mean_cg - mean_ex).max();
+  double stdev_err = arma::abs(stdev_cg - stdev_ex).max();
+  std::cout << "  max |mean diff|  = " << mean_err << std::endl;
+  std::cout << "  max |stdev diff| = " << stdev_err << std::endl;
+  assert(mean_err < 1e-4 * arma::stddev(y));
+  assert(stdev_err < 1e-4 * arma::stddev(y));
+
+  bool threw = false;
+  try {
+    model.predict(xp, true, true, false, "iterative");  // return_cov: exact only
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
 static void test_categorical_only() {
   std::cout << "=== Test 3: categorical-only (embedding) ===" << std::endl;
 
@@ -1999,6 +2046,7 @@ int main() {
   try {
     test_warp_functions();
     test_continuous_kumaraswamy();
+    test_predict_iterative();
     test_categorical_only();
     test_categorical_predict_at_train();
     test_mixed();

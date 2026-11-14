@@ -97,6 +97,14 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
   return m_impl.predict(X_n, return_stdev, return_cov, return_deriv);
 }
 
+std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::predict(const arma::mat& X_n,
+                                                                                      bool return_stdev,
+                                                                                      bool return_cov,
+                                                                                      bool return_deriv,
+                                                                                      const std::string& method) const {
+  return m_impl.predict(X_n, return_stdev, return_cov, return_deriv, method);
+}
+
 arma::mat MLPKriging::simulate(int nsim,
                                int seed,
                                const arma::mat& X_n,
