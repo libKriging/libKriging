@@ -16,7 +16,8 @@ bdir() { # build name -> its bench directory (bash 3.2 on macOS has no associati
 }
 ROUNDS=${ROUNDS:-5}
 log() { echo "$(date -u +%FT%TZ) $*" >> "$LOG"; }
-ac_ok() { pmset -g batt | head -1 | grep -q "AC Power"; }
+# ALLOW_BATTERY=1: measure on battery (the conditions file records it); otherwise wait for mains power
+ac_ok() { [ -n "${ALLOW_BATTERY:-}" ] || pmset -g batt | head -1 | grep -q "AC Power"; }
 idle_ok() {
   local idle; idle=$(top -l 2 -s 3 -n 0 | grep "CPU usage" | tail -1 | sed -E 's/.* ([0-9.]+)% idle.*/\1/')
   awk -v i="${idle:-0}" 'BEGIN{exit !(i>=88)}'
