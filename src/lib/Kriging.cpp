@@ -389,12 +389,19 @@ static ForkSafeRegistrar fork_safe_registrar;
 
 namespace libKriging {
 namespace detail {
-void accelerate_single_thread_here() {
+void accelerate_single_thread_here(bool pool_with_several_workers) {
 #if defined(LK_ACCELERATE_THREADING_API)
-  if (accelerate_single_in_child && accelerate_set_threading) {
+  // LK_ACCELERATE_POOL_SINGLE=0 restores Accelerate's default mode in the workers of a pool (measurements)
+  static const bool pool_policy = [] {
+    const char* e = getenv("LK_ACCELERATE_POOL_SINGLE");
+    return !(e && e[0] == '0');
+  }();
+  if ((accelerate_single_in_child || (pool_with_several_workers && pool_policy)) && accelerate_set_threading) {
     if (__builtin_available(macOS 15.0, *))
       accelerate_set_threading(static_cast<int>(BLAS_THREADING_SINGLE_THREADED));
   }
+#else
+  (void)pool_with_several_workers;
 #endif
 }
 }  // namespace detail
@@ -402,7 +409,7 @@ void accelerate_single_thread_here() {
 #else   // no pthread_atfork: no fork child
 namespace libKriging {
 namespace detail {
-void accelerate_single_thread_here() {}
+void accelerate_single_thread_here(bool) {}
 }  // namespace detail
 }  // namespace libKriging
 #endif  // !_WIN32 && _POSIX_VERSION

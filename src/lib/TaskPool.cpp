@@ -64,7 +64,7 @@ void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char
       // The OpenMP loops of the worker use its share (num_threads(omp_threads())),
       // and a pool started from it runs inline.
       ScopedShare worker_share(share);
-      accelerate_single_thread_here();  // fork child on macOS: Accelerate's mode is per thread
+      accelerate_single_thread_here(pool_size > 1);  // Accelerate's mode is per thread (macOS)
       while (true) {
         int task_id = next_task.fetch_add(1);
         if (task_id >= n_tasks)
