@@ -53,10 +53,21 @@ class LinearAlgebra {
   // (also the nugget / heterogeneous noise models); 3: no rcond test on a
   // noise-free matrix (factor 1, constant diagonal: the search with J and the
   // exact committed model), retry on a failing Cholesky only; test kept
-  // with a noise model.
+  // with a noise model; 4: see CommittedCholScope.
   static int chol_rcond_bound;
   LIBKRIGING_EXPORT static void set_chol_rcond_bound(int mode);
   LIBKRIGING_EXPORT static int get_chol_rcond_bound();
+  // Mode 4: mode 2 in the search, and no rcond test on the noise-free
+  // committed model (built inside a CommittedCholScope).
+  struct LIBKRIGING_EXPORT CommittedCholScope {
+    CommittedCholScope();
+    ~CommittedCholScope();
+    CommittedCholScope(const CommittedCholScope&) = delete;
+    CommittedCholScope& operator=(const CommittedCholScope&) = delete;
+
+   private:
+    bool m_previous;
+  };
   // Retries of the Cholesky (num_nugget added) since the last reset, by
   // trigger: a failing Cholesky, or the rcond test (study of #465).
   LIBKRIGING_EXPORT static void chol_retry_counts(unsigned long long& on_failure, unsigned long long& on_rcond);

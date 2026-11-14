@@ -1984,7 +1984,13 @@ void WarpKriging::populate_Model(WKModel& m, const arma::vec& theta, double sigm
     diag += m_noise / sigma2;
   }
 
-  KrigingImpl::populate_Model(m, theta, /*alpha=*/1.0, diag, do_update, /*bench=*/nullptr);
+  if (m_cache_jitter != m_chol_jitter) {
+    // the committed exact model (commit_model_chol_jitter): rcond test of the retry, study mode 4 (#465)
+    LinearAlgebra::CommittedCholScope committed;
+    KrigingImpl::populate_Model(m, theta, /*alpha=*/1.0, diag, do_update, /*bench=*/nullptr);
+  } else {
+    KrigingImpl::populate_Model(m, theta, /*alpha=*/1.0, diag, do_update, /*bench=*/nullptr);
+  }
 }
 
 WarpKriging::WKModel WarpKriging::make_Model(const arma::vec& theta, double sigma2) const {

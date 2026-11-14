@@ -120,6 +120,11 @@ std::atomic<unsigned long long> chol_retry_fail{0}, chol_retry_rcond{0};
 // factor, ||A||_1 <= max(d) + factor (n - 1), ||A^-1||_1 <= sqrt(n) / delta.
 // Mode 3: +inf for a noise-free matrix (factor 1, constant diagonal), i.e. no
 // rcond test there, a retry on a failing Cholesky only.
+bool& committed_chol() {
+  thread_local bool committed = false;
+  return committed;
+}
+
 double diag_rcond_lower_bound(arma::uword n, double factor, const arma::vec& diag) {
   const int mode = LinearAlgebra::chol_rcond_bound;
   if (mode <= 0 || n == 0)
@@ -129,12 +134,22 @@ double diag_rcond_lower_bound(arma::uword n, double factor, const arma::vec& dia
   const bool noise_free = (factor == 1.0) && (dmin == dmax);
   if (mode == 3)
     return noise_free ? arma::datum::inf : 0.0;
+  if (mode == 4 && noise_free && committed_chol())
+    return arma::datum::inf;
   if (mode == 1 && !noise_free)
     return 0.0;
   const double delta = dmin - factor;
   return delta > 0.0 ? delta / (std::sqrt(static_cast<double>(n)) * (dmax + factor * (n - 1))) : 0.0;
 }
 }  // namespace
+
+LIBKRIGING_EXPORT LinearAlgebra::CommittedCholScope::CommittedCholScope() : m_previous(committed_chol()) {
+  committed_chol() = true;
+}
+
+LIBKRIGING_EXPORT LinearAlgebra::CommittedCholScope::~CommittedCholScope() {
+  committed_chol() = m_previous;
+}
 
 LIBKRIGING_EXPORT void LinearAlgebra::chol_retry_counts(unsigned long long& on_failure, unsigned long long& on_rcond) {
   on_failure = chol_retry_fail.load();
