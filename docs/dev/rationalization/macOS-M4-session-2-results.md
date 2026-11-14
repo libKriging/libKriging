@@ -501,3 +501,13 @@ decision "check everywhere (a) / Accelerate only (b) / remove (c)": **(a) is aff
 | `potri` check cost (Q8) | below what a fit resolves (≲ 1-2 %) | (a) check everywhere is affordable |
 
 Everything in sections 2, 3 and 5 was measured twice on battery (series 2: Low Power Mode off, the reference); only mains power was not available.
+
+## Follow-up: PR "pool workers single-threaded in the parent too" (Q5 proposal)
+
+Branch `perf/pool-workers-accelerate-single` (stacked on #487). Same binary, three variants (`LK_ACCELERATE_POOL_SINGLE=0` =
+before, default = the PR, `VECLIB_MAXIMUM_THREADS=1` = reference), 5 interleaved rounds, `bench-fit-profile` d = 4, build
+without OpenMP; script `macOS-M4-session-2-pool-single.sh`, raw `macOS-M4-session-2-pool-single.csv`. Taken on battery with Low
+Power Mode **on** (restored by the maintainer before this run; the Q5 effect had been identical with it off).
+`BFGS4`: n = 500 541 -> 309 ms, n = 800 1842 -> 982 ms, n = 1500 8189 -> 5271 ms (0.53-0.64), `BFGS10` 0.59-0.74, `BFGS2`
+0.76-0.97, single-start `BFGS` 0.99-1.00; CPU 3-4x lower; equal to `VECLIB_MAXIMUM_THREADS=1` on the multistart fits.
+Outputs bitwise identical to the previous behaviour (94 832 numbers, n = 500 and 1500).
