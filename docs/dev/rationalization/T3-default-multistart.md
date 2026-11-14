@@ -8,6 +8,10 @@ Done (pending review). Decision: the `Kriging` default optimizer becomes `"BFGS4
 `"BFGS"`); the long-range restart is kept, for an explicit single start (`"BFGS"`) and the
 noise-free warm start of the nugget fits. Limits of the sample at the end.
 
+Superseded for the long-range restart by #466 (`long-range-restart-466.md`): measured on the T7
+base with `"BFGS2"` and `"BFGS4"` without the restart (the two comparisons missing here), it was
+removed in 2.0.
+
 ## Protocol
 
 T7 (statistical benchmark base, PR #447) had no usable driver when this was run: the protocol

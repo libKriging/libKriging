@@ -18,7 +18,7 @@ long_range)`; on `true` the next run starts from `restart_theta(theta_start, low
 | `ABNORMAL_TERMINATION_IN_LNSRCH` | yes | yes | yes | yes (all) |
 | `num_iters <= 2` | yes | yes | yes | yes (all) |
 | at lower bound (`< eps`) | theta space, free dims | theta space, all dims | gamma space, all dims | `distance_to_lower` over free dims; space chosen by the caller (unchanged) |
-| long range | single start, noise-free, LL | no | no | Kriging only (`max_long_range_restart` = 0 elsewhere) |
+| long range | single start, noise-free, LL | no | no | Kriging only (`max_long_range_restart` = 0 elsewhere); removed in 2.0 (#466) |
 | worse than best + `factr * eps * max(1, abs(min(best, f)))` | yes | yes (see below) | no | Kriging, WarpKriging joint; off for the AdamBFGS inner BFGS |
 | worse cascade | up to `max_restart` | up to `max_restart` | n/a | **bounded** (below) |
 | restart point | `(theta_start + theta_lower) / 2^retry`, clamped to the bounds | same, not clamped | same, clamped | same, clamped (all) |
