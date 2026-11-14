@@ -422,6 +422,7 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 | `LK_THREAD_START_DELAY_MS` | libKriging | WarpKriging start stagger (10 ms) |
 | `LK_CHOL_JITTER` | libKriging at load | fixed Cholesky jitter of noise-free fits (< 0 per kernel, default; 0 off; > 0 value), see 8.6 |
 | `LK_BENCH_WARMUP_MS` | benchmarks | busy-wait before measuring (300 ms, see 6.2) |
+| `LK_LONG_RANGE_RESTART`, `LK_MAX_LONG_RANGE_RESTART` | (none) | removed in 2.0 with the long-range restart of a single start, ignored (#466: `"BFGS2"` is as good at a lower cost) |
 | `OMP_NUM_THREADS` | OpenMP runtime | caps the budget |
 | `OPENBLAS_NUM_THREADS` | OpenBLAS at load | size of its thread pool; below the budget, kept by libKriging |
 | `OPENBLAS_THREAD_TIMEOUT` | OpenBLAS at load | spin time of its idle threads |

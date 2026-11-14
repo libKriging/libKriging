@@ -12,14 +12,15 @@ use every core (parallel starts, BLAS threads), and concurrent processes would
 distort the times.
 
 A variant SPEC is a whitespace-separated list of tokens:
-    NAME=VALUE      environment variable of the run (LK_LONG_RANGE_RESTART=0,
-                    LK_CHOL_JITTER=0, LK_NUM_THREADS_PERCENT=25, ...)
+    NAME=VALUE      environment variable of the run (LK_CHOL_JITTER=0,
+                    LK_NUM_THREADS_PERCENT=25, ...)
     only=NOISE/OBJ  restrict the variant to these chunks (e.g. only=none/LL,
                     several separated by ';'): settings that act on part of
-                    the grid only (the long-range restart: noise-free LL)
+                    the grid only (e.g. a nugget-only setting)
     OPTIMS          comma-separated optimizers (BFGS,BFGS4,BFGS10, ...)
-Default variants: "BFGS,BFGS4,BFGS10" and
-"LK_LONG_RANGE_RESTART=0 BFGS only=none/LL".
+Default variant: "BFGS,BFGS2,BFGS4,BFGS10" (the variant
+"LK_LONG_RANGE_RESTART=0 BFGS only=none/LL" of the committed reference run is
+gone with the long-range restart, removed in 2.0, #466).
 
 Then: merge the CSVs (--merge out.csv.gz), write machine.txt (always) and,
 with --summary, the tables (summarize.py) in <dir>/summary.md.
@@ -56,7 +57,7 @@ PROFILES = {
     "full": grid([100, 200, 500, 1000], NOISE_OBJ, 30),
 }
 
-DEFAULT_VARIANTS = ["BFGS,BFGS4,BFGS10", "LK_LONG_RANGE_RESTART=0 BFGS only=none/LL"]
+DEFAULT_VARIANTS = ["BFGS,BFGS2,BFGS4,BFGS10"]
 
 
 def parse_variant(spec):

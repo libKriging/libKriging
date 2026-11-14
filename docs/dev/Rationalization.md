@@ -41,6 +41,8 @@ carried by its own pull request, based on the branch of this document.
   (x 1.8–3.2 time, 50–83 % misses left on `sinhalf` d 8 vs 0 % for BFGS10); active only for
   `multistart == 1`, noise-free, LL. `docs/dev/CholJitter.md` shows BFGS10 (parallel starts)
   faster than the restarted single start at n = 200 and always at the optimum.
+  Follow-up (2.0, #466, `rationalization/long-range-restart-466.md`): measured on the T7 base with
+  `"BFGS4"` as the default, removed (`"BFGS2"` as good at a lower cost; no gain on the default path).
 - `worse` criterion: a worse restart triggers another one, up to `max_restart` = 10.
 - MLPKriging iteration budget changed twice in two days (#382, #407).
 

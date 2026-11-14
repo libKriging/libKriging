@@ -43,17 +43,22 @@ CASES = {
     """,
     # Different models from a thread pool: same results as one after the other
     # (up to the BLAS rounding of the budget split, docs/dev/parallel.md 3.1).
+    # The rounding can stop the single start at another point of a flat
+    # optimum: the same LL (1e-7 relative), theta up to 0.25 % apart on these
+    # sets (#466, without the long-range restart that used to refine it).
     "concurrent_models_match_sequential": """
         sets = [data(s) for s in range(4)]
         def fit(i):
             y, X = sets[i]
             k = lk.Kriging(y, X, "gauss", "constant", False, "BFGS", "LL")
-            return k.theta().ravel(), k.predict(X[:10], True, False, False)[0], k.simulate(3, 7, X[:10])
+            return (k.theta().ravel(), k.logLikelihood(), k.predict(X[:10], True, False, False)[0],
+                    k.simulate(3, 7, X[:10]))
         seq = [fit(i) for i in range(4)]
         with ThreadPoolExecutor(4) as ex:
             par = list(ex.map(fit, range(4)))
-        for (t1, p1, s1), (t2, p2, s2) in zip(seq, par):
-            np.testing.assert_allclose(t2, t1, rtol=1e-3)
+        for (t1, l1, p1, s1), (t2, l2, p2, s2) in zip(seq, par):
+            np.testing.assert_allclose(l2, l1, rtol=1e-6)
+            np.testing.assert_allclose(t2, t1, rtol=1e-2)
             np.testing.assert_allclose(p2, p1, rtol=1e-3, atol=1e-6)
             assert s2.shape == s1.shape and np.all(np.isfinite(s2))
     """,

@@ -14,7 +14,8 @@ Done (driver, run script, summarizer, reference results). Used by T3.
   `Kriging` fit per optimizer of `--optim` (constant trend, `normalize = false`), one CSV row
   per fit: objective at the fitted parameters, LL, theta, nugget ratio, test RMSE, wall and
   process CPU time (`getrusage`, all threads).
-- Settings of a variant come from the environment (`LK_LONG_RANGE_RESTART`, `LK_CHOL_JITTER`,
+- Settings of a variant come from the environment (`LK_CHOL_JITTER`, the long-range restart
+  `LK_LONG_RANGE_RESTART` of the reference run, removed in 2.0 by #466,
   `LK_NUM_THREADS_PERCENT`, any `LK_*`), read by the library; their effective values are in
   the `settings` column and the variant label is `optimizer:environment`.
 - Grid: gauss, matern5_2; noise-free (`none`) or estimated nugget on y + N(0, (0.05 sd(y))^2)

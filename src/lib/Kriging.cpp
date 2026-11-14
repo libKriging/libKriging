@@ -4251,10 +4251,6 @@ void Kriging::fit_impl(const arma::vec& y,
           optimizer.iprint = -1;  // Disable output in parallel mode. was Optim::log_level - 2;
           optimizer.max_iter = Optim::max_iteration;
           const bool loo_objective = objective.rfind("LOO", 0) == 0;  // exact or approximate LOO
-          // single start of a noise-free exact LL fit (measured there only;
-          // a multistart already draws other basins)
-          const bool long_range_restart_on = Optim::long_range_restart > 0.0 && multistart == 1
-                                             && m_noise_model == NoiseModel::None && objective == "LL";
           optimizer.pgtol = loo_objective ? Optim::gradient_tolerance / (n * n)
                                           : Optim::gradient_tolerance;  // scale by: n^2 for LOO vs. LL, and /10
                                                                         // because LOO is usually more smooth
@@ -4277,10 +4273,7 @@ void Kriging::fit_impl(const arma::vec& y,
           }
 
           using libKriging::detail::RestartPolicy;
-          RestartPolicy restarts({Optim::max_restart,
-                                  optimizer.factr,
-                                  /*worse_criterion=*/true,
-                                  long_range_restart_on ? Optim::max_long_range_restart : 0});
+          RestartPolicy restarts({Optim::max_restart, optimizer.factr, /*worse_criterion=*/true});
           arma::vec best_gamma = gamma_tmp;
 
           while (true) {
@@ -4310,19 +4303,7 @@ void Kriging::fit_impl(const arma::vec& y,
                                        : (Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp.head(d));
             const double sol_to_lb = RestartPolicy::distance_to_lower(theta_part, theta_lower, theta_upper);
 
-            // Long-range local optimum: on noise-free data the single start
-            // often converges (a sharp optimum, not a plateau) with a theta
-            // component far above the data scale, 400-2000 LL units below the
-            // multistart optimum at n 500-1000; max theta_j / maxdX_j was >= 3.6
-            // for those fits and <= 1.3 for the good ones (docs/dev/CholJitter.md,
-            // long-range restart). The best solution is kept, so a genuinely
-            // long-range optimum (inactive input) only costs the restarts.
-            bool long_range = false;
-            const arma::uvec free_dims = arma::find(theta_upper > theta_lower);
-            if (restarts.long_range_allowed() && !free_dims.is_empty())
-              long_range = arma::max(theta_part(free_dims) / m_maxdX(free_dims)) > Optim::long_range_restart;
-
-            if (!restarts.restart(opt_result.task, opt_result.num_iters, sol_to_lb < arma::datum::eps, long_range))
+            if (!restarts.restart(opt_result.task, opt_result.num_iters, sol_to_lb < arma::datum::eps))
               break;
 
             if (Optim::log_level > Optim::log_none) {
