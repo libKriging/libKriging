@@ -11,7 +11,7 @@ on:
       - 'v*' # done in release
   pull_request:
     branches:
-      - '*'
+      - '**'
   workflow_dispatch: # test a branch without a pull request
   schedule:
     - cron: '0 2 * * SAT'
