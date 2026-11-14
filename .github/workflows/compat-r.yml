@@ -11,7 +11,7 @@ on:
       - master
   pull_request:
     branches:
-      - '*'
+      - '**'
   workflow_dispatch: # test a branch without a pull request
   schedule:
     - cron: '0 3 * * SAT'
