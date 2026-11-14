@@ -37,6 +37,12 @@ NULL
 #' \code{linalg_set_chol_warning}: warn when the fallback adds that nugget.
 #' \code{linalg_check_chol_rcond}: check the reciprocal condition number of the
 #' factorizations.
+#' Iterative method (\code{method = "iterative(...)"}):
+#' \code{linalg_set_cg_warning}: warn when a conjugate-gradient solve stops
+#' before its tolerance; \code{linalg_set_cg_auto_precond}: automatic Nystrom
+#' preconditioner of the iterative predictor;
+#' \code{linalg_set_iterative_dense_max_mb}: host-memory budget (MiB) of the
+#' dense correlation matrix, \code{0} matrix-free (default 6144).
 #'
 #' @name linalg_settings
 #' @return The getters return the current value; the setters return
@@ -73,4 +79,29 @@ NULL
 #' parallel_get_num_threads()
 #' parallel_blas_backend()
 #' parallel_set_num_threads_percent(0)
+NULL
+
+#' GPU backend of the iterative method
+#'
+#' Process-wide settings of the GPU acceleration of \code{method =
+#' "iterative(...)"}, the same as the \code{Gpu} static methods of the Python,
+#' Octave / MATLAB and Julia bindings (\code{gpu_<name>} in R for
+#' \code{Gpu.<name>}). The default (CRAN) package is CPU only: no backend is
+#' compiled in and the settings have no effect; the "-gpu" source package is
+#' built with the backends found on the installing machine.
+#'
+#' \code{gpu_compiled_backends()}, \code{gpu_available()},
+#' \code{gpu_active_backend()}: read only (\code{"none"} on the CPU path).
+#' \code{gpu_set_enabled}: use the GPU when available (default \code{TRUE},
+#' \code{FALSE} when \code{LK_ITERATIVE_GPU=0}). \code{gpu_set_dense_max_mb}:
+#' device-memory budget (MiB) of the dense correlation matrix, \code{0}
+#' matrix-free. \code{gpu_set_mixed_precision}: TF32 / fp32 products (CUDA).
+#' \code{gpu_set_verbose}: diagnostic of each GPU CG call.
+#'
+#' @name gpu_settings
+#' @return The getters return the current value; the setters return
+#'   \code{NULL} invisibly.
+#' @examples
+#' gpu_compiled_backends()
+#' gpu_active_backend()
 NULL

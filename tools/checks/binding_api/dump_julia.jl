@@ -46,8 +46,8 @@ for name in names(jlibkriging)
     push!(lines, ("LinearAlgebra", String(name)))
 end
 
-# Optim / Parallel: the functions of the jlibkriging.Optim / jlibkriging.Parallel submodules
-for sub in (:Optim, :Parallel)
+# Optim / Parallel / Gpu: the functions of the jlibkriging.Optim / .Parallel / .Gpu submodules
+for sub in (:Optim, :Parallel, :Gpu)
     isdefined(jlibkriging, sub) || continue
     mod = getfield(jlibkriging, sub)
     for name in names(mod; all=true)
@@ -62,13 +62,13 @@ end
 # of the fullest method first, then the others'; required when positional in
 # every method, "kwargs..." as "*"
 function signature(scope, name)
-    mod = scope == "Optim" ? jlibkriging.Optim : scope == "Parallel" ? jlibkriging.Parallel : jlibkriging
+    mod = scope in ("Optim", "Parallel", "Gpu") && isdefined(jlibkriging, Symbol(scope)) ? getfield(jlibkriging, Symbol(scope)) : jlibkriging
     isdefined(mod, Symbol(name)) || return nothing
     f = getfield(mod, Symbol(name))
     T = get(SCOPES, scope, nothing)
     ms = Method[]
     for m in methods(f)
-        m.module in (jlibkriging, jlibkriging.Optim, jlibkriging.Parallel) || continue
+        m.module === mod || m.module === jlibkriging || continue
         params = Base.unwrap_unionall(m.sig).parameters
         member = T !== nothing && length(params) >= 2 && params[2] <: T
         # members of a model class take the object first; statics do not

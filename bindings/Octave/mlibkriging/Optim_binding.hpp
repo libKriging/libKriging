@@ -38,6 +38,10 @@ void set_chol_warning(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void check_chol_rcond(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void chol_rcond_checked(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void check(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_cg_warning(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_cg_auto_precond(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_iterative_dense_max_mb(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_iterative_dense_max_mb(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace LinearAlgebraBinding
 
 namespace ParallelBinding {
@@ -56,5 +60,19 @@ void blas_backend(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void blas_num_threads(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void omp_enabled(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace ParallelBinding
+
+namespace GpuBinding {
+void compiled_backends(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void available(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void active_backend(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_enabled(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_enabled(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_dense_max_mb(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_dense_max_mb(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_mixed_precision(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_mixed_precision(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_verbose(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_verbose(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+}  // namespace GpuBinding
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_OPTIM_BINDING_HPP

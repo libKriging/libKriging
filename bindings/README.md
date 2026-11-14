@@ -114,21 +114,21 @@ conditioning neighbors of a Vecchia fit (0 otherwise). `WarpKriging` and `MLPKri
 > `Base.depwarn`, Octave/Matlab warning id `mLibKriging:deprecated`; a conflicting explicit `method` raises). `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is no
 > longer accepted.
 
-**Exact / Vecchia / Nystrom methods — always explicit.** The method is passed at each step, never inferred from the
+**Exact / Vecchia / Nystrom / iterative methods — always explicit.** The method is passed at each step, never inferred from the
 fit:
 
-| Step | exact | Vecchia | Nystrom |
-|---|---|---|---|
-| fit (`method=`) | `"exact"` (default), any `objective`, any `noise` | `"vecchia(m)"`, any `objective`: Vecchia estimation, no exact factorization is kept; `noise` (none, `"nugget"`, known variances: response Vecchia) with `objective="LL"` only | `"nystrom(k)"`, any `objective`: no exact factorization is kept; `noise` (none, `"nugget"`, known variances) with `objective="LL"` only |
-| `predict(…, method=)` | `"exact"` (default): after an exact fit | `"vecchia"` / `"vecchia(m)"`: after any fit (m = fitted m, or 30) | `"nystrom"` / fitted `"nystrom(k)"`: after a Nystrom fit |
-| `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit; `with_noise` / nugget | `"nystrom"`: after a Nystrom fit (latent process; `with_noise` / nugget raise) |
-| `logLikelihood(method=)` | `"exact"` (default; after an approximate fit, recomputed in O(n³) at the fitted θ) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
-| `leaveOneOut(method=)`, `leaveOneOutVec(θ, method=)`, `logMargPost(method=)` | `"exact"` (default; O(n³), on any fit) | `"vecchia"`: after a Vecchia fit, noise model none only (raises otherwise) | `"nystrom"`: after a Nystrom fit, noise model none only (raises otherwise) |
-| `update` | exact refit (heterogeneous noise: `update` needs the new `noise`, raises without it) | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks; with heterogeneous noise, `update` with `noise` refits on the joined data) |
-| `update_simulate` | yes (heterogeneous noise: needs `noise_u`, raises without it; `fit` / `update` drop the last `simulate(…, will_update=true)`) | — | — |
-| `save` / `load` | yes | yes (`"method"` saved) | yes (`"method"` saved) |
+| Step | exact | Vecchia | Nystrom | iterative |
+|---|---|---|---|---|
+| fit (`method=`) | `"exact"` (default), any `objective`, any `noise` | `"vecchia(m)"`, any `objective`: Vecchia estimation, no exact factorization is kept; `noise` (none, `"nugget"`, known variances: response Vecchia) with `objective="LL"` only | `"nystrom(k)"`, any `objective`: no exact factorization is kept; `noise` (none, `"nugget"`, known variances) with `objective="LL"` only | `"iterative(m,...)"`: CG solves + SLQ log det, no exact factorization is kept; `objective="LL"` and no noise only (raises otherwise) |
+| `predict(…, method=)` | `"exact"` (default): after an exact fit | `"vecchia"` / `"vecchia(m)"`: after any fit (m = fitted m, or 30) | `"nystrom"` / fitted `"nystrom(k)"`: after a Nystrom fit | `"iterative"` / `"iterative(...)"`: after any noise-free fit (spec: fitted, or given) |
+| `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit; `with_noise` / nugget | `"nystrom"`: after a Nystrom fit (latent process; `with_noise` / nugget raise) | — (raises) |
+| `logLikelihood(method=)` | `"exact"` (default; after an approximate fit, recomputed in O(n³) at the fitted θ) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit | `"iterative"`: after an iterative fit |
+| `leaveOneOut(method=)`, `leaveOneOutVec(θ, method=)`, `logMargPost(method=)` | `"exact"` (default; O(n³), on any fit) | `"vecchia"`: after a Vecchia fit, noise model none only (raises otherwise) | `"nystrom"`: after a Nystrom fit, noise model none only (raises otherwise) | — (raises) |
+| `update` | exact refit (heterogeneous noise: `update` needs the new `noise`, raises without it) | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks; with heterogeneous noise, `update` with `noise` refits on the joined data) | iterative update (CG warm start; refit: one BFGS from the current θ) |
+| `update_simulate` | yes (heterogeneous noise: needs `noise_u`, raises without it; `fit` / `update` drop the last `simulate(…, will_update=true)`) | — | — | — |
+| `save` / `load` | yes | yes (`"method"` saved) | yes (`"method"` saved) | yes (`"method"` saved; probes rebuilt) |
 
-On a Vecchia or Nystrom fit, `predict` / `simulate` with `method="exact"` (the default) raise an error naming the method to use; the approximate
+On a Vecchia, Nystrom or iterative fit, `predict` / `simulate` with `method="exact"` (the default) raise an error naming the method to use; the approximate
 methods return mean / stdev only (`return_cov` / `return_deriv` / `will_update` raise). The string returned by
 `method()` can be passed back as is. To get the exact model at the Vecchia (or Nystrom) estimate, make a separate exact
 fit with `optim="none"` and the fitted `theta` (`is_theta_estim` false), e.g. in Python

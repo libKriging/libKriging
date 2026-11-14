@@ -477,6 +477,36 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return LinearAlgebraBinding::check_chol_rcond(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearAlgebra::chol_rcond_checked"_hash:
       return LinearAlgebraBinding::chol_rcond_checked(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::set_cg_warning"_hash:
+      return LinearAlgebraBinding::set_cg_warning(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::set_cg_auto_precond"_hash:
+      return LinearAlgebraBinding::set_cg_auto_precond(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::get_iterative_dense_max_mb"_hash:
+      return LinearAlgebraBinding::get_iterative_dense_max_mb(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearAlgebra::set_iterative_dense_max_mb"_hash:
+      return LinearAlgebraBinding::set_iterative_dense_max_mb(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::compiled_backends"_hash:
+      return GpuBinding::compiled_backends(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::available"_hash:
+      return GpuBinding::available(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::active_backend"_hash:
+      return GpuBinding::active_backend(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::get_enabled"_hash:
+      return GpuBinding::get_enabled(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::set_enabled"_hash:
+      return GpuBinding::set_enabled(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::get_dense_max_mb"_hash:
+      return GpuBinding::get_dense_max_mb(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::set_dense_max_mb"_hash:
+      return GpuBinding::set_dense_max_mb(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::get_mixed_precision"_hash:
+      return GpuBinding::get_mixed_precision(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::set_mixed_precision"_hash:
+      return GpuBinding::set_mixed_precision(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::get_verbose"_hash:
+      return GpuBinding::get_verbose(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::set_verbose"_hash:
+      return GpuBinding::set_verbose(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearAlgebra::check"_hash:
       return LinearAlgebraBinding::check(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::get_thread_pool_size"_hash:

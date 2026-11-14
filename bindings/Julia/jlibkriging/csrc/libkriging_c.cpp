@@ -1,5 +1,6 @@
 #include "libkriging_c.h"
 
+#include <libKriging/Gpu.hpp>
 #include <libKriging/Kriging.hpp>
 #include <libKriging/LinearAlgebra.hpp>
 #include <libKriging/MLPKriging.hpp>
@@ -1087,11 +1088,12 @@ int lk_warp_kriging_predict(void* ptr,
                             double* stdev_out,
                             double* cov_out,
                             double* mean_deriv_out,
-                            double* stdev_deriv_out) {
+                            double* stdev_deriv_out,
+                            const char* method) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
-    auto [mean, stdev, cov, mean_deriv, stdev_deriv]
-        = static_cast<WarpKriging*>(ptr)->predict(X_mat, return_stdev != 0, return_cov != 0, return_deriv != 0);
+    auto [mean, stdev, cov, mean_deriv, stdev_deriv] = static_cast<WarpKriging*>(ptr)->predict(
+        X_mat, return_stdev != 0, return_cov != 0, return_deriv != 0, method ? method : "exact");
     if (mean_out)
       std::memcpy(mean_out, mean.memptr(), mean.n_elem * sizeof(double));
     if (return_stdev && stdev_out)
@@ -1607,11 +1609,12 @@ int lk_mlp_kriging_predict(void* ptr,
                            double* stdev_out,
                            double* cov_out,
                            double* mean_deriv_out,
-                           double* stdev_deriv_out) {
+                           double* stdev_deriv_out,
+                           const char* method) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
-    auto [mean, stdev, cov, mean_deriv, stdev_deriv]
-        = static_cast<MLPKriging*>(ptr)->predict(X_mat, return_stdev != 0, return_cov != 0, return_deriv != 0);
+    auto [mean, stdev, cov, mean_deriv, stdev_deriv] = static_cast<MLPKriging*>(ptr)->predict(
+        X_mat, return_stdev != 0, return_cov != 0, return_deriv != 0, method ? method : "exact");
     if (mean_out)
       std::memcpy(mean_out, mean.memptr(), mean.n_elem * sizeof(double));
     if (return_stdev && stdev_out)
@@ -2576,4 +2579,96 @@ int lk_parallel_blas_num_threads(void) {
 
 int lk_parallel_omp_enabled(void) {
   return Parallel::omp_enabled() ? 1 : 0;
+}
+
+int lk_linalg_set_cg_warning(int v) {
+  try {
+    LinearAlgebra::set_cg_warning(v != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_linalg_set_cg_auto_precond(int v) {
+  try {
+    LinearAlgebra::set_cg_auto_precond(v != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_linalg_set_iterative_dense_max_mb(int v) {
+  try {
+    LinearAlgebra::set_iterative_dense_max_mb(v);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_linalg_get_iterative_dense_max_mb(void) {
+  return LinearAlgebra::get_iterative_dense_max_mb();
+}
+
+const char* lk_gpu_compiled_backends(void) {
+  static thread_local std::string s;  // valid until the next call of the thread
+  s = Gpu::compiled_backends();
+  return s.c_str();
+}
+
+int lk_gpu_available(void) {
+  return Gpu::available() ? 1 : 0;
+}
+
+const char* lk_gpu_active_backend(void) {
+  static thread_local std::string s;  // valid until the next call of the thread
+  s = Gpu::active_backend();
+  return s.c_str();
+}
+
+int lk_gpu_set_enabled(int v) {
+  try {
+    Gpu::set_enabled(v != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_gpu_get_enabled(void) {
+  return Gpu::get_enabled() ? 1 : 0;
+}
+
+int lk_gpu_set_dense_max_mb(int v) {
+  try {
+    Gpu::set_dense_max_mb(v);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_gpu_get_dense_max_mb(void) {
+  return Gpu::get_dense_max_mb();
+}
+
+int lk_gpu_set_mixed_precision(int v) {
+  try {
+    Gpu::set_mixed_precision(v != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_gpu_get_mixed_precision(void) {
+  return Gpu::get_mixed_precision() ? 1 : 0;
+}
+
+int lk_gpu_set_verbose(int v) {
+  try {
+    Gpu::set_verbose(v != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_gpu_get_verbose(void) {
+  return Gpu::get_verbose() ? 1 : 0;
 }

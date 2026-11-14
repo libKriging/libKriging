@@ -49,7 +49,11 @@ class PyMLPKriging {
            const std::string& method);
 
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
-  predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv = false);
+  predict(const py::array_t<double>& X_n,
+          bool return_stdev,
+          bool return_cov,
+          bool return_deriv = false,
+          const std::string& method = "exact");
 
   py::array_t<double> simulate(const int nsim,
                                const int seed,

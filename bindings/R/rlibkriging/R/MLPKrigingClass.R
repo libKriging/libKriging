@@ -152,14 +152,17 @@ fit.MLPKriging <- function(object, y, X,
 #' @param return_stdev return standard deviations?
 #' @param return_cov return full covariance?
 #' @param return_deriv return derivatives of mean and stdev wrt x?
+#' @param method \code{"exact"} (default) or \code{"iterative"} /
+#'   \code{"iterative(...)"}: matrix-free conjugate gradient (mean / stdev
+#'   only, no per-point noise)
 #' @param ... ignored
 #' @return list with \code{mean}, optionally \code{stdev}, \code{cov},
 #'   \code{mean_deriv}, \code{stdev_deriv}
 #' @method predict MLPKriging
 #' @export
 predict.MLPKriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE,
-                               return_deriv = FALSE, ...) {
-  mlpKriging_predict(object$ptr, as.matrix(x), return_stdev, return_cov, return_deriv)
+                               return_deriv = FALSE, method = "exact", ...) {
+  mlpKriging_predict(object$ptr, as.matrix(x), return_stdev, return_cov, return_deriv, method)
 }
 
 #' @title Simulate from an MLPKriging model

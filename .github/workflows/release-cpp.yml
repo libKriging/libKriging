@@ -171,11 +171,36 @@ jobs:
           path: |
             cpp-package
 
+  build-gpu-source-archive:
+    # "-gpu" variant of every binding: the repository with its submodules,
+    # built on the user's machine by tools/install-gpu.sh with every GPU
+    # backend found there; the binary packages stay CPU only.
+    name: "-gpu source archive"
+    needs: check-release-consistency
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Build libKriging-gpu source archive
+        shell: bash
+        run: |
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }} tools/release/gpu-source-archive.sh
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpp-artifact-gpu-src
+          path: |
+            gpu-package
+
   create-release-if-needed:
     name: Create Release
     needs:
       - check-release-consistency
       - build-cpp-library
+      - build-gpu-source-archive
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

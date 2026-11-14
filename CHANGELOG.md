@@ -33,6 +33,18 @@ past release, see the corresponding entry on the
   `compiled_backends`, `available`, `active_backend`; `LinearAlgebra::set_iterative_dense_max_mb`
   for the CPU dense fast path. `find_package(libKriging CONFIG)` finds the CUDA toolkit of a
   static CUDA build and the HIP runtime.
+- **Bindings of the iterative method and of `Gpu`**: `predict(..., method)` on `WarpKriging` /
+  `MLPKriging` (`"exact"` or `"iterative(...)"`) in every binding; `Gpu` settings (Python / Octave
+  `Gpu.*`, Julia `jlibkriging.Gpu.*`, R `gpu_*`); `LinearAlgebra` `set_cg_warning`,
+  `set_cg_auto_precond`, `set/get_iterative_dense_max_mb` (R `linalg_*`). Binding API check: `Gpu`
+  scope, smoke round trips of the new settings; the iterative accessors of `Kriging` are PENDING
+  (#435) like their Vecchia / Nystrom counterparts.
+- **`-gpu` packages**: `pylibkriging-gpu` (source distribution, `LIBKRIGING_PY_VARIANT=gpu`,
+  `tools/release/python-sdist-gpu.sh`) and the `libKriging-gpu_<version>_src.tar.gz` release asset
+  (`tools/release/gpu-source-archive.sh`, installed by `tools/install-gpu.sh`), compiled on the
+  installing machine with `ENABLE_GPU_ITERATIVE=AUTO`; release jobs in `release-python.yml` /
+  `release-cpp.yml`. `setup.py` forwards `ENABLE_GPU_ITERATIVE`, `ENABLE_<BACKEND>_ITERATIVE` and
+  `LIBKRIGING_CMAKE_ARGS`.
 - **`Parallel`: the thread settings in one place, in every binding** (TODO of #480): C++
   `libKriging/Parallel.hpp`, Python / Octave `Parallel.*`, Julia `jlibkriging.Parallel.*`, R
   `parallel_*`. Budget (`set_num_threads_percent`, `get_num_threads`), its distribution

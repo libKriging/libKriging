@@ -138,16 +138,18 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 5}};
+                 RequiresArg::Range{2, 6}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 5}};
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
 
   const bool return_stdev = flag_output_compliance(input, 2, "return_stdev", output, 1);
   const bool return_cov = flag_output_compliance(input, 3, "return_cov", output, 2);
   const bool return_deriv = flag_output_compliance(input, 4, "return_deriv", output, 3);
+  // method: "exact" (default), "iterative" or "iterative(...)"
+  const auto method = input.getOptional<std::string>(5, "method").value_or("exact");
 
   auto [y_pred, stdev_pred, cov_pred, mean_deriv, stdev_deriv]
-      = mk->predict(input.get<arma::mat>(1, "X_n matrix"), return_stdev, return_cov, return_deriv);
+      = mk->predict(input.get<arma::mat>(1, "X_n matrix"), return_stdev, return_cov, return_deriv, method);
   output.set(0, y_pred, "predicted y");
   output.setOptional(1, stdev_pred, "predicted stdev");
   output.setOptional(2, cov_pred, "predicted cov");
