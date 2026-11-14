@@ -12,6 +12,20 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **MLPKriging: default optimizer `"BFGS4"`** (#467, 2.0; was `"BFGS"`, a single start): C++
+  `MLPKriging` constructor and `fit`, Python `MLPKriging` and `MLPKrigingRegressor`, R
+  `MLPKriging()` / `fit.MLPKriging`, Octave / MATLAB, Julia. Measured on the 15-function MLP
+  benchmark of T8 (20 designs, tanh and selu, 600 cases; plain `Kriging` 7 %) and on the
+  projected-Branin 10D case of #407 (10 designs), `docs/dev/rationalization/mlp-default-467.md`:
+  test Q² < 0.5 on 68.5 % of the cases with the single start against 29.3 % with `"BFGS4"`
+  (25.3 % with `"BFGS10"`), #407 median Q² −6.0 / −2.5 (tanh / selu) against 0.983 / 0.993, for
+  x 2.1 the CPU time on one core (calibration included) and x 1.1 the wall time on 4 cores.
+  Changed results: every `MLPKriging` fit without an explicit `optim` (different mean, variance
+  factor and `logLikelihood()`). `WarpKriging` keeps `"BFGS"` for every warping, `mlp_joint`
+  included (pass `"BFGS4"` there). `calibration_folds` stays 3; with `"BFGS4"`,
+  `calibration_folds = "5"` gives narrower intervals (median test NLPD −0.15) for x 1.33 the CPU
+  time. Migration: pass `optim = "BFGS"` to get the 1.x fit back; `"BFGS10"` for a hard fit.
+  Saved models are loaded unchanged (`update(refit = true)` stays a warm-started single start).
 - **Long-range restart removed** (#466, 2.0): `Optim::set_long_range_restart` /
   `get_long_range_restart`, `Optim::set_max_long_range_restart` / `get_max_long_range_restart`
   and the environment variables `LK_LONG_RANGE_RESTART` / `LK_MAX_LONG_RANGE_RESTART` (now

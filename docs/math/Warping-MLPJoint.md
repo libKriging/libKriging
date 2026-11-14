@@ -66,6 +66,18 @@ a long run mostly overfits the training points: on `Branin(Wx)` in 10D
 start gave the same Q² as 20, at 15–20 times the cost, with a more
 overconfident predictive variance. `max_iter_bfgs` overrides it.
 
+`MLPKriging` runs 4 such starts by default (`optim = "BFGS4"`, since 2.0;
+the starts after the first draw random θ and network weights, and run in
+parallel). A single start (`"BFGS"`, the 1.x default) stops at a poor mean
+on most problems: on the 15-function benchmark of
+`docs/dev/rationalization/mlp-default-467.md` (600 cases) its test Q² is
+below 0.5 on 69 % of the cases, against 29 % with `"BFGS4"` and 25 % with
+`"BFGS10"`; on `Branin(Wx)` in 10D (#407) the median Q² is −6.0 (tanh) /
+−2.5 (selu) against 0.983 / 0.993. `"BFGS4"` costs 2.1 times the CPU time
+of the single start on one core (calibration included) and 1.1 times its
+wall time on 4 cores. `WarpKriging` keeps `"BFGS"`: pass `"BFGS4"` with an
+`mlp_joint` warping.
+
 ### Calibration of the predictive variance
 
 Maximising the likelihood over many weights also learns features in which
@@ -95,11 +107,14 @@ the model. It costs K single-start fits, run concurrently in the
 multistart thread pool (`Optim::set_thread_pool_size`). The tuning parameter
 `calibration_folds` sets K (`0` disables the calibration); it is not
 applied with per-observation noise, nor when n < 2K. K = 3 by default: for
-the single-start default fit it gives the same coverage and NLPD as K = 5 at
-about 0.57 times the CPU time. With a multistart `"BFGSn"`, set
-`calibration_folds = "5"` explicitly: each fold is refitted from the one
-winning start on 2/3 of the data, which overstates the error of the
-best-of-n fit (test NLPD +0.56 vs K = 5, 95 % CI [+0.20, +0.97], T8).
+a single start it gives the same coverage and NLPD as K = 5 at about 0.57
+times the CPU time (T8). With a multistart `"BFGSn"` (the default
+`"BFGS4"` included) 3 folds widen the intervals more than 5: each fold is
+refitted from the one winning start on 2/3 of the data, which overstates
+the error of the best-of-n fit. For `"BFGS4"`, K = 5 lowers the test NLPD
+by 0.15 (median of 600 paired cases, 95 % CI [0.10, 0.20]; coverage 0.961
+against 0.971) for 1.33 times the CPU time (#467); set
+`calibration_folds = "5"` for the sharpest intervals.
 
 ## Simple example
 

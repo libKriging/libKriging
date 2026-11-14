@@ -133,3 +133,41 @@ TEST_CASE("MLPKriging predictive variance is calibrated (#407)", "[mlp][calibrat
     CHECK(sl.nlpd == Approx(sc.nlpd).epsilon(1e-8));
   }
 }
+
+TEST_CASE("MLPKriging default optimizer is the multistart BFGS4 (#467)", "[mlp][default]") {
+  arma::arma_rng::set_seed(407);
+  const arma::mat X = lhs(60, kDim);
+  const arma::vec y = branin_proj(X);
+  const arma::mat Xt = arma::randu<arma::mat>(1000, kDim);
+  const arma::vec yt = branin_proj(Xt);
+
+  MLPKriging def({8}, 2, "tanh", "matern5_2");
+  def.fit(y, X);
+  MLPKriging multi({8}, 2, "tanh", "matern5_2");
+  multi.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS4");
+  MLPKriging single({8}, 2, "tanh", "matern5_2");
+  single.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS");
+
+  const Scores sd = score(def, Xt, yt);
+  const Scores ss = score(single, Xt, yt);
+  std::printf("[default optim] %s Q2 %.6g NLPD %.6g cov %.4g LL %.6g | BFGS Q2 %.6g NLPD %.6g cov %.4g LL %.6g\n",
+              def.optim().c_str(),
+              sd.q2,
+              sd.nlpd,
+              sd.coverage,
+              def.logLikelihood(),
+              ss.q2,
+              ss.nlpd,
+              ss.coverage,
+              single.logLikelihood());
+
+  CHECK(def.optim() == "BFGS4");
+  // The default is the explicit "BFGS4" fit (same starts, same calibration).
+  CHECK(def.logLikelihood() == multi.logLikelihood());
+  CHECK(def.var_scale() == multi.var_scale());
+  // The 1.x single start stays available; on this case it stops at a poor mean
+  // (Q2 -0.68 on Linux / OpenBLAS, #407 point 3), the multistart default reaches
+  // that of Kriging (0.86 both).
+  CHECK(sd.q2 > ss.q2);
+  CHECK(sd.q2 > 0.75);
+}

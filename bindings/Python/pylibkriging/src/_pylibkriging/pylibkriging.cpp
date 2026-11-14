@@ -398,7 +398,7 @@ needs "exact" or "vecchia"
       .def("noise", &PyKriging::noise);
 
   const std::string default_warp_optim = "BFGS";
-  const std::string default_mlp_optim = "BFGS";
+  const std::string default_mlp_optim = "BFGS4";  // #467
 
   /* --- NestedKriging --- */
   py::class_<PyNestedKriging>(m,

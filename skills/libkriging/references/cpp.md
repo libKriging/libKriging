@@ -152,6 +152,8 @@ re-added by `update_simulate` after a `will_update=true` simulate.
 // Facade over WarpKriging({"mlp_joint(...)"} , kernel); construct/fit the
 // same way as Kriging/WarpKriging — see MLPKriging.hpp for the exact
 // Parameters struct (theta / warp_params seeds) if you need to warm-start.
+// Default optim "BFGS4" (4 parallel starts, since 2.0; "BFGS" = 1.x single
+// start). WarpKriging keeps "BFGS": pass "BFGS4" for an mlp_joint warping.
 ```
 
 ## NestedKriging
