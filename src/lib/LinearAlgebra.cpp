@@ -7,6 +7,8 @@
 
 #include "libKriging/LinearAlgebra.hpp"
 
+#include <atomic>
+
 #include <thread>
 #ifdef _OPENMP
 #include <omp.h>
@@ -108,6 +110,42 @@ LIBKRIGING_EXPORT bool LinearAlgebra::chol_rcond_checked() {
 
 int LinearAlgebra::chol_rcond_bound = 0;
 
+namespace {
+// Retries of safe_chol_lower_retry, by trigger (study of #465)
+std::atomic<unsigned long long> chol_retry_fail{0}, chol_retry_rcond{0};
+
+// Lower bound of the 1-norm reciprocal condition number of factor * C + diag(d),
+// C a correlation matrix (unit diagonal, |C_ij| <= 1), used by the rcond test
+// of the Cholesky retry (chol_rcond_bound): lambda_min >= delta = min(d) -
+// factor, ||A||_1 <= max(d) + factor (n - 1), ||A^-1||_1 <= sqrt(n) / delta.
+// Mode 3: +inf for a noise-free matrix (factor 1, constant diagonal), i.e. no
+// rcond test there, a retry on a failing Cholesky only.
+double diag_rcond_lower_bound(arma::uword n, double factor, const arma::vec& diag) {
+  const int mode = LinearAlgebra::chol_rcond_bound;
+  if (mode <= 0 || n == 0)
+    return 0.0;
+  const double dmin = (diag.n_elem == 0) ? 1.0 : diag.min();
+  const double dmax = (diag.n_elem == 0) ? 1.0 : diag.max();
+  const bool noise_free = (factor == 1.0) && (dmin == dmax);
+  if (mode == 3)
+    return noise_free ? arma::datum::inf : 0.0;
+  if (mode == 1 && !noise_free)
+    return 0.0;
+  const double delta = dmin - factor;
+  return delta > 0.0 ? delta / (std::sqrt(static_cast<double>(n)) * (dmax + factor * (n - 1))) : 0.0;
+}
+}  // namespace
+
+LIBKRIGING_EXPORT void LinearAlgebra::chol_retry_counts(unsigned long long& on_failure, unsigned long long& on_rcond) {
+  on_failure = chol_retry_fail.load();
+  on_rcond = chol_retry_rcond.load();
+}
+
+LIBKRIGING_EXPORT void LinearAlgebra::reset_chol_retry_counts() {
+  chol_retry_fail = 0;
+  chol_retry_rcond = 0;
+}
+
 LIBKRIGING_EXPORT void LinearAlgebra::set_chol_rcond_bound(int mode) {
   LinearAlgebra::chol_rcond_bound = mode;
 };
@@ -136,6 +174,10 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond, double
     // t0 = Bench::toc(nullptr, "        rcond" ,t0);
   }
   if (!ok || wrong_rcond) {
+    if (!ok)
+      ++chol_retry_fail;
+    else
+      ++chol_retry_rcond;
     if (inc_cond > max_inc_choldiag) {
       throw std::runtime_error("[ERROR] Exceed max numerical nugget (" + std::to_string(inc_cond) + " x 1e"
                                + std::to_string(log10(LinearAlgebra::num_nugget)) + ") added to force chol matrix");
@@ -238,21 +280,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R,
 
   // Cholesky decompostion of covariance matrix
 
-  // Lower bound of the 1-norm reciprocal condition number of
-  // factor * C + diag(d), C a correlation matrix (unit diagonal, |C_ij| <= 1):
-  // lambda_min >= delta = min(d) - factor, ||A||_1 <= max(d) + factor (n - 1),
-  // ||A^-1||_1 <= sqrt(n) / delta (chol_rcond_bound, study of #465).
-  double rcond_lower_bound = 0.0;
-  if (LinearAlgebra::chol_rcond_bound > 0 && n > 0) {
-    const double dmin = (diag.n_elem == 0) ? 1.0 : diag.min();
-    const double dmax = (diag.n_elem == 0) ? 1.0 : diag.max();
-    const bool jitter_only = (factor == 1.0) && (dmin == dmax);
-    if (LinearAlgebra::chol_rcond_bound >= 2 || jitter_only) {
-      const double delta = dmin - factor;
-      if (delta > 0.0)
-        rcond_lower_bound = delta / (std::sqrt(static_cast<double>(n)) * (dmax + factor * (n - 1)));
-    }
-  }
+  const double rcond_lower_bound = diag_rcond_lower_bound(n, factor, diag);  // chol_rcond_bound
   arma::mat L = LinearAlgebra::safe_chol_lower_retry(
       *R, 0, rcond_lower_bound);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
   // t0 = Bench::toc(nullptr, "    Chol",t0);
@@ -305,7 +333,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(
   }
   // t0 = Bench::toc(nullptr, "    _Cov: diag",t0);
 
-  arma::mat L = LinearAlgebra::chol_block(*R, T_old);
+  arma::mat L = LinearAlgebra::chol_block(*R, T_old, diag_rcond_lower_bound(n, factor, diag));
   // t0 = Bench::toc(nullptr, "    Chol Block",t0);
 
   return L;
@@ -319,7 +347,9 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(
 //   Lo,o is the cholesky root of Co,o (known)
 //   Lu,o = Cu,o Lo,o^-T
 //   Lu,u is the cholesky root of Cu,u - Lu,o Lu,o^T
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C, const arma::mat Loo) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C,
+                                                      const arma::mat Loo,
+                                                      double rcond_lower_bound) {
   arma::uword n = C.n_rows;
   arma::uword no = Loo.n_rows;  // old size. n-1 if we just add one observation.
 
@@ -351,13 +381,15 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C, const a
   // after safe_chol_lower's own nugget-retry budget is exhausted, fall
   // back to a full from-scratch factorization of C instead of throwing.
   try {
-    L.submat(no, no, n - 1, n - 1) = LinearAlgebra::safe_chol_lower(Cuu - LinearAlgebra::crossprod(Lou));
+    // (the Schur complement of a noise-free matrix: mode 3 skips its rcond test as for C)
+    L.submat(no, no, n - 1, n - 1) = LinearAlgebra::safe_chol_lower_retry(
+        Cuu - LinearAlgebra::crossprod(Lou), 0, rcond_lower_bound == arma::datum::inf ? rcond_lower_bound : 0.0);
     // t0 = Bench::toc(nullptr, "        <Luu = chol( Cuu - Luo * Luo.t() )",t0);
   } catch (const std::exception&) {
     if (warn_chol)
       arma::cout << "[WARNING] Cholesky block update failed (near-singular conditional block); "
                  << "falling back to a full Cholesky factorization" << arma::endl;
-    return arma::trimatl(LinearAlgebra::safe_chol_lower(C));
+    return arma::trimatl(LinearAlgebra::safe_chol_lower_retry(C, 0, rcond_lower_bound));
   }
 
   arma::mat lowL = arma::trimatl(L);

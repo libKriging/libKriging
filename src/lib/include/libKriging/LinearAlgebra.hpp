@@ -50,10 +50,17 @@ class LinearAlgebra {
   // matrix built by cholCov, is already >= min_rcond. 0: off (default);
   // 1: only for a constant diagonal shift on a unit-scaled correlation
   // (the search jitter J, or WarpKriging's floor); 2: any diagonal shift
-  // (also the nugget / heterogeneous noise models).
+  // (also the nugget / heterogeneous noise models); 3: no rcond test on a
+  // noise-free matrix (factor 1, constant diagonal: the search with J and the
+  // exact committed model), retry on a failing Cholesky only; test kept
+  // with a noise model.
   static int chol_rcond_bound;
   LIBKRIGING_EXPORT static void set_chol_rcond_bound(int mode);
   LIBKRIGING_EXPORT static int get_chol_rcond_bound();
+  // Retries of the Cholesky (num_nugget added) since the last reset, by
+  // trigger: a failing Cholesky, or the rcond test (study of #465).
+  LIBKRIGING_EXPORT static void chol_retry_counts(unsigned long long& on_failure, unsigned long long& on_rcond);
+  LIBKRIGING_EXPORT static void reset_chol_retry_counts();
 
   static int max_inc_choldiag;
   LIBKRIGING_EXPORT static arma::mat safe_chol_lower(arma::mat X);
@@ -79,7 +86,7 @@ class LinearAlgebra {
                                                     const arma::mat& T_old,
                                                     const arma::mat& R_old);
 
-  LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo);
+  LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo, double rcond_lower_bound = 0.0);
 
   // Nystrom / partial-pivoted-Cholesky low-rank approximation of a covariance
   // matrix R (n x n, built lazily from X/_theta/_Cov), never materialized in
