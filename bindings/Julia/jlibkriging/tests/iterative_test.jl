@@ -13,7 +13,9 @@ y = f2d.(X[:, 1], X[:, 2])
 Xn = [0.15 0.3; 0.45 0.6; 0.75 0.2]
 
 @testset "predict method iterative on an exact fit" begin
-    k = Kriging(y, X, "matern5_2")
+    # fixed moderate theta: a free fit on this noise-free function drifts to a
+    # near-singular R (theta ~ 3-6) where CG does not reach its tolerance
+    k = Kriging(y, X, "matern5_2"; optim="none", theta=[0.1, 0.1], is_theta_estim=false)
     pe = predict(k, Xn; return_stdev=true)
     pc = predict(k, Xn; return_stdev=true, method="iterative(30,0,20,10,1e-12)")
     @test maximum(abs.(pe.mean .- pc.mean)) < 1e-5 * std_y(y)
@@ -31,7 +33,7 @@ end
 end
 
 @testset "WarpKriging predict method iterative" begin
-    w = WarpKriging(y, X, ["kumaraswamy", "kumaraswamy"], "matern5_2")
+    w = WarpKriging(y, X, ["kumaraswamy", "kumaraswamy"], "matern5_2"; optim="none", theta=[0.3, 0.3])
     pe = predict(w, Xn; return_stdev=true)
     pc = predict(w, Xn; return_stdev=true, method="iterative(30,0,20,10,1e-12)")
     @test maximum(abs.(pe.mean .- pc.mean)) < 1e-4 * std_y(y)

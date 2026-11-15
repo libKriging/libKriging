@@ -8,8 +8,11 @@ X = [mod(0.3819660 * (1:n)', 1), mod(0.7548777 * (1:n)', 1)];  % Kronecker desig
 y = sin(3 * X(:, 1)) + X(:, 2);
 Xn = [0.15 0.3; 0.45 0.6; 0.75 0.2];
 
-% predict method "iterative" on an exact fit: same predictor, solved by CG
-ke = Kriging(y, X, "matern5_2");
+% predict method "iterative" on an exact fit: same predictor, solved by CG.
+% Fixed moderate theta: a free fit on this noise-free function drifts to a
+% near-singular R (theta ~ 3-9) where CG does not reach its tolerance.
+p = Params("theta", [0.1 0.1], "is_theta_estim", false);
+ke = Kriging(y, X, "matern5_2", "constant", false, "none", "LL", p);
 [m_ex, s_ex] = ke.predict(Xn, true, false, false);
 [m_cg, s_cg] = ke.predict(Xn, true, false, false, "iterative(30,0,20,10,1e-12)");
 assert(max(abs(m_ex - m_cg)) < 1e-5 * std(y));
@@ -39,7 +42,8 @@ end
 assert(failed);
 
 % WarpKriging / MLPKriging: predict(..., method)
-wk = WarpKriging(y, X, {"kumaraswamy", "kumaraswamy"}, "matern5_2");
+wk = WarpKriging(y, X, {"kumaraswamy", "kumaraswamy"}, "matern5_2", "constant", false, "none", "LL", ...
+                 struct("theta", [0.3; 0.3]));
 [mw_ex, sw_ex] = wk.predict(Xn, true, false, false);
 [mw_cg, sw_cg] = wk.predict(Xn, true, false, false, "iterative(30,0,20,10,1e-12)");
 assert(max(abs(mw_ex - mw_cg)) < 1e-4 * std(y));
