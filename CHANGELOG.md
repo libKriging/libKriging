@@ -24,6 +24,14 @@ past release, see the corresponding entry on the
   setting: the results do not depend on it, #441).
 
 ### Changed
+- **macOS: multistart fits ×1.4-1.9 faster, with Accelerate** (#491, #490): the workers of a
+  multistart pool (`BFGS2`, `BFGS4`, `BFGS10`, …) run Accelerate single-threaded by themselves
+  (`BLASSetThreading`, macOS 15+, per thread), where their own threads and Accelerate's used to
+  oversubscribe the cores: on an Apple M4, `BFGS4` fits take 0.53-0.64 of the time at n = 500-1500
+  with 3-4x less CPU, the same fits bit for bit; single-start fits and the caller's thread keep
+  Accelerate's threads. This is what `VECLIB_MAXIMUM_THREADS=1` did (still the way on macOS < 15,
+  FAQ); `LK_ACCELERATE_POOL_SINGLE=0` turns it off. `kOmpMinRows` is also 200 on Apple (libomp
+  builds; the default macOS build has no OpenMP loops): ×1.6-1.8 per evaluation at n = 200-400.
 - **MLPKriging: default optimizer `"BFGS4"`** (#467, 2.0; was `"BFGS"`, a single start): C++
   `MLPKriging` constructor and `fit`, Python `MLPKriging` and `MLPKrigingRegressor`, R
   `MLPKriging()` / `fit.MLPKriging`, Octave / MATLAB, Julia. Measured on the 15-function MLP
@@ -314,6 +322,11 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **macOS: forked workers** (R `parallel::mclapply`, #455, #459, #487): libomp's own fork handlers
+  deadlocked the library's (no `omp_*` call in the handlers any more), and a forked child crashed
+  (SIGSEGV) in its first large Accelerate call, then in its first `BFGS4` fit: Accelerate runs
+  single-threaded in the child, in its forking thread and in the pool threads it creates
+  (the mode is per thread). `cmake_package` also finds a Homebrew libomp (`OpenMP_ROOT`, documented).
 - **Tests**: `KrigingApproxObjectivesTest` "approximate LOO / LMP fits are consistent with the
   exact fits" compared `leaveOneOut("nystrom(80)")` and `leaveOneOut("nystrom")` bitwise and
   failed intermittently on macOS (Accelerate). Both calls take the same deterministic code path;
