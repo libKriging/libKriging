@@ -187,10 +187,20 @@ static void test_predict_iterative() {
 
   double mean_err = arma::abs(mean_cg - mean_ex).max();
   double stdev_err = arma::abs(stdev_cg - stdev_ex).max();
+  // The iterative stdev solves run at sqrt(tol) (predictIterative_impl), so the
+  // VARIANCE is what is accurate to that level: near a training point the
+  // variance is close to 0 and its square root amplifies an error d into
+  // sqrt(d) (stdev diff 6e-5 on macOS arm64, 1.2e-6 on Linux). The variance
+  // error is of order stdev_tol * cond(R) = 1e-6 * cond(R): compared on the
+  // variances, relative to the largest one, at 1e-3 (a wrong variance or GLS
+  // formula gives an O(1) error; the mean, solved at tol, is checked tightly).
+  double var_err = arma::abs(arma::square(stdev_cg) - arma::square(stdev_ex)).max();
+  double var_max = arma::square(stdev_ex).max();
   std::cout << "  max |mean diff|  = " << mean_err << std::endl;
   std::cout << "  max |stdev diff| = " << stdev_err << std::endl;
+  std::cout << "  max |var diff| / max var = " << var_err / var_max << std::endl;
   assert(mean_err < 1e-4 * arma::stddev(y));
-  assert(stdev_err < 1e-4 * arma::stddev(y));
+  assert(var_err < 1e-3 * var_max);
 
   bool threw = false;
   try {
