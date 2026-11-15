@@ -1,0 +1,127 @@
+From ed4f3f0f7d11d375ab9a49df4ec02b620aca2d19 Mon Sep 17 00:00:00 2001
+From: yannrichet-asnr <yann.richet@asnr.fr>
+Date: Fri, 13 Nov 2026 20:52:05 +0100
+Subject: [PATCH] wip: GCD backend for detail::parallel_for on Apple without
+ OpenMP (not opened as a PR until measured)
+
+dispatch_apply when __APPLE__ and OpenMP is not compiled in; -DLK_NO_GCD_LOOPS for measurement; no option,
+no threshold change. A fork child has a budget of 1 (#460), so libdispatch is not used there.
+---
+ src/lib/OmpLoops.hpp    | 18 ++++++++++++++++
+ src/lib/ParallelFor.hpp | 48 ++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 61 insertions(+), 5 deletions(-)
+
+diff --git a/src/lib/OmpLoops.hpp b/src/lib/OmpLoops.hpp
+index 7d13ff7e..1290b402 100644
+--- a/src/lib/OmpLoops.hpp
++++ b/src/lib/OmpLoops.hpp
+@@ -22,6 +22,24 @@
+ #endif
+ #endif
+ 
++// Apple without OpenMP (the default macOS build: libomp is keg-only with
++// Homebrew): the same loops run on Grand Central Dispatch (ParallelFor.hpp).
++// LK_NO_GCD_LOOPS switches them off (measurements). LK_OMP_LOOPS then also means
++// "parallel loops compiled in", as for the OpenMP ones.
++#if !defined(_OPENMP) && defined(__APPLE__) && !defined(LK_NO_GCD_LOOPS)
++#define LK_OMP_LOOPS 1
++#define LK_GCD_LOOPS 1
++#if defined(__SANITIZE_THREAD__)
++#undef LK_OMP_LOOPS
++#undef LK_GCD_LOOPS
++#elif defined(__has_feature)
++#if __has_feature(thread_sanitizer)
++#undef LK_OMP_LOOPS
++#undef LK_GCD_LOOPS
++#endif
++#endif
++#endif
++
+ namespace libKriging {
+ namespace detail {
+ /// Smallest n for which the O(n^2) loops of an objective evaluation (covariance
+diff --git a/src/lib/ParallelFor.hpp b/src/lib/ParallelFor.hpp
+index 2ea92f81..bfdd3620 100644
+--- a/src/lib/ParallelFor.hpp
++++ b/src/lib/ParallelFor.hpp
+@@ -6,21 +6,49 @@
+ //   parallel_for(begin, end, chunk, nthreads, parallel, [&](long lo, long hi) { ... });
+ //
+ // calls the body on consecutive sub-ranges [lo, hi) of [begin, end) of at most
+-// `chunk` indices, dynamically distributed over at most `nthreads` OpenMP
+-// threads. The body runs once on the whole range, on the calling thread, when
+-// `parallel` is false, nthreads <= 1, the range is a single chunk, or the
+-// OpenMP loops are not compiled in (no OpenMP, or TSan without
+-// LK_TSAN_OPENMP: OmpLoops.hpp). The body
++// `chunk` indices, dynamically distributed over at most `nthreads` threads:
++// OpenMP, or Grand Central Dispatch (`dispatch_apply`) on Apple without OpenMP.
++// The body runs once on the whole range, on the calling thread, when
++// `parallel` is false, nthreads <= 1 (a fork() child has a budget of 1, so
++// libdispatch, which is not safe after fork() without exec, is not used there),
++// the range is a single chunk, or the parallel loops are not compiled in (no
++// OpenMP nor GCD, or TSan without LK_TSAN_OPENMP: OmpLoops.hpp). The body
+ // must not throw and the sub-ranges must be independent (disjoint outputs; any
+ // reduction is done by the caller after the loop, in a fixed order).
+ 
+ #include "OmpLoops.hpp"
+ 
+ #include <algorithm>
++#include <atomic>
++#include <type_traits>
++
++#ifdef LK_GCD_LOOPS
++#include <dispatch/dispatch.h>
++#endif
+ 
+ namespace libKriging {
+ namespace detail {
+ 
++#ifdef LK_GCD_LOOPS
++template <class F>
++struct GcdLoop {
++  F* body;
++  long begin, end, chunk, nchunks;
++  std::atomic<long> next;
++};
++
++// one dispatch_apply task: takes chunks from the shared counter until none is left
++// (dynamic scheduling, as schedule(dynamic, 1))
++template <class F>
++void gcd_worker(void* p, size_t) {
++  GcdLoop<F>* c = static_cast<GcdLoop<F>*>(p);
++  for (long k = c->next.fetch_add(1); k < c->nchunks; k = c->next.fetch_add(1)) {
++    const long lo = c->begin + k * c->chunk;
++    (*c->body)(lo, std::min(c->end, lo + c->chunk));
++  }
++}
++#endif
++
+ template <class F>
+ void parallel_for(long begin, long end, long chunk, int nthreads, bool parallel, F&& body) {
+   if (end <= begin)
+@@ -29,12 +57,22 @@ void parallel_for(long begin, long end, long chunk, int nthreads, bool parallel,
+ #ifdef LK_OMP_LOOPS
+   const long nchunks = (end - begin + chunk - 1) / chunk;
+   if (parallel && nthreads > 1 && nchunks > 1) {
++#if defined(_OPENMP)
+ #pragma omp parallel for schedule(dynamic, 1) num_threads(nthreads)
+     for (long k = 0; k < nchunks; k++) {
+       const long lo = begin + k * chunk;
+       body(lo, std::min(end, lo + chunk));
+     }
+     return;
++#else  // LK_GCD_LOOPS
++    using Body = typename std::remove_reference<F>::type;
++    GcdLoop<Body> c{&body, begin, end, chunk, nchunks, {0}};
++    dispatch_apply_f(static_cast<size_t>(std::min<long>(nthreads, nchunks)),
++                     dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0),
++                     &c,
++                     gcd_worker<Body>);
++    return;
++#endif
+   }
+ #else
+   (void)nthreads;
+-- 
+2.39.5 (Apple Git-154)
+

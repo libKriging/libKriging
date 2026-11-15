@@ -1,0 +1,20 @@
+diff --git a/src/lib/LinearAlgebra.cpp b/src/lib/LinearAlgebra.cpp
+index 3cb8238c..56a001ab 100644
+--- a/src/lib/LinearAlgebra.cpp
++++ b/src/lib/LinearAlgebra.cpp
+@@ -680,6 +680,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::inv_sympd(const arma::mat& L) {
+     arma::lapack::potri(&uplo, &n, Rinv.memptr(), &n, &info);
+   if (info == 0 && n > 0) {
+     Rinv = arma::symmatl(Rinv);
++#ifndef LK_NO_POTRI_CHECK  // measurement only (session 2, #472 section 5): the check of #458 compiled out
+     // O(n^2) check of the potri result against two triangular solves with the
+     // same L, on a fixed vector. A correct potri agrees to 3e-13 (measured up
+     // to n = 1500, cond(R) = 4e15); Accelerate's potri intermittently returned
+@@ -698,6 +699,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::inv_sympd(const arma::mat& L) {
+     arma::lapack::trtrs(&lo, &tr, &nonunit, &n, &one, const_cast<double*>(L.memptr()), &n, w.memptr(), &n, &info_wt);
+     if (info_w != 0 || info_wt != 0 || !(arma::norm(Rinv * v - w, "inf") <= 1e-8 * arma::norm(w, "inf")))
+       info = -1;
++#endif
+   }
+   if (info != 0)
+     return arma::solve(arma::trimatu(L.t()), arma::solve(arma::trimatl(L), arma::eye(L.n_rows, L.n_rows)));

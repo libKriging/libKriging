@@ -82,7 +82,7 @@ logic of #460 and a different pool path; the cause on master is the one above, c
 
 ## 2. #456 part (b): GCD backend — decision
 
-Branch `feat/parallel-for-gcd` (local, commit "wip: GCD backend", **not opened as a PR**): `dispatch_apply_f` path in
+Branch `feat/parallel-for-gcd` (it was local only and has been deleted; the commit "wip: GCD backend" is kept as `macOS-M4-session-2-gcd-backend.patch`, **never opened as a PR**): `dispatch_apply_f` path in
 master's `parallel_for` when `__APPLE__` and OpenMP is not compiled in; `-DLK_NO_GCD_LOOPS` for measurement; no
 `LK_APPLE_OPENMP`, no threshold change; a fork child has a budget of 1 (#460), so libdispatch is not used there (no
 separate flag needed). `clang-format` 14 clean. `build-gcd` full suite: **243 / 243**. Builds: `seq` (default macOS
@@ -511,3 +511,8 @@ Power Mode **on** (restored by the maintainer before this run; the Q5 effect had
 `BFGS4`: n = 500 541 -> 309 ms, n = 800 1842 -> 982 ms, n = 1500 8189 -> 5271 ms (0.53-0.64), `BFGS10` 0.59-0.74, `BFGS2`
 0.76-0.97, single-start `BFGS` 0.99-1.00; CPU 3-4x lower; equal to `VECLIB_MAXIMUM_THREADS=1` on the multistart fits.
 Outputs bitwise identical to the previous behaviour (94 832 numbers, n = 500 and 1500).
+
+## Patches kept (the scratch branches and worktrees were removed after #452 / #472 were closed)
+
+* `macOS-M4-session-2-gcd-backend.patch`: the GCD backend of `detail::parallel_for` measured in section 2 (closed #456).
+* `macOS-M4-session-2-nocheck-potri.patch`: `LK_NO_POTRI_CHECK`, the `potri` check of #458 compiled out, used by the Q8 follow-up (`build-nocheck`).
