@@ -46,7 +46,11 @@ if(NOT WIN32)
     if(OpenMP_CXX_FOUND)
         target_link_libraries(_pylibkriging PRIVATE OpenMP::OpenMP_CXX)
         # Set RTLD_NOW flag to ensure OpenMP is loaded before the module initializes
-        set_target_properties(_pylibkriging PROPERTIES LINK_FLAGS "-Wl,-z,now")
+        # (ELF linkers only: the static TLS block is a glibc matter, and Apple's ld rejects "-z", which broke the
+        # macOS build as soon as OpenMP was found, e.g. with libomp and -DOpenMP_ROOT)
+        if(NOT APPLE)
+            set_target_properties(_pylibkriging PROPERTIES LINK_FLAGS "-Wl,-z,now")
+        endif()
     endif()
 endif()
 

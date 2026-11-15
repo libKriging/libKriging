@@ -57,6 +57,28 @@ past release, see the corresponding entry on the
   setting: the results do not depend on it, #441).
 
 ### Changed
+- **macOS: multistart fits ×1.4-1.9 faster, with Accelerate** (#491, #490): the workers of a
+  multistart pool (`BFGS2`, `BFGS4`, `BFGS10`, …) run Accelerate single-threaded by themselves
+  (`BLASSetThreading`, macOS 15+, per thread), where their own threads and Accelerate's used to
+  oversubscribe the cores: on an Apple M4, `BFGS4` fits take 0.53-0.64 of the time at n = 500-1500
+  with 3-4x less CPU, the same fits bit for bit; single-start fits and the caller's thread keep
+  Accelerate's threads. This is what `VECLIB_MAXIMUM_THREADS=1` did (still the way on macOS < 15,
+  FAQ); `LK_ACCELERATE_POOL_SINGLE=0` turns it off. `kOmpMinRows` is also 200 on Apple (libomp
+  builds; the default macOS build has no OpenMP loops): ×1.6-1.8 per evaluation at n = 200-400.
+- **MLPKriging: default optimizer `"BFGS4"`** (#467, 2.0; was `"BFGS"`, a single start): C++
+  `MLPKriging` constructor and `fit`, Python `MLPKriging` and `MLPKrigingRegressor`, R
+  `MLPKriging()` / `fit.MLPKriging`, Octave / MATLAB, Julia. Measured on the 15-function MLP
+  benchmark of T8 (20 designs, tanh and selu, 600 cases; plain `Kriging` 7 %) and on the
+  projected-Branin 10D case of #407 (10 designs), `docs/dev/rationalization/mlp-default-467.md`:
+  test Q² < 0.5 on 68.5 % of the cases with the single start against 29.3 % with `"BFGS4"`
+  (25.3 % with `"BFGS10"`), #407 median Q² −6.0 / −2.5 (tanh / selu) against 0.983 / 0.993, for
+  x 1.6 the CPU time of the 1.x default (`"BFGS"`, 5 folds) on one core and x 1.04 its wall time
+  on 4 cores (calibration included). Changed results: every `MLPKriging` fit without an explicit
+  `optim` (different mean, variance factor and `logLikelihood()`). `WarpKriging` keeps `"BFGS"`
+  for every warping, `mlp_joint` included (pass `"BFGS4"` there). `calibration_folds` stays 5
+  (the 1.x value; see the T8 entry below). Migration: pass `optim = "BFGS"` to get the 1.x fit
+  back; `"BFGS10"` for a hard fit. Saved models are loaded unchanged (`update(refit = true)`
+  stays a warm-started single start).
 - **Long-range restart removed** (#466, 2.0): `Optim::set_long_range_restart` /
   `get_long_range_restart`, `Optim::set_max_long_range_restart` / `get_max_long_range_restart`
   and the environment variables `LK_LONG_RANGE_RESTART` / `LK_MAX_LONG_RANGE_RESTART` (now
@@ -181,12 +203,12 @@ past release, see the corresponding entry on the
   may end at a slightly different point (4 of 1728 measured Kriging fits, |ΔLL| <= 1.1e-5, 12 %
   fewer restarts; 216 WarpKriging fits unchanged). `AdamBFGS::inner_restart` now decides the restart itself
   (it receives the run's result, end and start points; `AdamBFGS::max_restart` is removed).
-- **MLPKriging variance calibration** (T8): `calibration_folds` defaults to 3 instead of 5. For
-  the default single-start fit, the calibrated fit takes x2.2 the CPU time of the uncalibrated
-  fit instead of x4.0 on 1 core (wall x1.8 instead of x2.4 on 4 cores), with the same 95 %
-  coverage (0.965 vs 0.957 on 135 fits) and test NLPD (+0.08, 95 % CI [-0.30, 0.45]). With a
-  multistart `"BFGSn"`, 3 folds widen the intervals more (test NLPD +0.56, CI [+0.20, +0.97], 45
-  `BFGS4` fits): set `calibration_folds = "5"` explicitly there. The factor is also no longer
+- **MLPKriging variance calibration** (T8, #467): `calibration_folds` keeps its 1.x default 5.
+  T8 lowered it to 3 for the single-start default (same coverage and test NLPD at x 0.57 the CPU
+  time of the calibrated fit); with the `"BFGS4"` default (#467) 3 folds widen the intervals more
+  (median test NLPD +0.15, 95 % CI [+0.10, +0.20], 600 paired cases; coverage 0.971 against 0.961)
+  for x 0.75 the CPU time, so 5 was restored. Pass `calibration_folds = "3"` to trade interval
+  width for fit time. The factor is no longer
   clamped to >= 1 (`var_scale()` = mean squared standardised held-out residual, the
   maximum-likelihood scale; the clamp was never active on the 260 K = 5 fits measured).
   Models saved before keep their number of folds. See
@@ -333,6 +355,11 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **macOS: forked workers** (R `parallel::mclapply`, #455, #459, #487): libomp's own fork handlers
+  deadlocked the library's (no `omp_*` call in the handlers any more), and a forked child crashed
+  (SIGSEGV) in its first large Accelerate call, then in its first `BFGS4` fit: Accelerate runs
+  single-threaded in the child, in its forking thread and in the pool threads it creates
+  (the mode is per thread). `cmake_package` also finds a Homebrew libomp (`OpenMP_ROOT`, documented).
 - **Tests**: `KrigingApproxObjectivesTest` "approximate LOO / LMP fits are consistent with the
   exact fits" compared `leaveOneOut("nystrom(80)")` and `leaveOneOut("nystrom")` bitwise and
   failed intermittently on macOS (Accelerate). Both calls take the same deterministic code path;

@@ -152,7 +152,7 @@ from several user threads (Python `ThreadPoolExecutor`, joblib threads,
   7e-5 relative measured (machine-dependent, amplified by the optimizer's
   stopping point): `ConcurrentCallsTest`.
 - Not covered: two threads using the **same** model object (not supported,
-  as for any non-const object), Accelerate (no per-thread control, section 5);
+  as for any non-const object), Accelerate (single / multi mode only, no thread count, section 5);
   MKL: per-thread count since #445; `ConcurrentCallsTest` runs against oneMKL
   (GNU and INTEL threading layers) in `blas-backends.yml` (T9).
 
@@ -196,7 +196,9 @@ Fortran one, by reference), weak symbols on ELF, `dlsym` on macOS,
 `GetProcAddress` on Windows (`mkl_rt*.dll`). With any other BLAS only the OpenMP
 and pool parts of the budget apply: each worker of a multistart keeps the BLAS's
 own thread count (oversubscription when the BLAS is multithreaded; set its
-environment variable, e.g. `VECLIB_MAXIMUM_THREADS=1`, for multistart fits).
+environment variable, e.g. `FLEXIBLAS_NUM_THREADS=1`, for multistart fits). Apple
+Accelerate is the exception: its mode is set per thread, and the workers of a multistart
+call `BLASSetThreading(single)` for themselves (macOS 15+, below).
 The MKL path is checked in CI (`.github/workflows/blas-backends.yml`: oneMKL
 preloaded on an OpenBLAS build and linked, GNU and INTEL threading layers):
 each multistart worker's LAPACK calls run at its share (`NThr:1` for BFGS4 on 4
@@ -210,7 +212,7 @@ the same test. Accelerate is run by the macOS arm64 job of the same workflow.
 | OpenBLAS pthreads | Linux distributions, R Linux binary (bundled), Windows (conda / bundled `openblas.dll`), macOS Intel (brew) | own pool, spins after each call and for ~100 ms after loading (6.2) | `openblas_set_num_threads` (global) | yes |
 | OpenBLAS OpenMP | Linux (`libopenblas0-openmp`) | libgomp team of the caller | follows `OMP_NUM_THREADS` | yes |
 | Intel MKL / oneMKL | Linux / Windows x86, MATLAB | Intel OpenMP / GNU OpenMP / TBB / sequential | `mkl_set_num_threads`, **`mkl_set_num_threads_local` (per thread)** | yes, per thread (#445; MATLAB's own MKL only if it exports the C entry points) |
-| Apple Accelerate | macOS arm64 | GCD | `VECLIB_MAXIMUM_THREADS` at load; `BLASSetThreading` (macOS 15+, single / multi only, process-wide) | no: no per-thread count; measured on 3 and 10 cores (T9): BFGS4 not faster with `BLASSetThreading(single)` (x0.95–1.15) nor `VECLIB_MAXIMUM_THREADS=1`, so not set by the library (#416) |
+| Apple Accelerate | macOS arm64 | GCD | `VECLIB_MAXIMUM_THREADS` at load (whole process); `BLASSetThreading` (macOS 15+, single / multi only, **per thread**) | partly: no thread count; each worker of a multistart pool (more than one worker, #491) and each thread created in a fork child (#487) calls `BLASSetThreading(single)` for itself; the calling thread and single-start fits keep the multithreaded default. Apple M4, build without OpenMP: BFGS4 fits take 0.53-0.64 of the time at n = 500-1500 (the time of `VECLIB_MAXIMUM_THREADS=1`), BFGS10 0.59-0.74, with 3-4x less CPU, same fits bit for bit; `LK_ACCELERATE_POOL_SINGLE=0` restores the old behaviour. The earlier T9 measurement (x0.95-1.15, #416) only switched the calling thread, not the workers |
 | FlexiBLAS | Fedora / RHEL / openSUSE; found first by Armadillo on Linux | the selected backend's | `flexiblas_set_num_threads` | no (`openblas_*` probably not visible through it) |
 | BLIS / AMD AOCL | Linux, Windows | pthreads / OpenMP | `bli_thread_set_num_threads` | no |
 | Reference (Netlib, R's Rblas) | fallback | sequential | — | nothing to drive |
@@ -421,9 +423,9 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
    (`OPENBLAS_NUM_THREADS` = physical cores or `OPENBLAS_THREAD_TIMEOUT=4` for short
    programs).
 5. **Other BLAS**: MKL driven per thread since #445 (`mkl_set_num_threads_local`
-   gives a real per-worker share); Accelerate (no per-thread count, only
-   single / multi process-wide from macOS 15), FlexiBLAS, BLIS — not driven,
-   documented (FAQ).
+   gives a real per-worker share); Accelerate (no thread count, only
+   single / multi per thread from macOS 15: the multistart workers set it for
+   themselves, #491), FlexiBLAS, BLIS — not driven, documented (FAQ).
 
 ## 9. Environment variables
 
@@ -441,7 +443,9 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 | `OPENBLAS_NUM_THREADS` | OpenBLAS at load | size of its thread pool; below the budget, kept by libKriging |
 | `OPENBLAS_THREAD_TIMEOUT` | OpenBLAS at load | spin time of its idle threads |
 | `MKL_NUM_THREADS` | MKL at load | its global count; below the budget, kept by libKriging |
-| `VECLIB_MAXIMUM_THREADS`, `BLIS_NUM_THREADS`, `FLEXIBLAS_NUM_THREADS` | other BLAS | their own thread counts (not driven by libKriging) |
+| `VECLIB_MAXIMUM_THREADS` | Accelerate at load | its thread count for the whole process; not needed for multistart fits since macOS 15 (the workers set single-threaded mode themselves), still the way on macOS < 15 |
+| `LK_ACCELERATE_POOL_SINGLE` | libKriging, macOS 15+ | `0`: the workers of a multistart pool keep Accelerate's multithreaded mode (default: single-threaded) |
+| `BLIS_NUM_THREADS`, `FLEXIBLAS_NUM_THREADS` | other BLAS | their own thread counts (not driven by libKriging) |
 | `GOMP_SPINCOUNT`, `KMP_BLOCKTIME` | libgomp / libomp | spin of idle OpenMP threads |
 
 ## 10. Open items
