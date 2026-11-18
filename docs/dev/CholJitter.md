@@ -550,12 +550,56 @@ test off:
   × 0.66, LL never worse than −0.014), no change with a nugget. Not measured: matern3_2 / exp,
   WarpKriging, NestedKriging, `simulate`, update.
 
+#### Widened study: all kernels, classes, simulate and update
+
+Modes 3 and 4 complete the study: mode 3 skips the test whenever the shift is noise-free
+(flawed: a nugget alpha = 1 exactly gives the same exact matrix), mode 4 is mode 2 plus no test
+on the noise-free committed model (`LinearAlgebra::CommittedCholScope`, opened by
+`Kriging::make_committed_Model` and the committed cache of `WarpKriging::populate_Model`).
+Driver `bench/thread-budget/rcond_study.cpp` (`LK_RCOND=on|off|nf|J|diag|diagc`): `BFGS4`,
+functions sin4, hartmann6, branin4, sinhalf8, kernels gauss, matern5_2, matern3_2, exp; per fit
+LL, theta, RMSE / NLPD / cov95 on 1000 test points, interpolation error, `update` (10 points,
+no refit) and, for Kriging, 200 `simulate` paths at 200 points. Fits changed against the
+current behaviour (on):
+
+| class | noise | n | sets x functions | fits | test off | mode 2 (diag) | mode 4 (diagc) |
+|---|---|---|---|---|---|---|---|
+| Kriging | none | 100-500 | 10 x 4 | 480 | RMSE < × 0.9 on 9 | identical | = test off |
+| Kriging | none | 1000 | 5 x 4 | 80 | RMSE < × 0.9 on 10 (down to × 0.48), LL up to +32 | RMSE > × 1.1 on 4 (up to × 2.48) | = test off |
+| Kriging | nugget | 100-500 | 10 x 4 | 480 | LL < −1 on 10, RMSE > × 1.1 on 10 | 1 theta moved | = mode 2 |
+| Kriging | nugget | 1000 | 5 x 4 | 80 | 17 theta moved, LL −57 / +14 | 2 theta moved, LL −30 / +5 | = mode 2 |
+| Kriging | hetero | 100-1000 | | 560 | identical | identical | identical |
+| Warp none, kuma | none | 100-500 | 5 x 3, 3 x 4 | 336 | RMSE < × 0.9 on 3 | identical | = test off |
+| Warp none, kuma | hetero | 100-500 | | 336 | identical | identical | identical |
+| NestedKriging | none | 100-500 | | 168 | identical | identical | identical |
+| MLPKriging | none | 100, 200 | 5 x 3 | 120 | **RMSE > × 1.1 on 6** (× 1.15 to × 1.97) | identical | = test off |
+
+`simulate` and `update` (z-scores, RMSE after update) never differ beyond the fits above.
+
+- Noise-free, the test fires only on gauss and matern5_2 (never matern3_2 / exp), and acts only
+  on the committed model: theta and LL are those of the test off in the 480 fits n <= 500.
+  Without it the committed model interpolates (max error 4.8e-3 → 1.9e-6) and predicts better
+  on 22 fits (Kriging, Warp n 500).
+- MLPKriging is the exception: the 6 fits (branin4, matern5_2, n 100 and 200) have the same
+  theta and LL; with the test the committed model gets the retry nugget, interpolates worse
+  (1e-2) and predicts better; without it the exact model interpolates to 1e-3 only. The matrix
+  is genuinely ill-conditioned there (close points in the learned feature space): the test
+  protects. No variant tested separates this case from the false alarm of Kriging matern5_2.
+- With a nugget, the test off degrades the search (alpha reaching 1 gives an exact matrix);
+  modes 2 and 4 keep the test there and stay at the current behaviour, up to 3 fits of 560
+  moved both ways.
+- Hence no rcond rule is changed here: mode 4 wins more often (22 fits against 6) but loses
+  where the protection is real. A criterion for the committed model (e.g. a posteriori check of
+  the interpolation residual) is left to a separate issue.
+
 
 ## Open items
 
 - The rcond test of the Cholesky retry (`rcond(L)^2 < 1e-18`) breaks the continuity the jitter
   gives (matern5_2, n 1000) and the exactness of the committed model (matern5_2, n >= 500):
-  measured above; retry only on a failing Cholesky, or a test bounded by J, to be decided (#465).
+  measured above: neither the test off, nor a test bounded by the diagonal, nor "no test on the
+  noise-free committed model" dominates (MLPKriging needs the protection); kept unchanged, a
+  criterion for the committed model to be decided in a separate issue.
 - The `N` floor of the WarpKriging / MLPKriging search: removal measured above, no gain or loss
   but MLPKriging moving both ways; kept, to be decided (#465).
 - Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;
