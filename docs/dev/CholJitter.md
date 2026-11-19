@@ -508,8 +508,9 @@ without it). A uniform "retry only on a failing Cholesky" is not supported by th
 
 #### A test bounded by the diagonal (study mode)
 
+Study code, kept on the branch `v2/rcond-study` and not merged:
 `LinearAlgebra::set_chol_rcond_bound(mode)` (default 0, unchanged; `bench-fit-protocol
---rcond-bound`): `cholCov` skips the rcond test when the diagonal shift delta of
+--rcond-bound`). `cholCov` skips the rcond test when the diagonal shift delta of
 `factor * C + diag(d)` already bounds the 1-norm reciprocal condition number,
 delta / (sqrt(n) (max d + factor (n − 1))) >= `min_rcond`. Mode 1: constant shift on a unit
 correlation only (the search jitter J, WarpKriging's floor); mode 2: any shift (nugget
@@ -552,11 +553,11 @@ test off:
 
 #### Widened study: all kernels, classes, simulate and update
 
-Modes 3 and 4 complete the study: mode 3 skips the test whenever the shift is noise-free
+Modes 3 and 4 (branch `v2/rcond-study` as well) complete the study: mode 3 skips the test whenever the shift is noise-free
 (flawed: a nugget alpha = 1 exactly gives the same exact matrix), mode 4 is mode 2 plus no test
 on the noise-free committed model (`LinearAlgebra::CommittedCholScope`, opened by
 `Kriging::make_committed_Model` and the committed cache of `WarpKriging::populate_Model`).
-Driver `bench/thread-budget/rcond_study.cpp` (`LK_RCOND=on|off|nf|J|diag|diagc`): `BFGS4`,
+Driver `bench/thread-budget/rcond_study.cpp` (same branch) (`LK_RCOND=on|off|nf|J|diag|diagc`): `BFGS4`,
 functions sin4, hartmann6, branin4, sinhalf8, kernels gauss, matern5_2, matern3_2, exp; per fit
 LL, theta, RMSE / NLPD / cov95 on 1000 test points, interpolation error, `update` (10 points,
 no refit) and, for Kriging, 200 `simulate` paths at 200 points. Fits changed against the
@@ -590,7 +591,7 @@ current behaviour (on):
   moved both ways.
 - Hence no rcond rule is changed here: mode 4 wins more often (22 fits against 6) but loses
   where the protection is real. A criterion for the committed model (e.g. a posteriori check of
-  the interpolation residual) is left to a separate issue.
+  the interpolation residual) is left to #496.
 
 
 ## Open items
@@ -599,7 +600,7 @@ current behaviour (on):
   gives (matern5_2, n 1000) and the exactness of the committed model (matern5_2, n >= 500):
   measured above: neither the test off, nor a test bounded by the diagonal, nor "no test on the
   noise-free committed model" dominates (MLPKriging needs the protection); kept unchanged, a
-  criterion for the committed model to be decided in a separate issue.
+  criterion for the committed model in #496.
 - The `N` floor of the WarpKriging / MLPKriging search: removal measured above, no gain or loss
   but MLPKriging moving both ways; kept, to be decided (#465).
 - Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;

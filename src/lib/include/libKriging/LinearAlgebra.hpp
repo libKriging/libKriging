@@ -45,37 +45,10 @@ class LinearAlgebra {
   static bool chol_rcond_check;
   LIBKRIGING_EXPORT static void check_chol_rcond(bool c);
   LIBKRIGING_EXPORT static bool chol_rcond_checked();
-  // Study of #465: skip the rcond test of the retry when a lower bound of the
-  // 1-norm reciprocal condition number, known from the diagonal of the
-  // matrix built by cholCov, is already >= min_rcond. 0: off (default);
-  // 1: only for a constant diagonal shift on a unit-scaled correlation
-  // (the search jitter J, or WarpKriging's floor); 2: any diagonal shift
-  // (also the nugget / heterogeneous noise models); 3: no rcond test on a
-  // noise-free matrix (factor 1, constant diagonal: the search with J and the
-  // exact committed model), retry on a failing Cholesky only; test kept
-  // with a noise model; 4: see CommittedCholScope.
-  static int chol_rcond_bound;
-  LIBKRIGING_EXPORT static void set_chol_rcond_bound(int mode);
-  LIBKRIGING_EXPORT static int get_chol_rcond_bound();
-  // Mode 4: mode 2 in the search, and no rcond test on the noise-free
-  // committed model (built inside a CommittedCholScope).
-  struct LIBKRIGING_EXPORT CommittedCholScope {
-    CommittedCholScope();
-    ~CommittedCholScope();
-    CommittedCholScope(const CommittedCholScope&) = delete;
-    CommittedCholScope& operator=(const CommittedCholScope&) = delete;
-
-   private:
-    bool m_previous;
-  };
-  // Retries of the Cholesky (num_nugget added) since the last reset, by
-  // trigger: a failing Cholesky, or the rcond test (study of #465).
-  LIBKRIGING_EXPORT static void chol_retry_counts(unsigned long long& on_failure, unsigned long long& on_rcond);
-  LIBKRIGING_EXPORT static void reset_chol_retry_counts();
 
   static int max_inc_choldiag;
   LIBKRIGING_EXPORT static arma::mat safe_chol_lower(arma::mat X);
-  static arma::mat safe_chol_lower_retry(arma::mat X, int warn, double rcond_lower_bound = 0.0);
+  static arma::mat safe_chol_lower_retry(arma::mat X, int warn);
 
   static double min_rcond;
   LIBKRIGING_EXPORT static double rcond_chol(arma::mat chol);
@@ -97,7 +70,7 @@ class LinearAlgebra {
                                                     const arma::mat& T_old,
                                                     const arma::mat& R_old);
 
-  LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo, double rcond_lower_bound = 0.0);
+  LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo);
 
   // Nystrom / partial-pivoted-Cholesky low-rank approximation of a covariance
   // matrix R (n x n, built lazily from X/_theta/_Cov), never materialized in
