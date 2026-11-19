@@ -71,15 +71,19 @@ PyKriging::PyKriging(const py::array_t<double>& y,
 
   if (noise.is_none()) {
     // No noise: pure GP (NoiseModel::None)
-    m_internal = std::make_unique<Kriging>(
-        mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    m_internal = without_gil(m_call, [&] {
+      return std::make_unique<Kriging>(
+          mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    });
   } else if (py::isinstance<py::str>(noise)) {
     // noise="nugget": estimated nugget mode
     std::string noise_str = noise.cast<std::string>();
     if (noise_str != "nugget")
       throw std::invalid_argument("noise string must be 'nugget', got '" + noise_str + "'");
     m_internal = std::make_unique<Kriging>(covType, Kriging::NoiseModel::Nugget);
-    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    without_gil(m_call, [&] {
+      m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    });
   } else {
     // noise is array or scalar: heterogeneous noise
     arma::colvec mat_noise;
@@ -90,8 +94,10 @@ PyKriging::PyKriging(const py::array_t<double>& y,
       mat_noise = carma::arr_to_col_view<double>(noise.cast<py::array_t<double>>());
     }
     m_internal = std::make_unique<Kriging>(covType, Kriging::NoiseModel::Heterogeneous);
-    m_internal->fit(
-        mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    without_gil(m_call, [&] {
+      m_internal->fit(
+          mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    });
   }
 }
 
@@ -120,10 +126,14 @@ void PyKriging::fit(const py::array_t<double>& y,
   Kriging::Parameters parameters = params_from_dict(dict);
 
   if (noise.is_none()) {
-    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    without_gil(m_call, [&] {
+      m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    });
   } else if (py::isinstance<py::str>(noise)) {
     // noise="nugget": just fit without noise vector (Nugget mode uses the non-noise fit overload)
-    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    without_gil(m_call, [&] {
+      m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    });
   } else {
     arma::colvec mat_noise;
     if (py::isinstance<py::float_>(noise) || py::isinstance<py::int_>(noise)) {
@@ -132,8 +142,10 @@ void PyKriging::fit(const py::array_t<double>& y,
     } else {
       mat_noise = carma::arr_to_col_view<double>(noise.cast<py::array_t<double>>());
     }
-    m_internal->fit(
-        mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    without_gil(m_call, [&] {
+      m_internal->fit(
+          mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
+    });
   }
 }
 
@@ -147,7 +159,7 @@ PyKriging::predict(const py::array_t<double>& X_n,
                    const std::string& method) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   auto [y_predict, y_stderr, y_cov, y_mean_deriv, y_stderr_deriv]
-      = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv, method);
+      = without_gil(m_call, [&] { return m_internal->predict(mat_X, return_stdev, return_cov, return_deriv, method); });
   return std::make_tuple(vec_to_arr(y_predict),
                          vec_to_arr(y_stderr),
                          carma::mat_to_arr(y_cov, true),
@@ -187,12 +199,13 @@ py::array_t<double> PyKriging::simulate(const int nsim,
     // "vecchia", "vecchia(m)" or "nystrom" (the noise-model overloads below
     // raise with "nystrom" for with_nugget=True / a non-zero with_noise:
     // Nystrom simulates the latent process only)
-    auto result = m_internal->simulate(nsim, seed, mat_X, method, will_update);
+    auto result = without_gil(m_call, [&] { return m_internal->simulate(nsim, seed, mat_X, method, will_update); });
     return carma::mat_to_arr(result, true);
   } else if (py::isinstance<py::bool_>(with_noise)) {
     // Nugget mode: simulate(nsim, seed, X_n, with_nugget, will_update, method)
     bool flag = with_noise.cast<bool>();
-    auto result = m_internal->simulate(nsim, seed, mat_X, flag, will_update, method);
+    auto result
+        = without_gil(m_call, [&] { return m_internal->simulate(nsim, seed, mat_X, flag, will_update, method); });
     return carma::mat_to_arr(result, true);
   } else {
     // Heterogeneous mode: simulate(nsim, seed, X_n, noise_vec, will_update, method)
@@ -203,7 +216,8 @@ py::array_t<double> PyKriging::simulate(const int nsim,
     } else {
       noise_vec = carma::arr_to_col_view<double>(with_noise.cast<py::array_t<double>>());
     }
-    auto result = m_internal->simulate(nsim, seed, mat_X, noise_vec, will_update, method);
+    auto result
+        = without_gil(m_call, [&] { return m_internal->simulate(nsim, seed, mat_X, noise_vec, will_update, method); });
     return carma::mat_to_arr(result, true);
   }
 }
@@ -218,7 +232,7 @@ void PyKriging::update(const py::array_t<double>& y_u,
   arma::mat mat_X = carma::arr_to_mat<double>(X_u);
 
   if (noise_u.is_none()) {
-    m_internal->update(mat_y, mat_X, refit);
+    without_gil(m_call, [&] { m_internal->update(mat_y, mat_X, refit); });
   } else {
     arma::colvec mat_noise;
     if (py::isinstance<py::float_>(noise_u) || py::isinstance<py::int_>(noise_u)) {
@@ -227,7 +241,7 @@ void PyKriging::update(const py::array_t<double>& y_u,
     } else {
       mat_noise = carma::arr_to_col<double>(noise_u.cast<py::array_t<double>>());
     }
-    m_internal->update(mat_y, mat_noise, mat_X, refit);
+    without_gil(m_call, [&] { m_internal->update(mat_y, mat_noise, mat_X, refit); });
   }
 }
 
@@ -240,7 +254,7 @@ py::array_t<double> PyKriging::update_simulate(const py::array_t<double>& y_u,
   arma::mat mat_X = carma::arr_to_mat<double>(X_u);
 
   if (noise_u.is_none()) {
-    arma::mat result = m_internal->update_simulate(mat_y, mat_X);
+    arma::mat result = without_gil(m_call, [&] { return m_internal->update_simulate(mat_y, mat_X); });
     return carma::mat_to_arr(result, true);
   } else {
     arma::colvec mat_noise;
@@ -250,7 +264,7 @@ py::array_t<double> PyKriging::update_simulate(const py::array_t<double>& y_u,
     } else {
       mat_noise = carma::arr_to_col<double>(noise_u.cast<py::array_t<double>>());
     }
-    arma::mat result = m_internal->update_simulate(mat_y, mat_noise, mat_X);
+    arma::mat result = without_gil(m_call, [&] { return m_internal->update_simulate(mat_y, mat_noise, mat_X); });
     return carma::mat_to_arr(result, true);
   }
 }

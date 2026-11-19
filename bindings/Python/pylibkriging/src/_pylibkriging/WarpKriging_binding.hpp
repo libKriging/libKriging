@@ -10,6 +10,8 @@
 #include <tuple>
 #include <vector>
 
+#include "call_guard.hpp"
+
 namespace py = pybind11;
 
 /// simulate's with_noise for WarpKriging / MLPKriging: None -> empty (no
@@ -107,6 +109,7 @@ class PyWarpKriging {
 
  private:
   std::unique_ptr<libKriging::WarpKriging> m_internal;
+  mutable CallMutex m_call;  // serializes the calls on this object (call_guard.hpp)
 };
 
 #endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_WARPKRIGING_BINDING_HPP

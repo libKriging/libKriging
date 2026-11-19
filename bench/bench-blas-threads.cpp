@@ -48,6 +48,11 @@ extern "C" {
 int openblas_get_num_threads(void) __attribute__((weak));
 void openblas_set_num_threads(int) __attribute__((weak));
 }
+#elif defined(_WIN32)
+// No weak symbols on Windows: looked up in the loaded modules
+#include "../tests/blas_symbols_win.hpp"
+static int (*const openblas_get_num_threads)(void) = lk_blas_win::proc<int (*)(void)>("openblas_get_num_threads");
+static void (*const openblas_set_num_threads)(int) = lk_blas_win::proc<void (*)(int)>("openblas_set_num_threads");
 #else
 static int (*const openblas_get_num_threads)(void) = nullptr;
 static void (*const openblas_set_num_threads)(int) = nullptr;
@@ -66,6 +71,14 @@ double cpu_seconds() {
   struct rusage ru;
   getrusage(RUSAGE_SELF, &ru);
   return ru.ru_utime.tv_sec + 1e-6 * ru.ru_utime.tv_usec + ru.ru_stime.tv_sec + 1e-6 * ru.ru_stime.tv_usec;
+#elif defined(_WIN32)
+  FILETIME creation, exit, kernel, user;
+  if (!GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user))
+    return 0.0;
+  auto seconds = [](const FILETIME& f) {  // 100 ns units
+    return 1e-7 * static_cast<double>((static_cast<unsigned long long>(f.dwHighDateTime) << 32) | f.dwLowDateTime);
+  };
+  return seconds(user) + seconds(kernel);
 #else
   return 0.0;
 #endif

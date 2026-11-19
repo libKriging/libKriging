@@ -1,0 +1,32 @@
+# 2026-11-13 vm
+Linux-6.18.44-fc-v445-x86_64-with-glibc2.39
+
+CPU(s):                                  4
+Model name:                              Intel(R) Xeon(R) Processor @ 2.10GHz
+Thread(s) per core:                      1
+Core(s) per socket:                      4
+Socket(s):                               1
+L2 cache:                                8 MiB (4 instances)
+L3 cache:                                260 MiB (1 instance)
+
+nproc: 4
+total        used        free      shared  buff/cache   available
+Mem:              15           0          14           0           1          15
+
+libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f2f901aa000)
+	libopenblas.so.0 => /lib/x86_64-linux-gnu/libopenblas.so.0 (0x00007f2f8d620000)
+	liblapack.so.3 => /lib/x86_64-linux-gnu/liblapack.so.3 (0x00007f2f8ce00000)
+
+c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+cmake version 3.28.3
+libKriging 6e008b2
+environment: (no LK_/OMP_/BLAS variable)
+
+Build: CMAKE_BUILD_TYPE=Release, Ninja, Python binding; OpenBLAS 0.3.26 pthreads (libopenblas0-pthread
+0.3.26+ds-1ubuntu0.1, Ubuntu 24.04 package, the BLAS of reference.csv.gz); library sources of 6e008b2
+(master before the removal, i.e. with the long-range restart). Run 2026-11-13, one chunk at a time on
+an otherwise idle 4-vCPU VM (same machine type as reference.csv.gz), 3.7 h of wall time, profile
+`reference`, variants:
+  "BFGS,BFGS2,BFGS4,BFGS10" (restart at its default c = 2)
+  "LK_LONG_RANGE_RESTART=0 BFGS only=none/LL;nugget/LL;nugget/LMP"
+  "LK_LONG_RANGE_RESTART=0 BFGS2,BFGS4 only=nugget/LL;nugget/LMP"

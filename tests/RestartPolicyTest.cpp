@@ -53,15 +53,6 @@ TEST_CASE("RestartPolicy criteria", "[RestartPolicy]") {
       n++;
     CHECK(n == 10);
   }
-  SECTION("long range: at most max_long_range_restart") {
-    config.max_long_range_restart = 2;
-    RestartPolicy p(config);
-    int n = 0;
-    while (p.record(1.0), p.restart(converged, 10, false, /*long_range=*/true))
-      n++;
-    CHECK(n == 2);
-    CHECK_FALSE(p.long_range_allowed());
-  }
   SECTION("worse within factr * epsmch is no change") {
     RestartPolicy p(config);
     p.record(100.0);

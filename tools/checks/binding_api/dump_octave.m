@@ -2,7 +2,7 @@
 % for compare.py, which compares the bindings with each other.
 % Usage: octave --path <mLibKriging dirs> --eval "dump_octave('<output file>')"
 function dump_octave(out_file)
-    scopes = {'Kriging', 'WarpKriging', 'MLPKriging', 'NestedKriging', 'Optim', 'LinearAlgebra'};
+    scopes = {'Kriging', 'WarpKriging', 'MLPKriging', 'NestedKriging', 'Optim', 'Parallel', 'LinearAlgebra'};
     % methods inherited from the handle superclass are not part of the API
     inherited = methods('handle');
 

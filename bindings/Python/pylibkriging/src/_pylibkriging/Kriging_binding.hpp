@@ -10,6 +10,8 @@
 #include <string>
 #include <tuple>
 
+#include "call_guard.hpp"
+
 namespace py = pybind11;
 
 class PyKriging {
@@ -142,6 +144,7 @@ class PyKriging {
 
  private:
   std::unique_ptr<Kriging> m_internal;
+  mutable CallMutex m_call;  // serializes the calls on this object (call_guard.hpp)
 
   static Kriging::NoiseModel parse_noise_model(const std::string& nm);
   static std::string noise_model_to_string(Kriging::NoiseModel nm);

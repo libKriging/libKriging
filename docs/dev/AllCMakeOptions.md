@@ -27,4 +27,5 @@ They should be used as `-D<option>=<value>` in `cmake` command line.
 | `SANITIZE`                   |            `OFF`            | `OFF`, `THREAD`, `ADDRESS`, `LEAK`                  | Enable sanitize feature (is available)            |
 | `LBFGSB_SHOW_BUILD`          |            `OFF`            | `ON`, `OFF`                                         | Show details of `lbfgsb_cpp` sub-build            |
 | `USE_JEMALLOC`               |            `OFF`            | `ON`, `OFF`                                         | Download and build jemalloc 5.3.0 as the default allocator (ignored on Windows). Off by default: it was disabled while debugging a TLS error in the Python bindings |
+| `OpenMP_ROOT`                |        &lt;empty&gt;        | &lt;path&gt;                                        | standard CMake hint for `find_package(OpenMP)`. **macOS**: Homebrew's `libomp` is keg-only and is found only with `-DOpenMP_ROOT=$(brew --prefix libomp)`; without it the build has no OpenMP and its parallel loops run sequentially |
 

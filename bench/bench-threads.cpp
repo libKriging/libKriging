@@ -37,6 +37,12 @@ int openblas_get_num_threads() __attribute__((weak));
 int openblas_get_parallel() __attribute__((weak));
 }
 #define LK_BENCH_OPENBLAS 1
+#elif defined(_WIN32)
+// No weak symbols on Windows: looked up in the loaded modules (last include)
+#include "../tests/blas_symbols_win.hpp"
+static int (*const openblas_get_num_threads)() = lk_blas_win::proc<int (*)()>("openblas_get_num_threads");
+static int (*const openblas_get_parallel)() = lk_blas_win::proc<int (*)()>("openblas_get_parallel");
+#define LK_BENCH_OPENBLAS 1
 #endif
 
 namespace {

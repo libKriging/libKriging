@@ -435,6 +435,34 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return OptimBinding::get_thread_start_delay_ms(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::set_thread_start_delay_ms"_hash:
       return OptimBinding::set_thread_start_delay_ms(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::get_num_threads_percent"_hash:
+      return ParallelBinding::get_num_threads_percent(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::set_num_threads_percent"_hash:
+      return ParallelBinding::set_num_threads_percent(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::get_num_threads"_hash:
+      return ParallelBinding::get_num_threads(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::get_thread_pool_size"_hash:
+      return ParallelBinding::get_thread_pool_size(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::set_thread_pool_size"_hash:
+      return ParallelBinding::set_thread_pool_size(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::get_thread_start_delay_ms"_hash:
+      return ParallelBinding::get_thread_start_delay_ms(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::set_thread_start_delay_ms"_hash:
+      return ParallelBinding::set_thread_start_delay_ms(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::get_blas_threads_min_n"_hash:
+      return ParallelBinding::get_blas_threads_min_n(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::set_blas_threads_min_n"_hash:
+      return ParallelBinding::set_blas_threads_min_n(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::get_omp_min_rows"_hash:
+      return ParallelBinding::get_omp_min_rows(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::set_omp_min_rows"_hash:
+      return ParallelBinding::set_omp_min_rows(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::blas_backend"_hash:
+      return ParallelBinding::blas_backend(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::blas_num_threads"_hash:
+      return ParallelBinding::blas_num_threads(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Parallel::omp_enabled"_hash:
+      return ParallelBinding::omp_enabled(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearAlgebra::get_chol_jitter"_hash:
       return LinearAlgebraBinding::get_chol_jitter(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearAlgebra::set_chol_jitter"_hash:

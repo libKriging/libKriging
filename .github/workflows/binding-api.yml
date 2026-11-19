@@ -25,7 +25,7 @@ on:
       - 'v*'
   pull_request:
     branches:
-      - '*'
+      - '**'
   workflow_dispatch: # test a branch without a pull request
 
 # One run per pull request (or branch) and workflow: a new push to a pull

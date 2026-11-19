@@ -257,7 +257,41 @@ class TestOptim:
             assert np.isfinite(k.logLikelihood())
         finally:
             lk.Optim.set_num_threads_percent(orig)
-    
+
+    def test_parallel_settings(self):
+        """Parallel: the thread settings of Optim, the OpenMP threshold, read-only levels"""
+        P = lk.Parallel
+        orig = (P.get_num_threads_percent(), P.get_thread_pool_size(), P.get_blas_threads_min_n(),
+                P.get_omp_min_rows())
+        try:
+            P.set_num_threads_percent(0.5)
+            assert lk.Optim.get_num_threads_percent() == 0.5
+            assert P.get_num_threads() == lk.Optim.get_num_threads() >= 1
+            P.set_thread_pool_size(3)
+            assert lk.Optim.get_thread_pool_size() == 3
+            P.set_blas_threads_min_n(0)
+            assert P.get_blas_threads_min_n() == 0
+            X = np.random.RandomState(2).uniform(size=(250, 2))
+            y = np.sin(6 * X[:, 0]) + X[:, 1]
+            k = lk.Kriging(y, X, "matern5_2")
+            theta = k.theta().ravel()
+            P.set_omp_min_rows(0)
+            assert P.get_omp_min_rows() == 0
+            ll_par = k.logLikelihoodFun(theta, False, False)[0]
+            P.set_omp_min_rows(10**6)
+            ll_ser = k.logLikelihoodFun(theta, False, False)[0]
+            assert abs(ll_par - ll_ser) <= 1e-12 * abs(ll_ser)  # performance setting only
+            with pytest.raises(Exception):
+                P.set_omp_min_rows(-1)
+            assert P.blas_backend() in ("mkl", "openblas", "accelerate", "unknown")
+            assert P.blas_num_threads() >= 0
+            assert isinstance(P.omp_enabled(), bool)
+        finally:
+            P.set_num_threads_percent(orig[0])
+            P.set_thread_pool_size(orig[1])
+            P.set_blas_threads_min_n(orig[2])
+            P.set_omp_min_rows(orig[3])
+
     def test_optim_affects_optimization(self):
         """Test that Optim settings actually affect model fitting"""
         np.random.seed(999)

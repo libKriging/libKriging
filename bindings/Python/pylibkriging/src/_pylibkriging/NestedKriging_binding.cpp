@@ -75,14 +75,17 @@ void PyNestedKriging::fit(const py::array_t<double>& y,
                           const std::string& method) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal->fit(
-      mat_y, mat_X, nb_groups, Trend::fromString(regmodel), optim, objective, params_from_dict(dict), warping, method);
+  const auto parameters = params_from_dict(dict);
+  without_gil(m_call, [&] {
+    m_internal->fit(
+        mat_y, mat_X, nb_groups, Trend::fromString(regmodel), optim, objective, parameters, warping, method);
+  });
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>> PyNestedKriging::predict(const py::array_t<double>& X_n,
                                                                               bool return_stdev) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
-  auto [mean, stdev] = m_internal->predict(mat_X, return_stdev);
+  auto [mean, stdev] = without_gil(m_call, [&] { return m_internal->predict(mat_X, return_stdev); });
   // return flat 1-D arrays (avoids (q,1) vs (q,) numpy broadcasting pitfalls)
   return {py::array_t<double>(static_cast<py::ssize_t>(mean.n_elem), mean.memptr()),
           py::array_t<double>(static_cast<py::ssize_t>(stdev.n_elem), stdev.memptr())};

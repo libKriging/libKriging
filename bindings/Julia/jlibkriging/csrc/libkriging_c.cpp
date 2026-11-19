@@ -5,6 +5,7 @@
 #include <libKriging/MLPKriging.hpp>
 #include <libKriging/NestedKriging.hpp>
 #include <libKriging/Optim.hpp>
+#include <libKriging/Parallel.hpp>
 
 #include <libKriging/Trend.hpp>
 #include <libKriging/WarpKriging.hpp>
@@ -2496,4 +2497,83 @@ double lk_optim_get_num_threads_percent(void) {
 
 int lk_optim_get_num_threads(void) {
   return Optim::get_num_threads();
+}
+
+// Parallel (Parallel.hpp): thread budget and its distribution
+int lk_parallel_set_num_threads_percent(double percent) {
+  try {
+    Parallel::set_num_threads_percent(percent);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_parallel_get_num_threads_percent(void) {
+  return Parallel::get_num_threads_percent();
+}
+
+int lk_parallel_set_thread_pool_size(int pool_size) {
+  try {
+    Parallel::set_thread_pool_size(pool_size);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_parallel_get_thread_pool_size(void) {
+  return Parallel::get_thread_pool_size();
+}
+
+int lk_parallel_set_thread_start_delay_ms(int delay_ms) {
+  try {
+    Parallel::set_thread_start_delay_ms(delay_ms);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_parallel_get_thread_start_delay_ms(void) {
+  return Parallel::get_thread_start_delay_ms();
+}
+
+int lk_parallel_set_blas_threads_min_n(int min_n) {
+  try {
+    Parallel::set_blas_threads_min_n(min_n);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_parallel_get_blas_threads_min_n(void) {
+  return Parallel::get_blas_threads_min_n();
+}
+
+int lk_parallel_set_omp_min_rows(int n) {
+  try {
+    Parallel::set_omp_min_rows(n);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_parallel_get_omp_min_rows(void) {
+  return Parallel::get_omp_min_rows();
+}
+
+int lk_parallel_get_num_threads(void) {
+  return Parallel::get_num_threads();
+}
+
+const char* lk_parallel_blas_backend(void) {
+  static thread_local std::string backend;  // valid until the next call of the thread
+  backend = Parallel::blas_backend();
+  return backend.c_str();
+}
+
+int lk_parallel_blas_num_threads(void) {
+  return Parallel::blas_num_threads();
+}
+
+int lk_parallel_omp_enabled(void) {
+  return Parallel::omp_enabled() ? 1 : 0;
 }

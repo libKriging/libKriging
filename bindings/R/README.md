@@ -108,10 +108,10 @@ physical cores by default, so k workers oversubscribe the machine k times. Give 
 worker its share of the thread budget, e.g. for k workers:
 
 ```r
-parallel::clusterCall(cl, function(k) rlibkriging:::optim_set_num_threads_percent(1 / k), length(cl))
+parallel::clusterCall(cl, function(k) rlibkriging::optim_set_num_threads_percent(1 / k), length(cl))
 ```
 
-(`rlibkriging:::optim_get_num_threads()` returns the resulting number of threads;
+(`optim_get_num_threads()` returns the resulting number of threads;
 see [docs/dev/FAQ.md](../../docs/dev/FAQ.md), "How many threads does libKriging use?").
 
 ## CI

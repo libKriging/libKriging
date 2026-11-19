@@ -66,6 +66,29 @@ using jlibkriging
     O.set_num_threads_percent(orig)
 end
 
+@testset "Parallel settings" begin
+    P = jlibkriging.Parallel
+    O = jlibkriging.Optim
+    orig = (P.get_num_threads_percent(), P.get_thread_pool_size(), P.get_blas_threads_min_n(), P.get_omp_min_rows())
+    P.set_num_threads_percent(0.5)
+    @test O.get_num_threads_percent() == 0.5
+    @test P.get_num_threads() == O.get_num_threads() >= 1
+    P.set_thread_pool_size(3)
+    @test O.get_thread_pool_size() == 3
+    P.set_blas_threads_min_n(0)
+    @test P.get_blas_threads_min_n() == 0
+    P.set_omp_min_rows(300)
+    @test P.get_omp_min_rows() == 300
+    @test_throws ErrorException P.set_omp_min_rows(-1)
+    @test P.blas_backend() in ("mkl", "openblas", "accelerate", "unknown")
+    @test P.blas_num_threads() >= 0
+    @test P.omp_enabled() isa Bool
+    P.set_num_threads_percent(orig[1])
+    P.set_thread_pool_size(orig[2])
+    P.set_blas_threads_min_n(orig[3])
+    P.set_omp_min_rows(orig[4])
+end
+
 @testset "LinearAlgebra settings" begin
     orig = chol_rcond_checked()
     check_chol_rcond(false)

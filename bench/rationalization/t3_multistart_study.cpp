@@ -12,8 +12,9 @@
 //   objective: LL, LOO or LMP
 //   sets:      data sets set0 .. set1 - 1 (seed 9000 + set, as jitter_n_study)
 //   pct:       Optim::set_num_threads_percent
-//   variants:  comma list of BFGS (long-range restart as configured, default
-//              c = 2), BFGS-nolr (Optim::set_long_range_restart(0)), BFGSk
+//   variants:  comma list of BFGS, BFGS-nolr, BFGSk; the long-range restart
+//              that BFGS-nolr switched off was removed in 2.0 (#466): BFGS-nolr
+//              is now the same fit as BFGS, kept for the T3 command lines
 // Output CSV (header + one row per fit):
 //   family,kernel,noise,objective,n,d,set,variant,pct,threads,obj,ll,rmse,
 //   wall_ms,cpu_ms,theta
@@ -91,7 +92,6 @@ int main(int argc, char** argv) {
     while (std::getline(ss, tok, ','))
       variants.push_back(tok);
   }
-  const double lr_default = Optim::get_long_range_restart();
   Optim::set_num_threads_percent(pct);
   {
     // OpenBLAS pthreads threads spin ~100 ms after loading (bench/thread-budget/README.md)
@@ -115,7 +115,6 @@ int main(int argc, char** argv) {
     }
     for (const std::string& v : variants) {
       const bool nolr = v == "BFGS-nolr";
-      Optim::set_long_range_restart(nolr ? 0.0 : lr_default);
       const std::string optim = nolr ? "BFGS" : v;
       std::string row;
       try {
@@ -170,6 +169,5 @@ int main(int argc, char** argv) {
       std::fflush(stdout);
     }
   }
-  Optim::set_long_range_restart(lr_default);
   Optim::set_num_threads_percent(0);
 }

@@ -17,6 +17,7 @@ function test_new_features()
     test_optim_tolerances();
     test_optim_thread_settings();
     test_optim_thread_budget();
+    test_parallel_settings();
     test_linalg_settings();
     test_model_chol_jitter_save_load();
     test_all_classes_have_covMat();
@@ -476,3 +477,36 @@ function test_model_chol_jitter_save_load()
     fprintf(' PASSED\n');
 end
 
+function test_parallel_settings()
+    fprintf('Test: Parallel settings...');
+
+    orig = {Parallel.get_num_threads_percent(), Parallel.get_thread_pool_size(), ...
+            Parallel.get_blas_threads_min_n(), Parallel.get_omp_min_rows()};
+    try
+        Parallel.set_num_threads_percent(0.5);
+        assert(Optim.get_num_threads_percent() == 0.5);
+        assert(Parallel.get_num_threads() == Optim.get_num_threads());
+        Parallel.set_thread_pool_size(3);
+        assert(Optim.get_thread_pool_size() == 3);
+        Parallel.set_blas_threads_min_n(0);
+        assert(Parallel.get_blas_threads_min_n() == 0);
+        Parallel.set_omp_min_rows(300);
+        assert(Parallel.get_omp_min_rows() == 300);
+        assert(any(strcmp(Parallel.blas_backend(), {'mkl', 'openblas', 'accelerate', 'unknown'})));
+        assert(Parallel.blas_num_threads() >= 0);
+        assert(islogical(Parallel.omp_enabled()));
+    catch err
+        restore_parallel(orig);
+        rethrow(err);
+    end
+    restore_parallel(orig);
+
+    fprintf(' PASSED\n');
+end
+
+function restore_parallel(orig)
+    Parallel.set_num_threads_percent(orig{1});
+    Parallel.set_thread_pool_size(orig{2});
+    Parallel.set_blas_threads_min_n(orig{3});
+    Parallel.set_omp_min_rows(orig{4});
+end

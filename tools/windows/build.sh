@@ -53,18 +53,14 @@ if [[ "$BUILD_TEST" == "true" ]]; then
       CTEST_FLAGS=--output-on-failure
     fi
 
-    # Python tests (fit/predict calls that repeatedly enter OpenMP parallel
-    # regions in LinearAlgebra.cpp, e.g. inside a BFGS loop) hang for ~1h
-    # under ctest on this job specifically, while the identical computation
-    # takes seconds on Linux/macOS or as a compiled C++ .exe -- the same
-    # MinGW/Windows libgomp thread-pool churn already diagnosed and fixed for
-    # Octave Windows (see tools/octave-windows/test.sh, commit b6cbf97a).
-    # Forcing single-threaded OpenMP avoids that churn here too. Verified
-    # across Python 3.7/3.9/3.10/3.11/3.12 (see issue #351).
-    if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
-      export OMP_NUM_THREADS=1
-      echo "OMP_NUM_THREADS=${OMP_NUM_THREADS} (Windows Python job: avoid libgomp thread-pool churn)"
-    fi
+    # No OMP_NUM_THREADS=1 for the Python job any more (#473). It was set
+    # against ~1h hangs of the Python tests (#351, attributed to OpenMP
+    # thread-pool churn; docs/dev/WindowsPythonHangDiagnostic354.md). Measured
+    # without it on a 10-core machine (#473): C++ suite, Python suite x5, the
+    # #354 reproducer x20, 200 BFGS4 fits in one process, at OpenMP thresholds
+    # 800 and 200: no hang. It also loaded OpenBLAS with 1 thread (OpenBLAS
+    # reads OMP_NUM_THREADS), so the multithreaded BLAS paths were never tested
+    # here. The Octave (MinGW / libgomp) job keeps it: not measured.
 
     # Test on fresh build lib (before installation)
     ctest -C "${MODE}" ${CTEST_FLAGS}

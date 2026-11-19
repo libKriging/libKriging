@@ -11,6 +11,18 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Added
+- **`Parallel`: the thread settings in one place, in every binding** (TODO of #480): C++
+  `libKriging/Parallel.hpp`, Python / Octave `Parallel.*`, Julia `jlibkriging.Parallel.*`, R
+  `parallel_*`. Budget (`set_num_threads_percent`, `get_num_threads`), its distribution
+  (`set_thread_pool_size`, `set_thread_start_delay_ms`, `set_blas_threads_min_n`, until now
+  C++ / environment only, and `set_omp_min_rows`, new), and the state of each level, read only
+  (`blas_backend`, `blas_num_threads`, `omp_enabled`). No separate OpenMP / BLAS thread count:
+  one budget bounds them together. Optim's thread settings stay, as the same settings.
+- **OpenMP threshold at run time**: `kOmpMinRows` stays the build default; `LK_OMP_MIN_ROWS` in
+  the environment or `Parallel::set_omp_min_rows` set it without recompiling (a performance
+  setting: the results do not depend on it, #441).
+
 ### Changed
 - **One jitter rule for Kriging, WarpKriging / MLPKriging and NestedKriging** (#465, part of #464):
   the search and the objective accessors (`logLikelihood()`, `leaveOneOut()`, `logMargPost()`) use
@@ -28,6 +40,94 @@ past release, see the corresponding entry on the
   `logLikelihood()` after `update(refit = false)` of a WarpKriging / MLPKriging as the exact
   model's log-likelihood gets the objective's (the one the fit maximizes); the exact model's value
   is not exposed (it is dominated by rounding where R is near singular).
+- **macOS: multistart fits ×1.4-1.9 faster, with Accelerate** (#491, #490): the workers of a
+  multistart pool (`BFGS2`, `BFGS4`, `BFGS10`, …) run Accelerate single-threaded by themselves
+  (`BLASSetThreading`, macOS 15+, per thread), where their own threads and Accelerate's used to
+  oversubscribe the cores: on an Apple M4, `BFGS4` fits take 0.53-0.64 of the time at n = 500-1500
+  with 3-4x less CPU, the same fits bit for bit; single-start fits and the caller's thread keep
+  Accelerate's threads. This is what `VECLIB_MAXIMUM_THREADS=1` did (still the way on macOS < 15,
+  FAQ); `LK_ACCELERATE_POOL_SINGLE=0` turns it off. `kOmpMinRows` is also 200 on Apple (libomp
+  builds; the default macOS build has no OpenMP loops): ×1.6-1.8 per evaluation at n = 200-400.
+- **MLPKriging: default optimizer `"BFGS4"`** (#467, 2.0; was `"BFGS"`, a single start): C++
+  `MLPKriging` constructor and `fit`, Python `MLPKriging` and `MLPKrigingRegressor`, R
+  `MLPKriging()` / `fit.MLPKriging`, Octave / MATLAB, Julia. Measured on the 15-function MLP
+  benchmark of T8 (20 designs, tanh and selu, 600 cases; plain `Kriging` 7 %) and on the
+  projected-Branin 10D case of #407 (10 designs), `docs/dev/rationalization/mlp-default-467.md`:
+  test Q² < 0.5 on 68.5 % of the cases with the single start against 29.3 % with `"BFGS4"`
+  (25.3 % with `"BFGS10"`), #407 median Q² −6.0 / −2.5 (tanh / selu) against 0.983 / 0.993, for
+  x 1.6 the CPU time of the 1.x default (`"BFGS"`, 5 folds) on one core and x 1.04 its wall time
+  on 4 cores (calibration included). Changed results: every `MLPKriging` fit without an explicit
+  `optim` (different mean, variance factor and `logLikelihood()`). `WarpKriging` keeps `"BFGS"`
+  for every warping, `mlp_joint` included (pass `"BFGS4"` there). `calibration_folds` stays 5
+  (the 1.x value; see the T8 entry below). Migration: pass `optim = "BFGS"` to get the 1.x fit
+  back; `"BFGS10"` for a hard fit. Saved models are loaded unchanged (`update(refit = true)`
+  stays a warm-started single start).
+- **Long-range restart removed** (#466, 2.0): `Optim::set_long_range_restart` /
+  `get_long_range_restart`, `Optim::set_max_long_range_restart` / `get_max_long_range_restart`
+  and the environment variables `LK_LONG_RANGE_RESTART` / `LK_MAX_LONG_RANGE_RESTART` (now
+  ignored) are removed, with the criterion of `Kriging::fit_impl`. Measured on the T7 base (3120
+  data sets, `docs/dev/rationalization/long-range-restart-466.md`): `"BFGS2"` has the miss rate of
+  the restarted single start on noise-free LL (13 % against 14 %) at 1/1.3-1/2.0 its wall time
+  and 1/1.5-1/2.3 its CPU time (4 cores), and fewer misses everywhere else; on the default path
+  (`"BFGS4"`) the restart only acted on nugget fits, through their noise-free warm start, for no
+  measurable gain (2 : 5 discordant sets of 1200) at x 1.15-1.31 their time. Changed results:
+  - nugget fits (any `"BFGS*"`, default included) take 13-24 % less time, same miss rate;
+  - an explicit single start (`optim = "BFGS"`) returns what it returned with
+    `LK_LONG_RANGE_RESTART=0`: half the time on noise-free LL, more misses (14 % → 26 % of the
+    benchmark sets on noise-free LL, + 2-6 points with a nugget).
+  Migration: use `"BFGS2"` where `"BFGS"` relied on the restart (same quality, lower cost), the
+  default `"BFGS4"` or more for a reliable optimum; drop `Optim::set_long_range_restart(...)`
+  calls (compile error) and the environment variables (no effect).
+- **R: global settings exported**, as in the other bindings: the `Optim` settings
+  (`optim_set_num_threads_percent`, `optim_get_num_threads`, `optim_set_thread_pool_size`,
+  `optim_set_max_iteration`, ...) and the `LinearAlgebra` settings (`linalg_set_chol_jitter`,
+  `linalg_set_num_nugget`, `linalg_set_chol_warning`, `linalg_check_chol_rcond`, ...) are
+  exported from `rlibkriging` instead of being reached through `rlibkriging:::` (which still
+  works). Documented in `R/settings.R`; the other `linalg_*` and the `random_*` helpers stay
+  internal, as in Python.
+- **Python: the GIL is released during fit / predict / simulate / update** (#473): the
+  `Kriging`, `WarpKriging`, `MLPKriging` and `NestedKriging` methods convert their arguments
+  with the GIL, run the libKriging call without it and convert the results with it again
+  (`call_guard.hpp`). Calls on different models from Python threads now run at the same time
+  and share the thread budget (docs/dev/parallel.md 3.1); calls on the same model object are
+  serialized by a per-object mutex (the GIL did it before). New `gil_release_test.py`.
+- **Windows: BLAS thread counts read by `BlasBackendTest` and the thread benchmarks** (#473):
+  PE / COFF has no weak symbols, so `openblas_get_num_threads`, `MKL_Get_Max_Threads`, ... are
+  looked up at run time in the loaded modules (`tests/blas_symbols_win.hpp`, any DLL name).
+  `BlasBackendTest` now detects the backend (`dgemm_` provider) and runs its OpenBLAS / MKL
+  cases on Windows; `bench-threads`, `bench-threads-ops` and `bench-blas-threads` report
+  `blas_kind` / `blas_threads` (was -1), and `bench-blas-threads` the CPU time (was 0).
+- **OpenMP threshold 200 with MSVC on Windows** (#473): `kOmpMinRows` (covariance matrix and
+  log-likelihood gradient loops) goes from 800 to 200 in MSVC builds, as on Linux. Measured on an
+  i9-10900K (10 cores / 20 threads, `vcomp`, OpenBLAS 0.3.33) at the thread budget: one LL +
+  gradient evaluation ×1.6 faster at n = 200 and ×1.5 at n = 400, full fits ×1.20 (`BFGS`) /
+  ×1.12 (`BFGS4`) at n = 500 for ×1.5–2.3 more CPU time, unchanged at n = 2000; the fitted model is
+  bit-identical (the gradients sum in one order whatever the threshold, #441). No hang with the C++
+  and Python suites without `OMP_NUM_THREADS=1`. MinGW builds (Octave, R on Windows) and macOS
+  keep 800 until measured. Migration: none.
+- **One OpenBLAS thread below 500 observations with MSVC on Windows** (#473): the automatic
+  small-problem rule (`Optim::blas_threads_min_n` = -1, #436) applies in MSVC builds even when the
+  machine has SMT headroom (on Linux it stays off there: the BLAS at the budget was faster). Measured
+  on an i9-10900K (10 cores / 20 threads, OpenBLAS 0.3.33): full fits at n = 200 / 300 / 400 ×1.59 /
+  ×1.51 / ×1.21 faster with `BFGS`, ×1.10 / ×1.08 / ×1.08 with `BFGS4`, with less CPU time and the
+  same optimum (to 1e-9 in LL, except one `BFGS` path at n = 200); per evaluation ×1.4–1.5 at
+  n = 200–400. Migration: `Optim::set_blas_threads_min_n(0)` or `LK_BLAS_THREADS_MIN_N=0` restores
+  the former behaviour; results may change in the last bits (the BLAS count changes).
+- **Thread budget under a CPU affinity mask on Windows** (#473): the physical cores are counted
+  among the CPUs of the process affinity mask (`start /affinity`, job objects,
+  `SetProcessAffinityMask`), as on Linux. Before, every core of the machine counted: a process
+  restricted to one core of a 10-core i9-10900K got a budget of 10 threads. A process spread over
+  several processor groups still counts every core. New test `AffinityTest` (Windows, Linux).
+- **Objective evaluations run at the thread budget** (#473): the public objective functions of
+  `Kriging` (`logLikelihood()`, `leaveOneOut()`, `logMargPost()`, with or without a method, their
+  `*Fun`, `*VecchiaFun`, `*NystromFun`, `leaveOneOutVec`) and `WarpKriging::logLikelihoodFun`
+  (so `MLPKriging`'s) open the same budget scope as fit / predict / simulate / update: OpenBLAS
+  at the budget (or 1 thread below `Optim::blas_threads_min_n`), MKL per thread, restored after.
+  Before, they ran at whatever count OpenBLAS had: the logical CPUs it was loaded with, or the
+  count another thread's call had set, so the same call on the same model could round
+  differently depending on the concurrent calls (1–2 ulp on `leaveOneOut()`,
+  `ConcurrentCallsTest` budget-1 case on Windows with OpenBLAS 0.3.33 loaded with 20 threads).
+  Migration: none; values may change in the last bits with a multithreaded OpenBLAS.
 - **Thread Sanitizer on the OpenMP loops** (#420, leftover of #439): with Clang + LLVM libomp,
   CMake finds Archer (`libarcher`) under `SANITIZE=THREAD` and defines `LK_TSAN_OPENMP`: the
   OpenMP loops (`OmpLoops.hpp`, NestedKriging's pair loop) stay compiled in and run on 2 threads
@@ -86,12 +186,12 @@ past release, see the corresponding entry on the
   may end at a slightly different point (4 of 1728 measured Kriging fits, |ΔLL| <= 1.1e-5, 12 %
   fewer restarts; 216 WarpKriging fits unchanged). `AdamBFGS::inner_restart` now decides the restart itself
   (it receives the run's result, end and start points; `AdamBFGS::max_restart` is removed).
-- **MLPKriging variance calibration** (T8): `calibration_folds` defaults to 3 instead of 5. For
-  the default single-start fit, the calibrated fit takes x2.2 the CPU time of the uncalibrated
-  fit instead of x4.0 on 1 core (wall x1.8 instead of x2.4 on 4 cores), with the same 95 %
-  coverage (0.965 vs 0.957 on 135 fits) and test NLPD (+0.08, 95 % CI [-0.30, 0.45]). With a
-  multistart `"BFGSn"`, 3 folds widen the intervals more (test NLPD +0.56, CI [+0.20, +0.97], 45
-  `BFGS4` fits): set `calibration_folds = "5"` explicitly there. The factor is also no longer
+- **MLPKriging variance calibration** (T8, #467): `calibration_folds` keeps its 1.x default 5.
+  T8 lowered it to 3 for the single-start default (same coverage and test NLPD at x 0.57 the CPU
+  time of the calibrated fit); with the `"BFGS4"` default (#467) 3 folds widen the intervals more
+  (median test NLPD +0.15, 95 % CI [+0.10, +0.20], 600 paired cases; coverage 0.971 against 0.961)
+  for x 0.75 the CPU time, so 5 was restored. Pass `calibration_folds = "3"` to trade interval
+  width for fit time. The factor is no longer
   clamped to >= 1 (`var_scale()` = mean squared standardised held-out residual, the
   maximum-likelihood scale; the clamp was never active on the 260 K = 5 fits measured).
   Models saved before keep their number of folds. See
@@ -134,7 +234,7 @@ past release, see the corresponding entry on the
   (built with the other benchmarks) fits >= 30 seeded data sets per configuration (gauss /
   matern5_2, noise-free / nugget, LL / LOO / LMP, test functions with and without inactive
   inputs, n 100-1000) with the optimizers given as arguments and the settings of the
-  environment (`LK_LONG_RANGE_RESTART`, `LK_CHOL_JITTER`, `LK_NUM_THREADS_PERCENT`); `run.py`
+  environment (`LK_CHOL_JITTER`, `LK_NUM_THREADS_PERCENT`, ...); `run.py`
   runs a profile (`smoke`: ~2 min, `reference`, `full`), `summarize.py` reports the miss rate
   with Wilson 95 % intervals, test RMSE, wall and CPU time. Reference results (4-core machine)
   committed in `bench/fit-protocol/results/`; see
@@ -161,7 +261,7 @@ past release, see the corresponding entry on the
   (Python `pylibkriging.linearalgebra_check` dict, R exported `linearalgebra_check` list,
   Octave `[ok, backend, report] = linearalgebra_check()`, Julia named tuple). See
   [docs/dev/FAQ.md](docs/dev/FAQ.md) ([#429](https://github.com/libKriging/libKriging/issues/429)).
-- **Long-range restart**: a noise-free LL fit with a single BFGS start (`"BFGS"`) is
+- **Long-range restart** (removed again before 2.0, #466: see `Changed`): a noise-free LL fit with a single BFGS start (`"BFGS"`) is
   restarted when it converges with max_j theta_j / maxdX_j > `Optim::set_long_range_restart(c)`
   (default 2, `LK_LONG_RANGE_RESTART`, 0 off), at most `Optim::set_max_long_range_restart(m)`
   times per start (default 2, `LK_MAX_LONG_RANGE_RESTART`), the best solution kept. The failed
@@ -238,6 +338,11 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **macOS: forked workers** (R `parallel::mclapply`, #455, #459, #487): libomp's own fork handlers
+  deadlocked the library's (no `omp_*` call in the handlers any more), and a forked child crashed
+  (SIGSEGV) in its first large Accelerate call, then in its first `BFGS4` fit: Accelerate runs
+  single-threaded in the child, in its forking thread and in the pool threads it creates
+  (the mode is per thread). `cmake_package` also finds a Homebrew libomp (`OpenMP_ROOT`, documented).
 - **Tests**: `KrigingApproxObjectivesTest` "approximate LOO / LMP fits are consistent with the
   exact fits" compared `leaveOneOut("nystrom(80)")` and `leaveOneOut("nystrom")` bitwise and
   failed intermittently on macOS (Accelerate). Both calls take the same deterministic code path;

@@ -23,23 +23,34 @@ This page collects questions about libKriging development
  multistart fit (`"BFGS10"`, ...) get it first, one start per thread; what remains goes to the
  BLAS and the OpenMP loops of each start. Change it with `Optim::set_num_threads_percent(x)` or
  the environment variable `LK_NUM_THREADS_PERCENT=x` (x <= 1: a ratio, x > 1: a percentage of
- the cores, 0: 100 %); `Optim::get_num_threads()` returns the resulting number of threads.
+ the cores, 0: 100 %); `Optim::get_num_threads()` returns the resulting number of threads
+ (the same settings in `Parallel`, below).
 
  | | set | read |
  |---|---|---|
- | C++ | `Optim::set_num_threads_percent(50)` | `Optim::get_num_threads()` |
- | Python | `lk.Optim.set_num_threads_percent(50)` | `lk.Optim.get_num_threads()` |
- | R | `rlibkriging:::optim_set_num_threads_percent(50)` | `rlibkriging:::optim_get_num_threads()` |
- | Octave | `Optim.set_num_threads_percent(50)` | `Optim.get_num_threads()` |
+ | C++ | `Parallel::set_num_threads_percent(50)` | `Parallel::get_num_threads()` |
+ | Python | `lk.Parallel.set_num_threads_percent(50)` | `lk.Parallel.get_num_threads()` |
+ | R | `parallel_set_num_threads_percent(50)` | `parallel_get_num_threads()` |
+ | Octave | `Parallel.set_num_threads_percent(50)` | `Parallel.get_num_threads()` |
+ | Julia | `jlibkriging.Parallel.set_num_threads_percent(50)` | `jlibkriging.Parallel.get_num_threads()` |
+
+ (`Optim.set_num_threads_percent` / `Optim.get_num_threads`, R `optim_*`, are the same
+ settings.) `Parallel` also tells which BLAS is used and with how many threads
+ (`blas_backend()`, `blas_num_threads()`), and sets the small-problem BLAS rule and the
+ OpenMP threshold (`set_blas_threads_min_n`, `set_omp_min_rows`).
 
  An explicit limit is never exceeded: `OMP_NUM_THREADS` (or `omp_set_num_threads` in the calling
  thread) caps the whole budget, `OPENBLAS_NUM_THREADS` (or `MKL_NUM_THREADS`) the BLAS only.
  The BLAS thread count is driven for OpenBLAS (process-wide) and Intel MKL / oneMKL (per thread,
  `mkl_set_num_threads_local`): each start of a multistart then uses its share of the budget for
- its BLAS calls. Apple Accelerate, FlexiBLAS and BLIS are not driven: with them each start of a
- multistart keeps the BLAS's own thread count (oversubscription when the BLAS is
- multithreaded); set `VECLIB_MAXIMUM_THREADS=1` (Accelerate), `FLEXIBLAS_NUM_THREADS=1` or
- `BLIS_NUM_THREADS=1` before loading the library for multistart fits. If you run several fits at
+ its BLAS calls. Apple Accelerate has no thread count, only single / multi, per thread (macOS 15+):
+ the workers of a multistart run it single-threaded by themselves (nothing to set; the caller's
+ thread and single-start fits keep its threads; `LK_ACCELERATE_POOL_SINGLE=0` turns this off; on
+ macOS < 15, which has no such call, set `VECLIB_MAXIMUM_THREADS=1` before loading the library for
+ multistart fits). FlexiBLAS and BLIS are not driven: with them each start of a multistart keeps the
+ BLAS's own thread count (oversubscription when the BLAS is multithreaded); set
+ `FLEXIBLAS_NUM_THREADS=1` or `BLIS_NUM_THREADS=1` before loading the library for multistart
+ fits. If you run several fits at
  once yourself (Python `multiprocessing`, R PSOCK / `future` workers, MPI, a job array on one
  node), each process uses the whole machine by default: give each one its part, e.g.
  `set_num_threads_percent(1 / k)` for k concurrent processes, or `OPENBLAS_NUM_THREADS=1

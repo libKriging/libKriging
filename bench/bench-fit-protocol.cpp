@@ -3,7 +3,7 @@
 // (kernel x noise x objective x function x n) and every seeded data set, fits
 // one Kriging model per optimizer of --optim and prints one CSV row per fit.
 // The settings that are not arguments come from the environment, read by the
-// library (LK_LONG_RANGE_RESTART, LK_CHOL_JITTER, LK_NUM_THREADS_PERCENT, ...)
+// library (LK_CHOL_JITTER, LK_NUM_THREADS_PERCENT, ...)
 // and written in the CSV, so that the rows of several runs (one per setting)
 // can be merged and compared on the same data sets (bench/fit-protocol/).
 //
@@ -215,10 +215,10 @@ std::string settings_label() {
     std::snprintf(jit, sizeof jit, "auto");
   else
     std::snprintf(jit, sizeof jit, "%g", c);
+  // the long-range restart (lrr=) was removed in 2.0 (#466)
   std::snprintf(b,
                 sizeof b,
-                "lrr=%g,jitter=%s,pct=%g%s",
-                Optim::get_long_range_restart(),
+                "jitter=%s,pct=%g%s",
                 jit,
                 Optim::get_num_threads_percent(),
                 LinearAlgebra::chol_rcond_checked() ? "" : ",rcond=0");

@@ -10,6 +10,8 @@
 #include <tuple>
 #include <vector>
 
+#include "call_guard.hpp"
+
 namespace py = pybind11;
 
 class PyMLPKriging {
@@ -97,6 +99,7 @@ class PyMLPKriging {
 
  private:
   std::unique_ptr<libKriging::MLPKriging> m_internal;
+  mutable CallMutex m_call;  // serializes the calls on this object (call_guard.hpp)
 };
 
 #endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_MLPKRIGING_BINDING_HPP

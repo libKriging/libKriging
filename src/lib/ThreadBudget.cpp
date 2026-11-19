@@ -3,11 +3,13 @@
 #include "libKriging/Optim.hpp"
 
 #include "BlasThreads.hpp"
+#include "OmpLoops.hpp"
 
 #include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <csignal>
+#include <cstdlib>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -184,7 +186,15 @@ int physical_cores_os() {
   return n;
 }
 #elif defined(_WIN32)
+// Cores with at least one logical CPU in the process affinity mask (start
+// /affinity, job objects, SetProcessAffinityMask), as sched_getaffinity on
+// Linux. A process spread over several processor groups (> 64 logical CPUs,
+// Windows 11 / Server 2022 default) has no single mask: every core counts.
 int physical_cores_os() {
+  DWORD_PTR process_mask = 0, system_mask = 0;
+  USHORT group = 0, group_count = 1;
+  const bool masked = GetProcessGroupAffinity(GetCurrentProcess(), &group_count, &group) && group_count == 1
+                      && GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask) && process_mask != 0;
   DWORD len = 0;
   GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len);
   if (len == 0)
@@ -196,8 +206,13 @@ int physical_cores_os() {
   int n = 0;
   for (DWORD off = 0; off < len;) {
     auto* p = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data() + off);
-    if (p->Relationship == RelationProcessorCore)
-      ++n;
+    if (p->Relationship == RelationProcessorCore) {
+      bool allowed = !masked;
+      for (WORD g = 0; !allowed && g < p->Processor.GroupCount; ++g)
+        allowed = p->Processor.GroupMask[g].Group == group && (p->Processor.GroupMask[g].Mask & process_mask) != 0;
+      if (allowed)
+        ++n;
+    }
     off += p->Size;
   }
   return n;
@@ -270,6 +285,30 @@ void apply_locked(BlasCountState& s) {
 }
 
 }  // namespace
+
+namespace {
+// OpenMP threshold in effect: kOmpMinRows (build), LK_OMP_MIN_ROWS (environment,
+// read at load), Parallel::set_omp_min_rows. Relaxed: a performance setting,
+// configuration-before-use as the other settings.
+std::atomic<unsigned long long> g_omp_min_rows{[] {
+  const char* v = std::getenv("LK_OMP_MIN_ROWS");
+  if (v != nullptr && *v != '\0') {
+    char* end = nullptr;
+    const long long n = std::strtoll(v, &end, 10);
+    if (end != v && n >= 0)
+      return static_cast<unsigned long long>(n);
+  }
+  return kOmpMinRows;
+}()};
+}  // namespace
+
+unsigned long long omp_min_rows() {
+  return g_omp_min_rows.load(std::memory_order_relaxed);
+}
+
+void set_omp_min_rows(unsigned long long n) {
+  g_omp_min_rows.store(n, std::memory_order_relaxed);
+}
 
 int physical_cores() {
   static const int n = [] {
@@ -450,8 +489,17 @@ int scope_blas_threads(unsigned long long n) {
     // its own call (T6 shared count state); the decision of a call must not
     // depend on the other calls running (T9 log, section 0)
     const int blas = target > 0 ? target : initial_blas_threads();
+#if defined(_MSC_VER)
+    // Windows / MSVC (vcomp, OpenBLAS's Win32 thread server): one BLAS thread
+    // is faster below the threshold even with SMT headroom (i9-10900K, 10
+    // cores / 20 threads, OpenBLAS 0.3.33: full fits x1.21-1.59 BFGS, x1.08-1.10
+    // BFGS4 at n = 200-400, same optimum, less CPU; #473)
+    if (blas > 1)
+      min_n = kAutoBlasMinN;
+#else
     if (blas > 1 && blas + budget > logical_cpus())
       min_n = kAutoBlasMinN;
+#endif
   }
   // A request like any other: it goes through the shared count state of the
   // ScopedBlasThreads (smallest live request in effect, the last scope restores

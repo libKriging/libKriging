@@ -595,6 +595,22 @@ int lk_optim_set_num_threads_percent(double percent);
 double lk_optim_get_num_threads_percent(void);
 int lk_optim_get_num_threads(void);
 
+/* Parallel (Parallel.hpp): thread budget and its distribution */
+int lk_parallel_set_num_threads_percent(double percent);
+double lk_parallel_get_num_threads_percent(void);
+int lk_parallel_set_thread_pool_size(int pool_size);
+int lk_parallel_get_thread_pool_size(void);
+int lk_parallel_set_thread_start_delay_ms(int delay_ms);
+int lk_parallel_get_thread_start_delay_ms(void);
+int lk_parallel_set_blas_threads_min_n(int min_n);
+int lk_parallel_get_blas_threads_min_n(void);
+int lk_parallel_set_omp_min_rows(int n);
+int lk_parallel_get_omp_min_rows(void);
+int lk_parallel_get_num_threads(void);
+const char* lk_parallel_blas_backend(void);
+int lk_parallel_blas_num_threads(void);
+int lk_parallel_omp_enabled(void);
+
 #ifdef __cplusplus
 }
 #endif

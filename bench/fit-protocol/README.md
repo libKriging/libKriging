@@ -5,7 +5,7 @@ results and decisions: [docs/dev/rationalization/T7-benchmark-base.md](../../doc
   every seeded data set of a grid (kernel x noise x objective x function x n) with each
   optimizer of `--optim`, one CSV row per fit (`--help` for the options and the columns).
   Settings that are not arguments come from the environment as for any libKriging program
-  (`LK_LONG_RANGE_RESTART`, `LK_CHOL_JITTER`, `LK_NUM_THREADS_PERCENT`, ...): their effective
+  (`LK_CHOL_JITTER`, `LK_NUM_THREADS_PERCENT`, ...): their effective
   values are in the `settings` column.
 - `--candidates 1` adds, for the noise-free fits, the columns of the jitter-rule study of #465
   (the model rebuilt at the fitted theta with jitter 0 and J: its log-likelihood, a check by
@@ -19,7 +19,10 @@ results and decisions: [docs/dev/rationalization/T7-benchmark-base.md](../../doc
   LOO on the log-density scale (n / 2) log(e / e_best)) with Wilson 95 % intervals, median
   test RMSE and RMSE / best, wall and CPU time, per configuration and variant.
 - `results/`: the reference run (`reference.csv.gz`), its machine (`machine.txt`) and tables
-  (`summary.md`).
+  (`summary.md`); the long-range restart study (#466, `long-range-466.*`, run on the library
+  before its removal; tables `long-range-466.md` by `long_range_466.py`, see
+  `docs/dev/rationalization/long-range-restart-466.md`). The `settings` column of the CSVs
+  written before 2.0 starts with `lrr=` (the removed restart).
 
 Commands (from the repository root, after building with `cmake --build <build> --target bench-fit-protocol`):
 

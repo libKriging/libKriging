@@ -96,8 +96,9 @@ model = lk.MLPKriging(
     kernel="gauss",
     regmodel="constant",
     normalize=False,
-    optim="BFGS",          # default: joint L-BFGS-B on MLP weights + θ; "BFGS10" adds
-                           # 10 starts (random θ and MLP weights)
+    optim="BFGS4",         # default since 2.0: 4 parallel joint L-BFGS-B starts
+                           # (MLP weights + θ); "BFGS10" for 10 starts, "BFGS" = 1.x
+                           # single start
     objective="LL",
     parameters={},
 )

@@ -65,18 +65,6 @@ class Optim {
 
   static int max_restart;  // eg. for wrong convergence to bounds
 
-  // Single-start BFGS of a noise-free LL fit: restart when the solution has a
-  // long-range component, max_j theta_j / maxdX_j > long_range_restart (0: off),
-  // at most max_long_range_restart times per start (docs/dev/CholJitter.md,
-  // long-range restart).
-  static double long_range_restart;
-  LIBKRIGING_EXPORT static void set_long_range_restart(double c);
-  LIBKRIGING_EXPORT static double get_long_range_restart();
-
-  static int max_long_range_restart;
-  LIBKRIGING_EXPORT static void set_max_long_range_restart(int m);
-  LIBKRIGING_EXPORT static int get_max_long_range_restart();
-
   static int max_iteration;
   LIBKRIGING_EXPORT static void set_max_iteration(int max_iteration_val);
   LIBKRIGING_EXPORT static int get_max_iteration();
@@ -116,6 +104,7 @@ class Optim {
   LIBKRIGING_EXPORT static void set_thread_start_delay_ms(int delay_ms);
   LIBKRIGING_EXPORT static int get_thread_start_delay_ms();
 
+  // Thread settings: also in Parallel (Parallel.hpp), which gathers them.
   // Thread budget of the library: the share of the physical cores it uses,
   // x <= 1 a ratio (0.5), x > 1 a percentage (50), 0 = automatic = 100 %.
   // Default from LK_NUM_THREADS_PERCENT. Never more than an explicit
@@ -145,7 +134,8 @@ class Optim {
   // compete with the OpenMP team for the cores. -1 = automatic (default, env
   // LK_BLAS_THREADS_MIN_N): threshold 500 when the BLAS threads and the
   // OpenMP team outnumber the logical CPUs (no SMT headroom: VMs, CI runners),
-  // off otherwise; 0 = off; n > 0 = threshold n. See REPORT-blas-threads.md.
+  // off otherwise, except with MSVC on Windows where it is always 500 (#473);
+  // 0 = off; n > 0 = threshold n. See REPORT-blas-threads.md.
   static int blas_threads_min_n;
   LIBKRIGING_EXPORT static void set_blas_threads_min_n(int min_n);
   LIBKRIGING_EXPORT static int get_blas_threads_min_n();

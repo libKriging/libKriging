@@ -42,6 +42,11 @@ int openblas_get_num_threads() __attribute__((weak));
 #define LK_TEST_WEAK 1
 #endif
 
+#if defined(_WIN32)
+// No weak symbols on Windows: looked up in the loaded modules (last include)
+#include "blas_symbols_win.hpp"
+#endif
+
 #if defined(LK_BACKEND_PROBE)
 // tests/backend_probe.c: records every dpotrf_ call of the process (thread,
 // MKL and OpenBLAS counts in effect in that thread) before forwarding it.
@@ -73,6 +78,8 @@ std::string blas_provider() {
   Dl_info info;
   if (f != nullptr && dladdr(f, &info) != 0 && info.dli_fname != nullptr)
     return info.dli_fname;
+#elif defined(_WIN32)
+  return lk_blas_win::module_path("dgemm_");
 #endif
   return "";
 }
@@ -97,6 +104,10 @@ int mkl_count() {
 #ifdef LK_TEST_WEAK
   if (MKL_Get_Max_Threads)
     return MKL_Get_Max_Threads();
+#elif defined(_WIN32)
+  static const auto f = lk_blas_win::proc<int (*)()>("MKL_Get_Max_Threads");
+  if (f)
+    return f();
 #endif
   return 0;
 }
@@ -107,6 +118,10 @@ int mkl_set_local(int n) {
 #ifdef LK_TEST_WEAK
   if (MKL_Set_Num_Threads_Local)
     return MKL_Set_Num_Threads_Local(n);
+#elif defined(_WIN32)
+  static const auto f = lk_blas_win::proc<int (*)(int)>("MKL_Set_Num_Threads_Local");
+  if (f)
+    return f(n);
 #endif
   (void)n;
   return -1;
@@ -116,6 +131,10 @@ int openblas_count() {
 #ifdef LK_TEST_WEAK
   if (openblas_get_num_threads)
     return openblas_get_num_threads();
+#elif defined(_WIN32)
+  static const auto f = lk_blas_win::proc<int (*)()>("openblas_get_num_threads");
+  if (f)
+    return f();
 #endif
   return 0;
 }
@@ -393,7 +412,7 @@ TEST_CASE("BFGS4 with 1 or 4 workers reaches the same optimum", "[backend]") {
 
 // Shared reference values (Linux x86_64, OpenBLAS 0.3.26 at 1 thread; T9 log):
 // 200 <= n < 800 is where T5 found the fitted model to depend on the OS
-// (OpenMP threshold 200 on Linux, 800 elsewhere). Single start "BFGS", so the
+// (OpenMP threshold 200 on Linux, 800 elsewhere at the time; 200 with MSVC since #473). Single start "BFGS", so the
 // starting point does not depend on the RNG. Two levels:
 // - the log-likelihood and its gradient at a fixed theta (no optimizer): only
 //   the rounding of the BLAS / libm differs between platforms;
