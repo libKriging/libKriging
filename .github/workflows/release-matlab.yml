@@ -1,7 +1,10 @@
 name: libKriging release workflow (Matlab binding)
 
 on:
-  workflow_dispatch:  # disabled: requires MATHWORKS_API_TOKEN secret
+  push:
+    tags:
+      - 'v*' # release tag trigger
+  workflow_dispatch:
     inputs:
       release-tag:
         description: 'Release tag'
@@ -94,6 +97,10 @@ jobs:
           echo "ENABLE_OCTAVE_BINDING=off" >> $GITHUB_ENV
           echo "ENABLE_MATLAB_BINDING=on"  >> $GITHUB_ENV
           echo "BUILD_NAME=linux-macos"    >> $GITHUB_ENV
+          echo "MATLAB_RELEASE=R2024b"     >> $GITHUB_ENV
+          # run by the "test Matlab" step: MATLAB is licensed for a public
+          # repository only inside the matlab-actions/run-* actions
+          echo "CTEST_EXCLUDE=^Matlab/"    >> $GITHUB_ENV
 
       - name: pre-install-linux
         shell: bash
@@ -103,9 +110,9 @@ jobs:
           sudo apt install -qy intel-mkl
 
       - name: Setup Matlab
-        uses: matlab-actions/setup-matlab@v2
+        uses: matlab-actions/setup-matlab@v3
         with:
-          token: ${{ secrets.MATHWORKS_API_TOKEN }}
+          release: ${{ env.MATLAB_RELEASE }}
 
       - name: install
         shell: bash
@@ -128,23 +135,37 @@ jobs:
         shell: bash
         run: tools/${BUILD_NAME}/test.sh
 
+      - name: test Matlab
+        uses: matlab-actions/run-command@v3
+        env:
+          # MATLAB bundles an older libstdc++ than the one the MEX file was built against
+          LD_PRELOAD: /usr/lib/x86_64-linux-gnu/libstdc++.so.6
+        with:
+          command: addpath('tools/matlab'), run_mex_tests('build')
+
       - name: Create package
         shell: bash
         run: |
-          VERSION=${GIT_TAG#v}
-          PKG_NAME="libKriging-${VERSION}-matlab"
-          mkdir -p matlab-package
-          if [ -d build/installed ]; then
-            cd build/installed
-            tar czf "../../matlab-package/${PKG_NAME}.tar.gz" .
-          else
-            echo "Warning: build/installed directory not found"
+          set -eo pipefail
+          # same layout as the Octave package (tools/release/octave-release.sh):
+          # the MEX file and the .m classes, to put on the MATLAB path
+          SRC=build/installed/bindings/Matlab
+          if ! ls "${SRC}"/mLibKriging.mex* >/dev/null 2>&1; then
+            echo "::error::no MEX file in ${SRC}: nothing to package"
+            ls -lR build/installed || true
+            exit 1
           fi
+          ldd "${SRC}"/mLibKriging.mex* || true
+          mkdir -p matlab-package
+          PKG="matlab-package/mLibKriging_${GIT_TAG#v}_$(uname -s)-$(uname -m)_MATLAB-${MATLAB_RELEASE}.tgz"
+          tar czvf "${PKG}" -C "${SRC}" .
+          ls -l matlab-package
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: matlab-artifact
+          if-no-files-found: error
           path: |
             matlab-package
 
@@ -226,11 +247,11 @@ jobs:
       - name: Prepare assets for upload
         shell: bash
         run: |
-          mkdir -p dist
           if [ -d dist ] && [ "$(ls -A dist 2>/dev/null)" ]; then
             find dist -type f -exec ls -lh {} \;
           else
-            echo "No Matlab artifacts to upload"
+            echo "::error::No Matlab artifacts to upload"
+            exit 1
           fi
 
       - name: upload Matlab assets
@@ -241,17 +262,18 @@ jobs:
           set -eo pipefail
           set -x
 
-          mkdir -p dist
           assets=()
           for asset in ./dist/*; do
             if [ -f "$asset" ]; then
               assets+=("-a" "$asset")
             fi
           done
-          if [ ${#assets[@]} -gt 0 ]; then
-            if [ "${{ needs.check-release-consistency.outputs.draft-release }}" == "true" ]; then
-              hub release edit -m "Draft Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
-            else
-              hub release edit -m "Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
-            fi
+          if [ ${#assets[@]} -eq 0 ]; then
+            echo "::error::No Matlab asset to upload"
+            exit 1
+          fi
+          if [ "${{ needs.check-release-consistency.outputs.draft-release }}" == "true" ]; then
+            hub release edit -m "Draft Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
+          else
+            hub release edit -m "Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
           fi

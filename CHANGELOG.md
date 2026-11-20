@@ -24,6 +24,14 @@ past release, see the corresponding entry on the
   setting: the results do not depend on it, #441).
 
 ### Changed
+- **MATLAB back in CI and in the releases** (#180): the "Matlab Linux" job of `main.yml` runs
+  again, and `release-matlab.yml` runs on `v*` tags and attaches
+  `mLibKriging_<version>_Linux-x86_64_MATLAB-R2024b.tgz` (MEX file and `.m` classes) to the
+  release. No MathWorks token is needed: for a public repository MATLAB is licensed only inside
+  the `matlab-actions/run-*` actions, so the `Matlab/*` tests run there
+  (`tools/matlab/run_mex_tests.m`, same list as CTest) instead of `ctest` starting
+  `matlab -batch`, the license failure since v0.9.3. The release workflow now fails when no
+  package is built, instead of uploading nothing. Windows and macOS: build from source.
 - **macOS: multistart fits ×1.4-1.9 faster, with Accelerate** (#491, #490): the workers of a
   multistart pool (`BFGS2`, `BFGS4`, `BFGS10`, …) run Accelerate single-threaded by themselves
   (`BLASSetThreading`, macOS 15+, per thread), where their own threads and Accelerate's used to
