@@ -10,6 +10,10 @@ output directory. Machine of the published numbers: `machine.txt`.
   `summarize_jitter_n.py <out dir>`; `jitter_n_study` marks each fit on stderr.
 - Long-range restart: `LK_LONG_RANGE_RESTART=0` (off) or `2` (default) on `jitter_n_study`; the
   families `sinhalf`, `branin` with d > 2 and `hartmann6` with d > 6 have inactive inputs.
+- Jitter rule of every class (#465): `jitter_rule_study <models> <kernels> <noises> <functions>
+  <ns> <sets> <optim>` (usage in the file); its `ll_i` columns and `LK_JR=ii` need a library
+  carrying the temporary study hook described there (not committed), else they are NaN / the
+  committed rule.
 - Study drivers (`*_study.cpp`, `*_probe.cpp`, `unstable_ll_profile.cpp`) are not built by
   CMake: compile them with the flags of `bench-fit-profile` from
   `<build-dir>/compile_commands.json`, then link with
