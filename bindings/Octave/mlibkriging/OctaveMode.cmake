@@ -3,6 +3,21 @@ if (OCTAVE_BINDING_MODE STREQUAL "Octave")
     set(OctaveMode_COMPILE_FLAGS "${OCT_CPPFLAGS} ${OCT_CXXPICFLAGS} ${OCT_CXXFLAGS}")
 elseif (OCTAVE_BINDING_MODE STREQUAL "Matlab")
     set(OctaveMode_INCLUDE_DIRS ${Matlab_INCLUDE_DIRS})
+    if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # The MEX file runs in a MATLAB process that has already loaded its own MKL. Linking it to
+        # another BLAS / LAPACK (e.g. the system MKL found by armadillo) mixes two MKL builds in the
+        # process: the system LAPACK then calls the internal kernels of MATLAB's MKL and crashes
+        # (segmentation violation in mkl_blas_*_dgemv from mkl_lapack_dlarf1, #180). MATLAB's own
+        # BLAS / LAPACK libraries are linked first, so that the BLAS / LAPACK symbols of the MEX file
+        # resolve to them; they are ILP64, as ARMA_BLAS_LONG (set for this build) expects.
+        find_library(Matlab_MWLAPACK_LIBRARY NAMES mwlapack PATHS "${Matlab_ROOT_DIR}/bin/glnxa64" NO_DEFAULT_PATH)
+        find_library(Matlab_MWBLAS_LIBRARY NAMES mwblas PATHS "${Matlab_ROOT_DIR}/bin/glnxa64" NO_DEFAULT_PATH)
+        if (NOT Matlab_MWLAPACK_LIBRARY OR NOT Matlab_MWBLAS_LIBRARY)
+            logFatalError("MATLAB BLAS / LAPACK libraries (libmwblas, libmwlapack) not found in ${Matlab_ROOT_DIR}/bin/glnxa64")
+        endif ()
+        set(OctaveMode_MATLAB_BLAS_LAPACK ${Matlab_MWLAPACK_LIBRARY} ${Matlab_MWBLAS_LIBRARY})
+        message(STATUS "Matlab MEX BLAS / LAPACK: ${OctaveMode_MATLAB_BLAS_LAPACK}")
+    endif ()
 else ()
     logFatalError("INTERNAL ERROR: OCTAVE_BINDING_MODE should be Octave or Matlab not '${OCTAVE_BINDING_MODE}'")
 endif ()
@@ -25,7 +40,12 @@ macro(add_mex_function)
     elseif (OCTAVE_BINDING_MODE STREQUAL "Matlab")
         matlab_add_mex(NAME ${ARGS_NAME}
                 SRC ${ARGS_SOURCES}
-                LINK_TO ${ARGS_LINK_LIBRARIES})
+                LINK_TO ${OctaveMode_MATLAB_BLAS_LAPACK} ${ARGS_LINK_LIBRARIES})
+        if (OctaveMode_MATLAB_BLAS_LAPACK)
+            # drop the BLAS / LAPACK libraries of the dependencies (armadillo) that are not needed
+            # once MATLAB's ones provide the symbols
+            target_link_options(${ARGS_NAME} PRIVATE "LINKER:--as-needed")
+        endif ()
     endif ()
 endmacro()
 

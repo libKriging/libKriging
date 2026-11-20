@@ -349,6 +349,19 @@ jobs:
         shell: bash
         run: tools/${BUILD_NAME}/build.sh
 
+      - name: check the MEX file uses MATLAB's BLAS / LAPACK
+        shell: bash
+        run: |
+          MEX=$(find build -name 'mLibKriging.mexa64' -not -path '*/installed/*' | head -1)
+          [ -n "$MEX" ] || { echo "::error::no mLibKriging.mexa64 under build"; exit 1; }
+          readelf -d "$MEX" | grep NEEDED
+          # a second MKL in the MATLAB process crashes it (#180)
+          if readelf -d "$MEX" | grep NEEDED | grep -E "libmkl|libopenblas|libblas|liblapack"; then
+            echo "::error::$MEX links another BLAS / LAPACK than MATLAB's libmwblas / libmwlapack"
+            exit 1
+          fi
+        if: matrix.enable_matlab == 'on'
+
       - name: check OpenMP is disabled
         shell: bash
         run: |
