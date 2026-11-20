@@ -30,6 +30,7 @@ CLASSES = [
     ("NestedKriging", "NestedKriging.hpp", "NestedKriging"),
     ("Optim", "Optim.hpp", "Optim"),
     ("Parallel", "Parallel.hpp", "Parallel"),
+    ("Gpu", "Gpu.hpp", "Gpu"),
     ("LinearAlgebra", "LinearAlgebra.hpp", "LinearAlgebra"),
     ("Random", "Random.hpp", "Random"),
     ("Covariance", "Covariance.hpp", "Covariance"),

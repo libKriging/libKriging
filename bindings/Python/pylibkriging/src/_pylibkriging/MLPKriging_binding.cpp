@@ -94,10 +94,14 @@ void PyMLPKriging::fit(const py::array_t<double>& y,
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
-PyMLPKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
+PyMLPKriging::predict(const py::array_t<double>& X_n,
+                      bool return_stdev,
+                      bool return_cov,
+                      bool return_deriv,
+                      const std::string& method) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   auto [mean, stdev, cov, mean_deriv, stdev_deriv]
-      = without_gil(m_call, [&] { return m_internal->predict(mat_X, return_stdev, return_cov, return_deriv); });
+      = without_gil(m_call, [&] { return m_internal->predict(mat_X, return_stdev, return_cov, return_deriv, method); });
   return std::make_tuple(vec_to_arr(mean),
                          vec_to_arr(stdev),
                          carma::mat_to_arr(cov, true),

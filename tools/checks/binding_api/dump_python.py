@@ -18,6 +18,7 @@ SCOPES = {
     "NestedKriging": lk.NestedKriging,
     "Optim": lk.Optim,
     "Parallel": lk.Parallel,
+    "Gpu": lk.Gpu,
     "LinearAlgebra": lk.LinearAlgebra,
 }
 

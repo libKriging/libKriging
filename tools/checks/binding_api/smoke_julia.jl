@@ -22,7 +22,7 @@ function check(label, f)
 end
 
 function setter_roundtrip(scope, setter, getter, kind, value)
-    mod = scope == "Optim" ? jlibkriging.Optim : scope == "Parallel" ? jlibkriging.Parallel : jlibkriging
+    mod = scope in ("Optim", "Parallel", "Gpu") ? getfield(jlibkriging, Symbol(scope)) : jlibkriging
     isdefined(mod, Symbol(setter)) || error("$scope.$setter not exposed")
     set = getfield(mod, Symbol(setter))
     if getter == "-"

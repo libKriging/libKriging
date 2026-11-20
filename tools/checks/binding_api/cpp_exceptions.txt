@@ -26,6 +26,13 @@ Kriging	set_vecchia_exact_commit	deprecated no-op, fit with method="exact"
 Kriging	vecchia_exact_commit	deprecated no-op, fit with method="exact"
 Kriging	is_vecchia_light	PENDING (#435): inspection of light fits, to expose or to decide
 Kriging	is_nystrom_light	PENDING (#435): inspection of light fits, to expose or to decide
+Kriging	is_iterative_light	PENDING (#435): inspection of light fits, to expose or to decide
+Kriging	iterative_nprobe	PENDING (#435): inspection of light fits, to expose or to decide
+Kriging	iterative_cg_converged	PENDING (#435): inspection of light fits, to expose or to decide
+Kriging	iterative_cg_n_unconverged	PENDING (#435): inspection of light fits, to expose or to decide
+Kriging	logLikelihoodIterativeFun	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
+Kriging	parse_iterative_method	internal parsing of the method argument ("iterative(...)")
+Kriging	iterative_method_string	internal parsing of the method argument ("iterative(...)")
 Kriging	predictVecchia	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
 Kriging	simulateVecchia	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
 Kriging	predictNystrom	PENDING (#435): approximation entry points, reached through fit(method=...), to expose or to decide
@@ -66,6 +73,15 @@ LinearAlgebra	solve_upper	internal numerical kernels, not user API
 LinearAlgebra	trace_prod	internal numerical kernels, not user API
 LinearAlgebra	woodbury_logdet	internal numerical kernels, not user API
 LinearAlgebra	woodbury_solve	internal numerical kernels, not user API
+LinearAlgebra	conjugateGradient	internal numerical kernels of the iterative method, not user API
+LinearAlgebra	conjugateGradientBatched	internal numerical kernels of the iterative method, not user API
+LinearAlgebra	stochasticLogDet	internal numerical kernels of the iterative method, not user API
+LinearAlgebra	stochasticLogDetBatched	internal numerical kernels of the iterative method, not user API
+LinearAlgebra	rademacherProbes	internal numerical kernels of the iterative method, not user API
+LinearAlgebra	cgNonConvergenceWarning	internal numerical kernels of the iterative method, not user API
+LinearAlgebra	warn_cg	internal flag, set with set_cg_warning
+LinearAlgebra	cg_auto_precond	internal flag, set with set_cg_auto_precond
+LinearAlgebra	cg_auto_precond_min_captured	internal threshold of the automatic CG preconditioner (LK_CG_AUTO_PRECOND_MIN_CAPTURED)
 Optim	parse_method	internal helpers of the optimizer
 Optim	theta_bounds	internal helpers of the optimizer
 Optim	get_blas_threads_min_n	small-problem BLAS rule (#436): exposed as Parallel.get_blas_threads_min_n

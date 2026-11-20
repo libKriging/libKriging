@@ -75,6 +75,34 @@ void linalg_set_chol_warning(bool warn) {
   impl_ptr->set_chol_warning(warn);
 }
 
+//' @rdname linalg_settings
+//' @export
+// [[Rcpp::export]]
+void linalg_set_cg_warning(bool warn) {
+  LinearAlgebra::set_cg_warning(warn);
+}
+
+//' @rdname linalg_settings
+//' @export
+// [[Rcpp::export]]
+void linalg_set_cg_auto_precond(bool on) {
+  LinearAlgebra::set_cg_auto_precond(on);
+}
+
+//' @rdname linalg_settings
+//' @export
+// [[Rcpp::export]]
+int linalg_get_iterative_dense_max_mb() {
+  return LinearAlgebra::get_iterative_dense_max_mb();
+}
+
+//' @rdname linalg_settings
+//' @export
+// [[Rcpp::export]]
+void linalg_set_iterative_dense_max_mb(int mb) {
+  LinearAlgebra::set_iterative_dense_max_mb(mb);
+}
+
 // [[Rcpp::export]]
 double linalg_rcond_approx_chol(arma::mat X) {
   LinearAlgebra* la = new LinearAlgebra();

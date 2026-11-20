@@ -730,6 +730,15 @@ class WarpKriging : protected KrigingImpl {
                                                                                               bool return_deriv
                                                                                               = false) const;
 
+  /** Prediction with an explicit method: "exact" (predict above) or
+   * "iterative" / "iterative(...)" (matrix-free conjugate gradient on the
+   * warped inputs, no use of the stored factorization; CG budget,
+   * preconditioner rank and cg_tol from the spec, as Kriging::predict). The
+   * iterative method returns mean / stdev only (return_cov / return_deriv
+   * raise) and needs a model without per-point noise. */
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
+  predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv, const std::string& method) const;
+
   // -----------------------------------------------------------------------
   //  Simulation
   // -----------------------------------------------------------------------
