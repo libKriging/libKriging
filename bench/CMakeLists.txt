@@ -59,6 +59,15 @@ add_custom_target(all_benchmarks
     DEPENDS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia bench-nystrom bench-threads bench-threads-ops bench-fit-protocol bench-blas-threads
     COMMENT "Building all benchmark executables")
 
+# Smoke run of the fit protocol (always on: a few seconds): every option path of
+# bench-fit-protocol, including the jitter-rule candidate columns (#465)
+add_test(NAME bench-fit-protocol-smoke
+        COMMAND bench-fit-protocol --optim BFGS --kernel gauss,matern5_2 --noise none,nugget
+                --objective LL,LOO,LMP --function branin4 --n 15 --sets 1 --ntest 30
+                --candidates 1 --rcond-check 0
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+set_tests_properties(bench-fit-protocol-smoke PROPERTIES FAIL_REGULAR_EXPRESSION ",error,|error:")
+
 # Add CTest entries for benchmarks (optional - can be run manually or via CI)
 if(ENABLE_BENCH_TESTS)
     add_test(NAME bench-kriging-quick

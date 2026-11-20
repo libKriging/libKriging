@@ -208,6 +208,15 @@ higher by > 0.05) on ~45 % of the cases with `"BFGS4"` (~40 % with
 depends on a few combinations of the inputs (projected Branin). Compare
 both on held-out data before recommending it.
 
+`logLikelihood()` (and `leaveOneOut()` / `logMargPost()` for `Kriging`) is the
+fit objective at the fitted parameters, the same in every class:
+`logLikelihood() == logLikelihoodFun(theta())`, after `fit`, `update` and
+`load`. For noise-free gauss / matern5_2 fits that objective has a tiny fixed
+jitter on the diagonal of R (`chol_jitter()`, 1e-9 / 1e-10) while the model
+used by `predict` is exact (`model_chol_jitter()` 0): compare models by
+`logLikelihood()` only with the same kernel and noise model (a `WarpKriging` /
+`MLPKriging` adds 1e-10 where `Kriging` adds nothing: matern3_2, exp, noise).
+
 ## 5. Where to look for exact syntax
 
 - `references/cpp.md` — C++ (the reference API; every other binding mirrors it)

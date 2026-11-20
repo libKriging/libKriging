@@ -32,6 +32,22 @@ past release, see the corresponding entry on the
   (`tools/matlab/run_mex_tests.m`, same list as CTest) instead of `ctest` starting
   `matlab -batch`, the license failure since v0.9.3. The release workflow now fails when no
   package is built, instead of uploading nothing. Windows and macOS: build from source.
+- **One jitter rule for Kriging, WarpKriging / MLPKriging and NestedKriging** (#465, part of #464):
+  the search and the objective accessors (`logLikelihood()`, `leaveOneOut()`, `logMargPost()`) use
+  the search diagonal 1 + J (`LinearAlgebra::kernel_chol_jitter`, `LK_CHOL_JITTER`), the committed
+  model (`predict`, `simulate`, `update`) is exact, and an accessor always equals its objective
+  function at the committed parameters (`logLikelihood() == logLikelihoodFun(theta())`). Kriging
+  and NestedKriging already did (no change of their results). WarpKriging / MLPKriging: after
+  `update(refit = false)`, and for a file saved without `objective_ll`, `logLikelihood()` returned
+  the log-likelihood of the committed exact model, another quantity (MLPKriging gauss /
+  matern5_2, n 100-200: up to 907 / 812 units from the objective); it is now the objective there
+  too. Fits, predictions and the
+  value after `fit` / `update(refit = true)` / `load` are unchanged. Rules (i) "logLikelihood() of
+  the exact model" and (ii) "commit with the search jitter" were measured and not kept
+  (`docs/dev/CholJitter.md`, one rule for every class). Migration: code that read
+  `logLikelihood()` after `update(refit = false)` of a WarpKriging / MLPKriging as the exact
+  model's log-likelihood gets the objective's (the one the fit maximizes); the exact model's value
+  is not exposed (it is dominated by rounding where R is near singular).
 - **macOS: multistart fits ×1.4-1.9 faster, with Accelerate** (#491, #490): the workers of a
   multistart pool (`BFGS2`, `BFGS4`, `BFGS10`, …) run Accelerate single-threaded by themselves
   (`BLASSetThreading`, macOS 15+, per thread), where their own threads and Accelerate's used to

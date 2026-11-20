@@ -172,3 +172,16 @@ def test_mlpkriging_simulate_with_noise_variances():
 
     with pytest.raises(ValueError):
         k.simulate(10, 7, Xn, with_noise=-var_n)
+
+
+def test_loglikelihood_is_the_objective_after_update():
+    # #465: logLikelihood() == logLikelihoodFun(theta()) after update(refit=False)
+    rng = np.random.default_rng(5)
+    X = rng.random((30, 2))
+    y = np.sin(6 * X[:, 0]) + X[:, 1]
+    Xu = rng.random((4, 2))
+    yu = np.sin(6 * Xu[:, 0]) + Xu[:, 1]
+    k = lk.MLPKriging(y, X, hidden_dims=[6], d_out=2, activation="tanh", kernel="gauss")
+    k.update(yu, Xu, refit=False)
+    ll_fun, _ = k.logLikelihoodFun(k.theta(), return_grad=False)
+    assert np.isclose(k.logLikelihood(), ll_fun, rtol=1e-6, atol=1e-8)
