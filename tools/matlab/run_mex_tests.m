@@ -29,6 +29,9 @@ function run_mex_tests(build_dir)
         error('run_mex_tests:noTest', 'no add_mex_test entry found in %s', test_dir);
     end
 
+    % Octave's assert (comparison forms used by the tests), MATLAB only
+    addpath(fullfile(root_dir, 'tools', 'matlab', 'octave_compat'));
+    warning('off', 'MATLAB:dispatcher:nameConflict');
     addpath(work_dir);
     addpath(src_dir);
     addpath(test_dir);

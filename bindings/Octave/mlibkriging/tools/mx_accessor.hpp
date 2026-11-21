@@ -15,6 +15,22 @@ std::ostream& operator<<(std::ostream& o, eMxType type);
 
 eMxType get_type(mxArray*);
 
+// mxArrayToString that also accepts a MATLAB string scalar (what a double-quoted literal is in
+// MATLAB; a char array in Octave), which mxArrayToString rejects. Returns nullptr if x is neither;
+// the caller frees the result with mxFree.
+inline char* mxStringOrCharToString(const mxArray* x) {
+  if (mxIsClass(x, "string")) {
+    mxArray* in = const_cast<mxArray*>(x);
+    mxArray* out[1] = {};
+    if (mexCallMATLAB(1, out, 1, &in, "char") != 0 || out[0] == nullptr)
+      return nullptr;
+    char* str = mxArrayToString(out[0]);
+    mxDestroyArray(out[0]);
+    return str;
+  }
+  return mxArrayToString(x);
+}
+
 template <typename T>
 struct converter_trait {
   using type = T;

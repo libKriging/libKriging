@@ -63,6 +63,12 @@ fi
 if [[ "${ENABLE_MATLAB_BINDING}" == "on" && "$(uname -s)" == "Linux" ]]; then
   export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
   echo "Forcing MATLAB to use system libstdc++.so.6 via LD_PRELOAD"
+  # The MATLAB build is compiled with ARMA_BLAS_LONG (64-bit BLAS integers, as MATLAB's own
+  # BLAS / LAPACK, which the MEX file links). The C++ test executables link armadillo's BLAS
+  # instead, libmkl_rt, whose default interface is LP64 (32-bit integers): select its ILP64
+  # interface, or every BLAS / LAPACK call reads its integer arguments wrong (#180).
+  export MKL_INTERFACE_LAYER=ILP64
+  echo "MKL_INTERFACE_LAYER=ILP64 for the C++ tests (ARMA_BLAS_LONG)"
 fi
 
 if [[ "$ENABLE_COVERAGE" == "on" ]]; then

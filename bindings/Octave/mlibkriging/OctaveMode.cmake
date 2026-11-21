@@ -81,6 +81,8 @@ macro(add_mex_test)
     elseif (OCTAVE_BINDING_MODE STREQUAL "Matlab")
         # see tools/run_matlab_command.sh and matlab_add_unit_test for startup detail
         string(REPLACE "/" "_" log_file_name "${ARGS_NAME}.log")
+        # Octave's assert (comparison forms used by the tests), see tools/matlab/run_mex_tests.m
+        set(TEST_SCRIPT "addpath('${LIBKRIGING_SOURCE_DIR}/tools/matlab/octave_compat'), ${TEST_SCRIPT}")
         add_test(NAME ${OCTAVE_BINDING_MODE}/${ARGS_NAME}
                 COMMAND ${PRECOMMAND} ${Matlab_MAIN_PROGRAM} -logfile "${log_file_name}" -batch "${TEST_SCRIPT}")
     endif ()

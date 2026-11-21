@@ -6,7 +6,7 @@ cleanup_files = {"load_kriging_k.json", "load_kriging_wk.json", "load_kriging_ml
                  "load_kriging_nuk.json", "load_kriging_nk.json"};
 for i = 1:numel(cleanup_files)
     if exist(cleanup_files{i}, "file")
-        unlink(cleanup_files{i});
+        delete(cleanup_files{i});
     end
 end
 
@@ -53,7 +53,7 @@ try
 catch err
     for i = 1:numel(cleanup_files)
         if exist(cleanup_files{i}, "file")
-            unlink(cleanup_files{i});
+            delete(cleanup_files{i});
         end
     end
     rethrow(err);
@@ -61,6 +61,6 @@ end
 
 for i = 1:numel(cleanup_files)
     if exist(cleanup_files{i}, "file")
-        unlink(cleanup_files{i});
+        delete(cleanup_files{i});
     end
 end

@@ -25,7 +25,7 @@ lastwarn("");
 ka = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLVecchia(7)");
 [wmsg, wid] = lastwarn();
 assert(strcmp(wid, "mLibKriging:deprecated"));
-assert(! isempty(strfind(wmsg, 'method="vecchia(7)"')));
+assert(~isempty(strfind(wmsg, 'method="vecchia(7)"')));
 lastwarn("");
 kno = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "vecchia(7)");
 assert(isempty(lastwarn()));
