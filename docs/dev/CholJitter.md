@@ -600,14 +600,75 @@ current behaviour (on):
   where the protection is real. A criterion for the committed model (e.g. a posteriori check of
   the interpolation residual) is left to #496.
 
+#### Residual of the committed model (study mode 5, #496)
+
+Results and analysis scripts: `bench/thread-budget/results/rcond-residual-496.tar.gz`
+(`<name>_on.csv` current behaviour, `_inf` mode 5 without fallback, `_res` tolerance 1e-5).
+
+Mode 5 (`set_chol_rcond_bound(5)`, `rcond_study` variant `res`, tolerance `LK_RES_TOL`) is
+mode 4 plus an a posteriori check: the noise-free committed model is first factorized without
+the rcond test (a failing Cholesky still retries); its interpolation residual
+max |y − F b − R alpha| / sd(y) (alpha = R^-1 (y − F b), b the GLS trend) is computed in
+O(n²) (`KrigingImpl::interpolation_residual`); above `LinearAlgebra::chol_residual_tol`
+(default 1e-5) the model is factorized again with the rcond test, i.e. the current behaviour.
+The check is applied where mode 4 removes the test: `Kriging::make_committed_Model` and the
+committed cache of `WarpKriging` / `MLPKriging` (`KrigingImpl::populate_committed`); with a
+noise model the model does not interpolate and nothing changes.
+
+`‖R alpha − y‖` and the interpolation error at the training points are the same quantity: the
+proposal of #496 has one criterion, not two. It is still a conditioning indicator (backward
+stable Cholesky: residual ~ n eps kappa ‖alpha‖), but weighted by `y` rather than estimated
+on `L` alone.
+
+Campaign (`BFGS4`, noise-free, gauss and matern5_2, functions sin4, hartmann6, branin4,
+sinhalf8, plus branin (2D) and sin_2 for MLPKriging), first the exact model without fallback
+(tolerance 1e300, = mode 4 plus the measured residual) against the current behaviour, then
+the tolerance 1e-5 for MLPKriging:
+
+| class | n | sets | fits | changed vs current | residual of the exact model where it changed | RMSE better / worse (±10 %) |
+|---|---|---|---|---|---|---|
+| Kriging | 100-500 | 10 x 4 | 240 | 11 (same theta) | 3.6e-9 … 1.25e-6 | 9 / 0 (× 0.40 … × 0.93) |
+| Kriging | 1000 | 5 x 4 | 40 | 14 (theta moved on 13: mode 4 search) | 3.8e-9 … 5.6e-7 | 10 / 0 (× 0.48 … × 0.74) |
+| Warp none, kuma | 100-500 | 3 x 3 | 108 | 9 | 1.5e-9 … 4.5e-7 | 3 / 0 |
+| MLP, exact (no fallback) | 100, 200 | 5 x 4 | 80 | 6 (branin4 matern5_2) | 0.04 … 0.9 (max over the inner fits) | 0 / **6** (× 1.16 … × 1.97) |
+| MLP, tol 1e-5 | 100, 200 | 5 x 4 | 80 | **0** (78 fallbacks) | | 0 / 0 |
+| MLP, tol 1e-5 | 100, 200 | 5 x 2 (branin, sin_2) | 40 | 5 | 2e-8 … 3.5e-5 | 4 / 0 (× 0.22 … × 0.93) |
+| MLP, tol 1e-5 | 500 | 3 x 6 | 36 | 6 (branin, sin_2, matern5_2) | 1.8e-9 … 2.5e-8 | 5 / 0 (× 0.60 … × 0.72) |
+
+- The residual separates the two cases of #496: the false alarms of Kriging / Warp have an
+  exact residual <= 1.25e-6 (all n up to 1000), the MLPKriging fits the test protects >= 2.5e-4
+  (branin4, matern5_2: final model of n 100 set 0; the others >= 5.6e-3). With 1e-5 the 20 + 14
+  false alarms keep the exact model and every protected MLPKriging fit falls back: no fit is
+  worse in RMSE, NLPD better on the fits that changed (Kriging n 1000: −0.6 to −0.9).
+- Margins: a factor 8 above the largest false-alarm residual; on the other side MLPKriging gauss
+  branin / sin_2 sit at 2e-6 … 8e-6 (kept exact, no change of outcome) and one fit at 3.5e-5
+  (fallback). Any tolerance in [1e-5, 2e-4] gives the same decisions on this campaign but for
+  that fit (not measured above 1e-5).
+- MLPKriging on d >= 4 (sin4, hartmann6, sinhalf8, n 500): residual ~1 with and without the
+  fallback: the 2-feature MLP maps distinct inputs to near points and the GP does not
+  interpolate at all; the fallback reproduces the current model there.
+- Calibration is not covered: WarpKriging kuma gauss branin4 (n 200 set 2, n 500 set 1)
+  keeps the exact model (residual 1.6e-8, 3.1e-8), RMSE unchanged, but NLPD 354 → 2261 and
+  −4.78 → 6.06, coverage 0.888 → 0.624 and 0.956 → 0.908: the retry nugget of the current
+  behaviour widened an overconfident gauss variance (#425). Same direction, smaller, Kriging
+  gauss branin4 n 200 set 2 (coverage 0.942 → 0.854, NLPD better). A floor on the predicted
+  variance (#428) is the matching remedy, not the Cholesky retry.
+- Cost: one O(n²) product per committed model; a second factorization only on a fallback
+  (MLPKriging d >= 4: every committed model).
+- Caveats: the inner fits of MLPKriging (80 % of the points) also go through the check, and the
+  `res_last` column of `rcond_study` is the last check, not always the final model; `update`
+  (block Cholesky) and NestedKriging keep the rcond test; Kriging n 1000 with a noise model is
+  that of mode 4 (= mode 2), measured in the previous section.
+
 
 ## Open items
 
 - The rcond test of the Cholesky retry (`rcond(L)^2 < 1e-18`) breaks the continuity the jitter
   gives (matern5_2, n 1000) and the exactness of the committed model (matern5_2, n >= 500):
   measured above: neither the test off, nor a test bounded by the diagonal, nor "no test on the
-  noise-free committed model" dominates (MLPKriging needs the protection); kept unchanged, a
-  criterion for the committed model in #496.
+  noise-free committed model" dominates (MLPKriging needs the protection); kept unchanged. The
+  residual check of the committed model (mode 5, #496) separates the two cases on the measured
+  campaign without a loss in RMSE; it does not protect the calibration of gauss (above).
 - The `N` floor of the WarpKriging / MLPKriging search: removal measured above, no gain or loss
   but MLPKriging moving both ways; kept, to be decided (#465).
 - Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;
