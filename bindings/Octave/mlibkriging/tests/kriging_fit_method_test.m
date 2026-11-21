@@ -95,7 +95,7 @@ k.update(yu, Xu, false);
 assert(strcmp(k.method(), "vecchia(10)"));
 assert(size(k.X(), 1) == n + 2);
 assert(max(abs(k.predict(Xu, false, false, false, "vecchia") - yu)) < 1e-3);
-f = [tempname() ".json"];
+f = [tempname() '.json'];
 k.save(f);
 kl = Kriging.load(f);
 assert(strcmp(kl.method(), "vecchia(10)"));
@@ -162,7 +162,7 @@ knh = Kriging(yn, X, "matern5_2", "constant", false, "BFGS", "LL", [], "heteroge
 assert(strcmp(knh.noise_model(), "heterogeneous"));
 mh = knh.predict(Xn, false, false, false, "nystrom");
 assert(all(isfinite(mh)));
-f = [tempname() ".json"];
+f = [tempname() '.json'];
 knh.save(f);
 khl = Kriging.load(f);
 assert(max(abs(khl.predict(Xn, false, false, false, "nystrom") - mh)) < 1e-12);
