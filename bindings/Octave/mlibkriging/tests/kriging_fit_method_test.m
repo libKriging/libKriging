@@ -34,7 +34,7 @@ assert(strcmp(ka.method(), "vecchia(7)"));
 
 % LOO / LMP objectives with an approximate method
 for mth = {"vecchia(10)", "nystrom(20)"}
-  m = mth{1};
+  m = char(mth{1});  % a string in MATLAB: m(1:7) indexes characters of a char array only
   am = m(1:7);
   kx = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LOO", [], "none", [], m);
   assert(strcmp(kx.objective(), "LOO"));

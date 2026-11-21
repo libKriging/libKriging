@@ -68,7 +68,10 @@ if [[ "${ENABLE_MATLAB_BINDING}" == "on" && "$(uname -s)" == "Linux" ]]; then
   # instead, libmkl_rt, whose default interface is LP64 (32-bit integers): select its ILP64
   # interface, or every BLAS / LAPACK call reads its integer arguments wrong (#180).
   export MKL_INTERFACE_LAYER=ILP64
-  echo "MKL_INTERFACE_LAYER=ILP64 for the C++ tests (ARMA_BLAS_LONG)"
+  # The default Intel threading layer of MKL 2020 (Ubuntu 22.04 intel-mkl) next to the GNU
+  # OpenMP runtime of libKriging gives wrong results (docs/dev/FAQ.md, #429)
+  export MKL_THREADING_LAYER=GNU
+  echo "MKL_INTERFACE_LAYER=ILP64 MKL_THREADING_LAYER=GNU for the C++ tests (ARMA_BLAS_LONG, system MKL)"
 fi
 
 if [[ "$ENABLE_COVERAGE" == "on" ]]; then
