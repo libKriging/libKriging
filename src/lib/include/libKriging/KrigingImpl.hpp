@@ -195,6 +195,19 @@ class KrigingImpl {
   /// `refit=false` update, neither of which touches either one).
   KModel allocate_KModel() const;
 
+  /// Interpolation residual of a factorized model at the training points,
+  /// max |y - F b - R alpha| / sd(y), with alpha = L^-T L^-1 (y - F b) and b
+  /// the GLS estimate (study of #496: criterion for the committed model).
+  double interpolation_residual(const KModel& m) const;
+
+  /// Committed noise-free factorization (study of #465 / #496). `populate`
+  /// fills `m`. Default and modes 1-4 of LinearAlgebra::chol_rcond_bound:
+  /// once, inside a LinearAlgebra::CommittedCholScope. Mode 5 and
+  /// `check_residual`: once without the rcond test of the Cholesky retry;
+  /// if interpolation_residual(m) > LinearAlgebra::chol_residual_tol, again
+  /// with the rcond test (the current behaviour).
+  void populate_committed(KModel& m, bool check_residual, const std::function<void()>& populate) const;
+
   /// Unified predict implementation shared by Kriging / NuggetKriging /
   /// NoiseKriging.  The three variants only differ in:
   ///

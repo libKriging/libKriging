@@ -68,6 +68,17 @@ class LinearAlgebra {
    private:
     bool m_previous;
   };
+  // Mode 5 (#496): mode 4, then the committed noise-free model is kept exact
+  // only if its interpolation residual max |y - F b - R alpha| / sd(y) is
+  // <= chol_residual_tol; otherwise it is factorized again with the rcond test
+  // (the current behaviour). Checks and fallbacks counted since the last
+  // reset_chol_retry_counts, with the residual of the last check.
+  static double chol_residual_tol;
+  LIBKRIGING_EXPORT static void set_chol_residual_tol(double tol);
+  LIBKRIGING_EXPORT static void record_committed_residual(double residual, bool fallback);
+  LIBKRIGING_EXPORT static void committed_residual_stats(double& last_residual,
+                                                         unsigned long long& checks,
+                                                         unsigned long long& fallbacks);
   // Retries of the Cholesky (num_nugget added) since the last reset, by
   // trigger: a failing Cholesky, or the rcond test (study of #465).
   LIBKRIGING_EXPORT static void chol_retry_counts(unsigned long long& on_failure, unsigned long long& on_rcond);

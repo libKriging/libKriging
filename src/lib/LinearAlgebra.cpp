@@ -134,7 +134,7 @@ double diag_rcond_lower_bound(arma::uword n, double factor, const arma::vec& dia
   const bool noise_free = (factor == 1.0) && (dmin == dmax);
   if (mode == 3)
     return noise_free ? arma::datum::inf : 0.0;
-  if (mode == 4 && noise_free && committed_chol())
+  if ((mode == 4 || mode == 5) && noise_free && committed_chol())
     return arma::datum::inf;
   if (mode == 1 && !noise_free)
     return 0.0;
@@ -156,9 +156,45 @@ LIBKRIGING_EXPORT void LinearAlgebra::chol_retry_counts(unsigned long long& on_f
   on_rcond = chol_retry_rcond.load();
 }
 
+double LinearAlgebra::chol_residual_tol = 1e-5;
+
+namespace {
+std::mutex& residual_mutex() {
+  static std::mutex m;
+  return m;
+}
+double committed_residual_last = 0.0;
+unsigned long long committed_residual_checks = 0, committed_residual_fallbacks = 0;
+}  // namespace
+
+LIBKRIGING_EXPORT void LinearAlgebra::set_chol_residual_tol(double tol) {
+  LinearAlgebra::chol_residual_tol = tol;
+}
+
+LIBKRIGING_EXPORT void LinearAlgebra::record_committed_residual(double residual, bool fallback) {
+  std::lock_guard<std::mutex> lock(residual_mutex());
+  ++committed_residual_checks;
+  if (fallback)
+    ++committed_residual_fallbacks;
+  committed_residual_last = residual;
+}
+
+LIBKRIGING_EXPORT void LinearAlgebra::committed_residual_stats(double& last_residual,
+                                                               unsigned long long& checks,
+                                                               unsigned long long& fallbacks) {
+  std::lock_guard<std::mutex> lock(residual_mutex());
+  last_residual = committed_residual_last;
+  checks = committed_residual_checks;
+  fallbacks = committed_residual_fallbacks;
+}
+
 LIBKRIGING_EXPORT void LinearAlgebra::reset_chol_retry_counts() {
   chol_retry_fail = 0;
   chol_retry_rcond = 0;
+  std::lock_guard<std::mutex> lock(residual_mutex());
+  committed_residual_last = 0.0;
+  committed_residual_checks = 0;
+  committed_residual_fallbacks = 0;
 }
 
 LIBKRIGING_EXPORT void LinearAlgebra::set_chol_rcond_bound(int mode) {

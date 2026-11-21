@@ -10,6 +10,9 @@
 //   J     set_chol_rcond_bound(1): test skipped when the search jitter bounds rcond
 //   diag  set_chol_rcond_bound(2): test skipped when any diagonal shift bounds rcond
 //   diagc set_chol_rcond_bound(4): diag, and no test on the noise-free committed model
+//   res   set_chol_rcond_bound(5): diagc, then the committed noise-free model is
+//         factorized again with the rcond test when its interpolation residual
+//         exceeds LK_RES_TOL (default 1e-5, relative to sd(y)) (#496)
 // For every model x kernel x noise x function x n x data set (the T7 data of
 // bench/bench-fit-protocol.cpp), one fit, then:
 //   ll, theta, rmse / nlpd / cov95 (500 test points, noise-free truth), wall_s
@@ -18,6 +21,8 @@
 //   interp           noise-free: max |predict(X) - y| / sd(y) (the committed
 //                    model interpolates when exact)
 //   rmse_upd / nlpd_upd / rr_upd  after update(refit = false) with 10 points
+//   res_last / res_chk / res_fb  variant res: residual of the last exact
+//                    committed model (the final one), number of checks, of fallbacks (fit only)
 //   sim_z / sim_sdr / rr_sim  Kriging: 200 conditional simulations at 200 test
 //                    points: RMS of (mean - predict mean) / (sd / sqrt(nsim))
 //                    (~1), median sd(simulations) / predict sd (~1); status
@@ -163,13 +168,17 @@ int main(int argc, char** argv) {
     LinearAlgebra::set_chol_rcond_bound(2);
   else if (variant == "diagc")
     LinearAlgebra::set_chol_rcond_bound(4);
-  else if (variant != "on") {
+  else if (variant == "res") {
+    LinearAlgebra::set_chol_rcond_bound(5);
+    if (const char* t = std::getenv("LK_RES_TOL"))
+      LinearAlgebra::set_chol_residual_tol(std::atof(t));
+  } else if (variant != "on") {
     std::fprintf(stderr, "unknown LK_RCOND %s\n", variant.c_str());
     return 1;
   }
   std::printf(
       "variant,model,kernel,noise,function,d,n,set,status,ll,theta,rmse,nlpd,cov95,wall_s,rf_fit,rr_fit,interp,"
-      "rmse_upd,nlpd_upd,rr_upd,sim_z,sim_sdr,rr_sim\n");
+      "rmse_upd,nlpd_upd,rr_upd,sim_z,sim_sdr,rr_sim,res_last,res_chk,res_fb\n");
   for (const auto& fname : functions) {
     std::string fam;
     arma::uword d;
@@ -214,7 +223,9 @@ int main(int argc, char** argv) {
                            s);
               double ll = NAN, wall = NAN, interp = NAN, rmse = NAN, nlpd = NAN, cov = NAN, rmseu = NAN, nlpdu = NAN,
                      simz = NAN, simsdr = NAN;
-              unsigned long long rf = 0, rr = 0, rru = 0, rrs = 0;
+              unsigned long long rf = 0, rr = 0, rru = 0, rrs = 0, res_chk = 0, res_fb = 0;
+              double res_last = NAN;
+              auto grab_res = [&] { LinearAlgebra::committed_residual_stats(res_last, res_chk, res_fb); };
               unsigned long long base_f = 0, base_r = 0;  // retries of the fit, kriging (counted before simulate)
               arma::vec th;
               std::string status = "ok";
@@ -249,6 +260,7 @@ int main(int argc, char** argv) {
                   else
                     k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", Kriging::Parameters{});
                   ll = k.logLikelihood();
+                  grab_res();
                   th = k.theta();
                   // simulate on the fitted model, before the update
                   base_f = fail_retries();
@@ -287,6 +299,7 @@ int main(int argc, char** argv) {
                 } else if (model == "nested") {
                   NestedKriging k(kernel);
                   k.fit(y, X, 4, Trend::RegressionModel::Constant, optim, "LL");
+                  grab_res();
                   after_fit(
                       k,
                       [&](const arma::mat& Z) {
@@ -305,6 +318,7 @@ int main(int argc, char** argv) {
                     MLPKriging k({8}, 2, "tanh", kernel);
                     k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL");
                     ll = k.logLikelihood();
+                    grab_res();
                     th = k.theta();
                     after_fit(k, pred_of(k), [&] { k.update(yu, Xu, false); });
                   } else {
@@ -315,6 +329,7 @@ int main(int argc, char** argv) {
                       pa.noise = nv;
                     k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", pa);
                     ll = k.logLikelihood();
+                    grab_res();
                     th = k.theta();
                     after_fit(k, pred_of(k), [&] { k.update(yu, Xu, false, noisy ? nvu : arma::vec()); });
                   }
@@ -325,8 +340,7 @@ int main(int argc, char** argv) {
               }
               std::printf(
                   "%s,%s,%s,%s,%s,%llu,%llu,%d,%s,%.10g,%s,%.6g,%.6g,%.4g,%.4g,%llu,%llu,%.3g,%.6g,%.6g,%llu,%.4g,%.4g,"
-                  "%"
-                  "llu\n",
+                  "%llu,%.3g,%llu,%llu\n",
                   variant.c_str(),
                   model.c_str(),
                   kernel.c_str(),
@@ -350,7 +364,10 @@ int main(int argc, char** argv) {
                   rru,
                   simz,
                   simsdr,
-                  rrs);
+                  rrs,
+                  res_last,
+                  res_chk,
+                  res_fb);
               std::fflush(stdout);
             }
         }
