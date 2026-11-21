@@ -32,6 +32,12 @@ past release, see the corresponding entry on the
   (`tools/matlab/run_mex_tests.m`, same list as CTest) instead of `ctest` starting
   `matlab -batch`, the license failure since v0.9.3. The release workflow now fails when no
   package is built, instead of uploading nothing. Windows and macOS: build from source.
+  The MEX file links MATLAB's BLAS / LAPACK (`libmwblas`, `libmwlapack`): linked to the system
+  MKL, it crashed MATLAB (two MKL builds in one process).
+- **MATLAB: `"..."` strings accepted everywhere** (#180): a MATLAB string (what a double-quoted
+  literal is in MATLAB) in a cell (`NestedKriging` warping), in a parameter struct (`WarpKriging`,
+  `MLPKriging`) or as a categorical label of `WarpKriging` was rejected; only char arrays
+  (`'...'`) worked. Octave is unchanged.
 - **One jitter rule for Kriging, WarpKriging / MLPKriging and NestedKriging** (#465, part of #464):
   the search and the objective accessors (`logLikelihood()`, `leaveOneOut()`, `logMargPost()`) use
   the search diagonal 1 + J (`LinearAlgebra::kernel_chol_jitter`, `LK_CHOL_JITTER`), the committed
