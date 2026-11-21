@@ -360,6 +360,9 @@ jobs:
             echo "::error::$MEX links another BLAS / LAPACK than MATLAB's libmwblas / libmwlapack"
             exit 1
           fi
+          for lib in libmwblas libmwlapack; do
+            readelf -d "$MEX" | grep NEEDED | grep -q "$lib" || { echo "::error::$MEX does not link $lib"; exit 1; }
+          done
         if: matrix.enable_matlab == 'on'
 
       - name: check OpenMP is disabled

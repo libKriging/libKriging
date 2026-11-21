@@ -15,8 +15,13 @@ elseif (OCTAVE_BINDING_MODE STREQUAL "Matlab")
         if (NOT Matlab_MWLAPACK_LIBRARY OR NOT Matlab_MWBLAS_LIBRARY)
             logFatalError("MATLAB BLAS / LAPACK libraries (libmwblas, libmwlapack) not found in ${Matlab_ROOT_DIR}/bin/glnxa64")
         endif ()
-        set(OctaveMode_MATLAB_BLAS_LAPACK ${Matlab_MWLAPACK_LIBRARY} ${Matlab_MWBLAS_LIBRARY})
-        message(STATUS "Matlab MEX BLAS / LAPACK: ${OctaveMode_MATLAB_BLAS_LAPACK}")
+        # --no-as-needed: they come before the static libraries that use them (Kriging, armadillo)
+        # on the link line, so --as-needed (default on Ubuntu) would drop them; once kept, their
+        # symbols satisfy the later references and the BLAS / LAPACK of armadillo (libmkl_rt) is
+        # dropped by --as-needed.
+        set(OctaveMode_MATLAB_BLAS_LAPACK
+                "-Wl,--no-as-needed" ${Matlab_MWLAPACK_LIBRARY} ${Matlab_MWBLAS_LIBRARY} "-Wl,--as-needed")
+        message(STATUS "Matlab MEX BLAS / LAPACK: ${Matlab_MWLAPACK_LIBRARY} ${Matlab_MWBLAS_LIBRARY}")
     endif ()
 else ()
     logFatalError("INTERNAL ERROR: OCTAVE_BINDING_MODE should be Octave or Matlab not '${OCTAVE_BINDING_MODE}'")
@@ -41,11 +46,6 @@ macro(add_mex_function)
         matlab_add_mex(NAME ${ARGS_NAME}
                 SRC ${ARGS_SOURCES}
                 LINK_TO ${OctaveMode_MATLAB_BLAS_LAPACK} ${ARGS_LINK_LIBRARIES})
-        if (OctaveMode_MATLAB_BLAS_LAPACK)
-            # drop the BLAS / LAPACK libraries of the dependencies (armadillo) that are not needed
-            # once MATLAB's ones provide the symbols
-            target_link_options(${ARGS_NAME} PRIVATE "LINKER:--as-needed")
-        endif ()
     endif ()
 endmacro()
 
