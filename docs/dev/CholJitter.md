@@ -617,6 +617,19 @@ count (sigma2 10 %, stdev × 6 apart). Same decisions as the study on the 90 fit
 sin4 / branin4 n 200 / 500, MLPKriging branin4 / branin / sin_2 n 100 / 200, the 10 protected
 MLPKriging fits included). A block update (`update(refit = false)`) keeps the rcond test on its
 Schur complement and is not checked.
+
+A Cholesky of the noise-free committed model that succeeds with its smallest pivot at the
+rounding level, min L_ii² < 4 eps ‖R‖₁, counts as failing (retry nugget). Without the rcond
+test, a numerically singular R otherwise gives the exact model or the retry-nugget one
+depending on the rounding: Kriging gauss n 50 (`ConcurrentCallsTest`), λ_min / λ_max 8e-19,
+succeeds on 9 of 50 perturbations of 1e-16 (MKL CI: sigma2 10 %, stdev × 6 apart between
+threads); those successes have min L_ii² / ‖R‖₁ <= 5.4e-17, the rcond false alarms >= 1.7e-14
+(matern5_2 / gauss, n 200-500). Re-run against the study: Kriging 144 of 144 fits unchanged
+(n 100-1000, 5 / 3 sets), WarpKriging 47 of 48 (kumaraswamy gauss branin4 n 500 set 1 back to
+the former model: one of the two coverage losses above), MLPKriging 2D: 6 of the 11 changed
+fits back to the former model (numerically singular there, so not reproducible across BLAS),
+one more within × 1.05. Net on MLPKriging: 6 of 156 fits change, 3 better by more than 10 %
+(down to × 0.60), none worse by more than 5 %.
 NestedKriging keeps its own group factorization with the rcond test for the NK aggregation.
 Taking the submodel's exact committed factor instead (so that NK with one group is the
 submodel) was measured and not kept: on 72 NestedKriging fits (gauss / matern5_2, plain /

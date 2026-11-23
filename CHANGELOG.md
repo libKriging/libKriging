@@ -38,8 +38,10 @@ past release, see the corresponding entry on the
   exact factors): NK with one group now differs from its exact submodel by the retry nugget. Measured (`docs/dev/CholJitter.md`,
   `bench/thread-budget/rcond_study.cpp`): noise-free Kriging (n 100-1000) and WarpKriging,
   34 fits of 388 change, RMSE better by more than 10 % on 22 (down to × 0.40), never worse by
-  more than 5 %; MLPKriging (n 100-500, 6 functions), 11 fits of 156 change, 9 better by more
-  than 10 % (down to × 0.22), none worse by more than 3 %. Results change: predictions of the
+  more than 5 %; MLPKriging (n 100-500, 6 functions), 6 fits of 156 change, 3 better by more
+  than 10 % (down to × 0.60), none worse by more than 5 %. A Cholesky of the committed model that
+  succeeds with its smallest pivot at the rounding level (min L_ii^2 < 4 eps ||R||_1) counts as
+  failing: the matrix is numerically singular and the outcome would depend on the BLAS. Results change: predictions of the
   noise-free models above, the fitted theta of Kriging at n 1000 (13 of 40 fits, LL never
   lower), and with a nugget a few fits where 1 - alpha now bounds rcond (3 of 560 moved in the
   study of #465, LL −30 to +5). Not covered: the variance of
