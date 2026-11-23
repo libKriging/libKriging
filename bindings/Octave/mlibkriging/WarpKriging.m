@@ -38,7 +38,7 @@ classdef WarpKriging < handle
             X_num = zeros(n, d);
 
             for j = 1:d
-                col = X{j};
+                col = WarpKriging.text_column(X{j});
                 if iscell(col) && ischar(col{1})
                     % String column: build sorted label list
                     labels = sort(unique(col));
@@ -72,12 +72,23 @@ classdef WarpKriging < handle
             end
         end
 
+        function col = text_column(col)
+            % A column of labels as a cell of char arrays: MATLAB string labels ("a" is a
+            % string in MATLAB, a char array in Octave) or a string array are converted.
+            if isa(col, 'string')
+                col = cellstr(col);
+            elseif iscell(col) && ~isempty(col) && isa(col{1}, 'string')
+                col = cellfun(@char, col, 'UniformOutput', false);
+            end
+        end
+
         function X_out = encode_X_from_warping(X, warping_specs)
             % Encode X using existing warping specs (for predict/simulate/update).
             if iscell(X)
                 has_str = false;
                 for j = 1:numel(X)
-                    if iscell(X{j}) && ischar(X{j}{1})
+                    col = WarpKriging.text_column(X{j});
+                    if iscell(col) && ischar(col{1})
                         has_str = true;
                         break;
                     end

@@ -188,9 +188,15 @@ matplot(x,s,col=rgb(0,0,1,0.2),type='l',lty=1,add=T)
 
 ## mlibkriging for Octave and MATLAB
 
-⚠️ Matlab/Windows binary packages are done on request (GitHub Action does not support all required Operating Systems)
+The `mLibKriging_*.tgz` archives of the [libKriging releases](https://github.com/libKriging/libKriging/releases)
+are built for Octave: their MEX file does not load in MATLAB. For MATLAB, use the
+`mLibKriging_<version>_Linux-x86_64_MATLAB-<release>.tgz` archive (Linux only, built with the MATLAB release named
+in the file, for that release and later ones), published from the release following v1.2.2 on; no release up to
+v1.2.2 has one. On Windows and macOS, or with an older MATLAB, build from source with
+`-DENABLE_MATLAB_BINDING=ON` (exclusive with `ENABLE_OCTAVE_BINDING=ON`, see
+[docs/dev/AllCMakeOptions.md](docs/dev/AllCMakeOptions.md)).
 
-Download and uncompress the Octave archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
+Download and uncompress the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
 
 ```shell
 # example (see the releases page for the latest version and your platform)

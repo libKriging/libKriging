@@ -40,7 +40,7 @@ static std::pair<WarpKriging::Parameters, std::map<std::string, std::string>> st
       wp.noise = converter<arma::vec>(val, "noise");
     } else if (fname == "adam_lr" || fname == "max_iter_adam" || fname == "max_iter_bfgs"
                || fname == "calibration_folds") {
-      char* str = mxArrayToString(val);
+      char* str = mxStringOrCharToString(val);
       if (str != nullptr) {
         tuning[fname] = std::string(str);
         mxFree(str);
@@ -69,17 +69,7 @@ static std::vector<std::string> cellToStringVec(const mxArray* cell, const char*
     if (elem == nullptr) {
       throw MxException(LOCATION(), "mLibKriging:badType", param_name, " contains an empty cell element");
     }
-    char* str = nullptr;
-    if (mxIsClass(elem, "string")) {
-      // In Matlab R2016b+, double-quoted literals create string objects, not char arrays.
-      // Convert to char array first so mxArrayToString can handle it.
-      mxArray* char_array[1] = {};
-      mexCallMATLAB(1, char_array, 1, &elem, "char");
-      str = mxArrayToString(char_array[0]);
-      mxDestroyArray(char_array[0]);
-    } else {
-      str = mxArrayToString(elem);
-    }
+    char* str = mxStringOrCharToString(elem);
     if (str == nullptr) {
       throw MxException(LOCATION(), "mLibKriging:badType", param_name, " cell element is not a string");
     }

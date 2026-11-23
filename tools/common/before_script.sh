@@ -67,7 +67,10 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 
     if ( command -v matlab >/dev/null 2>&1 ); then
       echo "Matlab config: $(command -v matlab)"
-      LD_PRELOAD=/lib/x86_64-linux-gnu/libstdc++.so.6 matlab -batch "ver; exit" 2>&1 | sed 's/^/  /'
+      # Read the version without starting MATLAB: outside the matlab-actions/run-*
+      # actions, MATLAB is not licensed on GitHub runners (see tools/matlab/run_mex_tests.m)
+      MATLAB_ROOT=$(dirname "$(dirname "$(readlink -f "$(command -v matlab)")")")
+      sed -n 's:.*<\(version\|release\)>\(.*\)</.*:  \1 \2:p' "${MATLAB_ROOT}/VersionInfo.xml" 2>/dev/null || echo "  (no VersionInfo.xml in ${MATLAB_ROOT})"
     else
       echo "No matlab command found"
     fi

@@ -25,7 +25,7 @@ static std::map<std::string, std::string> structToStringMap(const mxArray* s) {
     mxArray* val = mxGetFieldByNumber(s, 0, i);
     if (val == nullptr)
       continue;
-    char* str = mxArrayToString(val);
+    char* str = mxStringOrCharToString(val);
     if (str == nullptr) {
       if (mxIsNumeric(val) && mxGetNumberOfElements(val) == 1) {
         double dval = mxGetScalar(val);

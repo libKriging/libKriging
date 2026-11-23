@@ -59,7 +59,8 @@ patch is not a number (such as `v1.2.h`) only has to match `MAJOR.MINOR` and is 
 |---|---|
 | `release-cpp.yml` | C++ library archives (Linux, macOS, Windows) |
 | `release-python.yml` | `pylibkriging` wheels, attached to the release and uploaded to PyPI (refused if the version is already there; needs the `TWINE_PASSWORD` secret) |
-| `release-octave.yml`, `release-matlab.yml` | `mLibKriging` packages (the Matlab build needs a MathWorks license token) |
+| `release-octave.yml` | `mLibKriging` packages for Octave (Linux, macOS, Windows) |
+| `release-matlab.yml` | `mLibKriging` package for MATLAB, Linux x86-64 only (`..._MATLAB-<release>.tgz`); its tests run in `matlab-actions/run-command`, the only place where MATLAB is licensed for a public repository without a token. It fails if no package is built |
 | `release-r.yml` | `rlibkriging` archives |
 | `release-julia.yml` | tests the Julia binding on the tag; it does not publish anything |
 

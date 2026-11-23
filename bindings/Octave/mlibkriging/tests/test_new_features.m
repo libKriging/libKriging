@@ -1,7 +1,7 @@
 % Test suite for newly added features: covMat, model(), and Optim class
 % Run this test with: octave test_new_features.m
 
-function test_new_features()
+function run_new_features_tests()
     fprintf('=== Testing New Features ===\n\n');
     
     test_covMat_basic();
@@ -433,7 +433,7 @@ end
 
 
 % Run all tests
-test_new_features();
+run_new_features_tests();
 
 
 %% Test LinearAlgebra settings
