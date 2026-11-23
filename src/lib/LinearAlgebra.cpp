@@ -117,6 +117,18 @@ bool& committed_chol() {
   return committed;
 }
 
+// The last full factorization of a noise-free committed model on this thread
+// (rcond test skipped, bound +inf): whether there was one since the last
+// reset, and the nugget the retry added to it on a failing Cholesky
+struct CommittedFactor {
+  bool full = false;
+  double nugget = 0.0;
+};
+CommittedFactor& committed_factor_state() {
+  thread_local CommittedFactor f;
+  return f;
+}
+
 // Lower bound of the 1-norm reciprocal condition number of factor * C + diag(d),
 // C a correlation matrix (unit diagonal, |C_ij| <= 1): lambda_min >= delta =
 // min(d) - factor, ||A||_1 <= max(d) + factor (n - 1), ||A^-1||_1 <= sqrt(n) /
@@ -152,6 +164,15 @@ LIBKRIGING_EXPORT LinearAlgebra::CommittedCholScope::CommittedCholScope() : m_pr
 
 LIBKRIGING_EXPORT LinearAlgebra::CommittedCholScope::~CommittedCholScope() {
   committed_chol() = m_previous;
+}
+
+void LinearAlgebra::reset_committed_factor() {
+  committed_factor_state() = CommittedFactor{};
+}
+
+bool LinearAlgebra::committed_factor(double& nugget) {
+  nugget = committed_factor_state().nugget;
+  return committed_factor_state().full;
 }
 
 LIBKRIGING_EXPORT void LinearAlgebra::chol_retry_counts(unsigned long long& on_failure, unsigned long long& on_rcond) {
@@ -231,6 +252,12 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond, double
     }
     // t0 = Bench::toc(nullptr, "        inc_cond" ,t0);
   } else {
+    if (rcond_lower_bound == arma::datum::inf) {  // the noise-free committed model (CommittedCholScope)
+      double nugget = 0.0;
+      for (int k = 0; k < inc_cond; ++k)
+        nugget += LinearAlgebra::num_nugget * std::pow(10, k);
+      committed_factor_state() = CommittedFactor{true, nugget};
+    }
     if (warn_chol && (inc_cond > 0)) {
       arma::cout << "[WARNING] Added " << LinearAlgebra::num_nugget << " * 10^" << inc_cond << " numerical nugget to force Cholesky decomposition" << arma::endl;
     }
@@ -422,9 +449,9 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C,
   // after safe_chol_lower's own nugget-retry budget is exhausted, fall
   // back to a full from-scratch factorization of C instead of throwing.
   try {
-    // (the Schur complement: no rcond test when C has none, the noise-free committed model)
-    L.submat(no, no, n - 1, n - 1) = LinearAlgebra::safe_chol_lower_retry(
-        Cuu - LinearAlgebra::crossprod(Lou), 0, rcond_lower_bound == arma::datum::inf ? rcond_lower_bound : 0.0);
+    // the Schur complement keeps the rcond test (also for the committed
+    // model: the interpolation residual is checked on full factorizations only)
+    L.submat(no, no, n - 1, n - 1) = LinearAlgebra::safe_chol_lower(Cuu - LinearAlgebra::crossprod(Lou));
     // t0 = Bench::toc(nullptr, "        <Luu = chol( Cuu - Luo * Luo.t() )",t0);
   } catch (const std::exception&) {
     if (warn_chol)

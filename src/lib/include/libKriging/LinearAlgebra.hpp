@@ -69,6 +69,11 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static void set_chol_residual_tol(double tol);
   LIBKRIGING_EXPORT static double get_chol_residual_tol();
   static void record_committed_residual(double residual, bool fallback);
+  // Last full factorization of a noise-free committed model on this thread:
+  // false if none since reset_committed_factor; `nugget` added by the retry
+  // on a failing Cholesky (the residual is checked against R + nugget I).
+  static void reset_committed_factor();
+  static bool committed_factor(double& nugget);
   LIBKRIGING_EXPORT static void committed_residual_stats(double& last_residual,
                                                          unsigned long long& checks,
                                                          unsigned long long& fallbacks);

@@ -30,7 +30,8 @@ past release, see the corresponding entry on the
   exact committed model of Kriging / WarpKriging (gauss, matern5_2, n >= 200) it was a false alarm
   that stopped the model from interpolating (max error up to 4.8e-3 sd(y)). Now the noise-free
   committed model is factorized without the test and kept when its interpolation residual
-  max |y - F b - R alpha| / sd(y) is <= 1e-5, else factorized again with it (MLPKriging, where the
+  max |y - F b - (R + delta I) alpha| / sd(y) (delta: the nugget of a failing Cholesky) is
+  <= 1e-5, else factorized again with it (MLPKriging, where the
   learned features make the matrix genuinely ill-conditioned: the protection is kept); the test
   is skipped wherever the diagonal already bounds rcond (search jitter, nugget, noise);
   NestedKriging uses the submodel's committed factor. Measured (`docs/dev/CholJitter.md`,

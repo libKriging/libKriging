@@ -362,8 +362,7 @@ void NestedKriging::precompute_nk() {
     if (T.n_rows == idx.n_elem && T.n_cols == idx.n_elem) {
       m_L[g] = arma::trimatl(T);
     } else {
-      const double group_jitter
-          = warped() ? m_wsubmodels[g]->m_model_chol_jitter : m_submodels[g]->model_chol_jitter();
+      const double group_jitter = warped() ? m_wsubmodels[g]->m_model_chol_jitter : m_submodels[g]->model_chol_jitter();
       arma::mat R = corrMat(m_X.rows(idx), m_X.rows(idx));
       R.diag() += group_jitter;
       m_L[g] = LinearAlgebra::safe_chol_lower(R);

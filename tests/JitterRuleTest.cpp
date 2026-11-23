@@ -251,7 +251,8 @@ TEST_CASE("rcond test of the Cholesky retry skipped when the diagonal bounds rco
   const arma::mat dX = LinearAlgebra::compute_dX(X);
   const arma::vec theta(2, arma::fill::value(3.0));
   arma::mat R(n, n);
-  const arma::mat L = LinearAlgebra::cholCov(&R, dX, theta, matern52, 1.0, arma::vec(n, arma::fill::value(1.0 + 1e-13)));
+  const arma::mat L
+      = LinearAlgebra::cholCov(&R, dX, theta, matern52, 1.0, arma::vec(n, arma::fill::value(1.0 + 1e-13)));
   arma::mat Lp;
   REQUIRE(arma::chol(Lp, R, "lower"));
   INFO("rcond estimate " << LinearAlgebra::rcond_chol(Lp));
@@ -290,10 +291,11 @@ TEST_CASE("noise-free committed model: exact, checked by its interpolation resid
   CHECK(checks == 1);
   CHECK(fallbacks == 1);
   arma::mat R(n, n);
-  LinearAlgebra::cholCov(&R, LinearAlgebra::compute_dX(X), arma::vec(2, arma::fill::value(3.0)), matern52, 1.0, arma::vec());
+  LinearAlgebra::cholCov(
+      &R, LinearAlgebra::compute_dX(X), arma::vec(2, arma::fill::value(3.0)), matern52, 1.0, arma::vec());
   arma::mat L;
   REQUIRE(arma::chol(L, R, "lower"));
   INFO("rcond estimate " << LinearAlgebra::rcond_chol(L) << ", interpolation " << exact << " / " << fallback);
   if (LinearAlgebra::rcond_chol(L) < 1e-18)  // LinearAlgebra::min_rcond
-    CHECK(fallback > 10 * exact);  // the retry nugget of the rcond test
+    CHECK(fallback > 10 * exact);            // the retry nugget of the rcond test
 }

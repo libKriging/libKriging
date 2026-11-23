@@ -607,7 +607,16 @@ Adopted as the default (2026-11), the study modes 1-4 removed (`set_chol_rcond_b
 release before). The rule: in `cholCov` / `update_cholCov` the rcond test is skipped when the
 diagonal bounds rcond (mode 2: search jitter, nugget, noise); the noise-free committed model is
 factorized without it and kept if its interpolation residual is <= `chol_residual_tol` (1e-5,
-`LinearAlgebra::set_chol_residual_tol`, C++ only), else factorized again with the test.
+`LinearAlgebra::set_chol_residual_tol`, C++ only), else factorized again with the test. The
+residual is taken against the matrix factorized, R + delta I, delta the nugget the retry added
+when the exact Cholesky failed: max |y − F b − (R + delta I) alpha| / sd(y), the round-off of the
+factorization only. Against R it included delta alpha, the deliberate effect of that nugget,
+and could sit at the tolerance: Kriging gauss, n 50 (`ConcurrentCallsTest`), 9.6e-6 against R,
+1.1e-10 against R + delta I; with MKL on the CI runner the fallback then depended on the thread
+count (sigma2 10 %, stdev × 6 apart). Same decisions as the study on the 90 fits re-run (Kriging
+sin4 / branin4 n 200 / 500, MLPKriging branin4 / branin / sin_2 n 100 / 200, the 10 protected
+MLPKriging fits included). A block update (`update(refit = false)`) keeps the rcond test on its
+Schur complement and is not checked.
 NestedKriging takes the submodel's committed factor for its NK aggregation (it repeated the
 factorization, with the rcond test), so NK with one group is the submodel again. Measured on
 72 NestedKriging fits (gauss / matern5_2, plain / `none` / kumaraswamy warps, n 120 / 300, 3
