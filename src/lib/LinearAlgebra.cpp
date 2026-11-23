@@ -226,6 +226,17 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond, double
   // auto t0 = Bench::tic();
   bool ok = arma::chol(L, X, "lower");
   // t0 = Bench::toc(nullptr, "        arma::chol" ,t0);
+  // Noise-free committed model (no rcond test): a Cholesky that succeeds with
+  // its smallest pivot at the rounding level of the matrix, min L_ii^2 <
+  // 4 eps ||X||_1, is treated as failing. Such a matrix is numerically
+  // singular: whether the factorization succeeds depends on the rounding (BLAS,
+  // threads), and the model would jump between exact and retry-nugget (#496:
+  // gauss n 50, lambda_min / lambda_max 8e-19, success on 9 of 50 perturbations
+  // of 1e-16, those with min L_ii^2 / ||X||_1 <= 5.4e-17; the false alarms of the
+  // rcond test have >= 1.7e-14).
+  if (ok && rcond_lower_bound == arma::datum::inf && X.n_rows > 0
+      && arma::min(arma::square(L.diag())) < 4.0 * arma::datum::eps * arma::norm(X, 1))
+    ok = false;
   // the test is redundant when the conditioning is already bounded from the
   // diagonal (diag_rcond_lower_bound, given by cholCov / update_cholCov)
   bool wrong_rcond = LinearAlgebra::chol_rcond_check && !(rcond_lower_bound >= LinearAlgebra::min_rcond);
