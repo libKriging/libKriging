@@ -262,10 +262,7 @@ TEST_CASE("NestedKriging supports WarpKriging submodels", "[nested][warp]") {
 
   SECTION("NK interpolates the design points under warping") {
     auto [mean, stdev] = nk.predict(X, true);
-    // 1.7e-3 since the submodels are exact (#496): the NK aggregation matrix
-    // K_M is near singular at the design points with gauss; it was 1e-3 when
-    // the rcond test added a retry nugget to the submodel factors
-    CHECK(arma::abs(mean - y).max() < 3e-3);
+    CHECK(arma::abs(mean - y).max() < 1e-3);
     CHECK(stdev.max() < 1e-2);
   }
 
@@ -326,7 +323,11 @@ TEST_CASE("NestedKriging warped with one group reduces to full WarpKriging", "[n
   auto [m_nk, s_nk] = nk.predict(Xt, true);
   auto [m_wk, s_wk, cov, dm, ds] = nk.wsubmodel(0).predict(Xt, true, false, false);
 
-  CHECK(arma::abs(m_nk - m_wk).max() < 1e-6);
+  // the submodel's committed model is exact (#496), NK keeps the factorization
+  // with the rcond test of the retry for its aggregation (with exact factors
+  // the NK interpolation of the design varied from 4.5e-6 to 1.1e-3 across
+  // BLAS builds): the two differ by the retry nugget (2.8e-4 measured, gauss)
+  CHECK(arma::abs(m_nk - m_wk).max() < 1e-3);
   CHECK(arma::abs(s_nk - s_wk).max() < 1e-2);
 
   // covMat consistency: corr(x,x) == 1 => covMat diag == sigma2

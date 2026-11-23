@@ -617,14 +617,16 @@ count (sigma2 10 %, stdev × 6 apart). Same decisions as the study on the 90 fit
 sin4 / branin4 n 200 / 500, MLPKriging branin4 / branin / sin_2 n 100 / 200, the 10 protected
 MLPKriging fits included). A block update (`update(refit = false)`) keeps the rcond test on its
 Schur complement and is not checked.
-NestedKriging takes the submodel's committed factor for its NK aggregation (it repeated the
-factorization, with the rcond test), so NK with one group is the submodel again. Measured on
-72 NestedKriging fits (gauss / matern5_2, plain / `none` / kumaraswamy warps, n 120 / 300, 3
-groups, 6 sets): identical on 55, RMSE never worse (down to × 0.72), coverage lower on 3 gauss
-n 120 fits (0.67 → 0.47, 0.67 → 0.47, 0.75 → 0.47), NK gauss being already miscalibrated there
-(NLPD ~1e12 with either factor, coverage 0.34-0.75: #425). The interpolation of the design by NK
-with gauss and kumaraswamy warps (`NestedKrigingTest`, n 120) goes from < 1e-3 to 1.7e-3: the
-aggregation matrix `K_M` is near singular at design points; the test bound is 3e-3.
+NestedKriging keeps its own group factorization with the rcond test for the NK aggregation.
+Taking the submodel's exact committed factor instead (so that NK with one group is the
+submodel) was measured and not kept: on 72 NestedKriging fits (gauss / matern5_2, plain /
+`none` / kumaraswamy warps, n 120 / 300, 3 groups, 6 sets) RMSE never worse (down to × 0.72)
+but coverage lower on 3 gauss n 120 fits (0.67 → 0.47, 0.75 → 0.47), and the NK interpolation
+of the design with gauss and warps became fragile: the aggregation matrix `K_M` is near
+singular at design points, and the same test (`NestedKrigingTest`, warped subsample) gave
+4.5e-6 (MKL here), 4.5e-5 (OpenBLAS) and 1.1e-3 (oneMKL on the CI runner); three tests at
+1e-3 failed on some BLAS. The retry nugget of the rcond test regularizes it. NK with one group
+now differs from its exact submodel by that nugget (2.8e-4, gauss kumaraswamy n 60).
 
 The measurements of the study mode follow.
 
@@ -792,7 +794,7 @@ warps differ from Kriging's at the same theta (measured below: up to 0.09 at n 1
 |---|---|
 | fit of the common prior | `Kriging` (or `WarpKriging` when warped) on the data: rules above |
 | submodels (`optim = "none"`) | their committed model: 1 (exact), Kriging and WarpKriging; their `logLikelihood()` follows their class |
-| `precompute_nk` group factors | the submodel's committed factor `m_T` (#496); without one, its committed diagonal (`safe_chol_lower`) |
+| `precompute_nk` group factors | the submodel's committed diagonal (`safe_chol_lower`, with the rcond test: not the submodel's exact factor, #496) |
 | `predict`, PoE family (PoE, gPoE, BCM, rBCM) | each submodel's `predict` |
 | `predict`, NK aggregation | group factors as above; aggregation matrix `K_M` + 1e-10 (`NestedKriging::jitter`, a constant, not `N`; `solve`, `pinv` fallback, no retry) |
 

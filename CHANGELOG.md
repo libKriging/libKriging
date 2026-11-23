@@ -33,8 +33,9 @@ past release, see the corresponding entry on the
   max |y - F b - (R + delta I) alpha| / sd(y) (delta: the nugget of a failing Cholesky) is
   <= 1e-5, else factorized again with it (MLPKriging, where the
   learned features make the matrix genuinely ill-conditioned: the protection is kept); the test
-  is skipped wherever the diagonal already bounds rcond (search jitter, nugget, noise);
-  NestedKriging uses the submodel's committed factor. Measured (`docs/dev/CholJitter.md`,
+  is skipped wherever the diagonal already bounds rcond (search jitter, nugget, noise).
+  NestedKriging keeps the rcond test in its own group factors (its NK aggregation is fragile with
+  exact factors): NK with one group now differs from its exact submodel by the retry nugget. Measured (`docs/dev/CholJitter.md`,
   `bench/thread-budget/rcond_study.cpp`): noise-free Kriging (n 100-1000) and WarpKriging,
   34 fits of 388 change, RMSE better by more than 10 % on 22 (down to × 0.40), never worse by
   more than 5 %; MLPKriging (n 100-500, 6 functions), 11 fits of 156 change, 9 better by more
