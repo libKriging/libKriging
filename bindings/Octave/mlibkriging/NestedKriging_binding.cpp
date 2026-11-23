@@ -31,7 +31,7 @@ static std::vector<std::string> cellToStringVec(const mxArray* cell, const char*
   std::vector<std::string> result(n);
   for (size_t i = 0; i < n; ++i) {
     const mxArray* item = mxGetCell(cell, static_cast<mwIndex>(i));
-    char* str = mxArrayToString(item);
+    char* str = mxStringOrCharToString(item);
     if (!str)
       throw std::runtime_error(std::string(param_name) + " contains a non-string element");
     result[i] = str;

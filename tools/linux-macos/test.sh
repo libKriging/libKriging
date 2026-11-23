@@ -63,6 +63,15 @@ fi
 if [[ "${ENABLE_MATLAB_BINDING}" == "on" && "$(uname -s)" == "Linux" ]]; then
   export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
   echo "Forcing MATLAB to use system libstdc++.so.6 via LD_PRELOAD"
+  # The MATLAB build is compiled with ARMA_BLAS_LONG (64-bit BLAS integers, as MATLAB's own
+  # BLAS / LAPACK, which the MEX file links). The C++ test executables link armadillo's BLAS
+  # instead, libmkl_rt, whose default interface is LP64 (32-bit integers): select its ILP64
+  # interface, or every BLAS / LAPACK call reads its integer arguments wrong (#180).
+  export MKL_INTERFACE_LAYER=ILP64
+  # The default Intel threading layer of MKL 2020 (Ubuntu 22.04 intel-mkl) next to the GNU
+  # OpenMP runtime of libKriging gives wrong results (docs/dev/FAQ.md, #429)
+  export MKL_THREADING_LAYER=GNU
+  echo "MKL_INTERFACE_LAYER=ILP64 MKL_THREADING_LAYER=GNU for the C++ tests (ARMA_BLAS_LONG, system MKL)"
 fi
 
 if [[ "$ENABLE_COVERAGE" == "on" ]]; then

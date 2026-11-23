@@ -44,6 +44,20 @@ past release, see the corresponding entry on the
   gauss, overconfident (#425), lost the widening of the retry nugget on 5 fits of 444 (coverage
   down to 0.62, WarpKriging kumaraswamy). `LinearAlgebra::set_chol_residual_tol` (C++) sets the
   tolerance; `check_chol_rcond(false)` still removes the rcond test everywhere.
+- **MATLAB back in CI and in the releases** (#180): the "Matlab Linux" job of `main.yml` runs
+  again, and `release-matlab.yml` runs on `v*` tags and attaches
+  `mLibKriging_<version>_Linux-x86_64_MATLAB-R2024b.tgz` (MEX file and `.m` classes) to the
+  release. No MathWorks token is needed: for a public repository MATLAB is licensed only inside
+  the `matlab-actions/run-*` actions, so the `Matlab/*` tests run there
+  (`tools/matlab/run_mex_tests.m`, same list as CTest) instead of `ctest` starting
+  `matlab -batch`, the license failure since v0.9.3. The release workflow now fails when no
+  package is built, instead of uploading nothing. Windows and macOS: build from source.
+  The MEX file links MATLAB's BLAS / LAPACK (`libmwblas`, `libmwlapack`): linked to the system
+  MKL, it crashed MATLAB (two MKL builds in one process).
+- **MATLAB: `"..."` strings accepted everywhere** (#180): a MATLAB string (what a double-quoted
+  literal is in MATLAB) in a cell (`NestedKriging` warping), in a parameter struct (`WarpKriging`,
+  `MLPKriging`) or as a categorical label of `WarpKriging` was rejected; only char arrays
+  (`'...'`) worked. Octave is unchanged.
 - **One jitter rule for Kriging, WarpKriging / MLPKriging and NestedKriging** (#465, part of #464):
   the search and the objective accessors (`logLikelihood()`, `leaveOneOut()`, `logMargPost()`) use
   the search diagonal 1 + J (`LinearAlgebra::kernel_chol_jitter`, `LK_CHOL_JITTER`), the committed
