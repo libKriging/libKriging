@@ -963,7 +963,8 @@ end
 function predict(wk::WarpKriging, X_n::Matrix{Float64};
                  return_stdev::Bool=true,
                  return_cov::Bool=false,
-                 return_deriv::Bool=false)
+                 return_deriv::Bool=false,
+                 method::String="exact")
     m, d = size(X_n)
     mean_out = Vector{Float64}(undef, m)
     stdev_out = return_stdev ? Vector{Float64}(undef, m) : Float64[]
@@ -974,14 +975,15 @@ function predict(wk::WarpKriging, X_n::Matrix{Float64};
     ret = ccall(dlsym(_lk(), :lk_warp_kriging_predict), Cint,
                 (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
                  Cint, Cint, Cint,
-                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
+                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Cstring),
                 wk.ptr, X_n, m, d,
                 return_stdev ? 1 : 0, return_cov ? 1 : 0, return_deriv ? 1 : 0,
                 mean_out,
                 return_stdev ? stdev_out : C_NULL,
                 return_cov ? cov_out : C_NULL,
                 return_deriv ? mean_deriv_out : C_NULL,
-                return_deriv ? stdev_deriv_out : C_NULL)
+                return_deriv ? stdev_deriv_out : C_NULL,
+                method)
     _check_error(ret)
     return (mean=mean_out,
             stdev=return_stdev ? stdev_out : nothing,
@@ -1356,7 +1358,8 @@ end
 function predict(mk::MLPKriging, X_n::Matrix{Float64};
                  return_stdev::Bool=true,
                  return_cov::Bool=false,
-                 return_deriv::Bool=false)
+                 return_deriv::Bool=false,
+                 method::String="exact")
     m, d = size(X_n)
     mean_out = Vector{Float64}(undef, m)
     stdev_out = return_stdev ? Vector{Float64}(undef, m) : Float64[]
@@ -1367,14 +1370,15 @@ function predict(mk::MLPKriging, X_n::Matrix{Float64};
     ret = ccall(dlsym(_lk(), :lk_mlp_kriging_predict), Cint,
                 (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
                  Cint, Cint, Cint,
-                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
+                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Cstring),
                 mk.ptr, X_n, m, d,
                 return_stdev ? 1 : 0, return_cov ? 1 : 0, return_deriv ? 1 : 0,
                 mean_out,
                 return_stdev ? stdev_out : C_NULL,
                 return_cov ? cov_out : C_NULL,
                 return_deriv ? mean_deriv_out : C_NULL,
-                return_deriv ? stdev_deriv_out : C_NULL)
+                return_deriv ? stdev_deriv_out : C_NULL,
+                method)
     _check_error(ret)
     return (mean=mean_out,
             stdev=return_stdev ? stdev_out : nothing,
@@ -1809,6 +1813,20 @@ check_chol_rcond(check::Bool) = _check_error(ccall(dlsym(_lk(), :lk_linalg_check
 chol_rcond_checked() = ccall(dlsym(_lk(), :lk_linalg_chol_rcond_checked), Cint, ()) != 0
 
 """
+    set_cg_warning(warn::Bool) / set_cg_auto_precond(on::Bool)
+    get_iterative_dense_max_mb() / set_iterative_dense_max_mb(mb)
+
+Iterative method (`method = "iterative(...)"`): warning of a conjugate-gradient
+solve stopped before its tolerance, automatic Nystrom preconditioner of its
+predictor, host-memory budget (MiB) of the dense correlation matrix (0:
+matrix-free, default 6144).
+"""
+set_cg_warning(warn::Bool) = _check_error(ccall(dlsym(_lk(), :lk_linalg_set_cg_warning), Cint, (Cint,), warn))
+set_cg_auto_precond(on::Bool) = _check_error(ccall(dlsym(_lk(), :lk_linalg_set_cg_auto_precond), Cint, (Cint,), on))
+get_iterative_dense_max_mb() = Int(ccall(dlsym(_lk(), :lk_linalg_get_iterative_dense_max_mb), Cint, ()))
+set_iterative_dense_max_mb(mb::Integer) = _check_error(ccall(dlsym(_lk(), :lk_linalg_set_iterative_dense_max_mb), Cint, (Cint,), mb))
+
+"""
     jlibkriging.Optim
 
 Global optimizer settings, as `Optim` in C++ / Python / Octave (R:
@@ -1882,9 +1900,42 @@ omp_enabled() = ccall(dlsym(_lk(), :lk_parallel_omp_enabled), Cint, ()) != 0
 
 end # module Parallel
 
+"""
+    jlibkriging.Gpu
+
+GPU backend of the iterative method (`method = "iterative(...)"`), Gpu.hpp:
+the same settings as the `Gpu` static methods of the other bindings. A
+CPU-only build (the default) reports no backend and its settings have no
+effect.
+"""
+module Gpu
+
+import ..jlibkriging: _lk, _check_error
+using Libdl: dlsym
+
+# read only: compiled backends ("cuda,hip..." or ""), a usable device, backend in use ("none": CPU)
+compiled_backends() = unsafe_string(ccall(dlsym(_lk(), :lk_gpu_compiled_backends), Cstring, ()))
+available() = ccall(dlsym(_lk(), :lk_gpu_available), Cint, ()) != 0
+active_backend() = unsafe_string(ccall(dlsym(_lk(), :lk_gpu_active_backend), Cstring, ()))
+# use the GPU when available (default true; false when LK_ITERATIVE_GPU=0)
+set_enabled(x::Bool) = _check_error(ccall(dlsym(_lk(), :lk_gpu_set_enabled), Cint, (Cint,), x))
+get_enabled() = ccall(dlsym(_lk(), :lk_gpu_get_enabled), Cint, ()) != 0
+# device-memory budget (MiB) of the dense correlation matrix, 0: matrix-free
+set_dense_max_mb(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_gpu_set_dense_max_mb), Cint, (Cint,), x))
+get_dense_max_mb() = Int(ccall(dlsym(_lk(), :lk_gpu_get_dense_max_mb), Cint, ()))
+# TF32 / fp32 products of the dense CG matvec (CUDA)
+set_mixed_precision(x::Bool) = _check_error(ccall(dlsym(_lk(), :lk_gpu_set_mixed_precision), Cint, (Cint,), x))
+get_mixed_precision() = ccall(dlsym(_lk(), :lk_gpu_get_mixed_precision), Cint, ()) != 0
+# diagnostic of each GPU CG call
+set_verbose(x::Bool) = _check_error(ccall(dlsym(_lk(), :lk_gpu_set_verbose), Cint, (Cint,), x))
+get_verbose() = ccall(dlsym(_lk(), :lk_gpu_get_verbose), Cint, ()) != 0
+
+end # module Gpu
+
 export Kriging, WarpKriging, MLPKriging, NestedKriging
 export get_chol_jitter, set_chol_jitter, get_num_nugget, set_num_nugget, linearalgebra_check
 export set_chol_warning, check_chol_rcond, chol_rcond_checked
+export set_cg_warning, set_cg_auto_precond, get_iterative_dense_max_mb, set_iterative_dense_max_mb
 export nb_groups, aggregation, beta0, groups, set_predict_chunk!, set_warp_subsample!
 export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
 export load, load_kriging, load_warp_kriging, load_mlp_kriging, load_nested_kriging

@@ -15,6 +15,7 @@ method has its own page with the full derivation.
 |---|---|---|---|---|---|
 | `method="vecchia(m)"` | fit method (any `objective`; noise models with `"LL"`) | O(n·m³)/eval | *local* conditioning (m neighbors) | degrades for d ≳ 5 (nearest neighbors less informative) | [Vecchia.md](Vecchia.md) |
 | `method="nystrom(k)"` | fit method (any `objective`; noise models with `"LL"`) | O(n·k²)/eval | *global* low-rank covariance (k landmarks) | dimension-robust | [Nystrom.md](Nystrom.md) |
+| `method="iterative(m)"` | fit / predict method (`"LL"`, noise None only; `predict` also on any noise-free fit) | O(n²·iters)/eval, O(n) or O(n²) memory, GPU in the `-gpu` builds | *nothing* in the covariance: CG solves; log det R by SLQ (m probes) | none | [Iterative.md](Iterative.md), [PredictIterative.md](PredictIterative.md) |
 | `NestedKriging` | fit + predict, whole model | O(n³/p²) fit, O(q·n²/p) or O(q·n²) predict | divide-and-conquer (p groups) + aggregation | dimension-robust (submodels are exact Kriging) | [Nested.md](Nested.md) |
 | `subsetOfData` | pre-fit data reduction | O(n_max) k-means pass, then ordinary O(n_max³) fit | *nothing* — exact fit, just on fewer points | none (discards points outright rather than approximating structure) | [SubsetOfData.md](SubsetOfData.md) |
 | OpenMP | fit + predict, cross-cutting | same asymptotic cost, smaller constant | *nothing* — exact, just parallel | none | — (build-time; no dedicated objective/method, always on when available) |

@@ -8,7 +8,7 @@
 #    the S3 method they forward to), the S3 methods `generic.Class` (load(),
 #    summary(), as.list()...) and the free functions standing for a static
 #    method (subsetOfData);
-#  - Optim / Parallel / LinearAlgebra: the namespace functions optim_* / parallel_* / linalg_*
+#  - Optim / Parallel / Gpu / LinearAlgebra: the namespace functions optim_* / parallel_* / gpu_* / linalg_*
 #    (exported or not), prefix removed, except the wrappers of C++ internals
 #    kept for the R tests (TEST_HELPERS).
 suppressPackageStartupMessages(library(rlibkriging))
@@ -77,7 +77,7 @@ for (scope in names(statics)) {
 # Cholesky numerics below and the random generator (random_*, not listed)
 TEST_HELPERS <- c("linalg_chol_safe", "linalg_chol_block", "linalg_rcond_chol", "linalg_rcond_approx_chol")
 
-prefixes <- c(Optim = "optim_", Parallel = "parallel_", LinearAlgebra = "linalg_")
+prefixes <- c(Optim = "optim_", Parallel = "parallel_", Gpu = "gpu_", LinearAlgebra = "linalg_")
 for (scope in names(prefixes)) {
   fns <- setdiff(grep(paste0("^", prefixes[[scope]]), internals, value = TRUE), TEST_HELPERS)
   fns <- Filter(function(n) is.function(get(n, envir = ns)), fns)

@@ -93,9 +93,10 @@ Rcpp::List mlpKriging_predict(SEXP model_ptr,
                               const arma::mat& x_new,
                               bool withStd = true,
                               bool withCov = false,
-                              bool withDeriv = false) {
+                              bool withDeriv = false,
+                              const std::string& method = "exact") {
   MLPKrigingPtr model(lk_xptr(model_ptr));
-  auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model->predict(x_new, withStd, withCov, withDeriv);
+  auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model->predict(x_new, withStd, withCov, withDeriv, method);
 
   Rcpp::List result;
   result["mean"] = mean;

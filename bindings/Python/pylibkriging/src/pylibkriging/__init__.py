@@ -300,9 +300,9 @@ class WarpKriging:
                        regmodel, normalize, optim, objective, parameters, noise,
                        method)
 
-    def predict(self, X, return_stdev=True, return_cov=False, return_deriv=False):
+    def predict(self, X, return_stdev=True, return_cov=False, return_deriv=False, method="exact"):
         return self._impl.predict(self._encode_X(X),
-                                  return_stdev, return_cov, return_deriv)
+                                  return_stdev, return_cov, return_deriv, method)
 
     def simulate(self, nsim=1, seed=123, X=None, will_update=False, with_noise=None):
         """simulate(nsim=1, seed=123, X, will_update=False, with_noise=None)

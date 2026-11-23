@@ -6,6 +6,7 @@
 #include <carma>
 #include <cstdlib>
 #include <iostream>
+#include <libKriging/Gpu.hpp>
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/LinearAlgebra.hpp>
 #include <libKriging/Optim.hpp>
@@ -277,9 +278,10 @@ deprecated aliases of objective="LL" with method="vecchia(m)" / "nystrom(k)".)pb
            py::arg("return_deriv") = false,
            py::arg("method") = "exact",
            R"pbdoc(Prediction at X. method: "exact" (default, needs a method="exact" fit),
-"vecchia" / "vecchia(m)" (local Vecchia predictor, usable after any fit) or "nystrom" (needs a
-method="nystrom" fit); the approximate methods return mean / stdev only. Nothing is chosen
-implicitly: on a Vecchia or Nystrom fit, "exact" raises.)pbdoc")
+"vecchia" / "vecchia(m)" (local Vecchia predictor, usable after any fit), "nystrom" (needs a
+method="nystrom" fit) or "iterative" / "iterative(...)" (matrix-free conjugate gradient, usable
+after any fit without noise); the approximate methods return mean / stdev only. Nothing is
+chosen implicitly: on a Vecchia, Nystrom or iterative fit, "exact" raises.)pbdoc")
       .def_static("subsetOfData",
                   &PyKriging::subsetOfData,
                   py::arg("X"),
@@ -516,7 +518,10 @@ needs "exact" or "vecchia"
            py::arg("X"),
            py::arg("return_stdev") = true,
            py::arg("return_cov") = false,
-           py::arg("return_deriv") = false)
+           py::arg("return_deriv") = false,
+           py::arg("method") = "exact",
+           R"pbdoc(Prediction at X. method: "exact" (default) or "iterative" / "iterative(...)" (matrix-free
+conjugate gradient on the warped inputs, mean / stdev only, no per-point noise).)pbdoc")
       .def("simulate",
            &PyWarpKriging::simulate,
            py::arg("nsim") = 1,
@@ -617,7 +622,10 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
            py::arg("X"),
            py::arg("return_stdev") = true,
            py::arg("return_cov") = false,
-           py::arg("return_deriv") = false)
+           py::arg("return_deriv") = false,
+           py::arg("method") = "exact",
+           R"pbdoc(Prediction at X. method: "exact" (default) or "iterative" / "iterative(...)" (matrix-free
+conjugate gradient on the warped inputs, mean / stdev only, no per-point noise).)pbdoc")
       .def("simulate",
            &PyMLPKriging::simulate,
            py::arg("nsim") = 1,
@@ -723,7 +731,29 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       // reciprocal condition number of the factorizations
       .def_static("set_chol_warning", &LinearAlgebra::set_chol_warning, py::arg("warn"))
       .def_static("check_chol_rcond", &LinearAlgebra::check_chol_rcond, py::arg("check"))
-      .def_static("chol_rcond_checked", &LinearAlgebra::chol_rcond_checked);
+      .def_static("chol_rcond_checked", &LinearAlgebra::chol_rcond_checked)
+      // iterative method: warning of a CG solve stopped before its tolerance,
+      // automatic Nystrom preconditioner of predict, host-memory budget of the
+      // dense correlation matrix (MiB, 0: matrix-free)
+      .def_static("set_cg_warning", &LinearAlgebra::set_cg_warning, py::arg("warn"))
+      .def_static("set_cg_auto_precond", &LinearAlgebra::set_cg_auto_precond, py::arg("on"))
+      .def_static("get_iterative_dense_max_mb", &LinearAlgebra::get_iterative_dense_max_mb)
+      .def_static("set_iterative_dense_max_mb", &LinearAlgebra::set_iterative_dense_max_mb, py::arg("mb"));
+
+  // Gpu class - GPU backend of the iterative method (CPU-only build: no
+  // backend, settings without effect)
+  py::class_<Gpu>(m, "Gpu")
+      .def_static("compiled_backends", &Gpu::compiled_backends)
+      .def_static("available", &Gpu::available)
+      .def_static("active_backend", &Gpu::active_backend)
+      .def_static("get_enabled", &Gpu::get_enabled)
+      .def_static("set_enabled", &Gpu::set_enabled, py::arg("enabled"))
+      .def_static("get_dense_max_mb", &Gpu::get_dense_max_mb)
+      .def_static("set_dense_max_mb", &Gpu::set_dense_max_mb, py::arg("mb"))
+      .def_static("get_mixed_precision", &Gpu::get_mixed_precision)
+      .def_static("set_mixed_precision", &Gpu::set_mixed_precision, py::arg("on"))
+      .def_static("get_verbose", &Gpu::get_verbose)
+      .def_static("set_verbose", &Gpu::set_verbose, py::arg("on"));
 
   // Self-test of the detected BLAS / LAPACK backend through LinearAlgebra calls
   // and an oracle: single thread, then n_threads concurrent threads (0: hardware

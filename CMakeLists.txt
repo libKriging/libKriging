@@ -106,6 +106,31 @@ option(ENABLE_COVERAGE "Enable coverage target" OFF)
 option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
 option(SANITIZE "Enable sanitize feature" OFF) # could be THREAD, ADDRESS or LEAK
 option(LBFGSB_SHOW_BUILD OFF)
+# GPU acceleration of the iterative method (method "iterative(...)"), one
+# option per backend, each ON / OFF / AUTO (AUTO: enabled iff its toolchain --
+# and, for HIP, an AMD GPU -- is found at configure time). Default OFF for
+# every backend: the default build and the published packages are CPU only;
+# the separate "-gpu" packages build from source with ENABLE_GPU_ITERATIVE=AUTO.
+# ENABLE_GPU_ITERATIVE, when set, overrides the four at once (AUTO: detect
+# every backend, OFF: CPU only). Resolved by cmake/gpu.cmake into the internal
+# LIBKRIGING_<BACKEND>_ITERATIVE (ON/OFF). See docs/dev/AllCMakeOptions.md.
+#
+# CUDA: no load-time dependency on the toolkit (static CUDA runtime, cuBLAS
+# loaded on first use): a CUDA build runs the CPU path without a GPU.
+# HIP: verified on an AMD Radeon RX 6600 (gfx1032, ROCm/HIP SDK 6.2.4); needs
+# CMake >= 3.21 and a ROCm install providing hip-config.cmake.
+# SYCL: UNVERIFIED; needs a C++ compiler accepting -fsycl (icpx, oneAPI clang++).
+# Metal: macOS only, needs the metal-cpp headers (METAL_CPP_DIR).
+set(ENABLE_GPU_ITERATIVE "" CACHE STRING
+        "Override every GPU backend option: AUTO (detect all), OFF (CPU only), or empty (use ENABLE_<BACKEND>_ITERATIVE)")
+set(ENABLE_CUDA_ITERATIVE "OFF" CACHE STRING
+        "CUDA backend of the iterative method: ON, OFF or AUTO (if a CUDA toolkit is found)")
+set(ENABLE_HIP_ITERATIVE "OFF" CACHE STRING
+        "HIP/ROCm backend of the iterative method: ON, OFF or AUTO (if ROCm and an AMD GPU are found)")
+set(ENABLE_SYCL_ITERATIVE "OFF" CACHE STRING
+        "SYCL/oneAPI backend of the iterative method (UNVERIFIED): ON, OFF or AUTO (if the compiler accepts -fsycl)")
+set(ENABLE_METAL_ITERATIVE "OFF" CACHE STRING
+        "Apple Metal backend of the iterative method: ON, OFF or AUTO (macOS with metal-cpp headers)")
 
 set(PYBIND11_PYTHON_VERSION 3.7)
 
@@ -123,6 +148,8 @@ else ()
         logFatalError("Invalid CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'")
     endif ()
 endif ()
+
+include(cmake/gpu.cmake)
 
 # ENABLE_STATIC_ANALYSIS default is OFF
 string(TOUPPER "${ENABLE_STATIC_ANALYSIS}" ENABLE_STATIC_ANALYSIS)

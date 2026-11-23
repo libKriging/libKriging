@@ -12,6 +12,39 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- **Fit / predict method `"iterative"`** (matrix-free, from libKriging/libKriging#371): `method =
+  "iterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)"` (trailing
+  fields optional, `"iterative"` = `"iterative(30)"`) at `fit`, `predict`, `logLikelihood` and
+  `update`, next to `"exact"`, `"vecchia(m)"` and `"nystrom(k)"`. Conjugate-gradient solves, a
+  stochastic Lanczos quadrature estimate of log|R| with m probes and a Hutchinson gradient: no
+  O(n^3) factorization, O(n^2) per matrix-vector product (dense R kept below a memory budget, else
+  matrix-free). Objective `"LL"` and noise model None only: LOO / LMP, a nugget or a
+  heterogeneous noise, `simulate` and `update_simulate` raise an explicit error. The spec is
+  stored by `save` (probes and preconditioner landmarks rebuilt at `load`).
+  `predict(..., method = "iterative(...)")` also applies to an exact fit and to `WarpKriging` /
+  `MLPKriging`. `Kriging::logLikelihoodIterativeFun`, `iterative_nprobe`, `is_iterative_light`,
+  `iterative_cg_converged`. The matrix-vector products run under the thread budget with a
+  result independent of the number of threads.
+- **GPU backends of the iterative method** (CUDA, HIP, SYCL, Metal; from libKriging/libKriging#371):
+  CMake options `ENABLE_<CUDA|HIP|SYCL|METAL>_ITERATIVE` (`ON` / `OFF` / `AUTO`, default `OFF`:
+  CPU-only default build and packages) and `ENABLE_GPU_ITERATIVE` (`AUTO` / `OFF` for the four),
+  resolved by `cmake/gpu.cmake`. `Gpu` settings on the model of `Parallel` (`libKriging/Gpu.hpp`):
+  `set_enabled`, `set_dense_max_mb`, `set_mixed_precision`, `set_verbose`, read only
+  `compiled_backends`, `available`, `active_backend`; `LinearAlgebra::set_iterative_dense_max_mb`
+  for the CPU dense fast path. `find_package(libKriging CONFIG)` finds the CUDA toolkit of a
+  static CUDA build and the HIP runtime.
+- **Bindings of the iterative method and of `Gpu`**: `predict(..., method)` on `WarpKriging` /
+  `MLPKriging` (`"exact"` or `"iterative(...)"`) in every binding; `Gpu` settings (Python / Octave
+  `Gpu.*`, Julia `jlibkriging.Gpu.*`, R `gpu_*`); `LinearAlgebra` `set_cg_warning`,
+  `set_cg_auto_precond`, `set/get_iterative_dense_max_mb` (R `linalg_*`). Binding API check: `Gpu`
+  scope, smoke round trips of the new settings; the iterative accessors of `Kriging` are PENDING
+  (#435) like their Vecchia / Nystrom counterparts.
+- **`-gpu` packages**: `pylibkriging-gpu` (source distribution, `LIBKRIGING_PY_VARIANT=gpu`,
+  `tools/release/python-sdist-gpu.sh`) and the `libKriging-gpu_<version>_src.tar.gz` release asset
+  (`tools/release/gpu-source-archive.sh`, installed by `tools/install-gpu.sh`), compiled on the
+  installing machine with `ENABLE_GPU_ITERATIVE=AUTO`; release jobs in `release-python.yml` /
+  `release-cpp.yml`. `setup.py` forwards `ENABLE_GPU_ITERATIVE`, `ENABLE_<BACKEND>_ITERATIVE` and
+  `LIBKRIGING_CMAKE_ARGS`.
 - **`Parallel`: the thread settings in one place, in every binding** (TODO of #480): C++
   `libKriging/Parallel.hpp`, Python / Octave `Parallel.*`, Julia `jlibkriging.Parallel.*`, R
   `parallel_*`. Budget (`set_num_threads_percent`, `get_num_threads`), its distribution

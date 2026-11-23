@@ -285,7 +285,8 @@ int lk_warp_kriging_predict(void* ptr,
                             double* stdev_out,
                             double* cov_out,
                             double* mean_deriv_out,
-                            double* stdev_deriv_out);
+                            double* stdev_deriv_out,
+                            const char* method); /* "exact" (NULL), "iterative" or "iterative(...)" */
 
 /* with_noise: observation-noise VARIANCES (raw y scale, like the fit's noise),
  * noise_n = 1 (common) or m (one per row of X_n); NULL / noise_n = 0 for no
@@ -415,7 +416,8 @@ int lk_mlp_kriging_predict(void* ptr,
                            double* stdev_out,
                            double* cov_out,
                            double* mean_deriv_out,
-                           double* stdev_deriv_out);
+                           double* stdev_deriv_out,
+                           const char* method); /* "exact" (NULL), "iterative" or "iterative(...)" */
 
 /* with_noise: observation-noise VARIANCES (raw y scale, like the fit's noise),
  * noise_n = 1 (common) or m (one per row of X_n); NULL / noise_n = 0 for no
@@ -610,6 +612,25 @@ int lk_parallel_get_num_threads(void);
 const char* lk_parallel_blas_backend(void);
 int lk_parallel_blas_num_threads(void);
 int lk_parallel_omp_enabled(void);
+
+/* LinearAlgebra settings of the iterative method */
+int lk_linalg_set_cg_warning(int warn);
+int lk_linalg_set_cg_auto_precond(int on);
+int lk_linalg_set_iterative_dense_max_mb(int mb);
+int lk_linalg_get_iterative_dense_max_mb(void);
+
+/* Gpu (Gpu.hpp): GPU backend of the iterative method */
+const char* lk_gpu_compiled_backends(void);
+int lk_gpu_available(void);
+const char* lk_gpu_active_backend(void);
+int lk_gpu_set_enabled(int enabled);
+int lk_gpu_get_enabled(void);
+int lk_gpu_set_dense_max_mb(int mb);
+int lk_gpu_get_dense_max_mb(void);
+int lk_gpu_set_mixed_precision(int on);
+int lk_gpu_get_mixed_precision(void);
+int lk_gpu_set_verbose(int on);
+int lk_gpu_get_verbose(void);
 
 #ifdef __cplusplus
 }

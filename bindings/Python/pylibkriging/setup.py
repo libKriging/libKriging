@@ -4,6 +4,7 @@ import sys
 import platform
 import subprocess
 import argparse
+import shlex
 from packaging.version import Version
 from check_requirements import *
 
@@ -28,6 +29,25 @@ def main():
     global args  # will available to CMakeBuild functions
     args, unknown = argparser.parse_known_args()
     sys.argv = [sys.argv[0]] + unknown
+
+    # Distribution variant. "" (default): the `pylibkriging` package, CPU only
+    # (published binary wheels). "gpu": the `pylibkriging-gpu` source
+    # distribution, compiled at install time with every GPU backend found on the
+    # installing machine (ENABLE_GPU_ITERATIVE=AUTO). Selected by
+    # LIBKRIGING_PY_VARIANT, or by a VARIANT file next to this setup.py:
+    # tools/release/python-sdist-gpu.sh writes that file only for the time of
+    # the sdist build, so that it ships inside the pylibkriging-gpu sdist (which
+    # then builds the gpu variant with no environment variable) and never
+    # lingers in a checkout used to build the CPU wheels.
+    global variant
+    variant_file = Path(__file__).absolute().parent / "VARIANT"
+    variant = os.environ.get("LIBKRIGING_PY_VARIANT")
+    if variant is None and variant_file.exists():
+        variant = variant_file.read_text().strip()
+    variant = (variant or "").strip().lower()
+    if variant not in ("", "gpu"):
+        print(f"Unknown LIBKRIGING_PY_VARIANT '{variant}' (expected '' or 'gpu')", file=sys.stderr)
+        exit(1)
 
     libKriging_path = Path(__file__).absolute().parents[3]
     print(f"LibKriging root directory is {libKriging_path}")
@@ -57,7 +77,7 @@ def main():
         long_description = 'Python support for libKriging, the kriging library for performance and wide language support'
 
     setup(
-        name='pylibkriging',
+        name='pylibkriging-gpu' if variant == 'gpu' else 'pylibkriging',
         packages=['pylibkriging'],
         version=kriging_version,
         author='Pascal Havé',
@@ -148,6 +168,20 @@ class CMakeBuild(build_ext):
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       f'-DKRIGING_VERSION={self.distribution.get_version()}'
                       ]
+
+        # GPU backends of the iterative method: the CMake defaults are OFF (CPU
+        # only, the published wheels); the "gpu" variant detects every backend
+        # of the building machine (ENABLE_GPU_ITERATIVE=AUTO). The environment
+        # variables ENABLE_GPU_ITERATIVE / ENABLE_<BACKEND>_ITERATIVE override.
+        gpu_mode = os.environ.get('ENABLE_GPU_ITERATIVE', 'AUTO' if variant == 'gpu' else '')
+        if gpu_mode:
+            cmake_args += ['-DENABLE_GPU_ITERATIVE=' + gpu_mode]
+        for backend in ('CUDA', 'HIP', 'SYCL', 'METAL'):
+            value = os.environ.get(f'ENABLE_{backend}_ITERATIVE')
+            if value:
+                cmake_args += [f'-DENABLE_{backend}_ITERATIVE={value}']
+        # further CMake options, e.g. LIBKRIGING_CMAKE_ARGS="-DCMAKE_CUDA_ARCHITECTURES=90"
+        cmake_args += shlex.split(os.environ.get('LIBKRIGING_CMAKE_ARGS', ''))
 
         cfg = 'Debug' if args.debug else 'Release'
         print('build mode:', cfg)
