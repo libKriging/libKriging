@@ -651,8 +651,10 @@ the tolerance 1e-5 for MLPKriging:
   keeps the exact model (residual 1.6e-8, 3.1e-8), RMSE unchanged, but NLPD 354 → 2261 and
   −4.78 → 6.06, coverage 0.888 → 0.624 and 0.956 → 0.908: the retry nugget of the current
   behaviour widened an overconfident gauss variance (#425). Same direction, smaller, Kriging
-  gauss branin4 n 200 set 2 (coverage 0.942 → 0.854, NLPD better). A floor on the predicted
-  variance (#428) is the matching remedy, not the Cholesky retry.
+  gauss branin4 n 200 set 2 (coverage 0.942 → 0.854, NLPD better). The floor on the predicted
+  variance (#428, 4 eps sigma², in the measured code) is a rounding floor, orders of magnitude
+  below these variances: it does not cover this case. The cause is the overconfidence of gauss
+  (#425), which the retry nugget happened to hide.
 - Cost: one O(n²) product per committed model; a second factorization only on a fallback
   (MLPKriging d >= 4: every committed model).
 - Caveats: the inner fits of MLPKriging (80 % of the points) also go through the check, and the
