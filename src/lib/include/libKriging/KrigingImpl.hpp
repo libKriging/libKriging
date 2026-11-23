@@ -200,12 +200,11 @@ class KrigingImpl {
   /// the GLS estimate (study of #496: criterion for the committed model).
   double interpolation_residual(const KModel& m) const;
 
-  /// Committed noise-free factorization (study of #465 / #496). `populate`
-  /// fills `m`. Default and modes 1-4 of LinearAlgebra::chol_rcond_bound:
-  /// once, inside a LinearAlgebra::CommittedCholScope. Mode 5 and
-  /// `check_residual`: once without the rcond test of the Cholesky retry;
-  /// if interpolation_residual(m) > LinearAlgebra::chol_residual_tol, again
-  /// with the rcond test (the current behaviour).
+  /// Committed factorization (#465, #496). `populate` fills `m` inside a
+  /// LinearAlgebra::CommittedCholScope: noise-free, no rcond test in the
+  /// Cholesky retry. With `check_residual` (noise-free), the model is kept only
+  /// if interpolation_residual(m) <= LinearAlgebra::chol_residual_tol;
+  /// otherwise `populate` runs again with the rcond test.
   void populate_committed(KModel& m, bool check_residual, const std::function<void()>& populate) const;
 
   /// Unified predict implementation shared by Kriging / NuggetKriging /

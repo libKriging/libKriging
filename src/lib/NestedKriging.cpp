@@ -353,15 +353,21 @@ void NestedKriging::precompute_nk() {
   m_alpha.assign(p, arma::vec());
   for (arma::uword g = 0; g < p; ++g) {
     const arma::uvec& idx = m_groups[g];
-    // Same factorization as the submodel, with the Cholesky jitter it was
-    // fitted (or loaded) with, not the current LinearAlgebra setting: its
-    // committed one (Kriging::model_chol_jitter(), WarpKriging's
-    // m_model_chol_jitter; 0: exact, num_nugget added only if the Cholesky
-    // fails, as safe_chol_lower does for the submodel).
-    const double group_jitter = warped() ? m_wsubmodels[g]->m_model_chol_jitter : m_submodels[g]->model_chol_jitter();
-    arma::mat R = corrMat(m_X.rows(idx), m_X.rows(idx));
-    R.diag() += group_jitter;
-    m_L[g] = LinearAlgebra::safe_chol_lower(R);
+    // Same factorization as the submodel: its committed factor (exact, or with
+    // the retry nugget when its interpolation residual check fell back, #496),
+    // so NK with one group is the submodel. Without one (not fitted in this
+    // object), the factorization with the jitter the submodel was fitted (or
+    // loaded) with, not the current LinearAlgebra setting.
+    const arma::mat& T = warped() ? m_wsubmodels[g]->T() : m_submodels[g]->T();
+    if (T.n_rows == idx.n_elem && T.n_cols == idx.n_elem) {
+      m_L[g] = arma::trimatl(T);
+    } else {
+      const double group_jitter
+          = warped() ? m_wsubmodels[g]->m_model_chol_jitter : m_submodels[g]->model_chol_jitter();
+      arma::mat R = corrMat(m_X.rows(idx), m_X.rows(idx));
+      R.diag() += group_jitter;
+      m_L[g] = LinearAlgebra::safe_chol_lower(R);
+    }
     const arma::vec r = m_y(idx) - m_beta0;
     m_alpha[g] = arma::solve(arma::trimatu(m_L[g].t()), arma::solve(arma::trimatl(m_L[g]), r));
   }

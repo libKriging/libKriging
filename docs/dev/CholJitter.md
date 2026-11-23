@@ -600,7 +600,25 @@ current behaviour (on):
   where the protection is real. A criterion for the committed model (e.g. a posteriori check of
   the interpolation residual) is left to #496.
 
-#### Residual of the committed model (study mode 5, #496)
+#### Residual of the committed model (#496): the rule
+
+Adopted as the default (2026-11), the study modes 1-4 removed (`set_chol_rcond_bound`,
+`rcond_study` variants `J`, `diag`, `nf`, `diagc`, `res`; the "current behaviour" below is the
+release before). The rule: in `cholCov` / `update_cholCov` the rcond test is skipped when the
+diagonal bounds rcond (mode 2: search jitter, nugget, noise); the noise-free committed model is
+factorized without it and kept if its interpolation residual is <= `chol_residual_tol` (1e-5,
+`LinearAlgebra::set_chol_residual_tol`, C++ only), else factorized again with the test.
+NestedKriging takes the submodel's committed factor for its NK aggregation (it repeated the
+factorization, with the rcond test), so NK with one group is the submodel again. Measured on
+72 NestedKriging fits (gauss / matern5_2, plain / `none` / kumaraswamy warps, n 120 / 300, 3
+groups, 6 sets): identical on 55, RMSE never worse (down to × 0.72), coverage lower on 3 gauss
+n 120 fits (0.67 → 0.47, 0.67 → 0.47, 0.75 → 0.47), NK gauss being already miscalibrated there
+(NLPD ~1e12 with either factor, coverage 0.34-0.75: #425). The interpolation of the design by NK
+with gauss and kumaraswamy warps (`NestedKrigingTest`, n 120) goes from < 1e-3 to 1.7e-3: the
+aggregation matrix `K_M` is near singular at design points; the test bound is 3e-3.
+
+The measurements of the study mode follow.
+
 
 Results and analysis scripts: `bench/thread-budget/results/rcond-residual-496.tar.gz`
 (`<name>_on.csv` current behaviour, `_inf` mode 5 without fallback, `_res` tolerance 1e-5).
@@ -665,12 +683,12 @@ the tolerance 1e-5 for MLPKriging:
 
 ## Open items
 
-- The rcond test of the Cholesky retry (`rcond(L)^2 < 1e-18`) breaks the continuity the jitter
+- Done (#496): the rcond test of the Cholesky retry (`rcond(L)^2 < 1e-18`) broke the continuity the jitter
   gives (matern5_2, n 1000) and the exactness of the committed model (matern5_2, n >= 500):
   measured above: neither the test off, nor a test bounded by the diagonal, nor "no test on the
-  noise-free committed model" dominates (MLPKriging needs the protection); kept unchanged. The
-  residual check of the committed model (mode 5, #496) separates the two cases on the measured
-  campaign without a loss in RMSE; it does not protect the calibration of gauss (above).
+  noise-free committed model" dominates (MLPKriging needs the protection). Replaced (#496) by
+  the residual check of the committed model, which separates the two cases on the measured
+  campaign without a loss in RMSE; it does not protect the calibration of gauss (#425).
 - The `N` floor of the WarpKriging / MLPKriging search: removal measured above, no gain or loss
   but MLPKriging moving both ways; kept, to be decided (#465).
 - Calibration: gauss predictive sd is overconfident (sd / RMSE 0.25–0.43) with or without jitter;
@@ -688,7 +706,7 @@ the tolerance 1e-5 for MLPKriging:
 
 # Jitter of each class and method
 
-State after the jitter rule of #465 (2026-11).
+State after the jitter rule of #465 and the rcond rule of #496 (2026-11).
 
 Rule: the search and the objective accessors use the search diagonal 1 + `J`; the committed
 model is exact; an approximate method keeps the diagonal of its objective. Measurements and the
@@ -700,7 +718,7 @@ candidates rejected: [One rule for every class](#one-rule-for-every-class-465) b
 |---|---|---|---|
 | search jitter `J` | `kernel_chol_jitter(kernel)`: gauss 1e-9, matern5_2 1e-10, others 0; `set_chol_jitter(x)` / `LK_CHOL_JITTER`. WarpKriging / MLPKriging: at least `N` (below) | `Kriging::m_chol_jitter`, `WarpKriging::m_chol_jitter`, saved in the JSON | fixed, the same at every theta |
 | `num_nugget` `N` | 1e-10 (`set_num_nugget`) | `LinearAlgebra::num_nugget` | fixed constant |
-| retry | `N`·10^k, k = 0..10, added by `safe_chol_lower` when the Cholesky fails or rcond < 1e-18 | `LinearAlgebra::safe_chol_lower_retry` | stepwise: depends on whether a Cholesky fails, so on rounding (the discontinuity the search jitter removes) |
+| retry | `N`·10^k, k = 0..10, added by `safe_chol_lower` when the Cholesky fails or rcond < 1e-18; the rcond test is skipped when the diagonal bounds rcond (search jitter, nugget, noise) and on the noise-free committed model, checked by its interpolation residual instead (#496) | `LinearAlgebra::safe_chol_lower_retry`, `KrigingImpl::populate_committed` | stepwise: depends on whether a Cholesky fails, so on rounding (the discontinuity the search jitter removes) |
 
 Everything below adds the retry on top when the Cholesky still fails, except where `arma::chol` is
 called directly (noted "no retry").
@@ -711,7 +729,7 @@ called directly (noted "no retry").
 |---|---|---|
 | fit, `LL` / `LOO` / `LMP` objective (exact method) | `populate_Model` | 1 + `J` |
 | `logLikelihood()`, `logLikelihoodFun`, `leaveOneOut()`, `leaveOneOutFun/Vec`, `logMargPost(Fun)` | `make_Model` (objective) | 1 + `J` |
-| committed model `m_T` (after BFGS, `optim = "none"`, warm restart) | `commit_model_chol_jitter` / `make_committed_Model` | 1 (exact) |
+| committed model `m_T` (after BFGS, `optim = "none"`, warm restart) | `commit_model_chol_jitter` / `make_committed_Model` | 1 (exact, no rcond test); factorized again with the rcond test if its interpolation residual > 1e-5 sd(y) (#496) |
 | `predict` (mean, stdev, cov, deriv) | `m_T` | 1 (exact): interpolates the data |
 | `simulate` | `m_T`, then `safe_chol_lower` of the conditional covariance at `X_n` | 1 (exact); conditional covariance: 0 + retry |
 | `update(refit = false)` | `update_cholCov` extends `m_T` | 1 (exact) |
@@ -749,7 +767,7 @@ current cache (the search's while optimizing). Observation noise adds to either.
 |---|---|
 | fit / `update(refit = true)` objective, every start (the parallel clones too), `logLikelihoodFun` | 1 + `m_chol_jitter` |
 | `logLikelihood()` | the objective at the committed parameters, `logLikelihoodFun(theta())` (sigma2 profiled, with noise too): kept from the search (`objective_ll` in the JSON), re-evaluated after `update(refit = false)` and for a file without it (#465; it was the committed exact model's LL there before) |
-| committed model (`commit_model_chol_jitter`), `predict`, `simulate`, `update(refit = false)` | 1 (exact); the predicted variance is floored (`predict_impl`) |
+| committed model (`commit_model_chol_jitter`), `predict`, `simulate`, `update(refit = false)` | 1 (exact; noise-free: residual check as Kriging, #496); the predicted variance is floored (`predict_impl`) |
 | `update_simulate` | `R_uu` exact (1, or 1 + noise / sigma2) |
 | `simulate` conditional covariance | 0 + retry (`simulate_impl`, as Kriging) |
 | `load` of a file without `model_chol_jitter` | `m_chol_jitter` (one jitter for both, as saved) |
@@ -765,7 +783,7 @@ warps differ from Kriging's at the same theta (measured below: up to 0.09 at n 1
 |---|---|
 | fit of the common prior | `Kriging` (or `WarpKriging` when warped) on the data: rules above |
 | submodels (`optim = "none"`) | their committed model: 1 (exact), Kriging and WarpKriging; their `logLikelihood()` follows their class |
-| `precompute_nk` group factors | the submodel's committed diagonal (`safe_chol_lower`) |
+| `precompute_nk` group factors | the submodel's committed factor `m_T` (#496); without one, its committed diagonal (`safe_chol_lower`) |
 | `predict`, PoE family (PoE, gPoE, BCM, rBCM) | each submodel's `predict` |
 | `predict`, NK aggregation | group factors as above; aggregation matrix `K_M` + 1e-10 (`NestedKriging::jitter`, a constant, not `N`; `solve`, `pinv` fallback, no retry) |
 

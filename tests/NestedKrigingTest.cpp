@@ -262,7 +262,10 @@ TEST_CASE("NestedKriging supports WarpKriging submodels", "[nested][warp]") {
 
   SECTION("NK interpolates the design points under warping") {
     auto [mean, stdev] = nk.predict(X, true);
-    CHECK(arma::abs(mean - y).max() < 1e-3);
+    // 1.7e-3 since the submodels are exact (#496): the NK aggregation matrix
+    // K_M is near singular at the design points with gauss; it was 1e-3 when
+    // the rcond test added a retry nugget to the submodel factors
+    CHECK(arma::abs(mean - y).max() < 3e-3);
     CHECK(stdev.max() < 1e-2);
   }
 

@@ -229,51 +229,71 @@ TEST_CASE("jitter rule: NestedKriging submodels follow the rule", "[jitter][rule
   CHECK(arma::abs(yp - y).max() < 1e-5 * arma::abs(y).max());
 }
 
-TEST_CASE("rcond test bounded by the diagonal (study mode, #465)", "[jitter][rcond]") {
-  // matern5_2 correlation, n = 200 points of [0,1]^2, long range: with a
-  // diagonal shift delta the 1-norm rcond is >= delta / (sqrt(n) (max diag +
-  // factor (n - 1))), here 3.5e-17 >= min_rcond (1e-18), while the rcond
-  // estimate of the Cholesky factor can be lower (6e-19 with OpenBLAS).
+namespace {
+// matern5_2 correlation (a product over the inputs)
+double matern52(const arma::vec& d, const arma::vec& t) {
+  const arma::vec h = arma::abs(d) / t * std::sqrt(5.0);
+  double p = 1;
+  for (const double v : h)
+    p *= (1 + v + v * v / 3) * std::exp(-v);
+  return p;
+}
+}  // namespace
+
+TEST_CASE("rcond test of the Cholesky retry skipped when the diagonal bounds rcond (#465, #496)", "[jitter][rcond]") {
+  // matern5_2, n = 200 points of [0,1]^2, long range: with a diagonal shift
+  // delta the 1-norm rcond is >= delta / (sqrt(n) (max diag + factor (n - 1))),
+  // here 3.5e-17 >= min_rcond (1e-18), while the rcond estimate of the
+  // Cholesky factor can be lower (6e-19 with OpenBLAS): plain Cholesky.
   const arma::uword n = 200;
   arma::arma_rng::set_seed(1);
   const arma::mat X = arma::randu(n, 2);
   const arma::mat dX = LinearAlgebra::compute_dX(X);
-  auto cov = [](const arma::vec& d, const arma::vec& t) {
-    const arma::vec h = arma::abs(d) / t * std::sqrt(5.0);
-    double p = 1;
-    for (const double v : h)
-      p *= (1 + v + v * v / 3) * std::exp(-v);
-    return p;
-  };
   const arma::vec theta(2, arma::fill::value(3.0));
-  const int saved = LinearAlgebra::get_chol_rcond_bound();
-  auto chol_with = [&](int mode, double factor, double d) {
-    LinearAlgebra::set_chol_rcond_bound(mode);
-    arma::mat R(n, n);
-    arma::mat L = LinearAlgebra::cholCov(&R, dX, theta, cov, factor, arma::vec(n, arma::fill::value(d)));
-    arma::mat Lp;
-    const bool ok = arma::chol(Lp, R, "lower");
-    return std::make_tuple(L, Lp, ok);
+  arma::mat R(n, n);
+  const arma::mat L = LinearAlgebra::cholCov(&R, dX, theta, matern52, 1.0, arma::vec(n, arma::fill::value(1.0 + 1e-13)));
+  arma::mat Lp;
+  REQUIRE(arma::chol(Lp, R, "lower"));
+  INFO("rcond estimate " << LinearAlgebra::rcond_chol(Lp));
+  CHECK(arma::approx_equal(L, Lp, "absdiff", 0.0));
+}
+
+TEST_CASE("noise-free committed model: exact, checked by its interpolation residual (#496)", "[jitter][rcond]") {
+  // same ill-conditioned matern5_2 correlation (theta 3, n 200, 2D): the rcond
+  // estimate of the exact factor is below min_rcond, but the exact model
+  // interpolates; the retry nugget of the rcond test would not.
+  const arma::uword n = 200;
+  arma::arma_rng::set_seed(1);
+  const arma::mat X = arma::randu(n, 2);
+  const arma::vec y = arma::sin(3 * X.col(0)) + arma::cos(2 * X.col(1));
+  Kriging::Parameters fx;
+  fx.theta = arma::mat(1, 2, arma::fill::value(3.0));
+  fx.is_theta_estim = false;
+  auto interp = [&](double tol, unsigned long long& checks, unsigned long long& fallbacks) {
+    const double saved = LinearAlgebra::get_chol_residual_tol();
+    LinearAlgebra::set_chol_residual_tol(tol);
+    LinearAlgebra::reset_chol_retry_counts();
+    Kriging k("matern5_2");
+    k.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL", fx);
+    double res;
+    LinearAlgebra::committed_residual_stats(res, checks, fallbacks);
+    LinearAlgebra::set_chol_residual_tol(saved);
+    return arma::abs(std::get<0>(k.predict(X, false, false, false)) - y).max() / arma::stddev(y);
   };
-  {  // jitter: constant shift on the unit diagonal, modes 1 and 2 skip the test
-    const auto [L0, Lp, ok] = chol_with(0, 1.0, 1.0 + 1e-13);
-    REQUIRE(ok);
-    INFO("rcond estimate " << LinearAlgebra::rcond_chol(Lp));
-    if (LinearAlgebra::rcond_chol(Lp) < 1e-18)
-      CHECK(!arma::approx_equal(L0, Lp, "absdiff", 0.0));  // mode 0 retries
-    for (const int mode : {1, 2}) {
-      const auto [L, Lq, ok2] = chol_with(mode, 1.0, 1.0 + 1e-13);
-      CHECK(arma::approx_equal(L, Lq, "absdiff", 0.0));  // plain Cholesky, no retry
-    }
-  }
-  {  // nugget-like: factor < 1, unit diagonal; only mode 2 uses the bound
-    const double alpha = 1.0 - 1e-13;
-    const auto [L0, Lp, ok] = chol_with(0, alpha, 1.0);
-    const auto [L1, Lp1, ok1] = chol_with(1, alpha, 1.0);
-    CHECK(arma::approx_equal(L0, L1, "absdiff", 0.0));
-    const auto [L2, Lp2, ok2] = chol_with(2, alpha, 1.0);
-    if (ok2)
-      CHECK(arma::approx_equal(L2, Lp2, "absdiff", 0.0));
-  }
-  LinearAlgebra::set_chol_rcond_bound(saved);
+  unsigned long long checks = 0, fallbacks = 0;
+  const double exact = interp(LinearAlgebra::get_chol_residual_tol(), checks, fallbacks);
+  CHECK(checks == 1);
+  CHECK(fallbacks == 0);
+  CHECK(exact < 1e-6);
+  // tolerance 0: every committed model falls back to the rcond test
+  const double fallback = interp(0.0, checks, fallbacks);
+  CHECK(checks == 1);
+  CHECK(fallbacks == 1);
+  arma::mat R(n, n);
+  LinearAlgebra::cholCov(&R, LinearAlgebra::compute_dX(X), arma::vec(2, arma::fill::value(3.0)), matern52, 1.0, arma::vec());
+  arma::mat L;
+  REQUIRE(arma::chol(L, R, "lower"));
+  INFO("rcond estimate " << LinearAlgebra::rcond_chol(L) << ", interpolation " << exact << " / " << fallback);
+  if (LinearAlgebra::rcond_chol(L) < 1e-18)  // LinearAlgebra::min_rcond
+    CHECK(fallback > 10 * exact);  // the retry nugget of the rcond test
 }

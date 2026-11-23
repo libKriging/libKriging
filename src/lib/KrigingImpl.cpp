@@ -244,7 +244,7 @@ void KrigingImpl::populate_committed(KModel& m, bool check_residual, const std::
     LinearAlgebra::CommittedCholScope committed;
     populate();
   }
-  if (!check_residual || LinearAlgebra::get_chol_rcond_bound() != 5)
+  if (!check_residual)
     return;
   const double res = interpolation_residual(m);
   const bool fallback = !(res <= LinearAlgebra::chol_residual_tol);

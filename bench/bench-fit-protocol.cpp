@@ -22,9 +22,6 @@
 //   --header     1                   0: no CSV header (to append)
 //   --candidates 0                   1: jitter-rule candidate columns (#465, noise-free fits; see rebuild())
 //   --rcond-check 1                  0: no Cholesky retry on a low rcond estimate, only on failure
-//   --rcond-bound 0                  1: skip that test when the search jitter bounds rcond; 2: any diagonal shift;
-//                                    3: no test noise-free (search and committed model), kept with a noise model;
-//                                    4: 2, and no test on the noise-free committed model
 // Functions (on [0, 1]^d; "<family><d>" or "<family>_<d>", d defaults to the
 // active dimension):
 //   sin<d>     sum_j sin(2 pi f_j x_j), f_j ~ U[0.5, 3] (all inputs active)
@@ -221,16 +218,10 @@ std::string settings_label() {
   // the long-range restart (lrr=) was removed in 2.0 (#466)
   std::snprintf(b,
                 sizeof b,
-                "jitter=%s,pct=%g%s%s",
+                "jitter=%s,pct=%g%s",
                 jit,
                 Optim::get_num_threads_percent(),
-                LinearAlgebra::chol_rcond_checked() ? "" : ",rcond=0",
-                LinearAlgebra::get_chol_rcond_bound() == 0
-                    ? ""
-                    : (LinearAlgebra::get_chol_rcond_bound() == 1   ? ",rcond_bound=J"
-                       : LinearAlgebra::get_chol_rcond_bound() == 2 ? ",rcond_bound=diag"
-                       : LinearAlgebra::get_chol_rcond_bound() == 3 ? ",rcond=noise-only"
-                                                                    : ",rcond_bound=diag+committed"));
+                LinearAlgebra::chol_rcond_checked() ? "" : ",rcond=0");
   return b;
 }
 
@@ -250,8 +241,7 @@ int main(int argc, char** argv) {
                                             {"variant", ""},
                                             {"header", "1"},
                                             {"candidates", "0"},
-                                            {"rcond-check", "1"},
-                                            {"rcond-bound", "0"}};
+                                            {"rcond-check", "1"}};
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "-h" || a == "--help" || a.rfind("--", 0) != 0 || i + 1 >= argc || !opt.count(a.substr(2))) {
@@ -270,7 +260,6 @@ int main(int argc, char** argv) {
   // 0: safe_chol_lower retries (num_nugget x 10^k) only when the Cholesky fails, not
   // when its rcond estimate is below LinearAlgebra::min_rcond (study of #465)
   LinearAlgebra::check_chol_rcond(opt["rcond-check"] != "0");
-  LinearAlgebra::set_chol_rcond_bound(std::stoi(opt["rcond-bound"]));
   const std::string settings = settings_label();
   const std::string variant_base = opt["variant"].empty() ? settings : opt["variant"];
   const bool candidates = opt["candidates"] != "0";

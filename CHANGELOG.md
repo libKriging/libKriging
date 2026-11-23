@@ -24,6 +24,26 @@ past release, see the corresponding entry on the
   setting: the results do not depend on it, #441).
 
 ### Changed
+- **rcond test of the Cholesky retry: the noise-free committed model is checked by its
+  interpolation residual** (#496, follow-up of #465). The retry added a nugget when the 1-norm
+  rcond estimate of the factor was below 1e-18, about 4 orders of magnitude pessimistic: on the
+  exact committed model of Kriging / WarpKriging (gauss, matern5_2, n >= 200) it was a false alarm
+  that stopped the model from interpolating (max error up to 4.8e-3 sd(y)). Now the noise-free
+  committed model is factorized without the test and kept when its interpolation residual
+  max |y - F b - R alpha| / sd(y) is <= 1e-5, else factorized again with it (MLPKriging, where the
+  learned features make the matrix genuinely ill-conditioned: the protection is kept); the test
+  is skipped wherever the diagonal already bounds rcond (search jitter, nugget, noise);
+  NestedKriging uses the submodel's committed factor. Measured (`docs/dev/CholJitter.md`,
+  `bench/thread-budget/rcond_study.cpp`): noise-free Kriging (n 100-1000) and WarpKriging,
+  34 fits of 388 change, RMSE better by more than 10 % on 22 (down to × 0.40), never worse by
+  more than 5 %; MLPKriging (n 100-500, 6 functions), 11 fits of 156 change, 9 better by more
+  than 10 % (down to × 0.22), none worse by more than 3 %. Results change: predictions of the
+  noise-free models above, the fitted theta of Kriging at n 1000 (13 of 40 fits, LL never
+  lower), and with a nugget a few fits where 1 - alpha now bounds rcond (3 of 560 moved in the
+  study of #465, LL −30 to +5). Not covered: the variance of
+  gauss, overconfident (#425), lost the widening of the retry nugget on 5 fits of 444 (coverage
+  down to 0.62, WarpKriging kumaraswamy). `LinearAlgebra::set_chol_residual_tol` (C++) sets the
+  tolerance; `check_chol_rcond(false)` still removes the rcond test everywhere.
 - **One jitter rule for Kriging, WarpKriging / MLPKriging and NestedKriging** (#465, part of #464):
   the search and the objective accessors (`logLikelihood()`, `leaveOneOut()`, `logMargPost()`) use
   the search diagonal 1 + J (`LinearAlgebra::kernel_chol_jitter`, `LK_CHOL_JITTER`), the committed

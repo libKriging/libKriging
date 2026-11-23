@@ -45,20 +45,12 @@ class LinearAlgebra {
   static bool chol_rcond_check;
   LIBKRIGING_EXPORT static void check_chol_rcond(bool c);
   LIBKRIGING_EXPORT static bool chol_rcond_checked();
-  // Study of #465: skip the rcond test of the retry when a lower bound of the
-  // 1-norm reciprocal condition number, known from the diagonal of the
-  // matrix built by cholCov, is already >= min_rcond. 0: off (default);
-  // 1: only for a constant diagonal shift on a unit-scaled correlation
-  // (the search jitter J, or WarpKriging's floor); 2: any diagonal shift
-  // (also the nugget / heterogeneous noise models); 3: no rcond test on a
-  // noise-free matrix (factor 1, constant diagonal: the search with J and the
-  // exact committed model), retry on a failing Cholesky only; test kept
-  // with a noise model; 4: see CommittedCholScope.
-  static int chol_rcond_bound;
-  LIBKRIGING_EXPORT static void set_chol_rcond_bound(int mode);
-  LIBKRIGING_EXPORT static int get_chol_rcond_bound();
-  // Mode 4: mode 2 in the search, and no rcond test on the noise-free
-  // committed model (built inside a CommittedCholScope).
+  // rcond test of the Cholesky retry (#465, #496): safe_chol_lower retries
+  // when the Cholesky fails or rcond(L)^2 < min_rcond, except when the
+  // conditioning is already bounded from the diagonal of the matrix built by
+  // cholCov (search jitter, nugget, noise), and on the noise-free committed
+  // model (built inside a CommittedCholScope), which is factorized exactly and
+  // checked by its interpolation residual instead (KrigingImpl::populate_committed).
   struct LIBKRIGING_EXPORT CommittedCholScope {
     CommittedCholScope();
     ~CommittedCholScope();
@@ -68,19 +60,20 @@ class LinearAlgebra {
    private:
     bool m_previous;
   };
-  // Mode 5 (#496): mode 4, then the committed noise-free model is kept exact
-  // only if its interpolation residual max |y - F b - R alpha| / sd(y) is
-  // <= chol_residual_tol; otherwise it is factorized again with the rcond test
-  // (the current behaviour). Checks and fallbacks counted since the last
-  // reset_chol_retry_counts, with the residual of the last check.
+  // The noise-free committed model is kept exact only if its interpolation
+  // residual max |y - F b - R alpha| / sd(y) is <= chol_residual_tol (1e-5);
+  // otherwise it is factorized again with the rcond test (#496). Checks and
+  // fallbacks counted since the last reset_chol_retry_counts, with the residual
+  // of the last check.
   static double chol_residual_tol;
   LIBKRIGING_EXPORT static void set_chol_residual_tol(double tol);
-  LIBKRIGING_EXPORT static void record_committed_residual(double residual, bool fallback);
+  LIBKRIGING_EXPORT static double get_chol_residual_tol();
+  static void record_committed_residual(double residual, bool fallback);
   LIBKRIGING_EXPORT static void committed_residual_stats(double& last_residual,
                                                          unsigned long long& checks,
                                                          unsigned long long& fallbacks);
   // Retries of the Cholesky (num_nugget added) since the last reset, by
-  // trigger: a failing Cholesky, or the rcond test (study of #465).
+  // trigger: a failing Cholesky, or the rcond test (rcond_study, #465).
   LIBKRIGING_EXPORT static void chol_retry_counts(unsigned long long& on_failure, unsigned long long& on_rcond);
   LIBKRIGING_EXPORT static void reset_chol_retry_counts();
 

@@ -3,16 +3,15 @@
 // the Cholesky retry"), on every class, kernel and noise model, and on the
 // paths after the fit (predict, update, simulate).
 // Variant: environment LK_RCOND
-//   on    current: retry when the Cholesky fails or rcond(L)^2 < min_rcond
+//   on    default rule (#496): retry when the Cholesky fails or rcond(L)^2 <
+//         min_rcond, the test skipped when the diagonal bounds rcond; the
+//         noise-free committed model exact, factorized again with the test
+//         when its interpolation residual exceeds LK_RES_TOL (default 1e-5,
+//         relative to sd(y))
 //   off   LinearAlgebra::check_chol_rcond(false): retry on a failing Cholesky only
-//   nf    set_chol_rcond_bound(3): no rcond test on a noise-free matrix (the
-//         search with J and the exact committed model), kept with a noise model
-//   J     set_chol_rcond_bound(1): test skipped when the search jitter bounds rcond
-//   diag  set_chol_rcond_bound(2): test skipped when any diagonal shift bounds rcond
-//   diagc set_chol_rcond_bound(4): diag, and no test on the noise-free committed model
-//   res   set_chol_rcond_bound(5): diagc, then the committed noise-free model is
-//         factorized again with the rcond test when its interpolation residual
-//         exceeds LK_RES_TOL (default 1e-5, relative to sd(y)) (#496)
+// The variants of the study of #465 / #496 (modes J, diag, nf, diagc, res of
+// LinearAlgebra::set_chol_rcond_bound) were removed with the rule change; the
+// former default is the release before it.
 // For every model x kernel x noise x function x n x data set (the T7 data of
 // bench/bench-fit-protocol.cpp), one fit, then:
 //   ll, theta, rmse / nlpd / cov95 (500 test points, noise-free truth), wall_s
@@ -21,8 +20,8 @@
 //   interp           noise-free: max |predict(X) - y| / sd(y) (the committed
 //                    model interpolates when exact)
 //   rmse_upd / nlpd_upd / rr_upd  after update(refit = false) with 10 points
-//   res_last / res_chk / res_fb  variant res: residual of the last exact
-//                    committed model (the final one), number of checks, of fallbacks (fit only)
+//   res_last / res_chk / res_fb  residual of the last exact committed
+//                    model checked, number of checks, of fallbacks (fit only)
 //   sim_z / sim_sdr / rr_sim  Kriging: 200 conditional simulations at 200 test
 //                    points: RMS of (mean - predict mean) / (sd / sqrt(nsim))
 //                    (~1), median sd(simulations) / predict sd (~1); status
@@ -160,22 +159,12 @@ int main(int argc, char** argv) {
   const std::string variant = v ? v : "on";
   if (variant == "off")
     LinearAlgebra::check_chol_rcond(false);
-  else if (variant == "nf")
-    LinearAlgebra::set_chol_rcond_bound(3);
-  else if (variant == "J")
-    LinearAlgebra::set_chol_rcond_bound(1);
-  else if (variant == "diag")
-    LinearAlgebra::set_chol_rcond_bound(2);
-  else if (variant == "diagc")
-    LinearAlgebra::set_chol_rcond_bound(4);
-  else if (variant == "res") {
-    LinearAlgebra::set_chol_rcond_bound(5);
-    if (const char* t = std::getenv("LK_RES_TOL"))
-      LinearAlgebra::set_chol_residual_tol(std::atof(t));
-  } else if (variant != "on") {
+  else if (variant != "on") {
     std::fprintf(stderr, "unknown LK_RCOND %s\n", variant.c_str());
     return 1;
   }
+  if (const char* t = std::getenv("LK_RES_TOL"))
+    LinearAlgebra::set_chol_residual_tol(std::atof(t));
   std::printf(
       "variant,model,kernel,noise,function,d,n,set,status,ll,theta,rmse,nlpd,cov95,wall_s,rf_fit,rr_fit,interp,"
       "rmse_upd,nlpd_upd,rr_upd,sim_z,sim_sdr,rr_sim,res_last,res_chk,res_fb\n");
