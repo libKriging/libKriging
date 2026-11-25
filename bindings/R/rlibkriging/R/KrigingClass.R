@@ -3,29 +3,16 @@
 ## As an S3 class, it has no formal definition.
 ## ****************************************************************************
 
-# Validate the `objective` argument. Unlike match.arg(), this also accepts the
-# deprecated "LLVecchia" / "LLVecchia(m)" and "LLNystrom" / "LLNystrom(k)"
-# objectives (aliases of objective "LL" with method "vecchia(m)" /
-# "nystrom(k)"), in addition to "LL" / "LOO" / "LMP".
+# Validate the `objective` argument: "LL", "LOO" or "LMP". The objectives
+# "LLVecchia(m)" / "LLNystrom(k)" (aliases removed in 2.0) are passed on to
+# libKriging, whose error names the replacement (objective = "LL" with
+# method = "vecchia(m)" / "nystrom(k)").
 .match_kriging_objective <- function(objective) {
     objective <- objective[[1L]]
-    if (!grepl("^(LL|LOO|LMP|LLVecchia(\\([0-9]+\\))?|LLNystrom(\\([0-9]+\\))?)$", objective))
+    if (!grepl("^(LL|LOO|LMP)$", objective) && !grepl("^LL(Vecchia|Nystrom)", objective))
         stop("'objective' must be one of \"LL\", \"LOO\" or \"LMP\" (got \"",
              objective, "\")", call. = FALSE)
-    .warn_deprecated_objective(objective)
     objective
-}
-
-# Deprecated objectives ("LLVecchia(m)", "LLNystrom(k)") raise an R warning of
-# class "deprecatedWarning" (message from libKriging), e.g. to be caught with
-# withCallingHandlers(..., deprecatedWarning = ...) or made an error by
-# options(warn = 2).
-.warn_deprecated_objective <- function(objective) {
-    msg <- kriging_deprecation_message(objective)
-    if (nzchar(msg))
-        warning(structure(class = c("deprecatedWarning", "warning", "condition"),
-                          list(message = msg, call = NULL)))
-    invisible(NULL)
 }
 
 #' Shortcut to provide functions to the S3 class "Kriging"
@@ -83,9 +70,9 @@ classKriging <- function(nk) {
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
 #'     squares, \code{"LMP"} for the Log-Marginal Posterior.
-#'     \code{"LLVecchia(m)"} and \code{"LLNystrom(k)"} are deprecated
-#'     aliases of \code{objective = "LL"} with \code{method = "vecchia(m)"}
-#'     and \code{method = "nystrom(k)"}.
+#'     \code{"LLVecchia(m)"} and \code{"LLNystrom(k)"} (aliases removed
+#'     in 2.0) raise an error: use \code{objective = "LL"} with
+#'     \code{method = "vecchia(m)"} or \code{method = "nystrom(k)"}.
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
@@ -314,7 +301,7 @@ summary.Kriging <- function(object, ...) {
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
 #'     squares, \code{"LMP"} for the Log-Marginal Posterior
-#'     (\code{"LLVecchia(m)"} / \code{"LLNystrom(k)"}: deprecated aliases,
+#'     (\code{"LLVecchia(m)"} / \code{"LLNystrom(k)"}: removed in 2.0,
 #'     see \code{\link{Kriging}}).
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}

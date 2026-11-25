@@ -125,8 +125,8 @@ predict(ke, Xnew; return_cov=true)                            # exact, with cova
 ```
 The Vecchia predictor (`method="vecchia"`) is also usable after an exact fit. Approximate
 methods return mean / stdev only (`return_cov`, `return_deriv`, `will_update` raise).
-`objective="LLVecchia(m)"` / `"LLNystrom(k)"` are **deprecated** aliases of
-`objective="LL", method="vecchia(m)"` / `"nystrom(k)"`.
+`objective="LLVecchia(m)"` / `"LLNystrom(k)"` (1.2 spelling) were **removed** in 2.0 and raise:
+use `objective="LL", method="vecchia(m)"` / `"nystrom(k)"`.
 `predictVecchia`, `predictNystrom`, `simulateVecchia` and `simulateNystrom` (behind `method`) exist in C++ only.
 
 ## NestedKriging

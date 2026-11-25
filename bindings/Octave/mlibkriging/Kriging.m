@@ -38,7 +38,9 @@ classdef Kriging < handle
         % factorization; objectives "LL", "LOO" and "LMP" all have
         % approximate versions (noise-free models), "LL" also with the
         % noise models (both methods).
-        % "LLVecchia(m)" / "LLNystrom(k)" objectives are deprecated aliases.
+        % "LLVecchia(m)" / "LLNystrom(k)" objectives (aliases removed in
+        % 2.0) raise: use objective "LL" with method "vecchia(m)" /
+        % "nystrom(k)".
         function fit(obj, varargin)
             mLibKriging("Kriging::fit", obj.ref, varargin{:});
         end

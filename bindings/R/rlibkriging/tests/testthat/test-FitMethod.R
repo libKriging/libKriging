@@ -24,15 +24,24 @@ test_that("method is stored with its explicit size; objective stays the criterio
   expect_error(Kriging(y, X, "matern5_2", method = "Vecchia"))
 })
 
-test_that("deprecated LLVecchia / LLNystrom objectives are aliases", {
-  expect_warning(ka <- Kriging(y, X, "matern5_2", objective = "LLVecchia(10)"),
-                 class = "deprecatedWarning", regexp = 'method="vecchia\\(10\\)"')
+test_that("LLVecchia / LLNystrom objectives (removed in 2.0) raise and name the replacement", {
+  expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia(10)"),
+               'objective "LLVecchia(10)" was removed in libKriging 2.0; use objective="LL", method="vecchia(10)"',
+               fixed = TRUE)
+  expect_error(Kriging(y, X, "matern5_2", objective = "LLNystrom(8)"),
+               'use objective="LL", method="nystrom(8)"', fixed = TRUE)
+  expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia(10)", method = "nystrom"),
+               "was removed in libKriging 2.0", fixed = TRUE)
+  k0 <- Kriging(kernel = "matern5_2")
+  expect_error(k0$fit(y, X, objective = "LLNystrom"), 'method="nystrom(50)"', fixed = TRUE)
+  expect_error(NestedKriging(y, X, "matern5_2", 2, objective = "LLVecchia(10)"),
+               'method="vecchia(10)"', fixed = TRUE)
+  # the replacement calls
+  ka <- Kriging(y, X, "matern5_2", objective = "LL", method = "vecchia(10)")
   expect_equal(ka$objective(), "LL")
   expect_equal(ka$method(), "vecchia(10)")
-  expect_warning(kb <- Kriging(y, X, "matern5_2", objective = "LLNystrom(8)"),
-                 class = "deprecatedWarning")
+  kb <- Kriging(y, X, "matern5_2", objective = "LL", method = "nystrom(8)")
   expect_equal(kb$method(), "nystrom(8)")
-  expect_error(suppressWarnings(Kriging(y, X, "matern5_2", objective = "LLVecchia(10)", method = "nystrom")))
   expect_no_warning(Kriging(y, X, "matern5_2", method = "vecchia(10)"))
 })
 

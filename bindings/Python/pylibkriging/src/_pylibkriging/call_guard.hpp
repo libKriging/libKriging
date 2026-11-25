@@ -11,8 +11,7 @@
 // Calls on the SAME model object are serialized by a per-object mutex: the GIL
 // used to serialize them, and libKriging does not support one object used from
 // two threads at the same time. Lock order: the GIL is released first, then the
-// mutex taken, so a thread waiting for the mutex never holds the GIL (the
-// deprecation handler re-acquires the GIL inside the call).
+// mutex taken, so a thread waiting for the mutex never holds the GIL.
 //
 // Allocations made without the GIL go to std::malloc (gil_aware_malloc,
 // pylibkriging.cpp); numpy blocks freed without it are queued and freed at the

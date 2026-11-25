@@ -54,10 +54,6 @@ TEST_CASE("Vecchia method spec parsing and validation", "[vecchia][kriging]") {
   for (const std::string bad : {"vecchia()", "vecchia(x)", "vecchia(0)", "vecchia(-3)", "vecchia(10", "Vecchia"}) {
     CHECK_THROWS_AS(fit_method(y, X, bad), std::invalid_argument);
   }
-  for (const std::string bad : {"LLVecchia()", "LLVecchia(x)", "LLVecchia(0)", "LLVecchia(-3)", "LLVecchia(10"}) {
-    CHECK_THROWS_AS(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", bad),
-                    std::invalid_argument);
-  }
 
   // LOO and LMP have a Vecchia version too (see KrigingApproxObjectivesTest.cpp)
   for (const std::string objective : {"LOO", "LMP"}) {
@@ -71,7 +67,6 @@ TEST_CASE("Vecchia method spec parsing and validation", "[vecchia][kriging]") {
   Kriging knug("matern5_2", Kriging::NoiseModel::Nugget);
   CHECK_NOTHROW(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "vecchia(10)"));
   CHECK(knug.is_vecchia_light());
-  CHECK_NOTHROW(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(10)", {}));
   CHECK_NOTHROW(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)"));
   CHECK(knug.is_nystrom_light());
   // LOO / LMP with an approximate method: noise model None only
@@ -79,64 +74,62 @@ TEST_CASE("Vecchia method spec parsing and validation", "[vecchia][kriging]") {
                   std::invalid_argument);
 }
 
-TEST_CASE("deprecated LLVecchia objective is an alias of method vecchia", "[vecchia][kriging]") {
+// what() of the std::invalid_argument raised by a Kriging fit with `objective`
+static std::string removed_objective_error(const arma::vec& y,
+                                           const arma::mat& X,
+                                           const std::string& objective,
+                                           const std::string& method = "exact") {
+  try {
+    Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", objective, {}, method);
+  } catch (const std::invalid_argument& e) {
+    return e.what();
+  }
+  return "";
+}
+
+TEST_CASE("removed LLVecchia / LLNystrom objectives raise and name the replacement", "[vecchia][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(80, X, y);
 
-  Kriging k_alias(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(15)");
-  Kriging k = fit_method(y, X, "vecchia(15)");
-  CHECK(k_alias.objective() == "LL");
-  CHECK(k_alias.method() == "vecchia(15)");
-  CHECK(k_alias.is_vecchia_light());
-  CHECK(arma::approx_equal(k_alias.theta(), k.theta(), "absdiff", 0.0));
-  CHECK(k_alias.sigma2() == k.sigma2());
+  // the aliases of 1.x (objective="LL", method="vecchia(m)" / "nystrom(k)")
+  // are errors since 2.0, whatever the method, never reinterpreted
+  CHECK(removed_objective_error(y, X, "LLVecchia(15)")
+        == "fit: objective \"LLVecchia(15)\" was removed in libKriging 2.0; use objective=\"LL\", "
+           "method=\"vecchia(15)\"");
+  CHECK(removed_objective_error(y, X, "LLVecchia")
+        == "fit: objective \"LLVecchia\" was removed in libKriging 2.0; use objective=\"LL\", method=\"vecchia(30)\"");
+  CHECK(removed_objective_error(y, X, "LLNystrom(10)")
+        == "fit: objective \"LLNystrom(10)\" was removed in libKriging 2.0; use objective=\"LL\", "
+           "method=\"nystrom(10)\"");
+  CHECK(removed_objective_error(y, X, "LLNystrom")
+        == "fit: objective \"LLNystrom\" was removed in libKriging 2.0; use objective=\"LL\", method=\"nystrom(50)\"");
+  CHECK(removed_objective_error(y, X, "LLVecchia(15)", "vecchia(15)").find("use objective=\"LL\", method=\"vecchia(15)\"")
+        != std::string::npos);
+  CHECK(removed_objective_error(y, X, "LLVecchia(15)", "nystrom").find("was removed in libKriging 2.0")
+        != std::string::npos);
+  // malformed sizes: still the removal message, with the generic replacement
+  for (const std::string bad : {"LLVecchia()", "LLVecchia(x)", "LLVecchia(0)", "LLVecchia(-3)", "LLVecchia(10"})
+    CHECK(removed_objective_error(y, X, bad).find("method=\"vecchia(m)\"") != std::string::npos);
+  for (const std::string bad : {"LLNystrom()", "LLNystrom(x)", "LLNystrom(0)", "LLNystrom(-3)", "LLNystrom(10"})
+    CHECK(removed_objective_error(y, X, bad).find("method=\"nystrom(k)\"") != std::string::npos);
+  // also through fit() on a noise model, and through the static parser
+  Kriging knug("matern5_2", Kriging::NoiseModel::Nugget);
+  CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(10)", {}),
+                  std::invalid_argument);
+  CHECK_THROWS_AS(Kriging::fit_objective_method("LLNystrom(5)", "exact"), std::invalid_argument);
 
-  // "LLVecchia" defaults to m = 30; consistent explicit method accepted
-  CHECK(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia").method()
-        == "vecchia(30)");
-  CHECK_NOTHROW(
-      Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(15)", {}, "vecchia(15)"));
-  // conflicting method raises
-  CHECK_THROWS_AS(
-      Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(15)", {}, "vecchia(10)"),
-      std::invalid_argument);
-  CHECK_THROWS_AS(
-      Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(15)", {}, "nystrom"),
-      std::invalid_argument);
-
-  // the deprecation goes through the handler (bindings: native warnings)
-  std::vector<std::string> messages;
-  Kriging::set_deprecation_handler([&messages](const std::string& m) { messages.push_back(m); });
-  Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(15)");
-  Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom");
-  fit_method(y, X, "vecchia(15)");  // no deprecation
-  REQUIRE(messages.size() == 2);
-  CHECK(messages[0] == "objective \"LLVecchia(15)\" is deprecated; use objective=\"LL\", method=\"vecchia(15)\"");
-  CHECK(messages[1] == "objective \"LLNystrom\" is deprecated; use objective=\"LL\", method=\"nystrom(50)\"");
-  CHECK(Kriging::deprecated_objective_message("LL").empty());
-  // a throwing handler turns the deprecation into an error
-  Kriging::set_deprecation_handler([](const std::string& m) { throw std::runtime_error(m); });
-  CHECK_THROWS_AS(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(15)"),
-                  std::runtime_error);
-  Kriging::set_deprecation_handler(nullptr);  // default: printed once
-
-  // set_vecchia_exact_commit is deprecated: false is a no-op, true raises
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#endif
-  CHECK_NOTHROW(k.set_vecchia_exact_commit(false));
-  CHECK_THROWS_AS(k.set_vecchia_exact_commit(true), std::invalid_argument);
-  CHECK_FALSE(k.vecchia_exact_commit());
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#pragma warning(pop)
-#endif
+  // the replacement calls
+  Kriging kv(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "vecchia(15)");
+  CHECK(kv.objective() == "LL");
+  CHECK(kv.method() == "vecchia(15)");
+  CHECK(kv.is_vecchia_light());
+  CHECK(Kriging::fit_objective_method("LL", "vecchia") == std::make_pair(std::string("LL"), std::string("vecchia(30)")));
+  Kriging kn(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)");
+  CHECK(kn.objective() == "LL");
+  CHECK(kn.method() == "nystrom(10)");
+  CHECK(kn.is_nystrom_light());
+  CHECK(Kriging::fit_objective_method("LL", "nystrom") == std::make_pair(std::string("LL"), std::string("nystrom(50)")));
 }
 
 TEST_CASE("LLVecchia(n-1) matches the exact concentrated log-likelihood", "[vecchia][kriging]") {

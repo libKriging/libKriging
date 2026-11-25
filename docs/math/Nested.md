@@ -95,7 +95,7 @@ estimate discards, and is statistically preferable at any group size.
 The submodels are then exact. The default `method="exact"` keeps the
 per-group fits; `method()` / `objective()` report the choice. It is not
 supported together with `warping`. `objective="LLVecchia(m)"` /
-`"LLNystrom(k)"` are deprecated aliases.
+`"LLNystrom(k)"` were removed in 2.0 and raise.
 
 ## Simple example
 

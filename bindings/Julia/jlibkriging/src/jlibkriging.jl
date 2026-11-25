@@ -51,17 +51,6 @@ function _check_error(ret::Cint)
     end
 end
 
-# Deprecated fit objectives ("LLVecchia(m)", "LLNystrom(k)"): Julia
-# deprecation warning (message from libKriging), shown even without
-# --depwarn=yes, an error with --depwarn=error.
-function _warn_deprecated_objective(objective::String, funcsym::Symbol)
-    ptr = ccall(dlsym(_lk(), :lk_deprecated_objective_message), Cstring, (Cstring,), objective)
-    ptr == C_NULL && return nothing  # malformed spec: the fit raises the error
-    msg = unsafe_string(ptr)
-    isempty(msg) || Base.depwarn(msg, funcsym; force=true)
-    return nothing
-end
-
 function _check_ptr(ptr::Ptr{Nothing})
     if ptr == C_NULL
         msg = unsafe_string(ccall(dlsym(_lk(), :lk_get_last_error), Cstring, ()))
@@ -106,8 +95,8 @@ low dimension) or `"nystrom"` / `"nystrom(k)"` (Nystrom global low-rank
 approximation of rank `k`, default 50: O(n k^2)). An approximate fit keeps
 no exact factorization: `predict`, `simulate` and `log_likelihood` then take
 the same `method`. Approximate methods exist only for `objective="LL"`;
-both work with `noise` (nugget or heterogeneous). `objective="LLVecchia(m)"` / `"LLNystrom(k)"` are deprecated
-aliases of `objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"`.
+both work with `noise` (nugget or heterogeneous). `objective="LLVecchia(m)"` / `"LLNystrom(k)"` (aliases
+removed in 2.0) raise an error: use `objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"`.
 
 Initial or fixed hyper-parameters can be passed either via the `sigma2`,
 `theta`, `beta`, `nugget` keywords, or as a `parameters` dict with the same
@@ -129,7 +118,6 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                  is_beta_estim::Bool=true,
                  nugget::Union{Nothing,Float64}=nothing,
                  is_nugget_estim::Bool=true)
-    _warn_deprecated_objective(objective, :Kriging)
     n, d = size(X)
     @assert length(y) == n
 
@@ -266,7 +254,6 @@ function fit!(k::Kriging, y::Vector{Float64}, X::Matrix{Float64};
               objective::String="LL",
               parameters::Union{Nothing,AbstractDict}=nothing,
               method::String="exact")
-    _warn_deprecated_objective(objective, :fit!)
     n, d = size(X)
     @assert length(y) == n
     noise_ptr = noise === nothing ? C_NULL : pointer(noise)
@@ -1571,7 +1558,6 @@ function NestedKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String, n
                        is_theta_estim::Bool=true,
                        beta::Union{Nothing,Vector{Float64}}=nothing,
                        is_beta_estim::Bool=true)
-    _warn_deprecated_objective(objective, :NestedKriging)
     n, d = size(X)
     @assert length(y) == n
 
@@ -1625,7 +1611,6 @@ function fit!(k::NestedKriging, y::Vector{Float64}, X::Matrix{Float64}, nb_group
               beta::Union{Nothing,Vector{Float64}}=nothing,
               is_beta_estim::Bool=true,
               parameters::Union{Nothing,AbstractDict}=nothing)
-    _warn_deprecated_objective(objective, :fit!)
     n, d = size(X)
     @assert length(y) == n
     # `parameters` (as in Python / R) overrides the sigma2 / theta / beta

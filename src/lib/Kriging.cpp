@@ -3557,20 +3557,6 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
 }
 
 namespace {
-// Receiver of deprecation messages. Function-local static: safe to set from
-// another translation unit's static initializer (bindings).
-Kriging::DeprecationHandler& deprecation_handler() {
-  static Kriging::DeprecationHandler handler;
-  return handler;
-}
-
-// Default receiver: printed once per process
-void print_deprecation_once(const std::string& message) {
-  static std::atomic<bool> warned{false};
-  if (!warned.exchange(true))
-    arma::cout << "Warning: " << message << arma::endl;
-}
-
 // Canonical method string with its default size made explicit
 std::string canonical_fit_method(const std::string& method) {
   if (method == "exact")
@@ -3596,45 +3582,28 @@ std::string canonical_fit_method(const std::string& method) {
 }
 }  // namespace
 
-LIBKRIGING_EXPORT std::string Kriging::deprecated_objective_message(const std::string& objective) {
-  const bool vll = objective.rfind("LLVecchia", 0) == 0;
-  const bool nll = objective.rfind("LLNystrom", 0) == 0;
-  if (!vll && !nll)
-    return "";
-  const std::string method = vll ? "vecchia(" + std::to_string(parse_vll_m(objective)) + ")"
-                                 : "nystrom(" + std::to_string(parse_nystrom_k(objective)) + ")";
-  return "objective \"" + objective + "\" is deprecated; use objective=\"LL\", method=\"" + method + "\"";
-}
-
-LIBKRIGING_EXPORT void Kriging::set_deprecation_handler(DeprecationHandler handler) {
-  deprecation_handler() = std::move(handler);
-}
-
 LIBKRIGING_EXPORT std::pair<std::string, std::string> Kriging::fit_objective_method(const std::string& objective,
                                                                                     const std::string& method) {
-  std::string objective_out = objective;
-  std::string method_out = canonical_fit_method(method);
-  // deprecated aliases: objective "LLVecchia(m)" / "LLNystrom(k)"
+  const std::string method_out = canonical_fit_method(method);
+  // objectives "LLVecchia(m)" / "LLNystrom(k)": aliases removed in 2.0, an
+  // error naming the replacement (never reinterpreted)
   const bool vll = objective.rfind("LLVecchia", 0) == 0;
   const bool nll = objective.rfind("LLNystrom", 0) == 0;
   if (vll || nll) {
-    const std::string alias_method = vll ? "vecchia(" + std::to_string(parse_vll_m(objective)) + ")"
-                                         : "nystrom(" + std::to_string(parse_nystrom_k(objective)) + ")";
-    if (method_out != "exact" && method_out != alias_method)
-      throw std::invalid_argument("fit: objective \"" + objective + "\" (deprecated alias of method \"" + alias_method
-                                  + "\") conflicts with method \"" + method + "\"");
-    const DeprecationHandler& handler = deprecation_handler();
-    const std::string message = deprecated_objective_message(objective);
-    if (handler)
-      handler(message);
-    else
-      print_deprecation_once(message);
-    objective_out = "LL";
-    method_out = alias_method;
+    std::string replacement = vll ? "vecchia(m)" : "nystrom(k)";
+    try {
+      replacement = vll ? "vecchia(" + std::to_string(parse_vll_m(objective)) + ")"
+                        : "nystrom(" + std::to_string(parse_nystrom_k(objective)) + ")";
+    } catch (const std::invalid_argument&) {
+      // malformed size: the generic replacement above
+    }
+    throw std::invalid_argument("fit: objective \"" + objective
+                                + "\" was removed in libKriging 2.0; use objective=\"LL\", method=\"" + replacement
+                                + "\"");
   }
-  if (objective_out != "LL" && objective_out != "LOO" && objective_out != "LMP")
+  if (objective != "LL" && objective != "LOO" && objective != "LMP")
     throw std::invalid_argument("Unsupported fit objective: " + objective + " (supported are: LL, LOO, LMP)");
-  return {objective_out, method_out};
+  return {objective, method_out};
 }
 
 std::string Kriging::internal_fit_objective(const std::string& objective, const std::string& method) const {
@@ -3653,21 +3622,14 @@ std::string Kriging::internal_objective() const {
   return internal_fit_objective(m_objective, m_method.empty() ? std::string("exact") : m_method);
 }
 
-LIBKRIGING_EXPORT void Kriging::set_vecchia_exact_commit(bool b) {
-  if (b)
-    throw std::invalid_argument(
-        "set_vecchia_exact_commit(true) is no longer supported: a Vecchia fit never keeps the exact factorization; "
-        "fit the exact model with method=\"exact\" (optim=\"none\" and the Vecchia theta to reuse it)");
-}
-
 /** Fit the kriging object on (X,y):
  * @param y is n length column vector of output
  * @param X is n*d matrix of input
  * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
  * @param normalize is a boolean to enforce inputs/output normalization
  * @param optim is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
- * @param objective is 'LL' (default), 'LOO' or 'LMP' ('LLVecchia(m)' / 'LLNystrom(k)':
- *        deprecated aliases of 'LL' with method 'vecchia(m)' / 'nystrom(k)').
+ * @param objective is 'LL' (default), 'LOO' or 'LMP' ('LLVecchia(m)' / 'LLNystrom(k)',
+ *        removed in 2.0, raise: use 'LL' with method 'vecchia(m)' / 'nystrom(k)').
  *        Ignored if optim=='none'.
  * @param parameters starting values for hyper-parameters for optim, or final values if optim=='none'.
  * @param method 'exact' (default), 'vecchia(m)' or 'nystrom(k)': see Kriging.hpp.

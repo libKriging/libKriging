@@ -43,23 +43,10 @@ TEST_CASE("Nystrom method spec parsing and validation", "[nystrom][kriging]") {
   CHECK(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LOO", {}, "nystrom(10)").method()
         == "nystrom(10)");
 
-  // deprecated alias: objective "LLNystrom(k)" = objective "LL", method "nystrom(k)"
-  Kriging k_alias(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(10)");
-  Kriging k_method(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)");
-  CHECK(k_alias.objective() == "LL");
-  CHECK(k_alias.method() == "nystrom(10)");
-  CHECK(arma::approx_equal(k_alias.theta(), k_method.theta(), "absdiff", 0.0));
-  CHECK(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom").method()
-        == "nystrom(50)");
-  CHECK_THROWS_AS(
-      Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(10)", {}, "vecchia"),
-      std::invalid_argument);
-
-  // malformed specs throw
-  for (const std::string bad : {"LLNystrom()", "LLNystrom(x)", "LLNystrom(0)", "LLNystrom(-3)", "LLNystrom(10"}) {
-    CHECK_THROWS_AS(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", bad),
-                    std::invalid_argument);
-  }
+  // objective "LLNystrom(k)" (alias removed in 2.0) raises: see
+  // KrigingVecchiaTest.cpp, "removed LLVecchia / LLNystrom objectives ..."
+  CHECK_THROWS_AS(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(10)"),
+                  std::invalid_argument);
 
   // the nugget/noise channel is available with method "nystrom" (and only
   // the LL objective), as with method "vecchia"

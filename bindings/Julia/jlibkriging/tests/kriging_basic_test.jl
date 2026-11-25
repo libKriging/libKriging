@@ -185,12 +185,19 @@ end
     y = [f_test(x) for x in X[:, 1]] .+ X[:, 2]
     Xn = [0.15 0.3; 0.45 0.6; 0.75 0.2]
 
-    # method stored with its explicit size; deprecated objective aliases
+    # method stored with its explicit size; objectives "LLVecchia(m)" /
+    # "LLNystrom(k)" (aliases removed in 2.0) raise, naming the replacement
     @test jlibkriging.method(Kriging(y, X, "matern5_2"; method="vecchia")) == "vecchia(30)"
-    ka = @test_logs (:warn, r"objective \"LLVecchia\(7\)\" is deprecated") match_mode=:any Kriging(y, X, "matern5_2"; objective="LLVecchia(7)")
+    err = try Kriging(y, X, "matern5_2"; objective="LLVecchia(7)"); nothing catch e; e end
+    @test err isa ErrorException
+    @test occursin("objective \"LLVecchia(7)\" was removed in libKriging 2.0; use objective=\"LL\", method=\"vecchia(7)\"", err.msg)
+    err = try Kriging(y, X, "matern5_2"; objective="LLNystrom(5)"); nothing catch e; e end
+    @test err isa ErrorException
+    @test occursin("method=\"nystrom(5)\"", err.msg)
+    ka = Kriging(y, X, "matern5_2"; objective="LL", method="vecchia(7)")
     @test objective(ka) == "LL"
     @test jlibkriging.method(ka) == "vecchia(7)"
-    kb = @test_logs (:warn, r"method=\"nystrom\(5\)\"") match_mode=:any Kriging(y, X, "matern5_2"; objective="LLNystrom(5)")
+    kb = Kriging(y, X, "matern5_2"; objective="LL", method="nystrom(5)")
     @test jlibkriging.method(kb) == "nystrom(5)"
     @test objective(Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia(10)")) == "LOO"
     @test_throws ErrorException Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia", noise="nugget")

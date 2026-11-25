@@ -15,8 +15,8 @@ libKriging exposes it as a fit method of the log-likelihood objective,
 `method="vecchia"` (default m = 30 neighbors) or `method="vecchia(m)"`
 for an explicit m (with `objective="LL"`, the default), in C++ and every
 binding. `method()` then returns `"vecchia(m)"`, `objective()` `"LL"`.
-`objective="LLVecchia(m)"` is a deprecated alias of
-`objective="LL", method="vecchia(m)"` (deprecation warning).
+`objective="LLVecchia(m)"` (1.2 spelling) was removed in 2.0 and raises
+an error naming `objective="LL", method="vecchia(m)"`.
 
 ```r
 k <- Kriging(y, X, "matern5_2", method = "vecchia(30)")   # or "vecchia"

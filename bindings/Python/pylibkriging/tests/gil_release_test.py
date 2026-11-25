@@ -99,21 +99,16 @@ CASES = {
         with ThreadPoolExecutor(3) as ex:
             assert all(ex.map(run, ["warp", "mlp", "nested"]))
     """,
-    # The deprecation handler re-acquires the GIL inside the call (warning, and
-    # exception under an "error" filter).
-    "deprecation_handler_without_gil": """
+    # An error raised inside the call made without the GIL (objective
+    # "LLVecchia(m)", removed in 2.0) reaches Python as a ValueError.
+    "removed_objective_without_gil": """
         y, X = data(5, n=40, d=2)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        try:
             lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
-        assert any(issubclass(x.category, DeprecationWarning) for x in w)
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", DeprecationWarning)
-            try:
-                lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
-                raise AssertionError("no DeprecationWarning raised")
-            except DeprecationWarning:
-                pass
+            raise AssertionError("no ValueError raised")
+        except ValueError as e:
+            assert 'method="vecchia(7)"' in str(e), str(e)
+        assert lk.Kriging(y, X, "matern5_2", method="vecchia(7)").method() == "vecchia(7)"
     """,
 }
 
