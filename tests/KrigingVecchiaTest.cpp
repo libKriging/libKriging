@@ -104,8 +104,9 @@ TEST_CASE("removed LLVecchia / LLNystrom objectives raise and name the replaceme
            "method=\"nystrom(10)\"");
   CHECK(removed_objective_error(y, X, "LLNystrom")
         == "fit: objective \"LLNystrom\" was removed in libKriging 2.0; use objective=\"LL\", method=\"nystrom(50)\"");
-  CHECK(removed_objective_error(y, X, "LLVecchia(15)", "vecchia(15)").find("use objective=\"LL\", method=\"vecchia(15)\"")
-        != std::string::npos);
+  CHECK(
+      removed_objective_error(y, X, "LLVecchia(15)", "vecchia(15)").find("use objective=\"LL\", method=\"vecchia(15)\"")
+      != std::string::npos);
   CHECK(removed_objective_error(y, X, "LLVecchia(15)", "nystrom").find("was removed in libKriging 2.0")
         != std::string::npos);
   // malformed sizes: still the removal message, with the generic replacement
@@ -124,12 +125,14 @@ TEST_CASE("removed LLVecchia / LLNystrom objectives raise and name the replaceme
   CHECK(kv.objective() == "LL");
   CHECK(kv.method() == "vecchia(15)");
   CHECK(kv.is_vecchia_light());
-  CHECK(Kriging::fit_objective_method("LL", "vecchia") == std::make_pair(std::string("LL"), std::string("vecchia(30)")));
+  CHECK(Kriging::fit_objective_method("LL", "vecchia")
+        == std::make_pair(std::string("LL"), std::string("vecchia(30)")));
   Kriging kn(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)");
   CHECK(kn.objective() == "LL");
   CHECK(kn.method() == "nystrom(10)");
   CHECK(kn.is_nystrom_light());
-  CHECK(Kriging::fit_objective_method("LL", "nystrom") == std::make_pair(std::string("LL"), std::string("nystrom(50)")));
+  CHECK(Kriging::fit_objective_method("LL", "nystrom")
+        == std::make_pair(std::string("LL"), std::string("nystrom(50)")));
 }
 
 TEST_CASE("LLVecchia(n-1) matches the exact concentrated log-likelihood", "[vecchia][kriging]") {
