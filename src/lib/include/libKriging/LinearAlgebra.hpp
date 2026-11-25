@@ -45,10 +45,46 @@ class LinearAlgebra {
   static bool chol_rcond_check;
   LIBKRIGING_EXPORT static void check_chol_rcond(bool c);
   LIBKRIGING_EXPORT static bool chol_rcond_checked();
+  // rcond test of the Cholesky retry (#465, #496): safe_chol_lower retries
+  // when the Cholesky fails or rcond(L)^2 < min_rcond, except when the
+  // conditioning is already bounded from the diagonal of the matrix built by
+  // cholCov (search jitter, nugget, noise), and on the noise-free committed
+  // model (built inside a CommittedCholScope), which is factorized exactly and
+  // checked by its interpolation residual instead (KrigingImpl::populate_committed).
+  struct LIBKRIGING_EXPORT CommittedCholScope {
+    CommittedCholScope();
+    ~CommittedCholScope();
+    CommittedCholScope(const CommittedCholScope&) = delete;
+    CommittedCholScope& operator=(const CommittedCholScope&) = delete;
+
+   private:
+    bool m_previous;
+  };
+  // The noise-free committed model is kept exact only if its interpolation
+  // residual max |y - F b - R alpha| / sd(y) is <= chol_residual_tol (1e-5);
+  // otherwise it is factorized again with the rcond test (#496). Checks and
+  // fallbacks counted since the last reset_chol_retry_counts, with the residual
+  // of the last check.
+  static double chol_residual_tol;
+  LIBKRIGING_EXPORT static void set_chol_residual_tol(double tol);
+  LIBKRIGING_EXPORT static double get_chol_residual_tol();
+  static void record_committed_residual(double residual, bool fallback);
+  // Last full factorization of a noise-free committed model on this thread:
+  // false if none since reset_committed_factor; `nugget` added by the retry
+  // on a failing Cholesky (the residual is checked against R + nugget I).
+  static void reset_committed_factor();
+  static bool committed_factor(double& nugget);
+  LIBKRIGING_EXPORT static void committed_residual_stats(double& last_residual,
+                                                         unsigned long long& checks,
+                                                         unsigned long long& fallbacks);
+  // Retries of the Cholesky (num_nugget added) since the last reset, by
+  // trigger: a failing Cholesky, or the rcond test (rcond_study, #465).
+  LIBKRIGING_EXPORT static void chol_retry_counts(unsigned long long& on_failure, unsigned long long& on_rcond);
+  LIBKRIGING_EXPORT static void reset_chol_retry_counts();
 
   static int max_inc_choldiag;
   LIBKRIGING_EXPORT static arma::mat safe_chol_lower(arma::mat X);
-  static arma::mat safe_chol_lower_retry(arma::mat X, int warn);
+  static arma::mat safe_chol_lower_retry(arma::mat X, int warn, double rcond_lower_bound = 0.0);
 
   static double min_rcond;
   LIBKRIGING_EXPORT static double rcond_chol(arma::mat chol);
@@ -70,7 +106,7 @@ class LinearAlgebra {
                                                     const arma::mat& T_old,
                                                     const arma::mat& R_old);
 
-  LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo);
+  LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo, double rcond_lower_bound = 0.0);
 
   // Nystrom / partial-pivoted-Cholesky low-rank approximation of a covariance
   // matrix R (n x n, built lazily from X/_theta/_Cov), never materialized in

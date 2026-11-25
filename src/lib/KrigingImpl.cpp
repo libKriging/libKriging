@@ -230,6 +230,35 @@ void KrigingImpl::populate_Model(KModel& m,
   t0 = Bench::toc(bench, "z = L \\ (y - F*b), SSE = z'z", t0);
 }
 
+double KrigingImpl::interpolation_residual(const KModel& m, double nugget) const {
+  const arma::vec b
+      = LinearAlgebra::solve_upper(m.Rstar, LinearAlgebra::solve_lower(m.Rstar.t(), m.Fstar.t() * m.ystar));
+  const arma::vec r = m_y - m_F * b;
+  const arma::vec alpha = LinearAlgebra::solve_upper(m.L.t(), m.Estar);
+  const double sd = arma::stddev(m_y);
+  return arma::abs(r - m.R * alpha - nugget * alpha).max() / (sd > 0.0 ? sd : 1.0);
+}
+
+void KrigingImpl::populate_committed(KModel& m, bool check_residual, const std::function<void()>& populate) const {
+  LinearAlgebra::reset_committed_factor();
+  {
+    LinearAlgebra::CommittedCholScope committed;
+    populate();
+  }
+  double nugget = 0.0;
+  // a block update (update(refit = false)) keeps the rcond test on its new
+  // block and is not checked
+  if (!check_residual || !LinearAlgebra::committed_factor(nugget))
+    return;
+  // against the matrix factorized, R + nugget I: the round-off of the
+  // factorization, not the deliberate effect of a retry nugget
+  const double res = interpolation_residual(m, nugget);
+  const bool fallback = !(res <= LinearAlgebra::chol_residual_tol);
+  LinearAlgebra::record_committed_residual(res, fallback);
+  if (fallback)
+    populate();  // outside the scope: the rcond test of the retry applies
+}
+
 KrigingImpl::KModel KrigingImpl::allocate_KModel() const {
   const arma::uword n = m_X.n_rows;
   const arma::uword p = m_F.n_cols;

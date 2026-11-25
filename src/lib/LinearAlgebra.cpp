@@ -7,6 +7,8 @@
 
 #include "libKriging/LinearAlgebra.hpp"
 
+#include <atomic>
+
 #include <thread>
 #ifdef _OPENMP
 #include <omp.h>
@@ -106,17 +108,138 @@ LIBKRIGING_EXPORT bool LinearAlgebra::chol_rcond_checked() {
   return LinearAlgebra::chol_rcond_check;
 };
 
+namespace {
+// Retries of safe_chol_lower_retry, by trigger (rcond_study, #465 / #496)
+std::atomic<unsigned long long> chol_retry_fail{0}, chol_retry_rcond{0};
+
+bool& committed_chol() {
+  thread_local bool committed = false;
+  return committed;
+}
+
+// The last full factorization of a noise-free committed model on this thread
+// (rcond test skipped, bound +inf): whether there was one since the last
+// reset, and the nugget the retry added to it on a failing Cholesky
+struct CommittedFactor {
+  bool full = false;
+  double nugget = 0.0;
+};
+CommittedFactor& committed_factor_state() {
+  thread_local CommittedFactor f;
+  return f;
+}
+
+// Lower bound of the 1-norm reciprocal condition number of factor * C + diag(d),
+// C a correlation matrix (unit diagonal, |C_ij| <= 1): lambda_min >= delta =
+// min(d) - factor, ||A||_1 <= max(d) + factor (n - 1), ||A^-1||_1 <= sqrt(n) /
+// delta. safe_chol_lower_retry skips its rcond test when this bound is already
+// >= min_rcond (the search jitter J, a nugget 1 - alpha, a noise variance).
+// +inf for the noise-free committed model (factor 1, constant diagonal,
+// inside a CommittedCholScope): no rcond test there, a retry on a failing
+// Cholesky only; KrigingImpl::populate_committed checks its interpolation
+// residual instead (#496).
+double diag_rcond_lower_bound(arma::uword n, double factor, const arma::vec& diag) {
+  if (n == 0)
+    return 0.0;
+  const double dmin = (diag.n_elem == 0) ? 1.0 : diag.min();
+  const double dmax = (diag.n_elem == 0) ? 1.0 : diag.max();
+  const bool noise_free = (factor == 1.0) && (dmin == dmax);
+  if (noise_free && committed_chol())
+    return arma::datum::inf;
+  const double delta = dmin - factor;
+  return delta > 0.0 ? delta / (std::sqrt(static_cast<double>(n)) * (dmax + factor * (n - 1))) : 0.0;
+}
+
+std::mutex& residual_mutex() {
+  static std::mutex m;
+  return m;
+}
+double committed_residual_last = 0.0;
+unsigned long long committed_residual_checks = 0, committed_residual_fallbacks = 0;
+}  // namespace
+
+LIBKRIGING_EXPORT LinearAlgebra::CommittedCholScope::CommittedCholScope() : m_previous(committed_chol()) {
+  committed_chol() = true;
+}
+
+LIBKRIGING_EXPORT LinearAlgebra::CommittedCholScope::~CommittedCholScope() {
+  committed_chol() = m_previous;
+}
+
+void LinearAlgebra::reset_committed_factor() {
+  committed_factor_state() = CommittedFactor{};
+}
+
+bool LinearAlgebra::committed_factor(double& nugget) {
+  nugget = committed_factor_state().nugget;
+  return committed_factor_state().full;
+}
+
+LIBKRIGING_EXPORT void LinearAlgebra::chol_retry_counts(unsigned long long& on_failure, unsigned long long& on_rcond) {
+  on_failure = chol_retry_fail.load();
+  on_rcond = chol_retry_rcond.load();
+}
+
+double LinearAlgebra::chol_residual_tol = 1e-5;
+
+LIBKRIGING_EXPORT void LinearAlgebra::set_chol_residual_tol(double tol) {
+  LinearAlgebra::chol_residual_tol = tol;
+}
+
+LIBKRIGING_EXPORT double LinearAlgebra::get_chol_residual_tol() {
+  return LinearAlgebra::chol_residual_tol;
+}
+
+void LinearAlgebra::record_committed_residual(double residual, bool fallback) {
+  std::lock_guard<std::mutex> lock(residual_mutex());
+  ++committed_residual_checks;
+  if (fallback)
+    ++committed_residual_fallbacks;
+  committed_residual_last = residual;
+}
+
+LIBKRIGING_EXPORT void LinearAlgebra::committed_residual_stats(double& last_residual,
+                                                               unsigned long long& checks,
+                                                               unsigned long long& fallbacks) {
+  std::lock_guard<std::mutex> lock(residual_mutex());
+  last_residual = committed_residual_last;
+  checks = committed_residual_checks;
+  fallbacks = committed_residual_fallbacks;
+}
+
+LIBKRIGING_EXPORT void LinearAlgebra::reset_chol_retry_counts() {
+  chol_retry_fail = 0;
+  chol_retry_rcond = 0;
+  std::lock_guard<std::mutex> lock(residual_mutex());
+  committed_residual_last = 0.0;
+  committed_residual_checks = 0;
+  committed_residual_fallbacks = 0;
+}
+
 int LinearAlgebra::max_inc_choldiag = 10;
 
 // Recursive turn-around for ill-condition of correlation matrix. Used in *Kriging::fit & *Kriging::simulate
 //' @ref: Andrianakis, I. and Challenor, P. G. (2012). The effect of the nugget on Gaussian pro-cess emulators of
 // computer models. Comput. Stat. Data Anal., 56(12):4215–4228.
-arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
+arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond, double rcond_lower_bound) {
   arma::mat L = arma::mat(X.n_rows, X.n_cols, arma::fill::none);
   // auto t0 = Bench::tic();
   bool ok = arma::chol(L, X, "lower");
   // t0 = Bench::toc(nullptr, "        arma::chol" ,t0);
-  bool wrong_rcond = LinearAlgebra::chol_rcond_check;
+  // Noise-free committed model (no rcond test): a Cholesky that succeeds with
+  // its smallest pivot at the rounding level of the matrix, min L_ii^2 <
+  // 4 eps ||X||_1, is treated as failing. Such a matrix is numerically
+  // singular: whether the factorization succeeds depends on the rounding (BLAS,
+  // threads), and the model would jump between exact and retry-nugget (#496:
+  // gauss n 50, lambda_min / lambda_max 8e-19, success on 9 of 50 perturbations
+  // of 1e-16, those with min L_ii^2 / ||X||_1 <= 5.4e-17; the false alarms of the
+  // rcond test have >= 1.7e-14).
+  if (ok && rcond_lower_bound == arma::datum::inf && X.n_rows > 0
+      && arma::min(arma::square(L.diag())) < 4.0 * arma::datum::eps * arma::norm(X, 1))
+    ok = false;
+  // the test is redundant when the conditioning is already bounded from the
+  // diagonal (diag_rcond_lower_bound, given by cholCov / update_cholCov)
+  bool wrong_rcond = LinearAlgebra::chol_rcond_check && !(rcond_lower_bound >= LinearAlgebra::min_rcond);
   if (ok) {
     // wrong_rcond = wrong_rcond && (LinearAlgebra::rcond_approx_chol(L) < LinearAlgebra::min_rcond_approx);
     ////t0 = Bench::toc(nullptr, "        rcond_approx" ,t0);
@@ -124,6 +247,10 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
     // t0 = Bench::toc(nullptr, "        rcond" ,t0);
   }
   if (!ok || wrong_rcond) {
+    if (!ok)
+      ++chol_retry_fail;
+    else
+      ++chol_retry_rcond;
     if (inc_cond > max_inc_choldiag) {
       throw std::runtime_error("[ERROR] Exceed max numerical nugget (" + std::to_string(inc_cond) + " x 1e"
                                + std::to_string(log10(LinearAlgebra::num_nugget)) + ") added to force chol matrix");
@@ -132,10 +259,16 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
                                + std::to_string(LinearAlgebra::num_nugget));
     } else {
       X.diag() += LinearAlgebra::num_nugget * std::pow(10, inc_cond);
-      return LinearAlgebra::safe_chol_lower_retry(X, inc_cond + 1);
+      return LinearAlgebra::safe_chol_lower_retry(X, inc_cond + 1, rcond_lower_bound);
     }
     // t0 = Bench::toc(nullptr, "        inc_cond" ,t0);
   } else {
+    if (rcond_lower_bound == arma::datum::inf) {  // the noise-free committed model (CommittedCholScope)
+      double nugget = 0.0;
+      for (int k = 0; k < inc_cond; ++k)
+        nugget += LinearAlgebra::num_nugget * std::pow(10, k);
+      committed_factor_state() = CommittedFactor{true, nugget};
+    }
     if (warn_chol && (inc_cond > 0)) {
       arma::cout << "[WARNING] Added " << LinearAlgebra::num_nugget << " * 10^" << inc_cond << " numerical nugget to force Cholesky decomposition" << arma::endl;
     }
@@ -226,8 +359,9 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R,
 
   // Cholesky decompostion of covariance matrix
 
-  arma::mat L
-      = LinearAlgebra::safe_chol_lower(*R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
+  const double rcond_lower_bound = diag_rcond_lower_bound(n, factor, diag);
+  arma::mat L = LinearAlgebra::safe_chol_lower_retry(
+      *R, 0, rcond_lower_bound);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
   // t0 = Bench::toc(nullptr, "    Chol",t0);
 
   return L;
@@ -278,7 +412,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(
   }
   // t0 = Bench::toc(nullptr, "    _Cov: diag",t0);
 
-  arma::mat L = LinearAlgebra::chol_block(*R, T_old);
+  arma::mat L = LinearAlgebra::chol_block(*R, T_old, diag_rcond_lower_bound(n, factor, diag));
   // t0 = Bench::toc(nullptr, "    Chol Block",t0);
 
   return L;
@@ -292,7 +426,9 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(
 //   Lo,o is the cholesky root of Co,o (known)
 //   Lu,o = Cu,o Lo,o^-T
 //   Lu,u is the cholesky root of Cu,u - Lu,o Lu,o^T
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C, const arma::mat Loo) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C,
+                                                      const arma::mat Loo,
+                                                      double rcond_lower_bound) {
   arma::uword n = C.n_rows;
   arma::uword no = Loo.n_rows;  // old size. n-1 if we just add one observation.
 
@@ -324,13 +460,15 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C, const a
   // after safe_chol_lower's own nugget-retry budget is exhausted, fall
   // back to a full from-scratch factorization of C instead of throwing.
   try {
+    // the Schur complement keeps the rcond test (also for the committed
+    // model: the interpolation residual is checked on full factorizations only)
     L.submat(no, no, n - 1, n - 1) = LinearAlgebra::safe_chol_lower(Cuu - LinearAlgebra::crossprod(Lou));
     // t0 = Bench::toc(nullptr, "        <Luu = chol( Cuu - Luo * Luo.t() )",t0);
   } catch (const std::exception&) {
     if (warn_chol)
       arma::cout << "[WARNING] Cholesky block update failed (near-singular conditional block); "
                  << "falling back to a full Cholesky factorization" << arma::endl;
-    return arma::trimatl(LinearAlgebra::safe_chol_lower(C));
+    return arma::trimatl(LinearAlgebra::safe_chol_lower_retry(C, 0, rcond_lower_bound));
   }
 
   arma::mat lowL = arma::trimatl(L);

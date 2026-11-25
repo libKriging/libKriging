@@ -66,6 +66,14 @@ LinearAlgebra	solve_upper	internal numerical kernels, not user API
 LinearAlgebra	trace_prod	internal numerical kernels, not user API
 LinearAlgebra	woodbury_logdet	internal numerical kernels, not user API
 LinearAlgebra	woodbury_solve	internal numerical kernels, not user API
+LinearAlgebra	set_chol_residual_tol	study setting of the committed-model residual check (#496), C++ only like rcond_study
+LinearAlgebra	get_chol_residual_tol	study setting of the committed-model residual check (#496), C++ only like rcond_study
+LinearAlgebra	record_committed_residual	internal: called by the committed factorization (#496)
+LinearAlgebra	reset_committed_factor	internal: state of the committed factorization (#496)
+LinearAlgebra	committed_factor	internal: state of the committed factorization (#496)
+LinearAlgebra	committed_residual_stats	study counters of rcond_study (#496), C++ only
+LinearAlgebra	chol_retry_counts	study counters of rcond_study (#465), C++ only
+LinearAlgebra	reset_chol_retry_counts	study counters of rcond_study (#465), C++ only
 Optim	parse_method	internal helpers of the optimizer
 Optim	theta_bounds	internal helpers of the optimizer
 Optim	get_blas_threads_min_n	small-problem BLAS rule (#436): exposed as Parallel.get_blas_threads_min_n
