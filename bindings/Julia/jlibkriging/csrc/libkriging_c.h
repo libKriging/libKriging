@@ -583,6 +583,8 @@ int lk_optim_set_log_level(int level);
 int lk_optim_get_log_level(void);
 int lk_optim_set_max_iteration(int max_iteration);
 int lk_optim_get_max_iteration(void);
+int lk_optim_set_max_restart(int max_restart);
+int lk_optim_get_max_restart(void);
 int lk_optim_set_gradient_tolerance(double tolerance);
 double lk_optim_get_gradient_tolerance(void);
 int lk_optim_set_objective_rel_tolerance(double tolerance);

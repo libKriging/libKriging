@@ -101,6 +101,16 @@ LIBKRIGING_EXPORT int Optim::get_log_level() {
 
 int Optim::max_restart = get_env_or_default("LK_MAX_RESTART", 10);
 
+LIBKRIGING_EXPORT void Optim::set_max_restart(int max_restart_val) {
+  if (max_restart_val < 0)
+    throw std::invalid_argument("set_max_restart: expected max_restart >= 0");
+  Optim::max_restart = max_restart_val;
+};
+
+LIBKRIGING_EXPORT int Optim::get_max_restart() {
+  return Optim::max_restart;
+};
+
 int Optim::max_iteration = get_env_or_default("LK_MAX_ITERATION", 20);
 
 LIBKRIGING_EXPORT void Optim::set_max_iteration(int max_iteration_val) {

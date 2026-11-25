@@ -96,6 +96,20 @@ int optim_get_log_level() {
 //' @rdname optim_settings
 //' @export
 // [[Rcpp::export]]
+int optim_get_max_restart() {
+  return Optim::get_max_restart();
+}
+
+//' @rdname optim_settings
+//' @export
+// [[Rcpp::export]]
+void optim_set_max_restart(int max_restart) {
+  Optim::set_max_restart(max_restart);
+}
+
+//' @rdname optim_settings
+//' @export
+// [[Rcpp::export]]
 int optim_get_max_iteration() {
   Optim* la = new Optim();
   Rcpp::XPtr<Optim> impl_ptr(la);

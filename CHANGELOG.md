@@ -12,6 +12,19 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- **Settings: one table, one rule, the same setters in every binding** (#468): `docs/Settings.md`
+  lists the 17 `LK_*` environment variables read by the library, with the setter / getter of
+  each user setting in C++, Python, R, Julia and Octave / MATLAB, its default and its kind
+  (result / performance / output). Rule: an environment variable only gives the default, read
+  once when the library is loaded (changing it afterwards has no effect), and a setter call
+  overrides it. `LK_LINEARALGEBRA_CHECK_TRACE` and `LK_ACCELERATE_POOL_SINGLE` are documented as
+  unsupported diagnostics (no setter, may change). The `LK_*` rows of `docs/dev/parallel.md`
+  section 9 moved there.
+- **`Optim::set_max_restart` / `get_max_restart`** in C++ and every binding (Python / Octave
+  `Optim.set_max_restart`, R `optim_set_max_restart`, Julia `jlibkriging.Optim.set_max_restart`):
+  the restarts of one optimizer start were set by `LK_MAX_RESTART` only (default 10 unchanged;
+  0: no restart; a negative value is an error). Migration: none, `LK_MAX_RESTART` still sets the
+  default.
 - **`Parallel`: the thread settings in one place, in every binding** (TODO of #480): C++
   `libKriging/Parallel.hpp`, Python / Octave `Parallel.*`, Julia `jlibkriging.Parallel.*`, R
   `parallel_*`. Budget (`set_num_threads_percent`, `get_num_threads`), its distribution

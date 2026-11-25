@@ -64,6 +64,16 @@ catch_discover_tests(CholJitterTest)
 add_test(NAME CholJitterTest/LK_CHOL_JITTER COMMAND CholJitterTest "[.env]")
 set_tests_properties(CholJitterTest/LK_CHOL_JITTER PROPERTIES ENVIRONMENT "LK_CHOL_JITTER=0")
 
+add_executable(SettingsTest SettingsTest.cpp)
+target_link_libraries(SettingsTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries SettingsTest)
+catch_discover_tests(SettingsTest)
+# the hidden [.env] case checks the precedence rule of docs/Settings.md: every
+# LK_* user variable read at load, a setter call overrides it
+add_test(NAME SettingsTest/LK_environment COMMAND SettingsTest "[.env]")
+set_tests_properties(SettingsTest/LK_environment PROPERTIES ENVIRONMENT
+  "LK_REPARAMETRIZE=0;LK_THETA_LOWER_FACTOR=0.05;LK_THETA_UPPER_FACTOR=20;LK_VARIOGRAM_BOUNDS_HEURISTIC=false;LK_LOG_LEVEL=1;LK_MAX_RESTART=4;LK_MAX_ITERATION=33;LK_GRADIENT_TOLERANCE=0.002;LK_OBJECTIVE_REL_TOLERANCE=0.004;LK_NUM_THREADS_PERCENT=0.75;LK_THREAD_POOL_SIZE=3;LK_THREAD_START_DELAY_MS=5;LK_BLAS_THREADS_MIN_N=123;LK_OMP_MIN_ROWS=456;LK_CHOL_JITTER=1e-8")
+
 add_executable(JitterRuleTest JitterRuleTest.cpp)
 target_link_libraries(JitterRuleTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries JitterRuleTest)

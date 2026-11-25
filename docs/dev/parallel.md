@@ -429,22 +429,19 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 
 ## 9. Environment variables
 
+The `LK_*` variables of the library, with their setters, defaults and the
+precedence rule (read once at load, a setter call wins), are in one table:
+[docs/Settings.md](../Settings.md). This section adds the variables of the
+runtimes (OpenMP, BLAS) and of the benchmarks.
+
 | Variable | Read by | Effect |
 |---|---|---|
-| `LK_NUM_THREADS_PERCENT` | libKriging | budget share (x <= 1 ratio, x > 1 percentage) |
-| `LK_THREAD_POOL_SIZE` | libKriging | cap on the multistart workers |
-| `LK_THREAD_START_DELAY_MS` | libKriging | WarpKriging start stagger (10 ms) |
-| `LK_BLAS_THREADS_MIN_N` | libKriging | small-problem BLAS rule (-1 automatic, 0 off, n > 0 threshold) |
-| `LK_OMP_MIN_ROWS` | libKriging at load | OpenMP threshold of the covariance / gradient loops (`Parallel::set_omp_min_rows`) |
-| `LK_CHOL_JITTER` | libKriging at load | fixed Cholesky jitter of noise-free fits (< 0 per kernel, default; 0 off; > 0 value), see 8.6 |
 | `LK_BENCH_WARMUP_MS` | benchmarks | busy-wait before measuring (300 ms, see 6.2) |
-| `LK_LONG_RANGE_RESTART`, `LK_MAX_LONG_RANGE_RESTART` | (none) | removed in 2.0 with the long-range restart of a single start, ignored (#466: `"BFGS2"` is as good at a lower cost) |
 | `OMP_NUM_THREADS` | OpenMP runtime | caps the budget |
 | `OPENBLAS_NUM_THREADS` | OpenBLAS at load | size of its thread pool; below the budget, kept by libKriging |
 | `OPENBLAS_THREAD_TIMEOUT` | OpenBLAS at load | spin time of its idle threads |
 | `MKL_NUM_THREADS` | MKL at load | its global count; below the budget, kept by libKriging |
 | `VECLIB_MAXIMUM_THREADS` | Accelerate at load | its thread count for the whole process; not needed for multistart fits since macOS 15 (the workers set single-threaded mode themselves), still the way on macOS < 15 |
-| `LK_ACCELERATE_POOL_SINGLE` | libKriging, macOS 15+ | `0`: the workers of a multistart pool keep Accelerate's multithreaded mode (default: single-threaded) |
 | `BLIS_NUM_THREADS`, `FLEXIBLAS_NUM_THREADS` | other BLAS | their own thread counts (not driven by libKriging) |
 | `GOMP_SPINCOUNT`, `KMP_BLOCKTIME` | libgomp / libomp | spin of idle OpenMP threads |
 

@@ -2435,6 +2435,18 @@ int lk_optim_get_max_iteration(void) {
   return Optim::get_max_iteration();
 }
 
+int lk_optim_set_max_restart(int max_restart) {
+  try {
+    Optim::set_max_restart(max_restart);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_get_max_restart(void) {
+  return Optim::get_max_restart();
+}
+
 int lk_optim_set_gradient_tolerance(double tolerance) {
   try {
     Optim::set_gradient_tolerance(tolerance);

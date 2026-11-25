@@ -16,6 +16,8 @@ void get_log_level(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void set_log_level(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void get_max_iteration(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void set_max_iteration(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void get_max_restart(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_max_restart(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void get_gradient_tolerance(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void set_gradient_tolerance(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void get_objective_rel_tolerance(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

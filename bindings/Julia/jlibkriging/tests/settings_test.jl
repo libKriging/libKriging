@@ -12,6 +12,16 @@ using jlibkriging
     @test O.get_max_iteration() == 42
     O.set_max_iteration(orig)
 
+    orig = O.get_max_restart()
+    O.set_max_restart(3)
+    @test O.get_max_restart() == 3
+    O.set_max_restart(0)
+    @test O.get_max_restart() == 0
+    @test_throws Exception O.set_max_restart(-1)
+    @test O.get_max_restart() == 0
+    O.set_max_restart(orig)
+    @test O.get_max_restart() == orig
+
     orig = O.get_gradient_tolerance()
     O.set_gradient_tolerance(1e-4)
     @test O.get_gradient_tolerance() == 1e-4

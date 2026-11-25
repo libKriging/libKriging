@@ -679,6 +679,8 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def_static("set_log_level", &Optim::set_log_level)
       .def_static("get_max_iteration", &Optim::get_max_iteration)
       .def_static("set_max_iteration", &Optim::set_max_iteration)
+      .def_static("get_max_restart", &Optim::get_max_restart)
+      .def_static("set_max_restart", &Optim::set_max_restart, py::arg("max_restart"))
       .def_static("get_gradient_tolerance", &Optim::get_gradient_tolerance)
       .def_static("set_gradient_tolerance", &Optim::set_gradient_tolerance)
       .def_static("get_objective_rel_tolerance", &Optim::get_objective_rel_tolerance)

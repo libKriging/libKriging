@@ -423,6 +423,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return OptimBinding::get_max_iteration(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::set_max_iteration"_hash:
       return OptimBinding::set_max_iteration(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::get_max_restart"_hash:
+      return OptimBinding::get_max_restart(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::set_max_restart"_hash:
+      return OptimBinding::set_max_restart(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::get_gradient_tolerance"_hash:
       return OptimBinding::get_gradient_tolerance(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::set_gradient_tolerance"_hash:

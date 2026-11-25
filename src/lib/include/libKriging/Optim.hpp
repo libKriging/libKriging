@@ -63,7 +63,12 @@ class Optim {
   LIBKRIGING_EXPORT static void set_log_level(int t);
   LIBKRIGING_EXPORT static int get_log_level();
 
-  static int max_restart;  // eg. for wrong convergence to bounds
+  // Restarts of one optimizer start (Kriging, WarpKriging) when it converges to
+  // a bound or to a worse objective than the previous run, at most this many
+  // times (default 10, env LK_MAX_RESTART); 0 = no restart.
+  static int max_restart;
+  LIBKRIGING_EXPORT static void set_max_restart(int max_restart_val);
+  LIBKRIGING_EXPORT static int get_max_restart();
 
   static int max_iteration;
   LIBKRIGING_EXPORT static void set_max_iteration(int max_iteration_val);

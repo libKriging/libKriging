@@ -10,6 +10,7 @@ optim_names <- c(
   "variogram_bounds_heuristic_used", "use_variogram_bounds_heuristic",
   "get_log_level", "set_log_level",
   "get_max_iteration", "set_max_iteration",
+  "get_max_restart", "set_max_restart",
   "get_gradient_tolerance", "set_gradient_tolerance",
   "get_objective_rel_tolerance", "set_objective_rel_tolerance",
   "get_thread_start_delay_ms", "set_thread_start_delay_ms",
@@ -67,4 +68,63 @@ test_that("Parallel settings are exported and share Optim's", {
   parallel_set_thread_pool_size(orig[[2]])
   parallel_set_blas_threads_min_n(orig[[3]])
   parallel_set_omp_min_rows(orig[[4]])
+})
+
+# docs/Settings.md (#468): set / get round trip of every user setting, and the
+# precedence rule (LK_* environment read once at load, a setter call wins)
+test_that("Every user setting round-trips", {
+  settings <- list(
+    list("optim_set_max_restart", "optim_get_max_restart", 3L),
+    list("optim_set_max_iteration", "optim_get_max_iteration", 57L),
+    list("optim_set_gradient_tolerance", "optim_get_gradient_tolerance", 0.0125),
+    list("optim_set_objective_rel_tolerance", "optim_get_objective_rel_tolerance", 0.0025),
+    list("optim_set_theta_lower_factor", "optim_get_theta_lower_factor", 0.25),
+    list("optim_set_theta_upper_factor", "optim_get_theta_upper_factor", 4.5),
+    list("optim_use_variogram_bounds_heuristic", "optim_variogram_bounds_heuristic_used", FALSE),
+    list("optim_use_reparametrize", "optim_is_reparametrized", FALSE),
+    list("optim_set_log_level", "optim_get_log_level", 2L),
+    list("parallel_set_num_threads_percent", "parallel_get_num_threads_percent", 0.5),
+    list("parallel_set_thread_pool_size", "parallel_get_thread_pool_size", 2L),
+    list("parallel_set_thread_start_delay_ms", "parallel_get_thread_start_delay_ms", 7L),
+    list("parallel_set_blas_threads_min_n", "parallel_get_blas_threads_min_n", 250L),
+    list("parallel_set_omp_min_rows", "parallel_get_omp_min_rows", 300L),
+    list("linalg_set_chol_jitter", "linalg_get_chol_jitter", 1e-7))
+  for (s in settings) {
+    setter <- getExportedValue("rlibkriging", s[[1]])
+    getter <- getExportedValue("rlibkriging", s[[2]])
+    orig <- getter()
+    setter(s[[3]])
+    expect_equal(getter(), s[[3]], info = s[[1]])
+    setter(orig)
+    expect_equal(getter(), orig, info = s[[1]])
+  }
+  # a plain double holding an integer is accepted, as a user types it
+  orig <- optim_get_max_restart()
+  optim_set_max_restart(2)
+  expect_equal(optim_get_max_restart(), 2)
+  expect_error(optim_set_max_restart(-1))
+  expect_equal(optim_get_max_restart(), 2)
+  optim_set_max_restart(orig)
+})
+
+test_that("LK_* environment is read at load, a setter call wins", {
+  skip_on_cran()
+  rscript <- file.path(R.home("bin"), "Rscript")
+  code <- paste(
+    "library(rlibkriging)",
+    "stopifnot(optim_get_max_restart() == 4)",
+    "stopifnot(optim_get_max_iteration() == 33)",
+    "stopifnot(parallel_get_omp_min_rows() == 456)",
+    "stopifnot(linalg_get_chol_jitter() == 1e-8)",
+    "stopifnot(!optim_is_reparametrized())",
+    "Sys.setenv(LK_MAX_RESTART = '9')",
+    "stopifnot(optim_get_max_restart() == 4)",
+    "optim_set_max_restart(1)",
+    "stopifnot(optim_get_max_restart() == 1)",
+    "cat('OK')", sep = "; ")
+  out <- system2(rscript, c("-e", shQuote(code)), stdout = TRUE, stderr = TRUE,
+                 env = c(paste0("R_LIBS=", paste(.libPaths(), collapse = .Platform$path.sep)),
+                         "LK_MAX_RESTART=4", "LK_MAX_ITERATION=33", "LK_OMP_MIN_ROWS=456",
+                         "LK_CHOL_JITTER=1e-8", "LK_REPARAMETRIZE=0"))
+  expect_true(any(grepl("OK", out)), info = paste(out, collapse = "\n"))
 })

@@ -53,6 +53,14 @@ classdef Optim
             mLibKriging("Optim::set_max_iteration", int32(val));
         end
         
+        function val = get_max_restart()
+            val = mLibKriging("Optim::get_max_restart");
+        end
+        
+        function set_max_restart(val)
+            mLibKriging("Optim::set_max_restart", int32(val));
+        end
+        
         function val = get_gradient_tolerance()
             val = mLibKriging("Optim::get_gradient_tolerance");
         end

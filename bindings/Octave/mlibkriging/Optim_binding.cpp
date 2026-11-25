@@ -116,6 +116,24 @@ void set_max_iteration(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs)
   Optim::set_max_iteration(input.get<int>(0, "max_iteration"));
 }
 
+void get_max_restart(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{0}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  output.set(0, Optim::get_max_restart(), "max_restart");
+}
+
+void set_max_restart(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  Optim::set_max_restart(input.get<int>(0, "max_restart"));
+}
+
 void get_gradient_tolerance(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
