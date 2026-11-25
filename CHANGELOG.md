@@ -389,6 +389,11 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **Octave / MATLAB: integer getters returned a wrong value for a negative number** (#468):
+  an `int` result was a `uint64` array with only its low 4 bytes written, so
+  `Parallel.get_blas_threads_min_n()` returned 4294967295 instead of -1 (automatic) and could not
+  be restored with its setter. Integer results are now `int32` (they were `uint64`): code that
+  tested `isa(x, 'uint64')` must test `isinteger(x)`.
 - **macOS: forked workers** (R `parallel::mclapply`, #455, #459, #487): libomp's own fork handlers
   deadlocked the library's (no `omp_*` call in the handlers any more), and a forked child crashed
   (SIGSEGV) in its first large Accelerate call, then in its first `BFGS4` fit: Accelerate runs
