@@ -110,7 +110,8 @@ test_that("Every user setting round-trips", {
 test_that("LK_* environment is read at load, a setter call wins", {
   skip_on_cran()
   rscript <- file.path(R.home("bin"), "Rscript")
-  code <- paste(
+  script <- tempfile(fileext = ".R")
+  writeLines(c(
     "library(rlibkriging)",
     "stopifnot(optim_get_max_restart() == 4)",
     "stopifnot(optim_get_max_iteration() == 33)",
@@ -121,10 +122,19 @@ test_that("LK_* environment is read at load, a setter call wins", {
     "stopifnot(optim_get_max_restart() == 4)",
     "optim_set_max_restart(1)",
     "stopifnot(optim_get_max_restart() == 1)",
-    "cat('OK')", sep = "; ")
-  out <- system2(rscript, c("-e", shQuote(code)), stdout = TRUE, stderr = TRUE,
-                 env = c(paste0("R_LIBS=", paste(.libPaths(), collapse = .Platform$path.sep)),
-                         "LK_MAX_RESTART=4", "LK_MAX_ITERATION=33", "LK_OMP_MIN_ROWS=456",
-                         "LK_CHOL_JITTER=1e-8", "LK_REPARAMETRIZE=0"))
+    "cat('OK')"), script)
+  # the child inherits the environment of this process: system2(env = ) is
+  # not supported on Windows
+  vars <- c(R_LIBS = paste(.libPaths(), collapse = .Platform$path.sep),
+            LK_MAX_RESTART = "4", LK_MAX_ITERATION = "33", LK_OMP_MIN_ROWS = "456",
+            LK_CHOL_JITTER = "1e-8", LK_REPARAMETRIZE = "0")
+  old <- Sys.getenv(names(vars), unset = NA)
+  do.call(Sys.setenv, as.list(vars))
+  on.exit({
+    for (v in names(old))
+      if (is.na(old[[v]])) Sys.unsetenv(v) else do.call(Sys.setenv, setNames(list(old[[v]]), v))
+    unlink(script)
+  })
+  out <- system2(rscript, shQuote(script), stdout = TRUE, stderr = TRUE)
   expect_true(any(grepl("OK", out)), info = paste(out, collapse = "\n"))
 })
