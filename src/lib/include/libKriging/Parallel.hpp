@@ -15,33 +15,43 @@
 // Process-wide, configuration-before-use as Optim's settings (Optim.hpp): set
 // them before the calls, not while calls run in other threads.
 //
-// The thread settings of Optim (set_num_threads_percent, get_num_threads,
-// set_thread_pool_size, set_thread_start_delay_ms, set_blas_threads_min_n) are
-// the same settings, kept for compatibility.
+// Since 2.0 the thread settings are here only: Optim's set_num_threads_percent,
+// get_num_threads, set_thread_pool_size, set_thread_start_delay_ms and
+// set_blas_threads_min_n (and their getters) were moved to Parallel (#468).
+// Defaults from the LK_* environment variables, read when the library is
+// loaded; a setter call overrides them (docs/Settings.md).
 class Parallel {
  public:
   // --- budget
   /// Share of the physical cores used by the library: x <= 1 a ratio (0.5),
   /// x > 1 a percentage (50), 0 automatic (100 %). Default from
   /// LK_NUM_THREADS_PERCENT. Never more than an explicit OMP_NUM_THREADS /
-  /// omp_set_num_threads of the calling thread.
+  /// omp_set_num_threads of the calling thread nor the OpenBLAS count
+  /// (OPENBLAS_NUM_THREADS) in effect when the library is first used. 1 thread
+  /// in a forked child (fork(), R's parallel::mclapply) until
+  /// set_num_threads_percent is called in it.
   LIBKRIGING_EXPORT static void set_num_threads_percent(double x);
   LIBKRIGING_EXPORT static double get_num_threads_percent();
   /// Resolved thread budget (number of threads), read only.
   LIBKRIGING_EXPORT static int get_num_threads();
 
   // --- how the budget is distributed
-  /// Number of multistart workers (0: automatic, the budget); each worker's
-  /// BLAS and OpenMP loops get budget / workers. Default from LK_THREAD_POOL_SIZE.
+  /// Number of multistart workers (Kriging, WarpKriging, MLPKriging), at most
+  /// the number of starts (0: automatic, the budget); each worker's BLAS and
+  /// OpenMP loops get budget / workers. n >= 0. Default from LK_THREAD_POOL_SIZE.
   LIBKRIGING_EXPORT static void set_thread_pool_size(int pool_size);
   LIBKRIGING_EXPORT static int get_thread_pool_size();
-  /// Stagger of the WarpKriging multistart workers, in ms. Default from
+  /// Stagger of the WarpKriging / MLPKriging multistart workers: the first start
+  /// of worker k waits k times this, in ms (default 10, >= 0). Default from
   /// LK_THREAD_START_DELAY_MS.
   LIBKRIGING_EXPORT static void set_thread_start_delay_ms(int delay_ms);
   LIBKRIGING_EXPORT static int get_thread_start_delay_ms();
   /// Small-problem BLAS rule (OpenBLAS): calls on fewer training observations
   /// than this run the BLAS on 1 thread. -1 automatic (default), 0 off, n > 0
-  /// this threshold. Default from LK_BLAS_THREADS_MIN_N.
+  /// this threshold (min_n >= -1). Default from LK_BLAS_THREADS_MIN_N. The
+  /// automatic threshold is 500 when the BLAS threads and the OpenMP team
+  /// outnumber the logical CPUs (no SMT headroom: VMs, CI runners), off
+  /// otherwise, except with MSVC on Windows where it is always 500 (#473).
   LIBKRIGING_EXPORT static void set_blas_threads_min_n(int min_n);
   LIBKRIGING_EXPORT static int get_blas_threads_min_n();
   /// Number of rows from which the covariance and gradient loops run on the

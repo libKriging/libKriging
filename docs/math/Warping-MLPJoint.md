@@ -104,7 +104,7 @@ instead of σ² · (…). The mean, σ̂² (`sigma2()`) and `logLikelihood()` ar
 unchanged; c is reported by `var_scale()` and in `summary()`, kept by
 `update(refit=false)`, recomputed by `update(refit=true)`, and saved with
 the model. It costs K single-start fits, run concurrently in the
-multistart thread pool (`Optim::set_thread_pool_size`). The tuning parameter
+multistart thread pool (`Parallel::set_thread_pool_size`). The tuning parameter
 `calibration_folds` sets K (`0` disables the calibration); it is not
 applied with per-observation noise, nor when n < 2K. K = 5 by default
 (#467). Fewer folds widen the intervals with a multistart: each fold is

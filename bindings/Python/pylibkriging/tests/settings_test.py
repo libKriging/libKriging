@@ -82,3 +82,27 @@ def test_environment_read_at_import_setter_wins():
                LK_CHOL_JITTER="1e-8", LK_REPARAMETRIZE="0")
     r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_thread_settings_moved_to_parallel():
+    # 2.0 (#468): the thread settings are in Parallel only
+    for name in ("set_num_threads_percent", "get_num_threads_percent", "get_num_threads",
+                 "set_thread_pool_size", "get_thread_pool_size",
+                 "set_thread_start_delay_ms", "get_thread_start_delay_ms"):
+        assert not hasattr(lk.Optim, name), name
+        assert hasattr(lk.Parallel, name), name
+
+
+def test_invalid_environment_value_warns_and_uses_default():
+    code = (
+        "import pylibkriging as lk\n"
+        "assert lk.Optim.get_max_restart() == 10, lk.Optim.get_max_restart()\n"
+        "assert lk.Parallel.get_thread_pool_size() == 0\n"
+        "assert lk.Optim.is_reparametrized()\n"
+    )
+    env = dict(os.environ, LK_MAX_RESTART="abc", LK_THREAD_POOL_SIZE="-2", LK_REPARAMETRIZE="maybe")
+    r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    out = r.stdout + r.stderr
+    for name in ("LK_MAX_RESTART", "LK_THREAD_POOL_SIZE", "LK_REPARAMETRIZE"):
+        assert "[WARNING] " + name + "=" in out, out

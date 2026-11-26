@@ -1,7 +1,7 @@
 // Study driver (not built by CMake, see README.md for the build): the fixed
 // Cholesky jitter as a function of n (#426). For one (family, kernel, n, d),
 // fits every data set with each jitter value of a list, each at
-// Optim::set_num_threads_percent 10 / 100 / 200. A rule J(n) is a path through
+// Parallel::set_num_threads_percent 10 / 100 / 200. A rule J(n) is a path through
 // the (n, J) table: run_jitter_n.sh passes, per n, the constants and the values
 // of the rules at that n (summarize_jitter_n.py reassembles the rules).
 // Usage: jitter_n_study <family> <kernel> <n> <d> <sets> <optim> <J1,J2,...>
@@ -24,6 +24,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
 static arma::vec f(const std::string& family, const arma::mat& X, const arma::rowvec& freq) {
@@ -108,7 +109,7 @@ int main(int argc, char** argv) {
     for (double jitter : jitters) {
       LinearAlgebra::set_chol_jitter(jitter);
       for (double pct : {10.0, 100.0, 200.0}) {
-        Optim::set_num_threads_percent(pct);
+        Parallel::set_num_threads_percent(pct);
         try {
           Kriging k(kernel);
           std::fprintf(stderr, "FIT %d %g %g\n", s, jitter, pct);
@@ -144,5 +145,5 @@ int main(int argc, char** argv) {
     }
   }
   LinearAlgebra::set_chol_jitter(-1);
-  Optim::set_num_threads_percent(0);
+  Parallel::set_num_threads_percent(0);
 }

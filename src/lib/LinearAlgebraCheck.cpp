@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -341,30 +340,6 @@ double ratio(const arma::mat& a, const arma::mat& x, const arma::mat& t, double 
 
 using Results = std::map<std::string, double>;
 
-// LK_LINEARALGEBRA_CHECK_TRACE: stderr lines per check and per worker, to locate a BLAS crash or stall
-bool trace_enabled() {
-  static const bool trace = std::getenv("LK_LINEARALGEBRA_CHECK_TRACE") != nullptr;
-  return trace;
-}
-
-// one trace line, stamped with the time since the first one: the stamps of a
-// captured output (e.g. ctest) are those of its flushes, not of the events
-void trace_line(const char* fmt, ...) {
-  if (!trace_enabled())
-    return;
-  static const auto start = std::chrono::steady_clock::now();
-  char msg[512];
-  va_list args;
-  va_start(args, fmt);
-  std::vsnprintf(msg, sizeof msg, fmt, args);
-  va_end(args);
-  std::fprintf(stderr,
-               "LinearAlgebra::check +%.3f s %s\n",
-               std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(),
-               msg);
-  std::fflush(stderr);
-}
-
 void keep_worst(Results& into, const std::string& name, double r) {
   auto it = into.find(name);
   if (it == into.end() || !(r <= it->second))
@@ -381,27 +356,22 @@ Results run_checks(std::uint64_t seed, bool concurrent) {
   std::mt19937_64 g(seed);
   const arma::uword n = 150;
   const unsigned long long sd = seed;
-  trace_line("[%llu] start", sd);
   auto guarded = [&res, sd](const std::string& name, const std::function<double()>& f) {
-    trace_line("[%llu] %s", sd, name.c_str());
     double r;
     try {
       r = f();
     } catch (const std::exception&) {
       r = std::numeric_limits<double>::infinity();
     }
-    trace_line("[%llu] %s done", sd, name.c_str());
     keep_worst(res, name, r);
   };
   const arma::mat R = spd_mat(g, n);
   const arma::mat B = random_mat(g, n, 7);
   arma::mat L;
-  trace_line("[%llu] matrices drawn; safe_chol_lower", sd);
   try {
     L = LinearAlgebra::safe_chol_lower(R);
   } catch (const std::exception&) {
   }
-  trace_line("[%llu] safe_chol_lower done", sd);
 
   // each check: one public LinearAlgebra call, against an oracle computed
   // here in long double without the BLAS
@@ -543,9 +513,7 @@ LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads)
   const bool skip = is_mkl_2020_unsafe(out.backend);
 
   // the thread budget of the public methods (OpenBLAS count included)
-  trace_line("budget scope");
   libKriging::detail::BudgetScope budget;
-  trace_line("budget scope set");
 
   const Results single = skip ? Results{} : run_checks(1, false);
   const auto t2 = std::chrono::steady_clock::now();
@@ -556,28 +524,18 @@ LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads)
   std::vector<Results> per_thread(skip ? 0 : n_threads);
   if (!skip) {
     const int share = std::max(1, libKriging::detail::budget_total() / n_threads);
-    trace_line("concurrent pass: %d workers, BLAS share %d, OpenBLAS count %d",
-               n_threads,
-               share,
-               libKriging::detail::blas_threads_for(share));
     libKriging::detail::ScopedBlasThreads blas_share(libKriging::detail::blas_threads_for(share));
-    trace_line("OpenBLAS count set");
     std::vector<std::thread> threads;
     for (int t = 0; t < n_threads; ++t)
       threads.emplace_back([t, share, &per_thread] {
-        trace_line("worker %d started", t);
         libKriging::detail::ScopedShare worker_share(share);
         for (int rep = 0; rep < 2; ++rep)
           for (const auto& kv : run_checks(1000 + 100 * t + rep, true))
             keep_worst(per_thread[t], kv.first, kv.second);
-        trace_line("worker %d done", t);
       });
-    trace_line("workers created");
     for (auto& th : threads)
       th.join();
-    trace_line("workers joined; OpenBLAS count restored next");
   }
-  trace_line("concurrent pass closed");
   Results concurrent;
   for (const auto& r : per_thread)
     for (const auto& kv : r)
@@ -609,9 +567,7 @@ LIBKRIGING_EXPORT LinearAlgebra::CheckResult LinearAlgebra::check(int n_threads)
     section(line, concurrent);
   }
 
-  trace_line("report");
   const std::string advice = known_issues(out.backend);
-  trace_line("known issues looked up");
   if (!advice.empty())
     rep += "known issue: " + advice + "\n";
   const auto t3 = std::chrono::steady_clock::now();

@@ -220,11 +220,14 @@ used by `predict` is exact (`model_chol_jitter()` 0): compare models by
 ## 5. Where to look for exact syntax
 
 Process-wide settings (`Optim` optimizer settings such as `set_max_iteration` /
-`set_max_restart`, `Parallel` thread budget, `LinearAlgebra.set_chol_jitter`) and
+`set_max_restart`, `Parallel` thread settings, moved from `Optim` in 2.0, `LinearAlgebra.set_chol_jitter`) and
 the `LK_*` environment variables: `docs/Settings.md` (one table, same names in
 every binding; an environment variable only sets the default, read once when the
 library is loaded, and a setter call overrides it). Recommend the setter in code;
-the environment variable only for a run that must not change the code.
+the environment variable only for a run that must not change the code. An invalid
+value of a variable is ignored with a `[WARNING]` line. Code written for 1.x that calls
+`Optim.set_num_threads_percent` / `optim_set_num_threads_percent` (or the other thread
+settings) must use `Parallel` / `parallel_*` since 2.0.
 
 
 - `references/cpp.md` — C++ (the reference API; every other binding mirrors it)

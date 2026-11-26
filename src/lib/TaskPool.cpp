@@ -1,6 +1,7 @@
 #include "TaskPool.hpp"
 
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "BlasThreads.hpp"
@@ -24,10 +25,10 @@ void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char
     return;
   }
   // The budget goes to the tasks first: one worker per task up to the
-  // budget (or Optim::thread_pool_size), then each worker gets the rest for
+  // budget (or Parallel::get_thread_pool_size()), then each worker gets the rest for
   // its BLAS and OpenMP calls.
   const int total = budget_total();
-  int pool_size = Optim::thread_pool_size > 0 ? Optim::thread_pool_size : total;
+  int pool_size = Parallel::get_thread_pool_size() > 0 ? Parallel::get_thread_pool_size() : total;
   pool_size = std::max(1, std::min(pool_size, n_tasks));
   const int share = std::max(1, total / pool_size);
 
@@ -74,7 +75,7 @@ void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char
         // (applied to every task, it added up to ~(n_tasks/pool)^2
         // delays with no benefit once the pool is running).
         if (stagger && task_id < pool_size) {
-          int delay_ms = task_id * Optim::thread_start_delay_ms;
+          int delay_ms = task_id * Parallel::get_thread_start_delay_ms();
           std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
         }
 

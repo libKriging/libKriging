@@ -1,5 +1,5 @@
 // Study driver (not built by CMake): a single-start fit of the same data with 1, 10
-// and 20 BLAS threads (Optim::set_num_threads_percent 10 / 100 / 200), then the
+// and 20 BLAS threads (Parallel::set_num_threads_percent 10 / 100 / 200), then the
 // prediction RMSE on 1000 test points. Built against build-tb with the flags of
 // bench-fit-profile (compile_commands.json). The fixed-jitter variants used a
 // temporary TMP_JITTER hook in LinearAlgebra::cholCov (diag += jitter * factor),
@@ -15,6 +15,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 int main(int argc, char** argv) {
   const int nsets = std::atoi(argv[1]);
@@ -36,7 +37,7 @@ int main(int argc, char** argv) {
     for (arma::uword j = 0; j < d; ++j)
       y += arma::sin(2 * M_PI * X.col(j));
     for (double pct : {10.0, 100.0, 200.0}) {
-      Optim::set_num_threads_percent(pct);
+      Parallel::set_num_threads_percent(pct);
       Kriging k(kernel);
       Kriging::Parameters p{std::nullopt, true, std::nullopt, true};
       arma::arma_rng::set_seed(1);
@@ -55,7 +56,7 @@ int main(int argc, char** argv) {
       std::printf("%d,%g,%d,%.10g,%.6g,%.2f,%.6g,%.4g\n",
                   s,
                   pct,
-                  Optim::get_num_threads(),
+                  Parallel::get_num_threads(),
                   k.logLikelihood(),
                   k.theta()(0),
                   ms,

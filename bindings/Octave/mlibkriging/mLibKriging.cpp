@@ -435,10 +435,6 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return OptimBinding::get_objective_rel_tolerance(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::set_objective_rel_tolerance"_hash:
       return OptimBinding::set_objective_rel_tolerance(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Optim::get_thread_start_delay_ms"_hash:
-      return OptimBinding::get_thread_start_delay_ms(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Optim::set_thread_start_delay_ms"_hash:
-      return OptimBinding::set_thread_start_delay_ms(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Parallel::get_num_threads_percent"_hash:
       return ParallelBinding::get_num_threads_percent(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Parallel::set_num_threads_percent"_hash:
@@ -483,16 +479,6 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return LinearAlgebraBinding::chol_rcond_checked(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearAlgebra::check"_hash:
       return LinearAlgebraBinding::check(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Optim::get_thread_pool_size"_hash:
-      return OptimBinding::get_thread_pool_size(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Optim::set_thread_pool_size"_hash:
-      return OptimBinding::set_thread_pool_size(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Optim::get_num_threads_percent"_hash:
-      return OptimBinding::get_num_threads_percent(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Optim::set_num_threads_percent"_hash:
-      return OptimBinding::set_num_threads_percent(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Optim::get_num_threads"_hash:
-      return OptimBinding::get_num_threads(nlhs, plhs, nrhs - 1, prhs + 1);
 
     default:
       throw MxException(LOCATION(), "mLibKriging:noRoute", "No route to such command [", command, "]");

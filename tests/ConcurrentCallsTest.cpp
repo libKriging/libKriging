@@ -6,6 +6,7 @@
 #include <catch2/catch.hpp>
 #include "libKriging/Kriging.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/Random.hpp"
 #include <algorithm>
 #include <atomic>
@@ -269,8 +270,8 @@ namespace {
 // at the given thread budget; checks every compared quantity against `tol`
 // and returns the largest relative differences to the reference.
 Gaps concurrent_vs_sequential(double budget_percent, double tol) {
-  const double saved_percent = Optim::get_num_threads_percent();
-  Optim::set_num_threads_percent(budget_percent);
+  const double saved_percent = Parallel::get_num_threads_percent();
+  Parallel::set_num_threads_percent(budget_percent);
   const int initial = blas_count();
   // the caller's own count: a known value, restored by the library at the end
   const int caller = std::max(1, std::min(3, initial));
@@ -348,7 +349,7 @@ Gaps concurrent_vs_sequential(double budget_percent, double tol) {
   CHECK(max_seen.load() <= std::max(initial, caller));
   CHECK(blas_count() == (initial > 0 ? caller : 0));
   set_blas_count(initial);
-  Optim::set_num_threads_percent(saved_percent);
+  Parallel::set_num_threads_percent(saved_percent);
   return worst;
 }
 
@@ -387,8 +388,8 @@ TEST_CASE("Concurrent fit / predict / simulate from user threads", "[threads][co
   concurrent_vs_sequential(100, count_can_change ? 2e-3 : 0.0);
 }
 
-TEST_CASE("Optim::get_num_threads is not divided between concurrent calls", "[threads][concurrent]") {
-  const int full = Optim::get_num_threads();
+TEST_CASE("Parallel::get_num_threads is not divided between concurrent calls", "[threads][concurrent]") {
+  const int full = Parallel::get_num_threads();
   std::atomic<bool> stop{false};
   std::atomic<int> seen_min{full};
   arma::arma_rng::set_seed(7);
@@ -399,7 +400,7 @@ TEST_CASE("Optim::get_num_threads is not divided between concurrent calls", "[th
       Kriging k(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS");
   });
   for (int i = 0; i < 50; ++i) {
-    seen_min.store(std::min(seen_min.load(), Optim::get_num_threads()));
+    seen_min.store(std::min(seen_min.load(), Parallel::get_num_threads()));
     std::this_thread::yield();
   }
   stop.store(true);

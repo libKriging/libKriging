@@ -18,16 +18,21 @@ table of the `LK_*` environment variables read by the library (#468).
   `setenv`, `ENV`) has no effect in that process.
 - **A setter call wins** over the environment, for the rest of the process (or
   until the next setter call). The getter returns the value in effect.
-- An unparsable value is ignored (the built-in default is used, without a
-  message). Integers are read with `std::stoi` (`"3.7"` gives 3), booleans are
-  true for `1`, `true`, `TRUE`, `True` and false for any other value.
+- An unset or empty variable gives the built-in default. **An invalid value is
+  ignored with a warning**: the built-in default is used and a line
+  `[WARNING] LK_X="..." ignored (expected ...), default ... used` is printed
+  when the library is loaded. The whole value must be valid: integers reject
+  `"3.7"` and `"12abc"`, reals must be finite, and values below the minimum of
+  the setting (e.g. a negative count) are rejected; booleans are `1`, `true`,
+  `yes`, `on` or `0`, `false`, `no`, `off`, in any case.
 - The settings are process-wide, configuration-before-use: set them before
   starting fits from several threads, not while calls run
   (`docs/dev/rationalization/T6-thread-safety.md`). A forked child
   (`fork()`, R's `parallel::mclapply`) inherits the values of its parent, except
   its thread budget (1 thread, see `docs/dev/parallel.md`).
-- Variables marked **unsupported** below are diagnostics for the developers:
-  no setter, may change or disappear in any release.
+- Each setting belongs to one class, by domain: the optimizer in `Optim`, the
+  threads in `Parallel`, the Cholesky factorizations in `LinearAlgebra`; no
+  setting is duplicated in another class.
 
 ## Names in each binding
 
@@ -37,9 +42,12 @@ table of the `LK_*` environment variables read by the library (#468).
 | `Parallel::set_x(v)` | `pylibkriging.Parallel.set_x(v)` | `parallel_set_x(v)` | `jlibkriging.Parallel.set_x(v)` | `Parallel.set_x(v)` |
 | `LinearAlgebra::set_x(v)` | `pylibkriging.LinearAlgebra.set_x(v)` | `linalg_set_x(v)` | `jlibkriging.set_x(v)` (exported) | `LinearAlgebra.set_x(v)` |
 
-The thread settings of `Optim` (`set_num_threads_percent`, `get_num_threads`,
-`set_thread_pool_size`, `set_thread_start_delay_ms`) are the same settings as
-those of `Parallel`, kept for compatibility.
+Moved in 2.0: the thread settings of `Optim` (`set_num_threads_percent`,
+`get_num_threads_percent`, `get_num_threads`, `set_thread_pool_size`,
+`get_thread_pool_size`, `set_thread_start_delay_ms`,
+`get_thread_start_delay_ms`; C++ also `set_blas_threads_min_n` /
+`get_blas_threads_min_n`) are in `Parallel` only, with the same names (R:
+`optim_<name>` becomes `parallel_<name>`).
 
 ## Settings and environment variables
 
@@ -58,17 +66,18 @@ changes (up to the rounding of the BLAS); **output** — messages only.
 | `LK_REPARAMETRIZE` | `Optim::use_reparametrize` / `is_reparametrized` | true | result | optimize log(theta) instead of theta |
 | `LK_CHOL_JITTER` | `LinearAlgebra::set_chol_jitter` / `get_chol_jitter` | -1 (per kernel) | result | jitter on the correlation diagonal of noise-free fits: < 0 per kernel (gauss 1e-9, matern5_2 1e-10, others 0), 0 off, > 0 this value (`docs/dev/CholJitter.md`) |
 | `LK_LOG_LEVEL` | `Optim::set_log_level` / `get_log_level` | 0 | output | 0 none, 1 error, 2 warning, 3 info, 4 debug, 5 trace |
-| `LK_NUM_THREADS_PERCENT` | `Parallel::set_num_threads_percent` / `get_num_threads_percent` (also `Optim::`) | 0 (100 %) | performance | thread budget: share of the physical cores, x <= 1 a ratio, x > 1 a percentage; `get_num_threads()` gives the resulting count (`docs/dev/parallel.md`) |
-| `LK_THREAD_POOL_SIZE` | `Parallel::set_thread_pool_size` / `get_thread_pool_size` (also `Optim::`) | 0 (the budget) | performance | number of multistart workers |
-| `LK_THREAD_START_DELAY_MS` | `Parallel::set_thread_start_delay_ms` / `get_thread_start_delay_ms` (also `Optim::`) | 10 | performance | delay of the first start of worker k by k times this, in ms (WarpKriging, MLPKriging multistart) |
-| `LK_BLAS_THREADS_MIN_N` | `Parallel::set_blas_threads_min_n` / `get_blas_threads_min_n` | -1 (automatic) | performance | OpenBLAS on 1 thread below this number of observations; 0 off |
+| `LK_NUM_THREADS_PERCENT` | `Parallel::set_num_threads_percent` / `get_num_threads_percent` | 0 (100 %) | performance | thread budget: share of the physical cores, x <= 1 a ratio, x > 1 a percentage; `get_num_threads()` gives the resulting count (`docs/dev/parallel.md`) |
+| `LK_THREAD_POOL_SIZE` | `Parallel::set_thread_pool_size` / `get_thread_pool_size` | 0 (the budget) | performance | number of multistart workers (>= 0) |
+| `LK_THREAD_START_DELAY_MS` | `Parallel::set_thread_start_delay_ms` / `get_thread_start_delay_ms` | 10 | performance | delay of the first start of worker k by k times this, in ms (WarpKriging, MLPKriging multistart; >= 0) |
+| `LK_BLAS_THREADS_MIN_N` | `Parallel::set_blas_threads_min_n` / `get_blas_threads_min_n` | -1 (automatic) | performance | OpenBLAS on 1 thread below this number of observations; 0 off (>= -1) |
 | `LK_OMP_MIN_ROWS` | `Parallel::set_omp_min_rows` / `get_omp_min_rows` | build value (200 on Linux / MSVC, 800 elsewhere) | performance | rows from which the covariance and gradient loops run on the OpenMP threads |
-| `LK_LINEARALGEBRA_CHECK_TRACE` | none | unset | **unsupported** | any value: `LinearAlgebra.check()` / `linearalgebra_check` prints a line per check and per worker on stderr, to locate a BLAS crash or stall (read at its first call) |
-| `LK_ACCELERATE_POOL_SINGLE` | none | unset | **unsupported** | macOS 15+ only, `0`: the workers of a multistart pool keep Accelerate's multithreaded mode (measurements; read at the first multistart) |
 
-Removed in 2.0: `LK_LONG_RANGE_RESTART` and `LK_MAX_LONG_RANGE_RESTART`, with
-the long-range restart of a single start (#466); they are ignored. Pass
-`optim = "BFGS2"` instead.
+Removed in 2.0, ignored if set:
+- `LK_LONG_RANGE_RESTART`, `LK_MAX_LONG_RANGE_RESTART`, with the long-range
+  restart of a single start (#466): pass `optim = "BFGS2"` instead;
+- `LK_LINEARALGEBRA_CHECK_TRACE` (stderr trace of `LinearAlgebra.check()`) and
+  `LK_ACCELERATE_POOL_SINGLE` (macOS: Accelerate kept multithreaded in the
+  multistart workers), diagnostics of the developers with no setter (#468).
 
 Not read by the library, listed here so that they are not mistaken for
 settings: `LK_BENCH_WARMUP_MS` and the other `LK_*` variables of the

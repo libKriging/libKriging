@@ -54,12 +54,12 @@ test_that("forked children run on a budget of 1 thread; the parent's is unchange
   X <- matrix(runif(n * 3), ncol = 3)
   y <- rowSums(sin(3 * X))
   k <- Kriging(y, X, "matern5_2", optim = "BFGS10")  # spins up the BLAS / OpenMP pools
-  parent_before <- rlibkriging:::optim_get_num_threads()
+  parent_before <- rlibkriging:::parallel_get_num_threads()
 
   jobs <- lapply(1:3, function(i) parallel::mcparallel({
-    before <- rlibkriging:::optim_get_num_threads()
+    before <- rlibkriging:::parallel_get_num_threads()
     ki <- Kriging(y, X, "matern5_2", optim = "BFGS4")
-    list(before = before, after = rlibkriging:::optim_get_num_threads(), ll = logLikelihood(ki))
+    list(before = before, after = rlibkriging:::parallel_get_num_threads(), ll = logLikelihood(ki))
   }))
   pids <- vapply(jobs, function(j) j$pid, integer(1))
   res <- list()
@@ -82,5 +82,5 @@ test_that("forked children run on a budget of 1 thread; the parent's is unchange
     expect_equal(r$before, 1)
     expect_equal(r$after, 1)
   }
-  expect_equal(rlibkriging:::optim_get_num_threads(), parent_before)
+  expect_equal(rlibkriging:::parallel_get_num_threads(), parent_before)
 })

@@ -6,6 +6,7 @@
 #include <catch2/catch.hpp>
 #include "libKriging/Kriging.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/WarpKriging.hpp"
 #include "blas_counts.hpp"
 #include <algorithm>
@@ -152,8 +153,8 @@ int min_blas_threads_during(F run) {
 
 // Restores the thread budget setting at the end of a test.
 struct BudgetGuard {
-  double saved = Optim::get_num_threads_percent();
-  ~BudgetGuard() { Optim::set_num_threads_percent(saved); }
+  double saved = Parallel::get_num_threads_percent();
+  ~BudgetGuard() { Parallel::set_num_threads_percent(saved); }
 };
 
 }  // namespace
@@ -179,13 +180,13 @@ TEST_CASE("WarpKriging parallel multistart fit restores the BLAS / OpenMP thread
     WARN("no readable BLAS / OpenMP thread count in this build");
     return;
   }
-  const int pool_size = Optim::get_thread_pool_size();
-  Optim::set_thread_pool_size(2);
+  const int pool_size = Parallel::get_thread_pool_size();
+  Parallel::set_thread_pool_size(2);
   arma::vec y;
   arma::mat X;
   data(y, X, 20);
   libKriging::WarpKriging w(y, X, {"affine", "affine"}, "gauss", Trend::RegressionModel::Constant, false, "BFGS4");
-  Optim::set_thread_pool_size(pool_size);
+  Parallel::set_thread_pool_size(pool_size);
   const Threads after = get_threads();
   CHECK(after.blas == guard.set.blas);
   CHECK(after.omp == guard.set.omp);
@@ -250,13 +251,13 @@ TEST_CASE("fork() quiesces the child only and restores the parent's thread count
     // The thread budget (multistart pool, OpenMP loops) is 1 in the child
     // whatever the OpenMP runtime, also without OpenMP, before and after a fit
     // made in the child (#420).
-    bool ok = c.blas <= 1 && c.omp <= 1 && Optim::get_num_threads() == 1;
+    bool ok = c.blas <= 1 && c.omp <= 1 && Parallel::get_num_threads() == 1;
     {
       arma::vec y;
       arma::mat X;
       data(y, X);
       Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS4");
-      ok = ok && k.theta().is_finite() && get_threads().blas <= 1 && Optim::get_num_threads() == 1;
+      ok = ok && k.theta().is_finite() && get_threads().blas <= 1 && Parallel::get_num_threads() == 1;
     }
 #ifdef LK_TEST_MKL
     // MKL's global count is set to 1 in the child too (needed without OpenMP,
@@ -337,14 +338,14 @@ TEST_CASE("The BLAS thread count never exceeds the thread budget during a fit", 
   BudgetGuard guard;
   // a budget of 2 threads, below the count OpenBLAS was loaded with (by
   // default the logical CPUs)
-  Optim::set_num_threads_percent(100);
-  const int full = Optim::get_num_threads();
+  Parallel::set_num_threads_percent(100);
+  const int full = Parallel::get_num_threads();
   if (full < 2 || openblas_get_num_threads() <= 2) {
     WARN("fewer than 2 physical cores or OpenBLAS loaded with <= 2 threads: nothing to bound");
     return;
   }
-  Optim::set_num_threads_percent(2.0 / full);
-  const int budget = Optim::get_num_threads();
+  Parallel::set_num_threads_percent(2.0 / full);
+  const int budget = Parallel::get_num_threads();
   REQUIRE(budget == 2);
   arma::vec y;
   arma::mat X;
@@ -380,16 +381,16 @@ TEST_CASE("The BLAS thread count never exceeds the thread budget during a fit", 
 #endif
 }
 
-TEST_CASE("Below Optim::blas_threads_min_n observations a fit runs OpenBLAS on 1 thread", "[threads]") {
+TEST_CASE("Below Parallel::get_blas_threads_min_n observations a fit runs OpenBLAS on 1 thread", "[threads]") {
 #ifdef LK_TEST_OPENBLAS
   if (!openblas_get_num_threads || !openblas_set_num_threads) {
     WARN("no OpenBLAS in this build");
     return;
   }
   BudgetGuard guard;
-  Optim::set_num_threads_percent(100);
-  const int budget = Optim::get_num_threads();
-  const int min_n = Optim::get_blas_threads_min_n();
+  Parallel::set_num_threads_percent(100);
+  const int budget = Parallel::get_num_threads();
+  const int min_n = Parallel::get_blas_threads_min_n();
   arma::vec y;
   arma::mat X;
   data(y, X, 120);
@@ -401,7 +402,7 @@ TEST_CASE("Below Optim::blas_threads_min_n observations a fit runs OpenBLAS on 1
     WARN("fewer than 2 threads: nothing to lower");
     return;
   }
-  Optim::set_blas_threads_min_n(100);
+  Parallel::set_blas_threads_min_n(100);
   const int small_min = min_blas_threads_during([&] {
     Kriging k(y.head(60), X.head_rows(60), "matern5_2", Trend::RegressionModel::Constant, false, "BFGS");
     k.predict(X, true, false, false);
@@ -409,7 +410,7 @@ TEST_CASE("Below Optim::blas_threads_min_n observations a fit runs OpenBLAS on 1
   const int after = openblas_get_num_threads();
   const int large_min
       = min_blas_threads_during([&] { Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS"); });
-  Optim::set_blas_threads_min_n(min_n);
+  Parallel::set_blas_threads_min_n(min_n);
   INFO("budget " << budget << ", initial " << initial << ", OpenBLAS min seen: n = 60 " << small_min << ", n = 120 "
                  << large_min);
   CHECK(small_min == 1);
@@ -424,11 +425,11 @@ TEST_CASE("Below Optim::blas_threads_min_n observations a fit runs OpenBLAS on 1
 TEST_CASE("An explicit OpenMP limit of the calling thread caps the thread budget", "[threads]") {
   BudgetGuard guard;
   const int initial = omp_get_max_threads();
-  Optim::set_num_threads_percent(200);
+  Parallel::set_num_threads_percent(200);
   omp_set_num_threads(2);
-  CHECK(Optim::get_num_threads() <= 2);
+  CHECK(Parallel::get_num_threads() <= 2);
   omp_set_num_threads(1);
-  CHECK(Optim::get_num_threads() == 1);
+  CHECK(Parallel::get_num_threads() == 1);
   omp_set_num_threads(initial);
 }
 #endif
@@ -468,7 +469,7 @@ TEST_CASE("Objective, gradient and update do not depend on the thread budget", "
   par.is_theta_estim = false;
 
   auto run = [&](double percent) {
-    Optim::set_num_threads_percent(percent);
+    Parallel::set_num_threads_percent(percent);
     Kriging k(y.head(900), X.head_rows(900), "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", par);
     auto [ll, grad] = k.logLikelihoodFun(theta, true, false);
     k.update(y.tail(300), X.tail_rows(300), false);
@@ -478,7 +479,7 @@ TEST_CASE("Objective, gradient and update do not depend on the thread budget", "
   const auto [ll0, grad0, llu0] = run(1e-6);  // 1 thread
   for (const double percent : {20.0, 50.0, 100.0, 200.0}) {
     const auto [ll, grad, llu] = run(percent);
-    INFO("budget " << Optim::get_num_threads() << " threads, tolerance " << tol);
+    INFO("budget " << Parallel::get_num_threads() << " threads, tolerance " << tol);
     CHECK(std::abs(ll - ll0) <= tol * std::abs(ll0));
     CHECK(arma::norm(grad - grad0) <= tol * arma::norm(grad0));
     CHECK(std::abs(llu - llu0) <= tol * std::abs(llu0));
@@ -495,7 +496,7 @@ TEST_CASE("A fit leaves the caller's MKL thread count unchanged", "[threads]") {
     return;
   }
   BudgetGuard guard;
-  Optim::set_num_threads_percent(1e-6);  // budget 1: below MKL's count when it has more than 1
+  Parallel::set_num_threads_percent(1e-6);  // budget 1: below MKL's count when it has more than 1
   const int before = MKL_Get_Max_Threads();
   arma::vec y;
   arma::mat X;
@@ -516,15 +517,15 @@ TEST_CASE("An OpenBLAS loaded with fewer threads than the budget keeps its count
   REQUIRE(v != nullptr);
   const int loaded = std::stoi(v);
   BudgetGuard guard;
-  Optim::set_num_threads_percent(100);
+  Parallel::set_num_threads_percent(100);
   arma::vec y;
   arma::mat X;
   data(y, X, 60);
   const int seen = max_blas_threads_during(
       [&] { Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS4"); });
-  INFO("OPENBLAS_NUM_THREADS " << loaded << ", budget " << Optim::get_num_threads() << ", OpenBLAS max seen " << seen);
+  INFO("OPENBLAS_NUM_THREADS " << loaded << ", budget " << Parallel::get_num_threads() << ", OpenBLAS max seen " << seen);
   CHECK(seen <= loaded);
 #ifndef _OPENMP
-  CHECK(Optim::get_num_threads() >= 1);
+  CHECK(Parallel::get_num_threads() >= 1);
 #endif
 }

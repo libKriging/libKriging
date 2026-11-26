@@ -77,35 +77,5 @@ classdef Optim
             mLibKriging("Optim::set_objective_rel_tolerance", val);
         end
         
-        function val = get_thread_start_delay_ms()
-            val = mLibKriging("Optim::get_thread_start_delay_ms");
-        end
-        
-        function set_thread_start_delay_ms(val)
-            mLibKriging("Optim::set_thread_start_delay_ms", int32(val));
-        end
-        
-        function val = get_thread_pool_size()
-            val = mLibKriging("Optim::get_thread_pool_size");
-        end
-        
-        function set_thread_pool_size(val)
-            mLibKriging("Optim::set_thread_pool_size", int32(val));
-        end
-        
-        % Thread budget: x <= 1 ratio, x > 1 percentage of the cores,
-        % 0 automatic (100 %)
-        function val = get_num_threads_percent()
-            val = mLibKriging("Optim::get_num_threads_percent");
-        end
-        
-        function set_num_threads_percent(val)
-            mLibKriging("Optim::set_num_threads_percent", val);
-        end
-        
-        % Resolved thread budget (number of threads), read only
-        function val = get_num_threads()
-            val = mLibKriging("Optim::get_num_threads");
-        end
     end
 end

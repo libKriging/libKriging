@@ -684,19 +684,12 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def_static("get_gradient_tolerance", &Optim::get_gradient_tolerance)
       .def_static("set_gradient_tolerance", &Optim::set_gradient_tolerance)
       .def_static("get_objective_rel_tolerance", &Optim::get_objective_rel_tolerance)
-      .def_static("set_objective_rel_tolerance", &Optim::set_objective_rel_tolerance)
-      .def_static("get_thread_start_delay_ms", &Optim::get_thread_start_delay_ms)
-      .def_static("set_thread_start_delay_ms", &Optim::set_thread_start_delay_ms)
-      .def_static("get_thread_pool_size", &Optim::get_thread_pool_size)
-      .def_static("set_thread_pool_size", &Optim::set_thread_pool_size)
-      // thread budget: x <= 1 ratio, x > 1 percentage of the cores, 0 automatic (100 %)
-      .def_static("get_num_threads_percent", &Optim::get_num_threads_percent)
-      .def_static("set_num_threads_percent", &Optim::set_num_threads_percent, py::arg("percent"))
-      .def_static("get_num_threads", &Optim::get_num_threads);
+      .def_static("set_objective_rel_tolerance", &Optim::set_objective_rel_tolerance);
+
 
   // Parallel class - thread budget of the library and how it is distributed
   // between its levels (multistart workers, OpenMP loops, BLAS threads):
-  // docs/dev/parallel.md. Optim's thread settings are the same settings.
+  // docs/dev/parallel.md (only there since 2.0, #468).
   py::class_<Parallel>(m, "Parallel")
       .def_static("get_num_threads_percent", &Parallel::get_num_threads_percent)
       .def_static("set_num_threads_percent", &Parallel::set_num_threads_percent, py::arg("percent"))

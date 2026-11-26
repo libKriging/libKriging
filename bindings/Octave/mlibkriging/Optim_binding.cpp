@@ -170,69 +170,6 @@ void set_objective_rel_tolerance(int nlhs, mxArray** plhs, int nrhs, const mxArr
   Optim::set_objective_rel_tolerance(input.get<double>(0, "objective_rel_tolerance"));
 }
 
-void get_thread_start_delay_ms(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  MxMapper input{"Input",
-                 nrhs,
-                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{0}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  output.set(0, Optim::get_thread_start_delay_ms(), "thread_start_delay_ms");
-}
-
-void set_thread_start_delay_ms(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  MxMapper input{"Input",
-                 nrhs,
-                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{1}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
-  Optim::set_thread_start_delay_ms(input.get<int>(0, "thread_start_delay_ms"));
-}
-
-void get_thread_pool_size(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  MxMapper input{"Input",
-                 nrhs,
-                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{0}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  output.set(0, Optim::get_thread_pool_size(), "thread_pool_size");
-}
-
-void set_thread_pool_size(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  MxMapper input{"Input",
-                 nrhs,
-                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{1}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
-  Optim::set_thread_pool_size(input.get<int>(0, "thread_pool_size"));
-}
-
-void get_num_threads_percent(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  MxMapper input{"Input",
-                 nrhs,
-                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{0}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  output.set(0, Optim::get_num_threads_percent(), "num_threads_percent");
-}
-
-void set_num_threads_percent(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  MxMapper input{"Input",
-                 nrhs,
-                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{1}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
-  Optim::set_num_threads_percent(input.get<double>(0, "num_threads_percent"));
-}
-
-void get_num_threads(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  MxMapper input{"Input",
-                 nrhs,
-                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{0}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  output.set(0, Optim::get_num_threads(), "num_threads");
-}
-
 }  // namespace OptimBinding
 
 namespace LinearAlgebraBinding {

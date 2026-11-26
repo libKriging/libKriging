@@ -299,8 +299,8 @@ Static settings of the library, same names as in C++ (`Optim::`, `Parallel::`, `
 
 | Settings | R | Python | Octave/Matlab | Julia |
 |---|---|---|---|---|
-| Optimizer (`set_max_iteration`, `set_max_restart`, tolerances, `set_log_level`, theta bounds, threads…) | `rlibkriging:::optim_<name>(…)` | `Optim.<name>(…)` | `Optim.<name>(…)` | `jlibkriging.Optim.<name>(…)` |
-| Threads (`set_num_threads_percent`, `set_thread_pool_size`, `set_blas_threads_min_n`, `set_omp_min_rows`…) | `parallel_<name>(…)` | `Parallel.<name>(…)` | `Parallel.<name>(…)` | `jlibkriging.Parallel.<name>(…)` |
+| Optimizer (`set_max_iteration`, `set_max_restart`, tolerances, `set_log_level`, theta bounds…) | `optim_<name>(…)` | `Optim.<name>(…)` | `Optim.<name>(…)` | `jlibkriging.Optim.<name>(…)` |
+| Threads (`set_num_threads_percent`, `set_thread_pool_size`, `set_blas_threads_min_n`, `set_omp_min_rows`…; in `Optim` before 2.0) | `parallel_<name>(…)` | `Parallel.<name>(…)` | `Parallel.<name>(…)` | `jlibkriging.Parallel.<name>(…)` |
 | Cholesky (`set_chol_jitter`, `set_num_nugget`, `set_chol_warning`, `check_chol_rcond`…) | `rlibkriging:::linalg_<name>(…)` | `LinearAlgebra.<name>(…)` | `LinearAlgebra.<name>(…)` | `<name>(…)` |
 
 `jlibkriging.Optim` is not exported, not to clash with the Optim.jl package.

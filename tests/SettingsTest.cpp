@@ -137,3 +137,19 @@ TEST_CASE("Settings: LK_* environment read at load, setter overrides it", "[.env
   LinearAlgebra::set_chol_jitter(0.0);
   CHECK(LinearAlgebra::get_chol_jitter() == 0.0);
 }
+
+// Hidden case, run by ctest with invalid LK_* values (tests/CMakeLists.txt,
+// SettingsTest/LK_invalid): each one is ignored with a [WARNING] line (checked
+// on the output by SettingsTest/LK_invalid_warnings) and the built-in default
+// is used.
+TEST_CASE("Settings: invalid LK_* values give the default", "[.env_invalid]") {
+  CHECK(Optim::get_max_restart() == 10);              // LK_MAX_RESTART=abc
+  CHECK(Optim::get_max_iteration() == 20);            // LK_MAX_ITERATION=3.7
+  CHECK(Optim::is_reparametrized());                  // LK_REPARAMETRIZE=maybe
+  CHECK(Optim::get_gradient_tolerance() == 0.001);    // LK_GRADIENT_TOLERANCE=-1
+  CHECK(Parallel::get_thread_pool_size() == 0);       // LK_THREAD_POOL_SIZE=-2
+  CHECK(Parallel::get_num_threads_percent() == 0.0);  // LK_NUM_THREADS_PERCENT=inf
+  CHECK(LinearAlgebra::get_chol_jitter() < 0.0);      // LK_CHOL_JITTER=1e-9x
+  CHECK(Parallel::get_omp_min_rows() > 0);            // LK_OMP_MIN_ROWS=12abc
+  CHECK(Parallel::get_omp_min_rows() != 12);
+}

@@ -51,6 +51,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
 namespace {
@@ -220,7 +221,7 @@ std::string settings_label() {
                 sizeof b,
                 "jitter=%s,pct=%g%s",
                 jit,
-                Optim::get_num_threads_percent(),
+                Parallel::get_num_threads_percent(),
                 LinearAlgebra::chol_rcond_checked() ? "" : ",rcond=0");
   return b;
 }
@@ -372,7 +373,7 @@ int main(int argc, char** argv) {
                     variant_base.c_str(),
                     optim.c_str(),
                     settings.c_str(),
-                    Optim::get_num_threads(),
+                    Parallel::get_num_threads(),
                     kernel.c_str(),
                     noise.c_str(),
                     objective.c_str(),

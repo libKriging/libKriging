@@ -44,3 +44,13 @@ catch
 end
 assert(failed);
 assert(Optim.get_max_restart() == orig);
+
+% 2.0 (#468): the thread settings are in Parallel only
+m = methods('Optim');
+moved = {'set_num_threads_percent', 'get_num_threads_percent', 'get_num_threads', ...
+         'set_thread_pool_size', 'get_thread_pool_size', ...
+         'set_thread_start_delay_ms', 'get_thread_start_delay_ms'};
+for i = 1:numel(moved)
+  assert(~any(strcmp(m, moved{i})), sprintf('Optim.%s still defined', moved{i}));
+  assert(any(strcmp(methods('Parallel'), moved{i})), sprintf('Parallel.%s missing', moved{i}));
+end

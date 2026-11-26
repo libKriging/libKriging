@@ -1,8 +1,9 @@
 #include "ThreadBudget.hpp"
 
-#include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 
 #include "BlasThreads.hpp"
+#include "EnvSettings.hpp"
 #include "OmpLoops.hpp"
 
 #include <algorithm>
@@ -290,16 +291,8 @@ namespace {
 // OpenMP threshold in effect: kOmpMinRows (build), LK_OMP_MIN_ROWS (environment,
 // read at load), Parallel::set_omp_min_rows. Relaxed: a performance setting,
 // configuration-before-use as the other settings.
-std::atomic<unsigned long long> g_omp_min_rows{[] {
-  const char* v = std::getenv("LK_OMP_MIN_ROWS");
-  if (v != nullptr && *v != '\0') {
-    char* end = nullptr;
-    const long long n = std::strtoll(v, &end, 10);
-    if (end != v && n >= 0)
-      return static_cast<unsigned long long>(n);
-  }
-  return kOmpMinRows;
-}()};
+std::atomic<unsigned long long> g_omp_min_rows{static_cast<unsigned long long>(
+    env_int("LK_OMP_MIN_ROWS", static_cast<int>(kOmpMinRows), 0))};
 }  // namespace
 
 unsigned long long omp_min_rows() {
@@ -319,7 +312,7 @@ int physical_cores() {
 }
 
 // Set in a forked child only (async-signal-safe store from the atfork child
-// handler, Kriging.cpp), cleared by Optim::set_num_threads_percent.
+// handler, Kriging.cpp), cleared by Parallel::set_num_threads_percent.
 static volatile std::sig_atomic_t forked_child = 0;
 
 void set_forked_child() {
@@ -333,7 +326,7 @@ void clear_forked_child() {
 int budget_full() {
   if (forked_child)
     return 1;
-  double share = Optim::num_threads_percent;
+  double share = Parallel::get_num_threads_percent();
   if (!(share > 0.0))
     share = 1.0;
   else if (share > 1.0)
@@ -476,9 +469,10 @@ int scope_blas_threads(unsigned long long n) {
   const int budget = budget_total();
   const int target = blas_threads_for(budget);
   unsigned long long min_n = 0;
-  if (Optim::blas_threads_min_n > 0) {
-    min_n = static_cast<unsigned long long>(Optim::blas_threads_min_n);
-  } else if (Optim::blas_threads_min_n < 0) {
+  const int setting_min_n = Parallel::get_blas_threads_min_n();
+  if (setting_min_n > 0) {
+    min_n = static_cast<unsigned long long>(setting_min_n);
+  } else if (setting_min_n < 0) {
     // automatic: only when the BLAS threads and the OpenMP team (both at the
     // budget) outnumber the logical CPUs, i.e. without SMT headroom (VMs, CI
     // runners, SMT off). With SMT (budget = physical cores, half the logical

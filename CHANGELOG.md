@@ -13,13 +13,13 @@ past release, see the corresponding entry on the
 
 ### Added
 - **Settings: one table, one rule, the same setters in every binding** (#468): `docs/Settings.md`
-  lists the 17 `LK_*` environment variables read by the library, with the setter / getter of
-  each user setting in C++, Python, R, Julia and Octave / MATLAB, its default and its kind
-  (result / performance / output). Rule: an environment variable only gives the default, read
-  once when the library is loaded (changing it afterwards has no effect), and a setter call
-  overrides it. `LK_LINEARALGEBRA_CHECK_TRACE` and `LK_ACCELERATE_POOL_SINGLE` are documented as
-  unsupported diagnostics (no setter, may change). The `LK_*` rows of `docs/dev/parallel.md`
-  section 9 moved there.
+  lists the 15 `LK_*` environment variables read by the library, with the setter / getter of
+  each in C++, Python, R, Julia and Octave / MATLAB, its default and its kind (result /
+  performance / output). Rule: each setting belongs to one class by domain (`Optim` optimizer,
+  `Parallel` threads, `LinearAlgebra` Cholesky), never duplicated; an environment variable only
+  gives the default, read once when the library is loaded (changing it afterwards has no
+  effect), and a setter call overrides it. The `LK_*` rows of `docs/dev/parallel.md` section 9
+  moved there.
 - **`Optim::set_max_restart` / `get_max_restart`** in C++ and every binding (Python / Octave
   `Optim.set_max_restart`, R `optim_set_max_restart`, Julia `jlibkriging.Optim.set_max_restart`):
   the restarts of one optimizer start were set by `LK_MAX_RESTART` only (default 10 unchanged;
@@ -31,12 +31,22 @@ past release, see the corresponding entry on the
   (`set_thread_pool_size`, `set_thread_start_delay_ms`, `set_blas_threads_min_n`, until now
   C++ / environment only, and `set_omp_min_rows`, new), and the state of each level, read only
   (`blas_backend`, `blas_num_threads`, `omp_enabled`). No separate OpenMP / BLAS thread count:
-  one budget bounds them together. Optim's thread settings stay, as the same settings.
+  one budget bounds them together. Since #468 they are in `Parallel` only (see Removed).
 - **OpenMP threshold at run time**: `kOmpMinRows` stays the build default; `LK_OMP_MIN_ROWS` in
   the environment or `Parallel::set_omp_min_rows` set it without recompiling (a performance
   setting: the results do not depend on it, #441).
 
 ### Changed
+- **Invalid `LK_*` values: a warning instead of silence, and stricter parsing** (#468). A value
+  that is not entirely a valid number or boolean, or below the minimum of the setting, is
+  ignored with a line `[WARNING] LK_X="..." ignored (expected ...), default ... used` when the
+  library is loaded; before, it was silently ignored, and a prefix was accepted (`LK_MAX_ITERATION=3.7`
+  gave 3, `"12abc"` gave 12: now the default and a warning). Booleans accept `1/true/yes/on` and
+  `0/false/no/off` in any case (before: `1`, `true`, `TRUE`, `True` true, anything else false,
+  so `LK_REPARAMETRIZE=yes` turned it off). The thread setters reject invalid values with an
+  error: `set_thread_pool_size(n < 0)`, `set_thread_start_delay_ms(ms < 0)`,
+  `set_blas_threads_min_n(n < -1)` (before: accepted, a negative pool size meaning automatic).
+  Migration: pass 0 for an automatic pool size.
 - **rcond test of the Cholesky retry: the noise-free committed model is checked by its
   interpolation residual** (#496, follow-up of #465). The retry added a nugget when the 1-norm
   rcond estimate of the factor was below 1e-18, about 4 orders of magnitude pessimistic: on the
@@ -279,6 +289,21 @@ past release, see the corresponding entry on the
   BFGS20 (4 cores): 3369 → 1501 MB; n = 1000, BFGS10: 564 → 330 MB; WarpKriging n = 1000,
   BFGS10: 1112 → 578 MB. See
   [docs/dev/rationalization/T4-kmodel-per-worker.md](docs/dev/rationalization/T4-kmodel-per-worker.md).
+
+### Removed
+- **Thread settings of `Optim`, moved to `Parallel`** (#468): `set_num_threads_percent`,
+  `get_num_threads_percent`, `get_num_threads`, `set_thread_pool_size`, `get_thread_pool_size`,
+  `set_thread_start_delay_ms`, `get_thread_start_delay_ms` (and in C++ `set_blas_threads_min_n`,
+  `get_blas_threads_min_n`, plus the public static members `Optim::num_threads_percent`,
+  `thread_pool_size`, `thread_start_delay_ms`, `blas_threads_min_n`). They were the same settings
+  as those of `Parallel` (#480). Migration: same names in `Parallel` — C++ `Parallel::<name>`
+  (`#include "libKriging/Parallel.hpp"`), Python / Octave / MATLAB `Parallel.<name>`, Julia
+  `jlibkriging.Parallel.<name>`, R `parallel_<name>` instead of `optim_<name>`.
+- **`LK_LINEARALGEBRA_CHECK_TRACE` and `LK_ACCELERATE_POOL_SINGLE`** (#468): developer
+  diagnostics without a setter (a stderr trace of `LinearAlgebra.check()`, and on macOS 15+ a
+  switch keeping Accelerate multithreaded in the multistart workers, for the measurements of
+  #491); now ignored. Migration: none for users; the workers of a multistart pool always run
+  Accelerate single-threaded.
 
 ### Added
 - **Statistical benchmark base of the fit** (T7, `bench/fit-protocol/`): `bench-fit-protocol`

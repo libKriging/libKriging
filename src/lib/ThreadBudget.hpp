@@ -20,19 +20,19 @@ namespace detail {
 int physical_cores();
 
 /// Thread budget of the library: round(share × physical_cores()), share =
-/// Optim::num_threads_percent (x <= 1: ratio, x > 1: percentage, 0 = 100 %), at
+/// Parallel::get_num_threads_percent() (x <= 1: ratio, x > 1: percentage, 0 = 100 %), at
 /// least 1, never more than the calling thread's OpenMP limit
 /// (omp_get_max_threads(): OMP_NUM_THREADS, omp_set_num_threads). The OpenBLAS
-/// count bounds the BLAS only. Optim::get_num_threads().
+/// count bounds the BLAS only. Parallel::get_num_threads().
 int budget_full();
 
 /// Called by the pthread_atfork child handler (Kriging.cpp): budget_full() is 1
-/// in a forked child until Optim::set_num_threads_percent() is called in it,
+/// in a forked child until Parallel::set_num_threads_percent() is called in it,
 /// whatever the OpenMP runtime, also without OpenMP (where nothing else bounds
 /// the multistart pool of the child; #420).
 void set_forked_child();
 
-/// Clears the cap of set_forked_child() (Optim::set_num_threads_percent).
+/// Clears the cap of set_forked_child() (Parallel::set_num_threads_percent).
 void clear_forked_child();
 
 /// Budget of a call: budget_full() divided by the number of public calls
@@ -134,7 +134,7 @@ struct CallCount {
 /// hyperthreaded machine) until it returns; no-op inside a pool worker (the
 /// pool has set the worker's share). With the number n of training
 /// observations, OpenBLAS is requested at 1 thread instead when n is below the
-/// threshold of the small-problem rule (Optim::blas_threads_min_n, #436),
+/// threshold of the small-problem rule (Parallel::get_blas_threads_min_n(), #436),
 /// through the same shared count state; MKL is not concerned by the rule.
 struct BudgetScope {
   explicit BudgetScope(unsigned long long n = 0);

@@ -82,68 +82,8 @@ class Optim {
   LIBKRIGING_EXPORT static void set_objective_rel_tolerance(double objective_rel_tolerance_val);
   LIBKRIGING_EXPORT static double get_objective_rel_tolerance();
 
-  // Thread startup delay for BFGS multistart optimization (in milliseconds)
-  // Purpose: Stagger worker thread initialization to avoid race conditions
-  // 
-  // Background:
-  //   When multiple threads start simultaneously in BFGS multistart, they can
-  //   encounter race conditions during initialization, particularly with:
-  //   - Armadillo matrix memory allocation
-  //   - Thread-local RNG initialization
-  //   - Internal library state setup
-  //
-  // Investigation results (with exact equivalence test):
-  //   - 1ms delay:  FAILED - threads too close, race conditions observed
-  //                 Small differences in results (sigma2 diff ~1.3)
-  //   - 10ms delay: SUCCESS - exact equivalence achieved (diff == 0.0)
-  //   - 100ms delay: SUCCESS - exact equivalence, but unnecessary overhead
-  //
-  // Recommendation: 10ms provides the minimum safe delay to ensure:
-  //   - Deterministic behavior (BFGS20 == best of 20×BFGS1)
-  //   - Minimal overhead (max 190ms for 20 threads)
-  //   - Perfect reproducibility across runs
-  //
-  // Usage: Each worker thread i waits (i × thread_start_delay_ms) milliseconds
-  //        before beginning optimization work.
-  static int thread_start_delay_ms;
-  LIBKRIGING_EXPORT static void set_thread_start_delay_ms(int delay_ms);
-  LIBKRIGING_EXPORT static int get_thread_start_delay_ms();
-
-  // Thread settings: also in Parallel (Parallel.hpp), which gathers them.
-  // Thread budget of the library: the share of the physical cores it uses,
-  // x <= 1 a ratio (0.5), x > 1 a percentage (50), 0 = automatic = 100 %.
-  // Default from LK_NUM_THREADS_PERCENT. Never more than an explicit
-  // OMP_NUM_THREADS / omp_set_num_threads of the calling thread nor the
-  // OpenBLAS count (OPENBLAS_NUM_THREADS) in effect when the library is first
-  // used. The multistart pool gets it first (one worker per start, up to the
-  // budget), each worker's BLAS / OpenMP calls the rest (budget / workers).
-  // 1 thread in a forked child (fork(), R's parallel::mclapply) until
-  // set_num_threads_percent is called in it.
-  static double num_threads_percent;
-  LIBKRIGING_EXPORT static void set_num_threads_percent(double x);
-  LIBKRIGING_EXPORT static double get_num_threads_percent();
-  /// Resolved thread budget (number of threads), read only.
-  LIBKRIGING_EXPORT static int get_num_threads();
-
-  // Number of multistart workers (Kriging, WarpKriging, MLPKriging), at most
-  // the number of starts; 0 = automatic = the thread budget (one thread per
-  // worker when the starts outnumber it). Default from LK_THREAD_POOL_SIZE.
-  static int thread_pool_size;
-  LIBKRIGING_EXPORT static void set_thread_pool_size(int pool_size);
-  LIBKRIGING_EXPORT static int get_thread_pool_size();
-
-  // Small-problem BLAS rule (OpenBLAS only): fit / predict / update on fewer
-  // training observations than the threshold run OpenBLAS on 1 thread instead
-  // of the thread budget (restored after the call): below a few hundred
-  // observations the OpenBLAS threads mostly spin-wait between calls, and
-  // compete with the OpenMP team for the cores. -1 = automatic (default, env
-  // LK_BLAS_THREADS_MIN_N): threshold 500 when the BLAS threads and the
-  // OpenMP team outnumber the logical CPUs (no SMT headroom: VMs, CI runners),
-  // off otherwise, except with MSVC on Windows where it is always 500 (#473);
-  // 0 = off; n > 0 = threshold n. See REPORT-blas-threads.md.
-  static int blas_threads_min_n;
-  LIBKRIGING_EXPORT static void set_blas_threads_min_n(int min_n);
-  LIBKRIGING_EXPORT static int get_blas_threads_min_n();
+  // The thread settings (budget, multistart pool, start delay, small-problem
+  // BLAS rule) are in Parallel (Parallel.hpp) since 2.0 (#468).
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINLIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_OPTIM_HPPEARALGEBRA_HPP

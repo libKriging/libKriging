@@ -6,7 +6,7 @@
 //   on>0  : theta of "on", final model rebuilt at that theta with jitter 0
 //   on>10 : same, final jitter 1e-10
 //   on~0  : continuation, a last BFGS with jitter 0 started from the theta of "on"
-// Each variant is run with Optim::set_num_threads_percent 10 / 100 / 200 (column pct).
+// Each variant is run with Parallel::set_num_threads_percent 10 / 100 / 200 (column pct).
 // Usage: jitter_split_study <family> <kernel> <n> <d> <sets> <optim>
 //   family: sin (random freq in [0.5, 3]), sin1 (freq 1), branin, unstable
 // Output CSV: set,pct,variant,theta0,ll,rmse,pred0 (prediction at the first test point)
@@ -20,6 +20,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
 static arma::vec f(const std::string& family, const arma::mat& X, const arma::rowvec& freq) {
@@ -65,7 +66,7 @@ int main(int argc, char** argv) {
     const arma::mat Xt(500, d, arma::fill::randu);
     const arma::vec yt = f(family, Xt, freq);
     for (double pct : {10.0, 100.0, 200.0}) {
-      Optim::set_num_threads_percent(pct);
+      Parallel::set_num_threads_percent(pct);
       auto report = [&](const char* variant, Kriging& k) {
         const arma::vec m = std::get<0>(k.predict(Xt, false, false, false));
         const double rmse = std::sqrt(arma::mean(arma::square(m - yt))) / arma::stddev(yt);

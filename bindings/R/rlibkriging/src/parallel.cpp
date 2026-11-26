@@ -9,7 +9,7 @@
 
 // Thread budget of the library and its distribution between the levels
 // (multistart workers, OpenMP loops, BLAS threads): Parallel.hpp,
-// docs/dev/parallel.md. The optim_* thread settings are the same settings.
+// docs/dev/parallel.md. They were also optim_* before 2.0 (#468).
 
 //' @rdname parallel_settings
 //' @export

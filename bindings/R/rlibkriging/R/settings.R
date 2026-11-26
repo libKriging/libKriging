@@ -1,29 +1,21 @@
 #' Global settings of the optimizer
 #'
-#' Process-wide settings of libKriging's hyperparameter optimizer and thread
-#' budget, the same as the \code{Optim} static methods of the Python, Octave /
-#' MATLAB and Julia bindings (\code{optim_<name>} in R for \code{Optim.<name>}).
-#' Set them before fitting: changing one while a fit runs in another thread is
-#' a data race.
-#'
-#' Thread budget: \code{optim_set_num_threads_percent(x)} sets the share of the
-#' physical cores used by libKriging (multistart workers, OpenMP loops and
-#' BLAS), \code{x <= 1} a ratio (\code{0.5}), \code{x > 1} a percentage
-#' (\code{50}), \code{0} automatic (100 \%). Default from the
-#' \code{LK_NUM_THREADS_PERCENT} environment variable.
-#' \code{optim_get_num_threads()} returns the resulting number of threads.
-#' Socket workers (\code{parallel::makeCluster(type = "PSOCK")},
-#' \code{future::multisession}) each use the whole budget: give k workers
-#' \code{1 / k} each. Forked children (\code{parallel::mclapply}) start with
-#' one thread.
+#' Process-wide settings of libKriging's hyperparameter optimizer, the same as
+#' the \code{Optim} static methods of the Python, Octave / MATLAB and Julia
+#' bindings (\code{optim_<name>} in R for \code{Optim.<name>}). Set them before
+#' fitting: changing one while a fit runs in another thread is a data race.
+#' Defaults from the \code{LK_*} environment variables, read when the package is
+#' loaded (\code{Sys.setenv} afterwards has no effect); a setter call overrides
+#' them (docs/Settings.md). The thread settings are \code{parallel_*} (moved
+#' from \code{optim_*} in 2.0).
 #'
 #' @name optim_settings
 #' @return The getters return the current value; the setters return
 #'   \code{NULL} invisibly.
 #' @examples
-#' optim_set_num_threads_percent(0.5)
-#' optim_get_num_threads()
-#' optim_set_num_threads_percent(0)
+#' optim_set_max_restart(5)
+#' optim_get_max_restart()
+#' optim_set_max_restart(10)
 NULL
 
 #' Global settings of the Cholesky factorizations
@@ -52,7 +44,7 @@ NULL
 #' (\code{parallel_<name>} in R for \code{Parallel.<name>}); see
 #' docs/dev/parallel.md. One budget bounds the multistart workers, the OpenMP
 #' loops and the BLAS threads together; the other settings only shape how it is
-#' distributed. The \code{optim_*} thread settings are the same settings. Set
+#' distributed (these settings were also \code{optim_*} before 2.0). Set
 #' them before the calls.
 #'
 #' \code{parallel_set_num_threads_percent(x)}: share of the physical cores,
@@ -64,6 +56,10 @@ NULL
 #' from which the covariance / gradient loops run on OpenMP threads.
 #' \code{parallel_blas_backend()}, \code{parallel_blas_num_threads()},
 #' \code{parallel_omp_enabled()}: read only, the state of each level.
+#' Socket workers (\code{parallel::makeCluster(type = "PSOCK")},
+#' \code{future::multisession}) each use the whole budget: give k workers
+#' \code{1 / k} each. Forked children (\code{parallel::mclapply}) start with
+#' one thread.
 #'
 #' @name parallel_settings
 #' @return The getters return the current value; the setters return

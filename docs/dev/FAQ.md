@@ -21,10 +21,9 @@ This page collects questions about libKriging development
  One setting, the thread budget, bounds all of them: by default the physical cores of the
  machine (in the process's CPU affinity, within a container's CPU quota). The starts of a
  multistart fit (`"BFGS10"`, ...) get it first, one start per thread; what remains goes to the
- BLAS and the OpenMP loops of each start. Change it with `Optim::set_num_threads_percent(x)` or
+ BLAS and the OpenMP loops of each start. Change it with `Parallel::set_num_threads_percent(x)` or
  the environment variable `LK_NUM_THREADS_PERCENT=x` (x <= 1: a ratio, x > 1: a percentage of
- the cores, 0: 100 %); `Optim::get_num_threads()` returns the resulting number of threads
- (the same settings in `Parallel`, below).
+ the cores, 0: 100 %); `Parallel::get_num_threads()` returns the resulting number of threads.
 
  | | set | read |
  |---|---|---|
@@ -34,8 +33,8 @@ This page collects questions about libKriging development
  | Octave | `Parallel.set_num_threads_percent(50)` | `Parallel.get_num_threads()` |
  | Julia | `jlibkriging.Parallel.set_num_threads_percent(50)` | `jlibkriging.Parallel.get_num_threads()` |
 
- (`Optim.set_num_threads_percent` / `Optim.get_num_threads`, R `optim_*`, are the same
- settings.) `Parallel` also tells which BLAS is used and with how many threads
+ (Before 2.0 these settings were also in `Optim`, R `optim_*`: moved to `Parallel`, #468.)
+ `Parallel` also tells which BLAS is used and with how many threads
  (`blas_backend()`, `blas_num_threads()`), and sets the small-problem BLAS rule and the
  OpenMP threshold (`set_blas_threads_min_n`, `set_omp_min_rows`).
 
@@ -45,7 +44,7 @@ This page collects questions about libKriging development
  `mkl_set_num_threads_local`): each start of a multistart then uses its share of the budget for
  its BLAS calls. Apple Accelerate has no thread count, only single / multi, per thread (macOS 15+):
  the workers of a multistart run it single-threaded by themselves (nothing to set; the caller's
- thread and single-start fits keep its threads; `LK_ACCELERATE_POOL_SINGLE=0` turns this off; on
+ thread and single-start fits keep its threads; on
  macOS < 15, which has no such call, set `VECLIB_MAXIMUM_THREADS=1` before loading the library for
  multistart fits). FlexiBLAS and BLIS are not driven: with them each start of a multistart keeps the
  BLAS's own thread count (oversubscription when the BLAS is multithreaded); set
