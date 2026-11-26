@@ -125,8 +125,8 @@ ke = Kriging(y, X, "matern5_2", "constant", false, "none", "LL", ...
 ```
 The Vecchia predictor (`"vecchia"`) is also usable after an exact fit. Approximate methods
 return mean / stdev only (`return_cov`, `return_deriv`, `will_update` raise).
-Objectives `"LLVecchia(m)"` / `"LLNystrom(k)"` are **deprecated** aliases of `"LL"` with
-method `"vecchia(m)"` / `"nystrom(k)"`.
+Objectives `"LLVecchia(m)"` / `"LLNystrom(k)"` (1.2 spelling) were **removed** in 2.0 and raise:
+use `"LL"` with method `"vecchia(m)"` / `"nystrom(k)"`.
 `predictVecchia`, `predictNystrom`, `simulateVecchia` and `simulateNystrom` (behind `method`) exist in C++ only.
 
 ## NestedKriging

@@ -267,6 +267,42 @@ past release, see the corresponding entry on the
   BFGS10: 1112 → 578 MB. See
   [docs/dev/rationalization/T4-kmodel-per-worker.md](docs/dev/rationalization/T4-kmodel-per-worker.md).
 
+### Removed
+- **Objectives `"LLVecchia(m)"` / `"LLNystrom(k)"` and the Vecchia exact-commit setter** (#469).
+  The objective aliases were the 1.2 way to ask for an approximate fit, deprecated during the
+  2.0 cycle and never deprecated in a release: 1.2.x code using them fails with 2.0. A fit with
+  one of them now raises (C++ `std::invalid_argument`, Python `ValueError`, R / Julia /
+  Octave / Matlab error) with a message naming the replacement, e.g. `objective "LLVecchia(7)"
+  was removed in libKriging 2.0; use objective="LL", method="vecchia(7)"`; never reinterpreted,
+  whatever `method` is given. Save files of libKriging <= 1.2 storing such an objective still
+  load (as `method="vecchia(m)"` / `"nystrom(k)"`). Migration:
+  - `objective="LLVecchia(m)"` (or `"LLVecchia"`) → `objective="LL", method="vecchia(m)"`
+    (`method="vecchia"`, m = 30); the same in `NestedKriging`.
+  - `objective="LLNystrom(k)"` (or `"LLNystrom"`) → `objective="LL", method="nystrom(k)"`
+    (`method="nystrom"`, k = 50).
+  - C++ `Kriging::set_vecchia_exact_commit(bool)` / `vecchia_exact_commit()` → nothing to call
+    for `false` (a Vecchia fit is always light); for the exact model at the Vecchia estimate,
+    a separate fit with `method="exact"`, `optim="none"` and the fitted theta.
+  - C++ `Kriging::set_deprecation_handler` / `Kriging::deprecated_objective_message` (and the
+    `DeprecationHandler` type), R `kriging_deprecation_message` (internal), Julia C symbol
+    `lk_deprecated_objective_message`: no replacement, no deprecated objective is left to
+    report. The native deprecation warnings of the bindings for these objectives (Python
+    `DeprecationWarning`, R `deprecatedWarning`, Julia `Base.depwarn`, Octave / Matlab
+    `mLibKriging:deprecated`) become the errors above: code catching or silencing those
+    warnings must use the new spelling.
+- **Julia `get_*` / `is_normalize` getter aliases and the R `simulate(..., with_nugget = )`
+  alias** (#469). Migration:
+  - Julia `get_X`, `get_y`, `get_theta`, `get_sigma2`, `get_beta`, `get_nugget`, `get_noise`,
+    `get_centerX`, `get_scaleX`, `get_centerY`, `get_scaleY`, `get_F`, `get_T`, `get_M`,
+    `get_z` (Kriging), `get_warping` (WarpKriging), `get_hidden_dims` (MLPKriging) → the same
+    name without `get_` (`X(k)`, `theta(k)`, `warping(wk)`, `hidden_dims(mk)`, ...), already
+    exported; `is_normalize(k)` → `normalize(k)`. The old names are no longer defined
+    (`UndefVarError`). `get_chol_jitter` / `get_num_nugget` (global settings) are unchanged.
+  - R `simulate(k, ..., with_nugget = b)` (alias of the former `NuggetKriging` class) →
+    `with_noise = b`; `with_nugget` now raises an error naming `with_noise` instead of being
+    taken as `with_noise`. The Julia `with_nugget` keyword of `simulate` (the C++ argument
+    name) is unchanged.
+
 ### Added
 - **Statistical benchmark base of the fit** (T7, `bench/fit-protocol/`): `bench-fit-protocol`
   (built with the other benchmarks) fits >= 30 seeded data sets per configuration (gauss /
@@ -688,17 +724,10 @@ past release, see the corresponding entry on the
     method with its explicit size (`"vecchia(30)"`), and is saved / loaded.
     C++ trailing `method` argument of `fit` and of the constructor; Python /
     R / Julia `method=` keyword; Octave/Matlab trailing argument.
-  - `objective="LLVecchia(m)"` / `"LLNystrom(k)"` are deprecated aliases of
-    `objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"`; a
-    conflicting `method` raises. Save files of earlier versions load with the
-    matching method. Using an alias raises the native deprecation warning of
-    each language: Python `DeprecationWarning`, R `warning` of class
-    `deprecatedWarning`, Julia `Base.depwarn` (shown without `--depwarn`),
-    Octave/Matlab warning `mLibKriging:deprecated`. They follow each
-    language's filters (`warnings.simplefilter("error")`, `options(warn = 2)`,
-    `--depwarn=error`, `warning("error", ...)`). In C++, the message goes to
-    `Kriging::set_deprecation_handler` (default: printed once on
-    `arma::cout`), and `Kriging::deprecated_objective_message` gives it.
+  - `objective="LLVecchia(m)"` / `"LLNystrom(k)"` are replaced by
+    `objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"` (the
+    former spellings raise, see Removed). Save files of earlier versions
+    load with the matching method.
   - A Vecchia fit no longer performs the final exact O(n³) factorization:
     like a Nystrom fit, it keeps theta and the Vecchia-profiled beta /
     sigma2 only, so a large-n Vecchia fit no longer needs an n × n matrix.
@@ -720,9 +749,8 @@ past release, see the corresponding entry on the
   - Code predicting after an `LLNystrom` / `LLVecchia` fit must pass
     `method="nystrom"` / `"vecchia"`; the scikit-learn `KrigingRegressor`
     `method` parameter applies to `fit`, `predict` and `sample_y`.
-  - `set_vecchia_exact_commit(false)` is a deprecated no-op in C++ and
-    `set_vecchia_exact_commit(true)` raises; `vecchia_exact_commit()` is
-    deprecated.
+  - `set_vecchia_exact_commit` / `vecchia_exact_commit()` no longer exist
+    (see Removed): a Vecchia fit is always light.
   - NestedKriging: `method="vecchia(m)"` or `"nystrom(k)"` (after
     `warping`) estimates the common prior with one global Vecchia or Nystrom
     fit (formerly only `objective="LLVecchia(m)"`); `objective()` and

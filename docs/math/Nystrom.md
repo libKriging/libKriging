@@ -19,8 +19,8 @@ libKriging exposes it as a fit method of the log-likelihood objective,
 `method="nystrom"` (default k = 50 landmarks) or `method="nystrom(k)"`
 for an explicit rank k (with `objective="LL"`, the default), in C++ and
 every binding. `method()` then returns `"nystrom(k)"`, `objective()`
-`"LL"`. `objective="LLNystrom(k)"` is a deprecated alias of
-`objective="LL", method="nystrom(k)"` (deprecation warning).
+`"LL"`. `objective="LLNystrom(k)"` (1.2 spelling) was removed in 2.0
+and raises an error naming `objective="LL", method="nystrom(k)"`.
 
 ```r
 k <- Kriging(y, X, "matern5_2", method = "nystrom(50)")   # or "nystrom"

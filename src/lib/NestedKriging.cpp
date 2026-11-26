@@ -187,7 +187,7 @@ void NestedKriging::fit(const arma::vec& y,
     throw std::invalid_argument("nb_groups should be in [1, n/(d+2)]");
   if (m_aggregation == Aggregation::NK && regmodel != Trend::RegressionModel::Constant)
     throw std::invalid_argument("NK aggregation requires a Constant trend; use PoE/gPoE/BCM/rBCM otherwise");
-  // canonical (objective, method): resolves the deprecated "LLVecchia(m)"
+  // canonical (objective, method); "LLVecchia(m)" (removed in 2.0) raises
   const auto objective_method = Kriging::fit_objective_method(objective_in, method_in);
   const std::string& objective = objective_method.first;
   const std::string& method = objective_method.second;

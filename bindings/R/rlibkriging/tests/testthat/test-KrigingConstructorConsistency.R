@@ -9,10 +9,10 @@ X <- as.matrix(runif(12))
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 y <- f(X)
 
-test_that("method = 'vecchia(m)' is accepted, and the deprecated objective 'LLVecchia(m)'", {
+test_that("method = 'vecchia(m)' is accepted, the objective 'LLVecchia(m)' (removed in 2.0) raises", {
   expect_error(Kriging(y, X, "matern5_2", method = "vecchia(3)"), NA)
-  expect_warning(Kriging(y, X, "matern5_2", objective = "LLVecchia(3)"), class = "deprecatedWarning")
-  expect_warning(Kriging(y, X, "matern5_2", objective = "LLVecchia"), class = "deprecatedWarning")
+  expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia(3)"), 'method="vecchia(3)"', fixed = TRUE)
+  expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia"), 'method="vecchia(30)"', fixed = TRUE)
 })
 
 test_that("vecchia_neighbors / nystrom_rank report the approximation size", {

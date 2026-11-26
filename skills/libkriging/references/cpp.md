@@ -108,8 +108,9 @@ VARIANCES, like the `noise` of `fit` / `update`. LOO / LMP with an
 approximate method (`leaveOneOut("vecchia")`, `logMargPostNystromFun`, …)
 raise `std::invalid_argument` on a Nugget / Heterogeneous model.
 `Kriging::fit_objective_method(objective, method)` returns the canonical
-(objective, method) pair. Deprecated: objective `"LLVecchia(m)"` /
-`"LLNystrom(k)"` (aliases of `"LL"` + `"vecchia(m)"` / `"nystrom(k)"`).
+(objective, method) pair. Objectives `"LLVecchia(m)"` / `"LLNystrom(k)"`
+(1.2 spelling, removed in 2.0) throw `std::invalid_argument`: use `"LL"` +
+`"vecchia(m)"` / `"nystrom(k)"`.
 
 Pre-fit reduction and accessors:
 ```cpp
@@ -122,8 +123,8 @@ model.method();         // "exact", "vecchia(m)" or "nystrom(k)"
 model.nystrom_rank();   // rank k of a Nystrom fit, 0 otherwise
 model.vecchia_neighbors();   // m of a Vecchia fit, 0 otherwise
 model.is_vecchia_light(); model.is_nystrom_light();   // C++ only: no exact factorization held
-// Deprecated: set_vecchia_exact_commit(false) is a no-op, (true) throws;
-// vecchia_exact_commit() returns false (a Vecchia fit is always light).
+// a Vecchia fit is always light (set_vecchia_exact_commit removed in 2.0):
+// for the exact model, a separate fit with method="exact", optim="none".
 ```
 
 ## WarpKriging

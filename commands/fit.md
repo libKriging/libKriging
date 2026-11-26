@@ -16,8 +16,8 @@ Fit a libKriging model. Context / arguments: $ARGUMENTS
    - n ≳ few thousand → keep `Kriging` (noise-free, `objective="LL"`;
      `WarpKriging` / `MLPKriging` only implement `method="exact"`) with
      `method="vecchia(m)"` (d ≲ 5, local structure) or `method="nystrom(k)"`
-     (higher d) — not the deprecated `objective="LLVecchia(m)"` /
-     `"LLNystrom(k)"`; n ~ 10⁴–10⁶ and partitionable → `NestedKriging`
+     (higher d) — not `objective="LLVecchia(m)"` / `"LLNystrom(k)"`
+     (removed in 2.0, they raise); n ~ 10⁴–10⁶ and partitionable → `NestedKriging`
      (optionally `method="vecchia(m)"` / `"nystrom(k)"` for its common prior).
      An approximate fit keeps no exact factorization: later
      `predict` / `simulate` / `logLikelihood` calls pass the same method.

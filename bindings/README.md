@@ -103,16 +103,15 @@ of the approximate joint law, `"LMP"`: approximate log det R and R⁻¹, see [do
 [docs/math/LMP.md](../docs/math/LMP.md)) with the noise-free model (`noise_model` `none`); with `objective="LL"` both
 approximate methods also support the noise models (`noise="nugget"` and a heterogeneous `noise` vector), other
 combinations raise. `method()` returns the canonical string with its size (`"exact"`, `"vecchia(30)"`, `"nystrom(50)"`),
-`objective()` returns the criterion (`"LL"` for a deprecated `"LLVecchia(m)"` alias);
+`objective()` returns the criterion (`"LL"`, `"LOO"` or `"LMP"`);
 `nystrom_rank()` returns the rank `k` of a Nystrom fit (0 otherwise), `vecchia_neighbors()` the number `m` of
 conditioning neighbors of a Vecchia fit (0 otherwise). `WarpKriging` and `MLPKriging` take `method` too, but only
 `"exact"` is implemented.
 
-> **Deprecated aliases**: `objective="LLVecchia(m)"` is `objective="LL", method="vecchia(m)"` and
-> `objective="LLNystrom(k)"` is `objective="LL", method="nystrom(k)"` (still accepted, with the native deprecation
-> warning of each language: Python `DeprecationWarning`, R `warning` of class `deprecatedWarning`, Julia
-> `Base.depwarn`, Octave/Matlab warning id `mLibKriging:deprecated`; a conflicting explicit `method` raises). `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is no
-> longer accepted.
+> **Removed in 2.0**: `objective="LLVecchia(m)"` / `objective="LLNystrom(k)"` (the 1.2 spelling) raise an error
+> (Python `ValueError`, C++ `std::invalid_argument`, R / Julia / Octave / Matlab error) naming the replacement
+> `objective="LL", method="vecchia(m)"` / `objective="LL", method="nystrom(k)"`; they are never reinterpreted.
+> `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is not accepted either.
 
 **Exact / Vecchia / Nystrom methods — always explicit.** The method is passed at each step, never inferred from the
 fit:

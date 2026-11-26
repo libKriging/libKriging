@@ -434,10 +434,27 @@ TEST_CASE("NestedKriging with an approximate method: globally unified prior", "[
                   std::invalid_argument);
 }
 
-TEST_CASE("NestedKriging: deprecated LLVecchia objective is an alias of method vecchia", "[nested][vecchia]") {
+TEST_CASE("NestedKriging: removed LLVecchia objective raises, method vecchia replaces it", "[nested][vecchia]") {
   arma::mat X;
   arma::vec y;
   make_data(300, 2, X, y);
+  // objective "LLVecchia(m)" (alias removed in 2.0): an error naming the replacement
+  std::string what;
+  try {
+    NestedKriging(y,
+                  X,
+                  "matern5_2",
+                  3,
+                  NestedKriging::Aggregation::NK,
+                  NestedKriging::Partition::KMeans,
+                  123,
+                  Trend::RegressionModel::Constant,
+                  "BFGS",
+                  "LLVecchia(20)");
+  } catch (const std::invalid_argument& e) {
+    what = e.what();
+  }
+  CHECK(what.find("use objective=\"LL\", method=\"vecchia(20)\"") != std::string::npos);
   NestedKriging nk(y,
                    X,
                    "matern5_2",
@@ -447,7 +464,10 @@ TEST_CASE("NestedKriging: deprecated LLVecchia objective is an alias of method v
                    123,
                    Trend::RegressionModel::Constant,
                    "BFGS",
-                   "LLVecchia(20)");
+                   "LL",
+                   Kriging::Parameters{},
+                   std::vector<std::string>{},
+                   "vecchia(20)");
   CHECK(nk.objective() == "LL");
   CHECK(nk.method() == "vecchia(20)");
   // approximate methods exist for the LOO / LMP objectives too: the common

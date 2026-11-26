@@ -101,8 +101,8 @@ The approximate methods exist for every objective (`"LL"`, `"LOO"`,
 for `"LL"` also with `noise="nugget"` or a heterogeneous `noise` (both
 methods), and keep no exact factorization. `method()` returns the canonical
 string (`"exact"`, `"vecchia(30)"`, `"nystrom(50)"`). The former
-objectives `"LLVecchia(m)"` / `"LLNystrom(k)"` are deprecated aliases of
-`objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"`.
+objectives `"LLVecchia(m)"` / `"LLNystrom(k)"` were removed in 2.0 and
+raise: use `objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"`.
 
 ### Prediction
 
