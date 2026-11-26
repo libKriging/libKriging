@@ -107,18 +107,25 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test length(theta(k)) > 0
         @test sigma2(k) > 0.0
         @test length(beta(k)) > 0
-        @test isa(get_centerY(k), Float64)
-        @test isa(get_scaleY(k), Float64)
-        @test length(get_centerX(k)) == 1
-        @test length(get_scaleX(k)) == 1
-        @test size(get_F(k), 1) == n_train
-        @test size(get_T(k), 1) == n_train
-        @test length(get_z(k)) == n_train
+        @test isa(jlibkriging.centerY(k), Float64)
+        @test isa(jlibkriging.scaleY(k), Float64)
+        @test length(jlibkriging.centerX(k)) == 1
+        @test length(jlibkriging.scaleX(k)) == 1
+        @test size(jlibkriging.F(k), 1) == n_train
+        @test size(jlibkriging.T(k), 1) == n_train
+        @test length(jlibkriging.z(k)) == n_train
+        # get_* / is_normalize aliases removed in 2.0: the names without prefix only
+        for old in (:get_X, :get_y, :get_theta, :get_sigma2, :get_beta, :get_nugget, :get_noise,
+                    :get_centerX, :get_scaleX, :get_centerY, :get_scaleY, :get_F, :get_T, :get_M,
+                    :get_z, :get_warping, :get_hidden_dims, :is_normalize)
+            @test !isdefined(jlibkriging, old)
+        end
+        @test isa(jlibkriging.normalize(k), Bool)
 
         @test isa(is_beta_estim(k), Bool)
         @test isa(is_theta_estim(k), Bool)
         @test isa(is_sigma2_estim(k), Bool)
-        @test isa(normalize(k), Bool)
+        @test isa(jlibkriging.normalize(k), Bool)
     end
 
     @testset "Log-likelihood functions" begin
@@ -185,12 +192,19 @@ end
     y = [f_test(x) for x in X[:, 1]] .+ X[:, 2]
     Xn = [0.15 0.3; 0.45 0.6; 0.75 0.2]
 
-    # method stored with its explicit size; deprecated objective aliases
+    # method stored with its explicit size; objectives "LLVecchia(m)" /
+    # "LLNystrom(k)" (aliases removed in 2.0) raise, naming the replacement
     @test jlibkriging.method(Kriging(y, X, "matern5_2"; method="vecchia")) == "vecchia(30)"
-    ka = @test_logs (:warn, r"objective \"LLVecchia\(7\)\" is deprecated") match_mode=:any Kriging(y, X, "matern5_2"; objective="LLVecchia(7)")
+    err = try Kriging(y, X, "matern5_2"; objective="LLVecchia(7)"); nothing catch e; e end
+    @test err isa ErrorException
+    @test occursin("objective \"LLVecchia(7)\" was removed in libKriging 2.0; use objective=\"LL\", method=\"vecchia(7)\"", err.msg)
+    err = try Kriging(y, X, "matern5_2"; objective="LLNystrom(5)"); nothing catch e; e end
+    @test err isa ErrorException
+    @test occursin("method=\"nystrom(5)\"", err.msg)
+    ka = Kriging(y, X, "matern5_2"; objective="LL", method="vecchia(7)")
     @test objective(ka) == "LL"
     @test jlibkriging.method(ka) == "vecchia(7)"
-    kb = @test_logs (:warn, r"method=\"nystrom\(5\)\"") match_mode=:any Kriging(y, X, "matern5_2"; objective="LLNystrom(5)")
+    kb = Kriging(y, X, "matern5_2"; objective="LL", method="nystrom(5)")
     @test jlibkriging.method(kb) == "nystrom(5)"
     @test objective(Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia(10)")) == "LOO"
     @test_throws ErrorException Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia", noise="nugget")

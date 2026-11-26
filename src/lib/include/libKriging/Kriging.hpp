@@ -126,24 +126,12 @@ class Kriging : public KrigingImpl {
 
   LIBKRIGING_EXPORT Kriging(const Kriging& other, ExplicitCopySpecifier);
 
-  /** Deprecation message of a deprecated fit objective ("LLVecchia(m)",
-   * "LLNystrom(k)"), empty if `objective` is not deprecated (malformed
-   * specs throw std::invalid_argument). */
-  LIBKRIGING_EXPORT static std::string deprecated_objective_message(const std::string& objective);
-
-  /** Receiver of deprecation messages (deprecated objective aliases), called
-   * at every fit using one. Default (empty handler): printed once per process
-   * on arma::cout. The bindings route the messages to their native warning
-   * mechanism (Python DeprecationWarning, R warning, Julia depwarn, Octave
-   * warning). A handler may throw to turn the warning into an error. */
-  using DeprecationHandler = std::function<void(const std::string&)>;
-  LIBKRIGING_EXPORT static void set_deprecation_handler(DeprecationHandler handler);
-
   /** Canonical (objective, method) pair of a fit: method gets its explicit
    * size ("vecchia" -> "vecchia(30)", "nystrom" -> "nystrom(50)"), the
-   * deprecated objectives "LLVecchia(m)" / "LLNystrom(k)" become ("LL",
-   * "vecchia(m)") / ("LL", "nystrom(k)") (with a deprecation warning), and
-   * unknown names raise std::invalid_argument. Every objective ("LL",
+   * unknown names raise std::invalid_argument. The objectives
+   * "LLVecchia(m)" / "LLNystrom(k)" (aliases removed in 2.0) raise
+   * std::invalid_argument naming the replacement objective="LL",
+   * method="vecchia(m)" / "nystrom(k)". Every objective ("LL",
    * "LOO", "LMP") accepts every method. */
   LIBKRIGING_EXPORT static std::pair<std::string, std::string> fit_objective_method(const std::string& objective,
                                                                                     const std::string& method);
@@ -191,8 +179,8 @@ class Kriging : public KrigingImpl {
    * @param objective is the criterion: 'LL' (log-likelihood, default), 'LOO'
    *        (leave-one-out; see docs/math/LOO.md) or 'LMP' (log-marginal
    *        posterior; see docs/math/LMP.md). Ignored if optim=='none'.
-   *        'LLVecchia(m)' / 'LLNystrom(k)' are deprecated aliases of
-   *        objective='LL' with method='vecchia(m)' / 'nystrom(k)'.
+   *        ('LLVecchia(m)' / 'LLNystrom(k)', removed in 2.0, raise: use
+   *        objective='LL' with method='vecchia(m)' / 'nystrom(k)').
    * @param parameters starting paramteters for optim, or final values if optim=='none'.
    * @param method is how the covariance is evaluated, for the fit AND for
    *        what the model keeps afterwards: 'exact' (default: O(n^3) dense
@@ -329,13 +317,6 @@ class Kriging : public KrigingImpl {
   /// Number of Vecchia conditioning neighbors (0 = not fitted with method "vecchia")
   [[nodiscard]] arma::uword vecchia_neighbors() const { return m_vecchia_m; }
 
-  /** Deprecated: a method="vecchia(m)" fit never keeps the exact O(n^3)
-   * factorization any more (the model is "light"); fit the exact model with
-   * method="exact" instead. set_vecchia_exact_commit(false) is a no-op,
-   * set_vecchia_exact_commit(true) raises std::invalid_argument. */
-  [[deprecated("a Vecchia fit is always light: fit with method=\"exact\" for the exact model")]] LIBKRIGING_EXPORT void
-  set_vecchia_exact_commit(bool b);
-  [[deprecated("a Vecchia fit is always light")]] [[nodiscard]] bool vecchia_exact_commit() const { return false; }
   /// True when the model is a Vecchia fit without exact factorization
   [[nodiscard]] bool is_vecchia_light() const { return m_vecchia_light; }
 

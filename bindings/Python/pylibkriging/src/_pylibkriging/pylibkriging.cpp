@@ -141,14 +141,6 @@ PYBIND11_MODULE(_pylibkriging, m) {
   // to avoid mixing allocators from default libKriging and Python
   lkalloc::set_allocation_functions(gil_aware_malloc, gil_aware_free);
 
-  // deprecated fit objectives ("LLVecchia(m)", ...) raise a native
-  // DeprecationWarning (an error if the warnings filter says so)
-  Kriging::set_deprecation_handler([](const std::string& message) {
-    py::gil_scoped_acquire gil;
-    if (PyErr_WarnEx(PyExc_DeprecationWarning, message.c_str(), 1) < 0)
-      throw py::error_already_set();
-  });
-
   m.doc() = R"pbdoc(
         pylibkriging example plugin
         -----------------------
@@ -267,8 +259,8 @@ neighbors, default 30) or "nystrom" / "nystrom(k)" (rank-k Nystrom, default 50).
 fit keeps no exact factorization: predict / simulate / logLikelihood / leaveOneOut / logMargPost then take
 the same method. Objectives "LL", "LOO" and "LMP" all have approximate versions; with objective "LL" both
 methods also support noise ("nugget" or a heterogeneous noise vector), "LOO" / "LMP" with an approximate
-method are noise-free only. objective="LLVecchia(m)" / "LLNystrom(k)" are
-deprecated aliases of objective="LL" with method="vecchia(m)" / "nystrom(k)".)pbdoc")
+method are noise-free only. objective="LLVecchia(m)" / "LLNystrom(k)" (aliases removed in 2.0) raise
+ValueError: use objective="LL" with method="vecchia(m)" / "nystrom(k)".)pbdoc")
       .def("predict",
            &PyKriging::predict,
            py::arg("X"),

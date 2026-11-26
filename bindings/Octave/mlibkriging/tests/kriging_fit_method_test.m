@@ -20,15 +20,21 @@ assert(strcmp(k.method(), "vecchia(10)"));
 mdl = k.model();
 assert(strcmp(mdl.method, "vecchia(10)"));
 
-% deprecated aliases: objective "LLVecchia(m)" / "LLNystrom(k)"
-lastwarn("");
-ka = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLVecchia(7)");
-[wmsg, wid] = lastwarn();
-assert(strcmp(wid, "mLibKriging:deprecated"));
-assert(~isempty(strfind(wmsg, 'method="vecchia(7)"')));
-lastwarn("");
-kno = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "vecchia(7)");
-assert(isempty(lastwarn()));
+% objectives "LLVecchia(m)" / "LLNystrom(k)" (aliases removed in 2.0): an
+% error naming the replacement, never reinterpreted
+for spec = {{"LLVecchia(7)", 'method="vecchia(7)"'}, {"LLNystrom(5)", 'method="nystrom(5)"'}}
+  raised = false;
+  try
+    Kriging(y, X, "matern5_2", "constant", false, "BFGS", spec{1}{1});
+  catch err
+    raised = true;
+    assert(~isempty(strfind(err.message, "was removed in libKriging 2.0")));
+    assert(~isempty(strfind(err.message, spec{1}{2})));
+  end
+  assert(raised);
+end
+% the replacement call
+ka = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "vecchia(7)");
 assert(strcmp(ka.objective(), "LL"));
 assert(strcmp(ka.method(), "vecchia(7)"));
 

@@ -155,13 +155,13 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test length(noise(nk)) == n_train
         @test all(noise(nk) .>= 0.0)
         @test length(beta(nk)) > 0
-        @test isa(get_centerY(nk), Float64)
-        @test isa(get_scaleY(nk), Float64)
-        @test length(get_centerX(nk)) == 1
-        @test length(get_scaleX(nk)) == 1
-        @test size(get_F(nk), 1) == n_train
-        @test size(get_T(nk), 1) == n_train
-        @test length(get_z(nk)) == n_train
+        @test isa(jlibkriging.centerY(nk), Float64)
+        @test isa(jlibkriging.scaleY(nk), Float64)
+        @test length(jlibkriging.centerX(nk)) == 1
+        @test length(jlibkriging.scaleX(nk)) == 1
+        @test size(jlibkriging.F(nk), 1) == n_train
+        @test size(jlibkriging.T(nk), 1) == n_train
+        @test length(jlibkriging.z(nk)) == n_train
 
         @test isa(is_beta_estim(nk), Bool)
         @test isa(is_theta_estim(nk), Bool)

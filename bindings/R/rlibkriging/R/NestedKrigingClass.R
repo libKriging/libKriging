@@ -48,8 +48,8 @@ classNestedKriging <- function(nk) {
 #' @param optim Character, hyper-parameter optimization method of the
 #'     submodels: \code{"BFGS"} or \code{"none"}.
 #' @param objective Character: \code{"LL"} (default), \code{"LOO"} or
-#'     \code{"LMP"} (\code{"LLVecchia(m)"}: deprecated alias of \code{"LL"}
-#'     with \code{method = "vecchia(m)"}).
+#'     \code{"LMP"} (\code{"LLVecchia(m)"}, removed in 2.0, raises: use
+#'     \code{"LL"} with \code{method = "vecchia(m)"}).
 #' @param parameters Initial or fixed values for the hyper-parameters
 #'     (named list with \code{"sigma2"}, \code{"theta"}, \code{"beta"}).
 #' @param warping Optional character vector of per-dimension warp specs
@@ -86,7 +86,6 @@ NestedKriging <- function(y = NULL,
                           warping = NULL,
                           method = "exact") {
     stopifnot(!is.null(y), !is.null(X), !is.null(kernel), !is.null(nb_groups))
-    .warn_deprecated_objective(objective)
     nk <- new_NestedKrigingFit(y, X, kernel, nb_groups,
                                aggregation, partition, seed,
                                regmodel, optim, objective, parameters, warping, method)
@@ -210,7 +209,6 @@ fit.NestedKriging <- function(object, y, X, nb_groups,
                               method = "exact", ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.matrix(X)) X <- as.matrix(X)
-    .warn_deprecated_objective(objective)
     nestedkriging_fit(object, as.numeric(y), X, nb_groups,
                       regmodel, optim, objective, parameters, warping, method)
     invisible(NULL)

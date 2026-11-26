@@ -394,7 +394,7 @@ def test_vecchia_neighbors_and_nystrom_rank():
     assert k.method() == "exact"
 
 
-def test_fit_method_and_deprecated_objectives():
+def test_fit_method_and_removed_objectives():
     rng = np.random.default_rng(9)
     X = rng.uniform(size=(40, 2))
     y = np.sin(3 * X[:, 0]) + X[:, 1]
@@ -402,20 +402,22 @@ def test_fit_method_and_deprecated_objectives():
     assert k.objective() == "LL" and k.method() == "vecchia(30)"
     assert lk.Kriging(y, X, "matern5_2", method="nystrom").method() == "nystrom(50)"
     assert k.model()["method"] == "vecchia(30)"
-    # deprecated aliases: objective "LLVecchia(m)" / "LLNystrom(k)", with a
-    # native DeprecationWarning (an error under a "error" warnings filter)
-    with pytest.warns(DeprecationWarning, match=r'objective "LLVecchia\(7\)" is deprecated'):
-        ka = lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
+    # objectives "LLVecchia(m)" / "LLNystrom(k)" (aliases removed in 2.0):
+    # a ValueError naming the replacement, never reinterpreted
+    with pytest.raises(ValueError, match=r'objective "LLVecchia\(7\)" was removed in libKriging 2\.0; '
+                                         r'use objective="LL", method="vecchia\(7\)"'):
+        lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
+    with pytest.raises(ValueError, match=r'use objective="LL", method="nystrom\(5\)"'):
+        lk.Kriging(y, X, "matern5_2", objective="LLNystrom(5)")
+    with pytest.raises(ValueError, match=r'method="vecchia\(30\)"'):
+        lk.Kriging(y, X, "matern5_2").fit(y, X, objective="LLVecchia")
+    with pytest.raises(ValueError, match="was removed in libKriging 2.0"):
+        lk.NestedKriging(y, X, "matern5_2", 2, objective="LLVecchia(7)")
+    # the replacement calls
+    ka = lk.Kriging(y, X, "matern5_2", objective="LL", method="vecchia(7)")
     assert ka.objective() == "LL" and ka.method() == "vecchia(7)"
-    with pytest.warns(DeprecationWarning, match='method="nystrom\\(5\\)"'):
-        kb = lk.Kriging(y, X, "matern5_2", objective="LLNystrom(5)")
+    kb = lk.Kriging(y, X, "matern5_2", objective="LL", method="nystrom(5)")
     assert kb.objective() == "LL" and kb.method() == "nystrom(5)"
-    import warnings
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", DeprecationWarning)
-        with pytest.raises(DeprecationWarning):
-            lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
-        lk.Kriging(y, X, "matern5_2", method="vecchia(7)")  # no warning
     # LOO / LMP have approximate versions too (without noise model); with
     # objective LL, both approximate methods support the noise models
     assert lk.Kriging(y, X, "matern5_2", objective="LOO", method="vecchia(10)").objective() == "LOO"
@@ -427,7 +429,7 @@ def test_fit_method_and_deprecated_objectives():
     assert lk.Kriging(y, X, "matern5_2", method="vecchia", noise="nugget").method() == "vecchia(30)"
     with pytest.raises(ValueError):
         lk.Kriging(y, X, "matern5_2", method="Vecchia")
-    with pytest.raises(ValueError):  # conflict: raised before any warning
+    with pytest.raises(ValueError, match="was removed in libKriging 2.0"):
         lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)", method="nystrom")
 
 

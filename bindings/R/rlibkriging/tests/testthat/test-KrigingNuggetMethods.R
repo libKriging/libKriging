@@ -158,3 +158,12 @@ test_that("nugget / update",
 
 test_that("nugget / update almost converge",
           expect_equal(as.list(r2)$theta, as.list(r)$theta, tolerance = 2E-2))
+
+test_that("simulate: with_nugget (removed in 2.0) raises, with_noise replaces it", {
+  Xn <- matrix(runif(6), ncol = 2)
+  expect_error(simulate(r, nsim = 2, seed = 1, x = Xn, with_nugget = FALSE),
+               "'with_nugget' was removed in libKriging 2.0; use 'with_noise'", fixed = TRUE)
+  expect_error(r$simulate(nsim = 2, seed = 1, x = Xn, with_nugget = TRUE), "use 'with_noise'", fixed = TRUE)
+  expect_equal(dim(simulate(r, nsim = 2, seed = 1, x = Xn, with_noise = FALSE)), c(3, 2))
+  expect_equal(simulate(r, nsim = 2, seed = 1, x = Xn), simulate(r, nsim = 2, seed = 1, x = Xn, with_noise = TRUE))
+})

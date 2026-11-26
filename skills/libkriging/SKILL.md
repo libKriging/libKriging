@@ -1,6 +1,6 @@
 ---
 name: libkriging
-description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, Vecchia, Nystrom (method="vecchia"/"nystrom", or the deprecated LLVecchia/LLNystrom objectives), or any of the libKriging bindings above.
+description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, Vecchia, Nystrom (method="vecchia"/"nystrom", or the LLVecchia/LLNystrom objectives of 1.2, removed in 2.0), or any of the libKriging bindings above.
 ---
 
 # libKriging usage
@@ -95,9 +95,10 @@ Ask, in order:
      `optim="none"` and that `theta` (`is_theta_estim` false). `update`
      and `save` / `load` keep the method. See the table in
      [bindings/README.md](../../bindings/README.md).
-   - `objective="LLVecchia(m)"` / `"LLNystrom(k)"` are **deprecated**
-     aliases of `objective="LL"` with `method="vecchia(m)"` /
-     `"nystrom(k)"` — write the `method=` form in new code.
+   - `objective="LLVecchia(m)"` / `"LLNystrom(k)"` (1.2 spelling) were
+     **removed** in 2.0 and raise an error: write `objective="LL"` with
+     `method="vecchia(m)"` / `"nystrom(k)"`. Migrating 1.x code means
+     replacing every such objective, not catching the error.
 
 6. **Is `n` large enough (~10⁴–10⁶) that even Vecchia/Nystrom are too
    slow, and the design can be partitioned / prediction can be

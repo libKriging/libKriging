@@ -93,9 +93,9 @@ class NestedKriging {
    * @param warping per-dimension warp specs (see WarpKriging), empty for
    *        plain Kriging submodels.
    * @param method "exact" (default), "vecchia(m)" or "nystrom(k)": how the
-   *        common prior is estimated (see above). The deprecated objective
-   *        "LLVecchia(m)" is an alias of objective "LL" with method
-   *        "vecchia(m)" (see Kriging::fit_objective_method). */
+   *        common prior is estimated (see above). The objective
+   *        "LLVecchia(m)" (alias removed in 2.0) raises: use objective "LL"
+   *        with method "vecchia(m)" (see Kriging::fit_objective_method). */
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
                              arma::uword nb_groups,
