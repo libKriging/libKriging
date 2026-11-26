@@ -16,9 +16,9 @@
 namespace {
 struct ThreadSettings {
   double num_threads_percent = libKriging::detail::env_double("LK_NUM_THREADS_PERCENT", 0.0, 0.0);  // 0: 100 %
-  int thread_pool_size = libKriging::detail::env_int("LK_THREAD_POOL_SIZE", 0, 0);  // 0: the thread budget
+  int thread_pool_size = libKriging::detail::env_int("LK_THREAD_POOL_SIZE", 0, 0);            // 0: the thread budget
   int thread_start_delay_ms = libKriging::detail::env_int("LK_THREAD_START_DELAY_MS", 0, 0);  // 0: no stagger (#468)
-  int blas_threads_min_n = libKriging::detail::env_int("LK_BLAS_THREADS_MIN_N", -1, -1);  // -1: automatic
+  int blas_threads_min_n = libKriging::detail::env_int("LK_BLAS_THREADS_MIN_N", -1, -1);      // -1: automatic
 };
 
 ThreadSettings& settings() {
