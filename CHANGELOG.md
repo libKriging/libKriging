@@ -43,8 +43,9 @@ past release, see the corresponding entry on the
   exist: with reentrant tasks and a deterministic choice of the best start, 800 multistart fits
   (WarpKriging kumaraswamy n 60 / 150, `BFGS8` and `BFGS4+Adam`, MLPKriging `BFGS8`; delays 0 to
   10 ms; pools of 4 and 8 workers on 4 cores) are all bit-identical to the sequential run
-  (`bench/thread-budget/start_delay_study.cpp`); `MultistartDeterminismTest` checks it on every
-  CI platform. Results unchanged; small multistart fits faster (WarpKriging n 60 `BFGS8`: 26
+  (`bench/thread-budget/start_delay_study.cpp`, OpenBLAS); `MultistartDeterminismTest` checks on
+  every CI platform that the fit does not depend on the delay at a given pool size (with MKL it
+  does depend on the pool size, through the BLAS thread count of each start). Results unchanged; small multistart fits faster (WarpKriging n 60 `BFGS8`: 26
   instead of 42 ms, 28 instead of 81 ms with 8 workers). Migration: none;
   `set_thread_start_delay_ms(10)` restores the former stagger.
 - **Invalid `LK_*` values: a warning instead of silence, and stricter parsing** (#468). A value

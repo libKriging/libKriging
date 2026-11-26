@@ -103,8 +103,14 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
   fits each, pool of 4 and of 8 workers: 800 fits, all bit-identical to the
   sequential run (pool of 1). Cost of 10 ms against 0: WarpKriging n 60 BFGS8,
   42 against 26 ms per fit (pool 4), 81 against 28 ms (pool 8); within noise at
-  n 150 and for MLPKriging. `MultistartDeterminismTest` checks the
-  same on every CI platform.
+  n 150 and for MLPKriging. `MultistartDeterminismTest` checks on every CI
+  platform that, at each pool size (1, automatic, 8), the fit does not depend on
+  the delay (0, 2, 10 ms) nor on the run. The identity with the sequential run
+  is a property of OpenBLAS, not a guarantee: the pool size sets the BLAS
+  threads of each start (section 3; section 4), and with MKL the rounding depends on that
+  count (oneMKL CI job, budget 2: WarpKriging log-likelihood 168.6582472041 with
+  2 or 8 workers, 168.6582472862 with 1; the MLPKriging case then keeps another
+  start).
 
 Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
 = 200 on Linux and with MSVC on Windows (#473), 800 elsewhere until measured
