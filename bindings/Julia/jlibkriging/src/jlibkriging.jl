@@ -657,12 +657,6 @@ function normalize(k::Kriging)
     return ccall(dlsym(_lk(), :lk_kriging_is_normalize), Cint, (Ptr{Nothing},), k.ptr) != 0
 end
 
-# Deprecated alias
-function is_normalize(k::Kriging)
-    Base.depwarn("`is_normalize` is deprecated, use `normalize` instead", :is_normalize)
-    return normalize(k)
-end
-
 function regmodel(k::Kriging)
     return unsafe_string(ccall(dlsym(_lk(), :lk_kriging_regmodel), Cstring, (Ptr{Nothing},), k.ptr))
 end
@@ -712,18 +706,6 @@ noise_model(k::Kriging) = unsafe_string(ccall(dlsym(_lk(), :lk_kriging_noise_mod
 nugget(k::Kriging) = ccall(dlsym(_lk(), :lk_kriging_get_nugget), Float64, (Ptr{Nothing},), k.ptr)
 is_nugget_estim(k::Kriging) = ccall(dlsym(_lk(), :lk_kriging_is_nugget_estim), Cint, (Ptr{Nothing},), k.ptr) != 0
 noise(k::Kriging) = _get_vec(:lk_kriging_get_noise, k.ptr)
-
-# Deprecated get_*/is_normalize aliases for Kriging
-for (_old, _new) in [(:get_X, :X), (:get_y, :y), (:get_theta, :theta), (:get_sigma2, :sigma2),
-                     (:get_beta, :beta), (:get_nugget, :nugget), (:get_noise, :noise),
-                     (:get_centerX, :centerX), (:get_scaleX, :scaleX),
-                     (:get_centerY, :centerY), (:get_scaleY, :scaleY),
-                     (:get_F, :F), (:get_T, :T), (:get_M, :M), (:get_z, :z)]
-    @eval function $(_old)(k::Kriging)
-        Base.depwarn("`$($_old)` is deprecated, use `$($_new)` instead", $(_old))
-        return $(_new)(k)
-    end
-end
 
 # ─── WarpKriging ──────────────────────────────────────────────────
 
@@ -1109,14 +1091,6 @@ function cov_mat(wk::WarpKriging, X1::Matrix{Float64}, X2::Matrix{Float64})
     return out
 end
 
-# Deprecated aliases for WarpKriging
-for (_old, _new) in [(:get_X, :X), (:get_y, :y), (:get_theta, :theta), (:get_sigma2, :sigma2), (:get_warping, :warping)]
-    @eval function $(_old)(wk::WarpKriging)
-        Base.depwarn("`$($_old)` is deprecated, use `$($_new)` instead", $(_old))
-        return $(_new)(wk)
-    end
-end
-
 function warping(wk::WarpKriging)
     n_ref = Ref{Cint}(0)
     ret = ccall(dlsym(_lk(), :lk_warp_kriging_get_warping), Cint,
@@ -1200,19 +1174,19 @@ end
 
 # fit! accepting mixed-type Matrix{Any}
 function fit!(wk::WarpKriging, y::Vector{Float64}, X::Matrix{Any}; kwargs...)
-    X_num, _ = encode_string_columns(X, get_warping(wk))
+    X_num, _ = encode_string_columns(X, warping(wk))
     return fit!(wk, y, X_num; kwargs...)
 end
 
 # predict accepting mixed-type Matrix{Any}
 function predict(wk::WarpKriging, X_n::Matrix{Any}; kwargs...)
-    X_num, _ = encode_string_columns(X_n, get_warping(wk))
+    X_num, _ = encode_string_columns(X_n, warping(wk))
     return predict(wk, X_num; kwargs...)
 end
 
 # simulate accepting mixed-type Matrix{Any}
 function simulate(wk::WarpKriging, nsim::Int, seed::Int, X_n::Matrix{Any}; kwargs...)
-    X_num, _ = encode_string_columns(X_n, get_warping(wk))
+    X_num, _ = encode_string_columns(X_n, warping(wk))
     return simulate(wk, nsim, seed, X_num; kwargs...)
 end
 
@@ -1222,7 +1196,7 @@ simulate(wk::WarpKriging, X_n::AbstractMatrix; nsim::Int=1, seed::Int=123, kwarg
 
 # update! accepting mixed-type Matrix{Any}
 function update!(wk::WarpKriging, y_u::Vector{Float64}, X_u::Matrix{Any})
-    X_num, _ = encode_string_columns(X_u, get_warping(wk))
+    X_num, _ = encode_string_columns(X_u, warping(wk))
     return update!(wk, y_u, X_num)
 end
 
@@ -1473,14 +1447,6 @@ z(mk::MLPKriging) = _get_vec(:lk_mlp_kriging_get_z, mk.ptr)
 beta(mk::MLPKriging) = _get_vec(:lk_mlp_kriging_get_beta, mk.ptr)
 theta(mk::MLPKriging) = _get_vec(:lk_mlp_kriging_get_theta, mk.ptr)
 sigma2(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_get_sigma2), Float64, (Ptr{Nothing},), mk.ptr)
-
-# Deprecated aliases for MLPKriging
-for (_old, _new) in [(:get_X, :X), (:get_y, :y), (:get_theta, :theta), (:get_sigma2, :sigma2), (:get_hidden_dims, :hidden_dims)]
-    @eval function $(_old)(mk::MLPKriging)
-        Base.depwarn("`$($_old)` is deprecated, use `$($_new)` instead", $(_old))
-        return $(_new)(mk)
-    end
-end
 
 function hidden_dims(mk::MLPKriging)
     n_ref = Ref{Cint}(0)
@@ -1886,11 +1852,5 @@ export is_beta_estim, is_theta_estim, is_sigma2_estim
 export nugget, is_nugget_estim, noise
 export is_fitted, feature_dim, warping
 export activation, hidden_dims
-# Deprecated: get_X, get_y, get_theta, get_sigma2, get_beta, get_nugget, get_noise,
-#             get_centerX, get_scaleX, get_centerY, get_scaleY, get_F, get_T, get_M, get_z,
-#             get_warping, get_hidden_dims, is_normalize
-export get_X, get_centerX, get_scaleX, get_y, get_centerY, get_scaleY
-export get_F, get_T, get_M, get_z, get_beta, get_theta, get_sigma2
-export get_nugget, get_noise, get_warping, get_hidden_dims, is_normalize
 
 end # module

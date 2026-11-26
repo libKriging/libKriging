@@ -107,18 +107,25 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test length(theta(k)) > 0
         @test sigma2(k) > 0.0
         @test length(beta(k)) > 0
-        @test isa(get_centerY(k), Float64)
-        @test isa(get_scaleY(k), Float64)
-        @test length(get_centerX(k)) == 1
-        @test length(get_scaleX(k)) == 1
-        @test size(get_F(k), 1) == n_train
-        @test size(get_T(k), 1) == n_train
-        @test length(get_z(k)) == n_train
+        @test isa(jlibkriging.centerY(k), Float64)
+        @test isa(jlibkriging.scaleY(k), Float64)
+        @test length(jlibkriging.centerX(k)) == 1
+        @test length(jlibkriging.scaleX(k)) == 1
+        @test size(jlibkriging.F(k), 1) == n_train
+        @test size(jlibkriging.T(k), 1) == n_train
+        @test length(jlibkriging.z(k)) == n_train
+        # get_* / is_normalize aliases removed in 2.0: the names without prefix only
+        for old in (:get_X, :get_y, :get_theta, :get_sigma2, :get_beta, :get_nugget, :get_noise,
+                    :get_centerX, :get_scaleX, :get_centerY, :get_scaleY, :get_F, :get_T, :get_M,
+                    :get_z, :get_warping, :get_hidden_dims, :is_normalize)
+            @test !isdefined(jlibkriging, old)
+        end
+        @test isa(jlibkriging.normalize(k), Bool)
 
         @test isa(is_beta_estim(k), Bool)
         @test isa(is_theta_estim(k), Bool)
         @test isa(is_sigma2_estim(k), Bool)
-        @test isa(normalize(k), Bool)
+        @test isa(jlibkriging.normalize(k), Bool)
     end
 
     @testset "Log-likelihood functions" begin

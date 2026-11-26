@@ -8,8 +8,7 @@ A dump is a text file of "<scope>\\t<name>[\\t<args>]" lines written by the
 dump_* script of this directory, the binding being given by its file name
 (python.txt, r.txt, octave.txt or julia.txt). Names are matched across
 bindings after normalization of the naming conventions: case and "_" are
-ignored, as are Julia's trailing "!", the deprecated Julia "get_" prefix of
-the model getters and R's trailing "_" (F_, T_): leaveOneOut, leave_one_out
+ignored, as are Julia's trailing "!" and R's trailing "_" (F_, T_): leaveOneOut, leave_one_out
 and fit / fit! match. A few names are the same method under another name
 (ALIASES).
 
@@ -68,7 +67,6 @@ ALIASES = {
     # conversion of the object, an idiom)
     "r": {("Kriging", "as.list"): "model"},
     "julia": {
-        "is_normalize": "normalize",  # deprecated getter
         # static load(filename) of each class (load(filename) dispatches on the file)
         "load_kriging": "load",
         "load_warp_kriging": "load",
@@ -95,17 +93,11 @@ ARG_IDIOMS = {
     },
 }
 
-# scopes of the model classes, whose Julia getters had a "get_" prefix
-MODELS = ("Kriging", "WarpKriging", "MLPKriging", "NestedKriging")
-
-
 def normalize(lang, scope, name):
     aliases = ALIASES.get(lang, {})
     name = aliases.get((scope, name), aliases.get(name, name))
     if lang == "julia":
         name = name.rstrip("!")
-        if scope in MODELS:
-            name = re.sub(r"^get_", "", name)
     return name.replace("_", "").lower()
 
 

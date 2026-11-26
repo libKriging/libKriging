@@ -526,11 +526,12 @@ subsetOfData <- function(X, n_max, method = "kmeans", seed = 123) {
 simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL, will_update = FALSE,
                              method = "exact", ...) {
     args <- list(...)
-    # Accept with_nugget as alias for with_noise (backward compat for NuggetKriging)
-    if (!is.null(args$with_nugget)) {
-        if (is.null(with_noise)) with_noise <- args$with_nugget
-        args$with_nugget <- NULL
-    }
+    # with_nugget, the alias of the former NuggetKriging class, was removed in
+    # 2.0: an error rather than a warning, which would silently simulate with
+    # the default noise
+    if ("with_nugget" %in% names(args))
+        stop("simulate: argument 'with_nugget' was removed in libKriging 2.0; use 'with_noise'",
+             call. = FALSE)
     is_nugget <- kriging_noise_model(object) == "nugget"
     if (is.logical(with_noise) && !with_noise && is_nugget) {
         # with_noise=FALSE for a nugget model: simulate without nugget noise.
@@ -540,7 +541,7 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL,
         with_noise <- NULL
     } else if (is.null(with_noise) && is_nugget && !startsWith(method, "nystrom")) {
         # For nugget models, default to including the nugget noise
-        # (backward compat: old simulate.NuggetKriging defaulted to with_nugget=TRUE)
+        # (as the former simulate.NuggetKriging)
         with_noise <- TRUE
     }
     if (length(args) > 0) warnOnDots(args)

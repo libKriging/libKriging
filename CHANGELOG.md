@@ -290,6 +290,18 @@ past release, see the corresponding entry on the
     `DeprecationWarning`, R `deprecatedWarning`, Julia `Base.depwarn`, Octave / Matlab
     `mLibKriging:deprecated`) become the errors above: code catching or silencing those
     warnings must use the new spelling.
+- **Julia `get_*` / `is_normalize` getter aliases and the R `simulate(..., with_nugget = )`
+  alias** (#469). Migration:
+  - Julia `get_X`, `get_y`, `get_theta`, `get_sigma2`, `get_beta`, `get_nugget`, `get_noise`,
+    `get_centerX`, `get_scaleX`, `get_centerY`, `get_scaleY`, `get_F`, `get_T`, `get_M`,
+    `get_z` (Kriging), `get_warping` (WarpKriging), `get_hidden_dims` (MLPKriging) → the same
+    name without `get_` (`X(k)`, `theta(k)`, `warping(wk)`, `hidden_dims(mk)`, ...), already
+    exported; `is_normalize(k)` → `normalize(k)`. The old names are no longer defined
+    (`UndefVarError`). `get_chol_jitter` / `get_num_nugget` (global settings) are unchanged.
+  - R `simulate(k, ..., with_nugget = b)` (alias of the former `NuggetKriging` class) →
+    `with_noise = b`; `with_nugget` now raises an error naming `with_noise` instead of being
+    taken as `with_noise`. The Julia `with_nugget` keyword of `simulate` (the C++ argument
+    name) is unchanged.
 
 ### Added
 - **Statistical benchmark base of the fit** (T7, `bench/fit-protocol/`): `bench-fit-protocol`
