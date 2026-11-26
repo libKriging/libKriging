@@ -91,6 +91,13 @@ foreach(var_value "LK_MAX_RESTART=abc" "LK_MAX_ITERATION=3.7" "LK_REPARAMETRIZE=
     PASS_REGULAR_EXPRESSION "WARNING\\] ${var_name}=\"${var_val}\" ignored")
 endforeach()
 
+# WarpKriging / MLPKriging multistart fits do not depend on the start delay nor
+# on the pool size (default start delay 0 ms, #468)
+add_executable(MultistartDeterminismTest MultistartDeterminismTest.cpp)
+target_link_libraries(MultistartDeterminismTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries MultistartDeterminismTest)
+catch_discover_tests(MultistartDeterminismTest)
+
 add_executable(JitterRuleTest JitterRuleTest.cpp)
 target_link_libraries(JitterRuleTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries JitterRuleTest)

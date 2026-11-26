@@ -16,6 +16,8 @@ output directory. Machine of the published numbers: `machine.txt`.
   committed rule.
 - rcond test of the Cholesky retry (#465): `LK_RCOND=on|off|nf|J|diag|diagc|res rcond_study <models> <kernels>
   <noises> <functions> <ns> <sets> <optim> [first_set]` (variants and columns in the file); variant `res` (#496): tolerance `LK_RES_TOL`.
+- Start delay of the multistart workers (#468): `[POOL=k] start_delay_study [reps]`; prints, per
+  case and delay, how many fits are bit-identical to the sequential run, and the median time.
 - Study drivers (`*_study.cpp`, `*_probe.cpp`, `unstable_ll_profile.cpp`) are not built by
   CMake: compile them with the flags of `bench-fit-profile` from
   `<build-dir>/compile_commands.json`, then link with

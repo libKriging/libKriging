@@ -204,6 +204,7 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
   }
 
   SECTION("Thread startup delay") {
+    const int saved_delay = Parallel::get_thread_start_delay_ms();
     Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
     Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
 
@@ -222,8 +223,8 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
     nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS5", "LL", parameters);
     CHECK(nk.theta().n_elem == d);
 
-    // Reset to default
-    Parallel::set_thread_start_delay_ms(10);
+    // Restore
+    Parallel::set_thread_start_delay_ms(saved_delay);
   }
 }
 

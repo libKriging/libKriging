@@ -92,8 +92,19 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
   pool worker to its share, restored after; an MKL loaded with fewer threads
   (`MKL_NUM_THREADS`; its default is the physical cores) is left as it is.
 - No nested pools: a pool started from a worker runs its tasks inline.
-- No start stagger for the Kriging multistart (it cost 2× at n = 100 with 20
-  workers); kept for WarpKriging (`Parallel::get_thread_start_delay_ms`).
+- No start stagger by default (#468). The first start of worker k waits
+  k × `Parallel::get_thread_start_delay_ms()` (WarpKriging, MLPKriging; never
+  for the Kriging multistart, where 10 ms cost 2× at n = 100 with 20 workers),
+  0 ms since 2.0 (10 ms before). The stagger was meant to avoid races at
+  start-up; with reentrant tasks and a deterministic choice of the best start
+  the fits do not depend on it: `bench/thread-budget/start_delay_study.cpp`
+  (Linux, 4 cores, OpenBLAS), WarpKriging kumaraswamy n 60 / 150, `BFGS8` and
+  `BFGS4+Adam`, MLPKriging {8} n 80 `BFGS8`, delays 0 / 1 / 2 / 5 / 10 ms, 20
+  fits each, pool of 4 and of 8 workers: 800 fits, all bit-identical to the
+  sequential run (pool of 1). Cost of 10 ms against 0: WarpKriging n 60 BFGS8,
+  42 against 26 ms per fit (pool 4), 81 against 28 ms (pool 8); within noise at
+  n 150 and for MLPKriging. `MultistartDeterminismTest` checks the
+  same on every CI platform.
 
 Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
 = 200 on Linux and with MSVC on Windows (#473), 800 elsewhere until measured

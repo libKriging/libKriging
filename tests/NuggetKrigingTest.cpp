@@ -209,6 +209,7 @@ TEST_CASE("NuggetKriging multistart and parallel tests", "[multistart]") {
   }
 
   SECTION("Thread startup delay") {
+    const int saved_delay = Parallel::get_thread_start_delay_ms();
     Kriging ok("gauss", Kriging::NoiseModel::Nugget);
     Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
 
@@ -227,8 +228,8 @@ TEST_CASE("NuggetKriging multistart and parallel tests", "[multistart]") {
     ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS5", "LL", parameters);
     CHECK(ok.theta().n_elem == d);
 
-    // Reset to default
-    Parallel::set_thread_start_delay_ms(10);
+    // Restore
+    Parallel::set_thread_start_delay_ms(saved_delay);
   }
 }
 

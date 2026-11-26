@@ -42,8 +42,9 @@ class Parallel {
   LIBKRIGING_EXPORT static void set_thread_pool_size(int pool_size);
   LIBKRIGING_EXPORT static int get_thread_pool_size();
   /// Stagger of the WarpKriging / MLPKriging multistart workers: the first start
-  /// of worker k waits k times this, in ms (default 10, >= 0). Default from
-  /// LK_THREAD_START_DELAY_MS.
+  /// of worker k waits k times this, in ms (>= 0). Default 0 since 2.0 (was 10):
+  /// the fits are bit-identical whatever the delay, it only costs time
+  /// (docs/dev/parallel.md). Default from LK_THREAD_START_DELAY_MS.
   LIBKRIGING_EXPORT static void set_thread_start_delay_ms(int delay_ms);
   LIBKRIGING_EXPORT static int get_thread_start_delay_ms();
   /// Small-problem BLAS rule (OpenBLAS): calls on fewer training observations

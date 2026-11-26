@@ -68,7 +68,7 @@ changes (up to the rounding of the BLAS); **output** — messages only.
 | `LK_LOG_LEVEL` | `Optim::set_log_level` / `get_log_level` | 0 | output | 0 none, 1 error, 2 warning, 3 info, 4 debug, 5 trace |
 | `LK_NUM_THREADS_PERCENT` | `Parallel::set_num_threads_percent` / `get_num_threads_percent` | 0 (100 %) | performance | thread budget: share of the physical cores, x <= 1 a ratio, x > 1 a percentage; `get_num_threads()` gives the resulting count (`docs/dev/parallel.md`) |
 | `LK_THREAD_POOL_SIZE` | `Parallel::set_thread_pool_size` / `get_thread_pool_size` | 0 (the budget) | performance | number of multistart workers (>= 0) |
-| `LK_THREAD_START_DELAY_MS` | `Parallel::set_thread_start_delay_ms` / `get_thread_start_delay_ms` | 10 | performance | delay of the first start of worker k by k times this, in ms (WarpKriging, MLPKriging multistart; >= 0) |
+| `LK_THREAD_START_DELAY_MS` | `Parallel::set_thread_start_delay_ms` / `get_thread_start_delay_ms` | 0 (10 before 2.0) | performance | delay of the first start of worker k by k times this, in ms (WarpKriging, MLPKriging multistart; >= 0); the fits do not depend on it (`docs/dev/parallel.md`) |
 | `LK_BLAS_THREADS_MIN_N` | `Parallel::set_blas_threads_min_n` / `get_blas_threads_min_n` | -1 (automatic) | performance | OpenBLAS on 1 thread below this number of observations; 0 off (>= -1) |
 | `LK_OMP_MIN_ROWS` | `Parallel::set_omp_min_rows` / `get_omp_min_rows` | build value (200 on Linux / MSVC, 800 elsewhere) | performance | rows from which the covariance and gradient loops run on the OpenMP threads |
 

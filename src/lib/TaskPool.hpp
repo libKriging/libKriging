@@ -22,8 +22,10 @@ namespace detail {
 /// locals that concurrent optimizers would race on.
 ///
 /// stagger: delay the first task of worker k by k × Parallel::get_thread_start_delay_ms()
-/// (WarpKriging); off for short tasks such as a Kriging start, where 20 workers
-/// waited up to 190 ms, longer than a whole start at n = 100. Defined in TaskPool.cpp.
+/// (WarpKriging, MLPKriging; 0 ms by default since 2.0: the results do not depend
+/// on it, bench/thread-budget/start_delay_study.cpp); off for short tasks such as a
+/// Kriging start, where 20 workers waited up to 190 ms at 10 ms, longer than a
+/// whole start at n = 100. Defined in TaskPool.cpp.
 void run_task_pool(int n_tasks, const std::function<void(int)>& task, const char* label, bool stagger = true);
 
 }  // namespace detail
