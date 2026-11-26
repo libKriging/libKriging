@@ -291,8 +291,8 @@ namespace {
 // OpenMP threshold in effect: kOmpMinRows (build), LK_OMP_MIN_ROWS (environment,
 // read at load), Parallel::set_omp_min_rows. Relaxed: a performance setting,
 // configuration-before-use as the other settings.
-std::atomic<unsigned long long> g_omp_min_rows{static_cast<unsigned long long>(
-    env_int("LK_OMP_MIN_ROWS", static_cast<int>(kOmpMinRows), 0))};
+std::atomic<unsigned long long> g_omp_min_rows{
+    static_cast<unsigned long long>(env_int("LK_OMP_MIN_ROWS", static_cast<int>(kOmpMinRows), 0))};
 }  // namespace
 
 unsigned long long omp_min_rows() {

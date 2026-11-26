@@ -686,7 +686,6 @@ raise ValueError. There is no fitted-nugget shortcut: with_noise=True raises.)pb
       .def_static("get_objective_rel_tolerance", &Optim::get_objective_rel_tolerance)
       .def_static("set_objective_rel_tolerance", &Optim::set_objective_rel_tolerance);
 
-
   // Parallel class - thread budget of the library and how it is distributed
   // between its levels (multistart workers, OpenMP loops, BLAS threads):
   // docs/dev/parallel.md (only there since 2.0, #468).

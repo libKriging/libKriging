@@ -523,7 +523,8 @@ TEST_CASE("An OpenBLAS loaded with fewer threads than the budget keeps its count
   data(y, X, 60);
   const int seen = max_blas_threads_during(
       [&] { Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS4"); });
-  INFO("OPENBLAS_NUM_THREADS " << loaded << ", budget " << Parallel::get_num_threads() << ", OpenBLAS max seen " << seen);
+  INFO("OPENBLAS_NUM_THREADS " << loaded << ", budget " << Parallel::get_num_threads() << ", OpenBLAS max seen "
+                               << seen);
   CHECK(seen <= loaded);
 #ifndef _OPENMP
   CHECK(Parallel::get_num_threads() >= 1);

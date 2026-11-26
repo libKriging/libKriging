@@ -3,8 +3,8 @@
 #include <stdexcept>
 
 #include "BlasThreads.hpp"
-#include "OmpLoops.hpp"
 #include "EnvSettings.hpp"
+#include "OmpLoops.hpp"
 #include "ThreadBudget.hpp"
 
 // The thread settings of the library, stored here since 2.0 (they were in
