@@ -324,23 +324,23 @@ end
 function test_optim_thread_settings()
     fprintf('Test: Optim thread settings...');
     
-    orig_delay = Optim.get_thread_start_delay_ms();
-    orig_pool = Optim.get_thread_pool_size();
+    orig_delay = Parallel.get_thread_start_delay_ms();
+    orig_pool = Parallel.get_thread_pool_size();
     
     try
-        Optim.set_thread_start_delay_ms(20);
-        assert(Optim.get_thread_start_delay_ms() == 20);
+        Parallel.set_thread_start_delay_ms(20);
+        assert(Parallel.get_thread_start_delay_ms() == 20);
         
-        Optim.set_thread_pool_size(4);
-        assert(Optim.get_thread_pool_size() == 4);
+        Parallel.set_thread_pool_size(4);
+        assert(Parallel.get_thread_pool_size() == 4);
     catch err
-        Optim.set_thread_start_delay_ms(orig_delay);
-        Optim.set_thread_pool_size(orig_pool);
+        Parallel.set_thread_start_delay_ms(orig_delay);
+        Parallel.set_thread_pool_size(orig_pool);
         rethrow(err);
     end
     
-    Optim.set_thread_start_delay_ms(orig_delay);
-    Optim.set_thread_pool_size(orig_pool);
+    Parallel.set_thread_start_delay_ms(orig_delay);
+    Parallel.set_thread_pool_size(orig_pool);
     
     fprintf(' PASSED\n');
 end
@@ -348,25 +348,25 @@ end
 function test_optim_thread_budget()
     fprintf('Test: Optim thread budget...');
     
-    orig = Optim.get_num_threads_percent();
+    orig = Parallel.get_num_threads_percent();
     try
-        Optim.set_num_threads_percent(100);
-        full = Optim.get_num_threads();
+        Parallel.set_num_threads_percent(100);
+        full = Parallel.get_num_threads();
         assert(full >= 1);
-        Optim.set_num_threads_percent(50);
-        assert(Optim.get_num_threads_percent() == 50);
-        assert(Optim.get_num_threads() >= 1 && Optim.get_num_threads() <= full);
-        Optim.set_num_threads_percent(0.5);  % ratio: same as 50 %
-        assert(Optim.get_num_threads() <= full);
+        Parallel.set_num_threads_percent(50);
+        assert(Parallel.get_num_threads_percent() == 50);
+        assert(Parallel.get_num_threads() >= 1 && Parallel.get_num_threads() <= full);
+        Parallel.set_num_threads_percent(0.5);  % ratio: same as 50 %
+        assert(Parallel.get_num_threads() <= full);
         % a fit runs with a reduced budget
         X = (1:20)' / 21;
         k = Kriging(sin(6 * X), X, "matern3_2");
         assert(isfinite(k.logLikelihood()));
     catch err
-        Optim.set_num_threads_percent(orig);
+        Parallel.set_num_threads_percent(orig);
         rethrow(err);
     end
-    Optim.set_num_threads_percent(orig);
+    Parallel.set_num_threads_percent(orig);
     
     fprintf(' PASSED\n');
 end
@@ -484,10 +484,9 @@ function test_parallel_settings()
             Parallel.get_blas_threads_min_n(), Parallel.get_omp_min_rows()};
     try
         Parallel.set_num_threads_percent(0.5);
-        assert(Optim.get_num_threads_percent() == 0.5);
-        assert(Parallel.get_num_threads() == Optim.get_num_threads());
+        assert(Parallel.get_num_threads_percent() == 0.5);
         Parallel.set_thread_pool_size(3);
-        assert(Optim.get_thread_pool_size() == 3);
+        assert(Parallel.get_thread_pool_size() == 3);
         Parallel.set_blas_threads_min_n(0);
         assert(Parallel.get_blas_threads_min_n() == 0);
         Parallel.set_omp_min_rows(300);

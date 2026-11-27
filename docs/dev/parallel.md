@@ -23,7 +23,7 @@ One number, `budget`, bounds the threads of all three levels:
 
 ```
 budget = round(share × physical cores)        at least 1
-share  = Optim::set_num_threads_percent(x) / LK_NUM_THREADS_PERCENT=x
+share  = Parallel::set_num_threads_percent(x) / LK_NUM_THREADS_PERCENT=x
          x <= 1: ratio (0.5), x > 1: percentage (50), 0 or unset: 100 %
 ```
 
@@ -40,12 +40,11 @@ share  = Optim::set_num_threads_percent(x) / LK_NUM_THREADS_PERCENT=x
 - The OpenBLAS count it was loaded with (`OPENBLAS_NUM_THREADS`) bounds the BLAS
   only: below the budget it is kept as it is, and the pool and the OpenMP loops
   still get the whole budget.
-- `Optim::get_num_threads()` returns the resolved budget.
+- `Parallel::get_num_threads()` returns the resolved budget.
 
 API: `Parallel` (C++ `libKriging/Parallel.hpp`; Python / Octave `Parallel.<same name>`,
-R `parallel_<same name>`, Julia `jlibkriging.Parallel.<same name>`). The thread settings
-of `Optim` (`Optim::set_num_threads_percent`, ...) are the same settings, kept for
-compatibility.
+R `parallel_<same name>`, Julia `jlibkriging.Parallel.<same name>`). Since 2.0 the thread
+settings are there only (they were also in `Optim` before, #468; table in docs/Settings.md).
 
 ```cpp
 // budget
@@ -93,8 +92,25 @@ share   = max(1, budget / workers)         per worker, for its BLAS and its Open
   pool worker to its share, restored after; an MKL loaded with fewer threads
   (`MKL_NUM_THREADS`; its default is the physical cores) is left as it is.
 - No nested pools: a pool started from a worker runs its tasks inline.
-- No start stagger for the Kriging multistart (it cost 2× at n = 100 with 20
-  workers); kept for WarpKriging (`Optim::thread_start_delay_ms`).
+- No start stagger by default (#468). The first start of worker k waits
+  k × `Parallel::get_thread_start_delay_ms()` (WarpKriging, MLPKriging; never
+  for the Kriging multistart, where 10 ms cost 2× at n = 100 with 20 workers),
+  0 ms since 2.0 (10 ms before). The stagger was meant to avoid races at
+  start-up; with reentrant tasks and a deterministic choice of the best start
+  the fits do not depend on it: `bench/thread-budget/start_delay_study.cpp`
+  (Linux, 4 cores, OpenBLAS), WarpKriging kumaraswamy n 60 / 150, `BFGS8` and
+  `BFGS4+Adam`, MLPKriging {8} n 80 `BFGS8`, delays 0 / 1 / 2 / 5 / 10 ms, 20
+  fits each, pool of 4 and of 8 workers: 800 fits, all bit-identical to the
+  sequential run (pool of 1). Cost of 10 ms against 0: WarpKriging n 60 BFGS8,
+  42 against 26 ms per fit (pool 4), 81 against 28 ms (pool 8); within noise at
+  n 150 and for MLPKriging. `MultistartDeterminismTest` checks on every CI
+  platform that, at each pool size (1, automatic, 8), the fit does not depend on
+  the delay (0, 2, 10 ms) nor on the run. The identity with the sequential run
+  is a property of OpenBLAS, not a guarantee: the pool size sets the BLAS
+  threads of each start (section 3; section 4), and with MKL the rounding depends on that
+  count (oneMKL CI job, budget 2: WarpKriging log-likelihood 168.6582472041 with
+  2 or 8 workers, 168.6582472862 with 1; the MLPKriging case then keeps another
+  start).
 
 Thresholds below which a loop stays serial: `kOmpMinRows` (covariance, gradient)
 = 200 on Linux and with MSVC on Windows (#473), 800 elsewhere until measured
@@ -122,7 +138,7 @@ from several user threads (Python `ThreadPoolExecutor`, joblib threads,
   the number of public calls running at that moment in user threads (nested
   calls of a thread counted once), at least 1. It is read when the call sizes
   its pool and at each OpenMP loop: a call started alone keeps the pool it
-  sized, its later loops shrink. `Optim::get_num_threads()` returns the
+  sized, its later loops shrink. `Parallel::get_num_threads()` returns the
   undivided budget.
 - **OpenBLAS count**: process-global, so one value for all the calls. The
   scopes of every thread (`BudgetScope`, the pool's `ScopedBlasThreads`) share
@@ -132,19 +148,19 @@ from several user threads (Python `ThreadPoolExecutor`, joblib threads,
   BLAS at the share of the most constrained one (never more than the budget;
   no oversubscription from one call restoring the count of another).
   Side effect of the small-problem rule (#436, section 3): a call on a small
-  problem (`n < Optim::blas_threads_min_n`, automatic threshold 500: without SMT
+  problem (`n < Parallel::get_blas_threads_min_n`, automatic threshold 500: without SMT
   headroom, and always with MSVC on Windows since #473) requests 1
   BLAS thread, so while it runs it also sets the process-wide OpenBLAS count to
   1 for the concurrent calls on big problems. Their results are unchanged (up
   to the rounding above); their BLAS throughput drops for that time. To avoid
   it, run small and big problems in separate phases, or disable the rule
-  (`Optim::set_blas_threads_min_n(0)` or `LK_BLAS_THREADS_MIN_N=0`). MKL is not
+  (`Parallel::set_blas_threads_min_n(0)` or `LK_BLAS_THREADS_MIN_N=0`). MKL is not
   concerned (per-thread count, rule not applied).
 - **Random engine**: `Random`'s engine and seed are per thread
   (`thread_local`): a multistart fit draws its starts and `simulate()` reseeds
   in the calling thread, without racing with the other calls. `reset_seed()`
   applies to the thread that calls it; a new thread starts from seed 123.
-- **Settings** (`Optim::*`, `LinearAlgebra::*`): configuration-before-use. Reads
+- **Settings** (`Optim::*`, `Parallel::*`, `LinearAlgebra::*`): configuration-before-use. Reads
   from concurrent calls are safe; setting one while calls run is a data race
   and a fit reads several settings at different times. Set them first.
 - Results equal the sequential ones, up to the rounding of the BLAS count:
@@ -212,7 +228,7 @@ the same test. Accelerate is run by the macOS arm64 job of the same workflow.
 | OpenBLAS pthreads | Linux distributions, R Linux binary (bundled), Windows (conda / bundled `openblas.dll`), macOS Intel (brew) | own pool, spins after each call and for ~100 ms after loading (6.2) | `openblas_set_num_threads` (global) | yes |
 | OpenBLAS OpenMP | Linux (`libopenblas0-openmp`) | libgomp team of the caller | follows `OMP_NUM_THREADS` | yes |
 | Intel MKL / oneMKL | Linux / Windows x86, MATLAB | Intel OpenMP / GNU OpenMP / TBB / sequential | `mkl_set_num_threads`, **`mkl_set_num_threads_local` (per thread)** | yes, per thread (#445; MATLAB's own MKL only if it exports the C entry points) |
-| Apple Accelerate | macOS arm64 | GCD | `VECLIB_MAXIMUM_THREADS` at load (whole process); `BLASSetThreading` (macOS 15+, single / multi only, **per thread**) | partly: no thread count; each worker of a multistart pool (more than one worker, #491) and each thread created in a fork child (#487) calls `BLASSetThreading(single)` for itself; the calling thread and single-start fits keep the multithreaded default. Apple M4, build without OpenMP: BFGS4 fits take 0.53-0.64 of the time at n = 500-1500 (the time of `VECLIB_MAXIMUM_THREADS=1`), BFGS10 0.59-0.74, with 3-4x less CPU, same fits bit for bit; `LK_ACCELERATE_POOL_SINGLE=0` restores the old behaviour. The earlier T9 measurement (x0.95-1.15, #416) only switched the calling thread, not the workers |
+| Apple Accelerate | macOS arm64 | GCD | `VECLIB_MAXIMUM_THREADS` at load (whole process); `BLASSetThreading` (macOS 15+, single / multi only, **per thread**) | partly: no thread count; each worker of a multistart pool (more than one worker, #491) and each thread created in a fork child (#487) calls `BLASSetThreading(single)` for itself; the calling thread and single-start fits keep the multithreaded default. Apple M4, build without OpenMP: BFGS4 fits take 0.53-0.64 of the time at n = 500-1500 (the time of `VECLIB_MAXIMUM_THREADS=1`), BFGS10 0.59-0.74, with 3-4x less CPU, same fits bit for bit. The earlier T9 measurement (x0.95-1.15, #416) only switched the calling thread, not the workers |
 | FlexiBLAS | Fedora / RHEL / openSUSE; found first by Armadillo on Linux | the selected backend's | `flexiblas_set_num_threads` | no (`openblas_*` probably not visible through it) |
 | BLIS / AMD AOCL | Linux, Windows | pthreads / OpenMP | `bli_thread_set_num_threads` | no |
 | Reference (Netlib, R's Rblas) | fallback | sequential | — | nothing to drive |
@@ -293,7 +309,7 @@ in the child, which blocked at its first call (T9). The child also sets MKL's
 global count to 1, and caps the thread budget at 1 (a plain store, no call
 into the OpenMP runtime: #455), so the multistart pool and the OpenMP loops of
 a child run on 1 thread whatever the OpenMP runtime, also in builds without
-OpenMP, where nothing else bounded them (#420); `Optim::set_num_threads_percent`
+OpenMP, where nothing else bounded them (#420); `Parallel::set_num_threads_percent`
 called in the child lifts the cap. **MKL limitation**: a `fork()` while other threads run MKL
 calls can leave MKL's fast memory manager locked in the child (deadlock in
 `mkl_serv_allocate` / at thread exit); set `MKL_DISABLE_FAST_MM=1` in that case
@@ -429,22 +445,19 @@ build deadlocks in forked workers). With `mclapply`, give each worker one thread
 
 ## 9. Environment variables
 
+The `LK_*` variables of the library, with their setters, defaults and the
+precedence rule (read once at load, a setter call wins), are in one table:
+[docs/Settings.md](../Settings.md). This section adds the variables of the
+runtimes (OpenMP, BLAS) and of the benchmarks.
+
 | Variable | Read by | Effect |
 |---|---|---|
-| `LK_NUM_THREADS_PERCENT` | libKriging | budget share (x <= 1 ratio, x > 1 percentage) |
-| `LK_THREAD_POOL_SIZE` | libKriging | cap on the multistart workers |
-| `LK_THREAD_START_DELAY_MS` | libKriging | WarpKriging start stagger (10 ms) |
-| `LK_BLAS_THREADS_MIN_N` | libKriging | small-problem BLAS rule (-1 automatic, 0 off, n > 0 threshold) |
-| `LK_OMP_MIN_ROWS` | libKriging at load | OpenMP threshold of the covariance / gradient loops (`Parallel::set_omp_min_rows`) |
-| `LK_CHOL_JITTER` | libKriging at load | fixed Cholesky jitter of noise-free fits (< 0 per kernel, default; 0 off; > 0 value), see 8.6 |
 | `LK_BENCH_WARMUP_MS` | benchmarks | busy-wait before measuring (300 ms, see 6.2) |
-| `LK_LONG_RANGE_RESTART`, `LK_MAX_LONG_RANGE_RESTART` | (none) | removed in 2.0 with the long-range restart of a single start, ignored (#466: `"BFGS2"` is as good at a lower cost) |
 | `OMP_NUM_THREADS` | OpenMP runtime | caps the budget |
 | `OPENBLAS_NUM_THREADS` | OpenBLAS at load | size of its thread pool; below the budget, kept by libKriging |
 | `OPENBLAS_THREAD_TIMEOUT` | OpenBLAS at load | spin time of its idle threads |
 | `MKL_NUM_THREADS` | MKL at load | its global count; below the budget, kept by libKriging |
 | `VECLIB_MAXIMUM_THREADS` | Accelerate at load | its thread count for the whole process; not needed for multistart fits since macOS 15 (the workers set single-threaded mode themselves), still the way on macOS < 15 |
-| `LK_ACCELERATE_POOL_SINGLE` | libKriging, macOS 15+ | `0`: the workers of a multistart pool keep Accelerate's multithreaded mode (default: single-threaded) |
 | `BLIS_NUM_THREADS`, `FLEXIBLAS_NUM_THREADS` | other BLAS | their own thread counts (not driven by libKriging) |
 | `GOMP_SPINCOUNT`, `KMP_BLOCKTIME` | libgomp / libomp | spin of idle OpenMP threads |
 

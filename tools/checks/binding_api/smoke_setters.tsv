@@ -5,13 +5,11 @@
 # The getter is restored to its initial value at the end.
 Optim	set_log_level	get_log_level	int	3
 Optim	set_max_iteration	get_max_iteration	int	57
+Optim	set_max_restart	get_max_restart	int	3
 Optim	set_gradient_tolerance	get_gradient_tolerance	float	0.0125
 Optim	set_objective_rel_tolerance	get_objective_rel_tolerance	float	0.0025
 Optim	set_theta_lower_factor	get_theta_lower_factor	float	0.25
 Optim	set_theta_upper_factor	get_theta_upper_factor	float	4.5
-Optim	set_thread_start_delay_ms	get_thread_start_delay_ms	int	7
-Optim	set_thread_pool_size	get_thread_pool_size	int	2
-Optim	set_num_threads_percent	get_num_threads_percent	float	0.5
 Optim	use_reparametrize	is_reparametrized	bool	-
 Optim	use_variogram_bounds_heuristic	variogram_bounds_heuristic_used	bool	-
 Parallel	set_num_threads_percent	get_num_threads_percent	float	0.5

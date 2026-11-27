@@ -9,6 +9,7 @@
 #include <memory>
 #include "libKriging/Kriging.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 // clang-format on
 
 // Test function: sum of squares
@@ -67,8 +68,8 @@ TEST_CASE("KrigingWarmRestartTest - Warm restart is faster than cold fit", "[upd
     // Starts one after the other: with the thread budget the 4 starts of the
     // cold fit run in parallel, and on a 4-core runner its wall time came
     // close to the single warm start (29 vs 33 ms on the coverage CI job)
-    const int saved_pool_size = Optim::get_thread_pool_size();
-    Optim::set_thread_pool_size(1);
+    const int saved_pool_size = Parallel::get_thread_pool_size();
+    Parallel::set_thread_pool_size(1);
 
     // Best of 3 (each from a new initial fit): a single sample is noisy at
     // these sizes (n = 33, ~1-5 ms), e.g. with a threaded MKL the first BLAS
@@ -100,7 +101,7 @@ TEST_CASE("KrigingWarmRestartTest - Warm restart is faster than cold fit", "[upd
     INFO("Warm restart: " << warm_ms << " ms");
     INFO("Cold fit:     " << cold_ms << " ms");
 
-    Optim::set_thread_pool_size(saved_pool_size);
+    Parallel::set_thread_pool_size(saved_pool_size);
 
     // Warm restart should be noticeably faster (at most 80% of cold fit time)
     CHECK(warm_ms < cold_ms * 0.8);

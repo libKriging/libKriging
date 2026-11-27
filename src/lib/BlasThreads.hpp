@@ -62,7 +62,7 @@ void touch_mkl_entry_points();
 /// - for a worker of a pool with several workers (`pool_with_several_workers`): the workers already use
 ///   the cores, and Accelerate's own threads on top of them oversubscribe (Apple M4: multistart fits
 ///   ×1.5-1.9 faster, 3.5-4x less CPU, same optimum as VECLIB_MAXIMUM_THREADS=1; single-start fits
-///   keep Accelerate's threads). LK_ACCELERATE_POOL_SINGLE=0 turns this case off.
+///   keep Accelerate's threads).
 /// The calling thread only: the thread that called run_task_pool keeps its own mode. Defined in
 /// Kriging.cpp.
 void accelerate_single_thread_here(bool pool_with_several_workers = false);

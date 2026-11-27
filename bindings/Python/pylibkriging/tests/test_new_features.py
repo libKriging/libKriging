@@ -226,49 +226,48 @@ class TestOptim:
     
     def test_optim_thread_settings(self):
         """Test thread configuration"""
-        orig_delay = lk.Optim.get_thread_start_delay_ms()
-        orig_pool = lk.Optim.get_thread_pool_size()
+        orig_delay = lk.Parallel.get_thread_start_delay_ms()
+        orig_pool = lk.Parallel.get_thread_pool_size()
         
         try:
-            lk.Optim.set_thread_start_delay_ms(20)
-            assert lk.Optim.get_thread_start_delay_ms() == 20
+            lk.Parallel.set_thread_start_delay_ms(20)
+            assert lk.Parallel.get_thread_start_delay_ms() == 20
             
-            lk.Optim.set_thread_pool_size(4)
-            assert lk.Optim.get_thread_pool_size() == 4
+            lk.Parallel.set_thread_pool_size(4)
+            assert lk.Parallel.get_thread_pool_size() == 4
         finally:
-            lk.Optim.set_thread_start_delay_ms(orig_delay)
-            lk.Optim.set_thread_pool_size(orig_pool)
+            lk.Parallel.set_thread_start_delay_ms(orig_delay)
+            lk.Parallel.set_thread_pool_size(orig_pool)
 
     def test_optim_thread_budget(self):
         """Thread budget: share of the cores, resolved thread count"""
-        orig = lk.Optim.get_num_threads_percent()
+        orig = lk.Parallel.get_num_threads_percent()
         try:
-            lk.Optim.set_num_threads_percent(100)
-            full = lk.Optim.get_num_threads()
+            lk.Parallel.set_num_threads_percent(100)
+            full = lk.Parallel.get_num_threads()
             assert full >= 1
-            lk.Optim.set_num_threads_percent(50)
-            assert lk.Optim.get_num_threads_percent() == 50
-            assert 1 <= lk.Optim.get_num_threads() <= full
-            lk.Optim.set_num_threads_percent(0.5)  # ratio: same as 50 %
-            assert 1 <= lk.Optim.get_num_threads() <= full
+            lk.Parallel.set_num_threads_percent(50)
+            assert lk.Parallel.get_num_threads_percent() == 50
+            assert 1 <= lk.Parallel.get_num_threads() <= full
+            lk.Parallel.set_num_threads_percent(0.5)  # ratio: same as 50 %
+            assert 1 <= lk.Parallel.get_num_threads() <= full
             # a fit runs with a reduced budget
             X = np.random.RandomState(1).uniform(size=(20, 1))
             k = lk.Kriging(np.sin(6 * X[:, 0]), X, "matern3_2")
             assert np.isfinite(k.logLikelihood())
         finally:
-            lk.Optim.set_num_threads_percent(orig)
+            lk.Parallel.set_num_threads_percent(orig)
 
     def test_parallel_settings(self):
-        """Parallel: the thread settings of Optim, the OpenMP threshold, read-only levels"""
+        """Parallel: the thread settings (moved from Optim in 2.0), the OpenMP threshold, read-only levels"""
         P = lk.Parallel
         orig = (P.get_num_threads_percent(), P.get_thread_pool_size(), P.get_blas_threads_min_n(),
                 P.get_omp_min_rows())
         try:
             P.set_num_threads_percent(0.5)
-            assert lk.Optim.get_num_threads_percent() == 0.5
-            assert P.get_num_threads() == lk.Optim.get_num_threads() >= 1
+            assert lk.Parallel.get_num_threads_percent() == 0.5
             P.set_thread_pool_size(3)
-            assert lk.Optim.get_thread_pool_size() == 3
+            assert lk.Parallel.get_thread_pool_size() == 3
             P.set_blas_threads_min_n(0)
             assert P.get_blas_threads_min_n() == 0
             X = np.random.RandomState(2).uniform(size=(250, 2))

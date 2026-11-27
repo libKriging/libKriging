@@ -1,7 +1,7 @@
 // Study driver (not built by CMake, see fit_repro_study.cpp for the build):
 // the fixed Cholesky jitter (current default: kernel jitter for the
 // objective, <= num_nugget for the committed model) against no jitter, on a
-// wider grid. Each fit is run with Optim::set_num_threads_percent 10 / 100 / 200.
+// wider grid. Each fit is run with Parallel::set_num_threads_percent 10 / 100 / 200.
 // Usage: jitter_scale_study <family> <kernel> <n> <d> <sets> <optim> [noise] [jitter]
 //   family: sin (sum_j sin(2 pi f_j x_j), f_j ~ U[0.5, 3]), branin (d = 2),
 //           hartmann6 (d = 6)
@@ -19,6 +19,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
 static arma::vec f(const std::string& family, const arma::mat& X, const arma::rowvec& freq) {
@@ -79,7 +80,7 @@ int main(int argc, char** argv) {
     for (double jitter : {0.0, jitter_on}) {
       LinearAlgebra::set_chol_jitter(jitter);
       for (double pct : {10.0, 100.0, 200.0}) {
-        Optim::set_num_threads_percent(pct);
+        Parallel::set_num_threads_percent(pct);
         try {
           Kriging k(kernel);
           const auto t0 = std::chrono::steady_clock::now();
@@ -103,5 +104,5 @@ int main(int argc, char** argv) {
     }
   }
   LinearAlgebra::set_chol_jitter(-1);
-  Optim::set_num_threads_percent(0);
+  Parallel::set_num_threads_percent(0);
 }

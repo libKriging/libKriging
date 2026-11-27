@@ -122,6 +122,7 @@ add_python_test(NAME NewFeatures FILENAME test_new_features.py)
 add_python_test(NAME NormalizeScale FILENAME normalize_scale_test.py)
 add_python_test(NAME sklearn_estimator FILENAME sklearn_estimator_test.py)
 add_python_test(NAME sklearn_multimodel FILENAME sklearn_multimodel_test.py)
+add_python_test(NAME Settings FILENAME settings_test.py)
 # Without scikit-learn these modules are skipped as a whole (importorskip) and
 # pytest exits with 5 ("no tests collected"): report them as skipped, not failed.
 set_tests_properties(Python/sklearn_estimator Python/sklearn_multimodel PROPERTIES SKIP_RETURN_CODE 5)

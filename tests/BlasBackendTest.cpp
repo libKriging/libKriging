@@ -7,6 +7,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/Random.hpp"
 #include <algorithm>
 #include <chrono>
@@ -151,11 +152,11 @@ void weyl_data(arma::uword n, arma::mat& X, arma::vec& y) {
 }
 
 struct BudgetGuard {
-  double percent = Optim::get_num_threads_percent();
-  int pool = Optim::get_thread_pool_size();
+  double percent = Parallel::get_num_threads_percent();
+  int pool = Parallel::get_thread_pool_size();
   ~BudgetGuard() {
-    Optim::set_num_threads_percent(percent);
-    Optim::set_thread_pool_size(pool);
+    Parallel::set_num_threads_percent(percent);
+    Parallel::set_thread_pool_size(pool);
   }
 };
 
@@ -198,11 +199,11 @@ int lowered(int b0, int share) {
 
 TEST_CASE("BLAS backend in use", "[backend]") {
   const std::string b = backend();
-  Optim::set_num_threads_percent(100);
+  Parallel::set_num_threads_percent(100);
   std::printf("[backend] dgemm_ from: %s\n[backend] backend: %s, budget: %d, MKL count: %d, OpenBLAS count: %d\n",
               blas_provider().c_str(),
               b.c_str(),
-              Optim::get_num_threads(),
+              Parallel::get_num_threads(),
               mkl_count(),
               openblas_count());
 #if defined(LK_BACKEND_PROBE)
@@ -225,9 +226,9 @@ TEST_CASE("MKL: each multistart worker runs its BLAS at its share", "[backend][m
     return;
   }
   BudgetGuard guard;
-  Optim::set_num_threads_percent(100);
-  Optim::set_thread_pool_size(0);
-  const int B = Optim::get_num_threads();
+  Parallel::set_num_threads_percent(100);
+  Parallel::set_thread_pool_size(0);
+  const int B = Parallel::get_num_threads();
   if (B < 2) {
     WARN("budget " << B << ": no pool");
     return;
@@ -287,9 +288,9 @@ TEST_CASE("OpenBLAS: each multistart worker runs its BLAS at its share", "[backe
     return;
   }
   BudgetGuard guard;
-  Optim::set_num_threads_percent(100);
-  Optim::set_thread_pool_size(0);
-  const int B = Optim::get_num_threads();
+  Parallel::set_num_threads_percent(100);
+  Parallel::set_thread_pool_size(0);
+  const int B = Parallel::get_num_threads();
   if (B < 2) {
     WARN("budget " << B << ": no pool");
     return;
@@ -355,19 +356,19 @@ TEST_CASE("MKL: the caller's count is restored after fit / predict / simulate / 
   };
 
   SECTION("no thread-local count in the caller, budget 100 %") {
-    Optim::set_num_threads_percent(100);
+    Parallel::set_num_threads_percent(100);
     REQUIRE(mkl_set_local(0) == 0);
     const int m0 = mkl_count();
     all_calls(m0, 0);
   }
   SECTION("no thread-local count in the caller, budget 1 thread") {
-    Optim::set_num_threads_percent(1e-6);
+    Parallel::set_num_threads_percent(1e-6);
     REQUIRE(mkl_set_local(0) == 0);
     const int m0 = mkl_count();
     all_calls(m0, 0);
   }
   SECTION("the caller's own thread-local count, budget 50 %") {
-    Optim::set_num_threads_percent(50);
+    Parallel::set_num_threads_percent(50);
     mkl_set_local(3);
     all_calls(3, 3);
     mkl_set_local(0);
@@ -381,13 +382,13 @@ TEST_CASE("MKL: the caller's count is restored after fit / predict / simulate / 
 // (parallel.md, section 4), not the optimum.
 TEST_CASE("BFGS4 with 1 or 4 workers reaches the same optimum", "[backend]") {
   BudgetGuard guard;
-  Optim::set_num_threads_percent(100);
+  Parallel::set_num_threads_percent(100);
   for (const char* kernel : {"matern5_2", "gauss"}) {
     arma::mat X;
     arma::vec y;
     weyl_data(300, X, y);
     auto fit = [&](int pool) {
-      Optim::set_thread_pool_size(pool);
+      Parallel::set_thread_pool_size(pool);
       Random::reset_seed(123);
       Kriging k(y, X, kernel, Trend::RegressionModel::Constant, false, "BFGS4");
       return std::make_pair(arma::vec(k.theta()), k.logLikelihood());
@@ -469,7 +470,7 @@ TEST_CASE("Fitted theta for 200 <= n < 800 matches the shared reference", "[back
   };
   const arma::vec theta_fixed = {0.3, 0.5, 0.7};
   BudgetGuard guard;
-  Optim::set_num_threads_percent(100);
+  Parallel::set_num_threads_percent(100);
   const bool print = std::getenv("LK_PRINT_REFERENCE") != nullptr;
   for (const auto& r : refs) {
     arma::mat X;
@@ -593,9 +594,9 @@ double median_of(std::vector<double> v) {
 // single-threaded during the multistart. Measures, asserts nothing.
 TEST_CASE("Multistart timing per BLAS threading", "[.timing]") {
   BudgetGuard guard;
-  Optim::set_num_threads_percent(100);
+  Parallel::set_num_threads_percent(100);
   const int reps = 3;
-  std::printf("[timing] backend %s, budget %d\n", backend().c_str(), Optim::get_num_threads());
+  std::printf("[timing] backend %s, budget %d\n", backend().c_str(), Parallel::get_num_threads());
   for (arma::uword n : {200, 400, 800}) {
     arma::mat X;
     arma::vec y;

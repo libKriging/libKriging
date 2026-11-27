@@ -2421,6 +2421,18 @@ int lk_optim_get_max_iteration(void) {
   return Optim::get_max_iteration();
 }
 
+int lk_optim_set_max_restart(int max_restart) {
+  try {
+    Optim::set_max_restart(max_restart);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_optim_get_max_restart(void) {
+  return Optim::get_max_restart();
+}
+
 int lk_optim_set_gradient_tolerance(double tolerance) {
   try {
     Optim::set_gradient_tolerance(tolerance);
@@ -2443,46 +2455,6 @@ int lk_optim_set_objective_rel_tolerance(double tolerance) {
 
 double lk_optim_get_objective_rel_tolerance(void) {
   return Optim::get_objective_rel_tolerance();
-}
-
-int lk_optim_set_thread_start_delay_ms(int delay_ms) {
-  try {
-    Optim::set_thread_start_delay_ms(delay_ms);
-    return 0;
-  }
-  CATCH_RETURN
-}
-
-int lk_optim_get_thread_start_delay_ms(void) {
-  return Optim::get_thread_start_delay_ms();
-}
-
-int lk_optim_set_thread_pool_size(int pool_size) {
-  try {
-    Optim::set_thread_pool_size(pool_size);
-    return 0;
-  }
-  CATCH_RETURN
-}
-
-int lk_optim_get_thread_pool_size(void) {
-  return Optim::get_thread_pool_size();
-}
-
-int lk_optim_set_num_threads_percent(double percent) {
-  try {
-    Optim::set_num_threads_percent(percent);
-    return 0;
-  }
-  CATCH_RETURN
-}
-
-double lk_optim_get_num_threads_percent(void) {
-  return Optim::get_num_threads_percent();
-}
-
-int lk_optim_get_num_threads(void) {
-  return Optim::get_num_threads();
 }
 
 // Parallel (Parallel.hpp): thread budget and its distribution

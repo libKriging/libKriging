@@ -210,38 +210,38 @@ test_that("Optim tolerances work", {
 })
 
 test_that("Optim thread settings work", {
-  orig_delay <- rlibkriging:::optim_get_thread_start_delay_ms()
-  orig_pool <- rlibkriging:::optim_get_thread_pool_size()
+  orig_delay <- rlibkriging:::parallel_get_thread_start_delay_ms()
+  orig_pool <- rlibkriging:::parallel_get_thread_pool_size()
 
-  rlibkriging:::optim_set_thread_start_delay_ms(20)
-  expect_equal(rlibkriging:::optim_get_thread_start_delay_ms(), 20)
+  rlibkriging:::parallel_set_thread_start_delay_ms(20)
+  expect_equal(rlibkriging:::parallel_get_thread_start_delay_ms(), 20)
 
-  rlibkriging:::optim_set_thread_pool_size(4)
-  expect_equal(rlibkriging:::optim_get_thread_pool_size(), 4)
+  rlibkriging:::parallel_set_thread_pool_size(4)
+  expect_equal(rlibkriging:::parallel_get_thread_pool_size(), 4)
 
-  rlibkriging:::optim_set_thread_start_delay_ms(orig_delay)
-  rlibkriging:::optim_set_thread_pool_size(orig_pool)
+  rlibkriging:::parallel_set_thread_start_delay_ms(orig_delay)
+  rlibkriging:::parallel_set_thread_pool_size(orig_pool)
 })
 
 test_that("Optim thread budget works", {
-  orig <- rlibkriging:::optim_get_num_threads_percent()
+  orig <- rlibkriging:::parallel_get_num_threads_percent()
 
-  rlibkriging:::optim_set_num_threads_percent(100)
-  full <- rlibkriging:::optim_get_num_threads()
+  rlibkriging:::parallel_set_num_threads_percent(100)
+  full <- rlibkriging:::parallel_get_num_threads()
   expect_gte(full, 1)
-  rlibkriging:::optim_set_num_threads_percent(50)
-  expect_equal(rlibkriging:::optim_get_num_threads_percent(), 50)
-  expect_gte(rlibkriging:::optim_get_num_threads(), 1)
-  expect_lte(rlibkriging:::optim_get_num_threads(), full)
-  rlibkriging:::optim_set_num_threads_percent(0.5) # ratio: same as 50 %
-  expect_lte(rlibkriging:::optim_get_num_threads(), full)
+  rlibkriging:::parallel_set_num_threads_percent(50)
+  expect_equal(rlibkriging:::parallel_get_num_threads_percent(), 50)
+  expect_gte(rlibkriging:::parallel_get_num_threads(), 1)
+  expect_lte(rlibkriging:::parallel_get_num_threads(), full)
+  rlibkriging:::parallel_set_num_threads_percent(0.5) # ratio: same as 50 %
+  expect_lte(rlibkriging:::parallel_get_num_threads(), full)
   # a fit runs with a reduced budget
   set.seed(1)
   X <- matrix(runif(20), ncol = 1)
   k <- Kriging(sin(6 * X[, 1]), X, "matern3_2")
   expect_true(is.finite(k$logLikelihood()))
 
-  rlibkriging:::optim_set_num_threads_percent(orig)
+  rlibkriging:::parallel_set_num_threads_percent(orig)
 })
 
 test_that("All classes have covMat", {

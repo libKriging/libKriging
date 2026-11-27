@@ -1783,20 +1783,12 @@ set_log_level(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_log_le
 get_log_level() = Int(ccall(dlsym(_lk(), :lk_optim_get_log_level), Cint, ()))
 set_max_iteration(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_max_iteration), Cint, (Cint,), x))
 get_max_iteration() = Int(ccall(dlsym(_lk(), :lk_optim_get_max_iteration), Cint, ()))
+set_max_restart(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_max_restart), Cint, (Cint,), x))
+get_max_restart() = Int(ccall(dlsym(_lk(), :lk_optim_get_max_restart), Cint, ()))
 set_gradient_tolerance(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_gradient_tolerance), Cint, (Cdouble,), x))
 get_gradient_tolerance() = ccall(dlsym(_lk(), :lk_optim_get_gradient_tolerance), Cdouble, ())
 set_objective_rel_tolerance(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_objective_rel_tolerance), Cint, (Cdouble,), x))
 get_objective_rel_tolerance() = ccall(dlsym(_lk(), :lk_optim_get_objective_rel_tolerance), Cdouble, ())
-set_thread_start_delay_ms(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_thread_start_delay_ms), Cint, (Cint,), x))
-get_thread_start_delay_ms() = Int(ccall(dlsym(_lk(), :lk_optim_get_thread_start_delay_ms), Cint, ()))
-# Julia's own threads and OpenBLAS are not driven by these (docs/dev/parallel.md 5)
-set_thread_pool_size(x::Integer) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_thread_pool_size), Cint, (Cint,), x))
-get_thread_pool_size() = Int(ccall(dlsym(_lk(), :lk_optim_get_thread_pool_size), Cint, ()))
-# thread budget: x <= 1 ratio, x > 1 percentage of the cores, 0 automatic (100 %)
-set_num_threads_percent(x::Real) = _check_error(ccall(dlsym(_lk(), :lk_optim_set_num_threads_percent), Cint, (Cdouble,), x))
-get_num_threads_percent() = ccall(dlsym(_lk(), :lk_optim_get_num_threads_percent), Cdouble, ())
-get_num_threads() = Int(ccall(dlsym(_lk(), :lk_optim_get_num_threads), Cint, ()))
-
 end # module Optim
 
 """
@@ -1805,8 +1797,8 @@ end # module Optim
 Thread budget of libKriging and how it is distributed between its levels
 (multistart workers, OpenMP loops, BLAS threads), as `Parallel` in C++ /
 Python / Octave (R: `parallel_<name>`), docs/dev/parallel.md:
-`jlibkriging.Parallel.set_num_threads_percent(50)`. Optim's thread settings are
-the same settings. Julia's own threads and OpenBLAS are not driven by these.
+`jlibkriging.Parallel.set_num_threads_percent(50)`. The thread settings are
+only there since 2.0 (#468). Julia's own threads and OpenBLAS are not driven by these.
 """
 module Parallel
 

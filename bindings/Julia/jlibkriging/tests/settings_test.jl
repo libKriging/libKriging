@@ -12,6 +12,16 @@ using jlibkriging
     @test O.get_max_iteration() == 42
     O.set_max_iteration(orig)
 
+    orig = O.get_max_restart()
+    O.set_max_restart(3)
+    @test O.get_max_restart() == 3
+    O.set_max_restart(0)
+    @test O.get_max_restart() == 0
+    @test_throws Exception O.set_max_restart(-1)
+    @test O.get_max_restart() == 0
+    O.set_max_restart(orig)
+    @test O.get_max_restart() == orig
+
     orig = O.get_gradient_tolerance()
     O.set_gradient_tolerance(1e-4)
     @test O.get_gradient_tolerance() == 1e-4
@@ -45,25 +55,32 @@ using jlibkriging
     O.set_theta_lower_factor(lo)
     O.set_theta_upper_factor(up)
 
-    orig = O.get_thread_start_delay_ms()
-    O.set_thread_start_delay_ms(5)
-    @test O.get_thread_start_delay_ms() == 5
-    O.set_thread_start_delay_ms(orig)
+    orig = jlibkriging.Parallel.get_thread_start_delay_ms()
+    jlibkriging.Parallel.set_thread_start_delay_ms(5)
+    @test jlibkriging.Parallel.get_thread_start_delay_ms() == 5
+    jlibkriging.Parallel.set_thread_start_delay_ms(orig)
 
-    orig = O.get_thread_pool_size()
-    O.set_thread_pool_size(2)
-    @test O.get_thread_pool_size() == 2
-    O.set_thread_pool_size(orig)
+    orig = jlibkriging.Parallel.get_thread_pool_size()
+    jlibkriging.Parallel.set_thread_pool_size(2)
+    @test jlibkriging.Parallel.get_thread_pool_size() == 2
+    jlibkriging.Parallel.set_thread_pool_size(orig)
 
-    orig = O.get_num_threads_percent()
-    O.set_num_threads_percent(100)
-    full = O.get_num_threads()
+    orig = jlibkriging.Parallel.get_num_threads_percent()
+    jlibkriging.Parallel.set_num_threads_percent(100)
+    full = jlibkriging.Parallel.get_num_threads()
     @test full >= 1
-    O.set_num_threads_percent(50)
-    @test O.get_num_threads_percent() == 50
-    @test 1 <= O.get_num_threads() <= full
-    @test_throws ErrorException O.set_num_threads_percent(-1)
-    O.set_num_threads_percent(orig)
+    jlibkriging.Parallel.set_num_threads_percent(50)
+    @test jlibkriging.Parallel.get_num_threads_percent() == 50
+    @test 1 <= jlibkriging.Parallel.get_num_threads() <= full
+    @test_throws ErrorException jlibkriging.Parallel.set_num_threads_percent(-1)
+    jlibkriging.Parallel.set_num_threads_percent(orig)
+
+    # moved to jlibkriging.Parallel in 2.0 (#468)
+    for f in (:set_num_threads_percent, :get_num_threads_percent, :get_num_threads,
+              :set_thread_pool_size, :get_thread_pool_size,
+              :set_thread_start_delay_ms, :get_thread_start_delay_ms)
+        @test !isdefined(O, f)
+    end
 end
 
 @testset "Parallel settings" begin
@@ -71,10 +88,10 @@ end
     O = jlibkriging.Optim
     orig = (P.get_num_threads_percent(), P.get_thread_pool_size(), P.get_blas_threads_min_n(), P.get_omp_min_rows())
     P.set_num_threads_percent(0.5)
-    @test O.get_num_threads_percent() == 0.5
-    @test P.get_num_threads() == O.get_num_threads() >= 1
+    @test jlibkriging.Parallel.get_num_threads_percent() == 0.5
+    @test P.get_num_threads() >= 1
     P.set_thread_pool_size(3)
-    @test O.get_thread_pool_size() == 3
+    @test jlibkriging.Parallel.get_thread_pool_size() == 3
     P.set_blas_threads_min_n(0)
     @test P.get_blas_threads_min_n() == 0
     P.set_omp_min_rows(300)

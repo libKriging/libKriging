@@ -7,6 +7,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "SeparableDln.hpp"  // private (src/lib)
 #include "blas_counts.hpp"
 #include <array>
@@ -26,7 +27,7 @@
 // 2. End to end: the same bits with a 1-thread budget and with the whole
 //    budget, below and above kOmpMinRows. The gradients also go through the
 //    BLAS / LAPACK (R^-1, triangular solves), whose count follows the budget
-//    (Optim::set_num_threads_percent) and which may round differently with it
+//    (Parallel::set_num_threads_percent) and which may round differently with it
 //    (MKL; OpenBLAS 0.3.33 on Windows, #473): with a BLAS loaded with more than
 //    1 thread, with Apple Accelerate (thread count not settable by the
 //    library, on macOS CI two identical calls differ), or a BLAS found to give
@@ -38,8 +39,8 @@
 namespace {
 
 struct Budget {
-  const double saved = Optim::get_num_threads_percent();
-  ~Budget() { Optim::set_num_threads_percent(saved); }
+  const double saved = Parallel::get_num_threads_percent();
+  ~Budget() { Parallel::set_num_threads_percent(saved); }
 };
 
 std::vector<arma::vec> gradients(Kriging& k, const arma::vec& gamma) {
@@ -105,8 +106,8 @@ TEST_CASE("LL / LMP theta gradients do not depend on the OpenMP thread count", "
   k.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL", par);
 
   Budget restore;
-  Optim::set_num_threads_percent(1e-9);  // budget: 1 thread
-  REQUIRE(Optim::get_num_threads() == 1);
+  Parallel::set_num_threads_percent(1e-9);  // budget: 1 thread
+  REQUIRE(Parallel::get_num_threads() == 1);
   const std::vector<arma::vec> g1 = gradients(k, gamma);
 #if defined(__APPLE__)
   // Accelerate: thread count not settable by the library, results not
@@ -116,8 +117,8 @@ TEST_CASE("LL / LMP theta gradients do not depend on the OpenMP thread count", "
   const bool blas_reproducible = !lk_test::blas_count_can_change() && bitwise_equal(g1, gradients(k, gamma));
 #endif
 
-  Optim::set_num_threads_percent(0);  // whole budget
-  INFO("thread budget: " << Optim::get_num_threads());
+  Parallel::set_num_threads_percent(0);  // whole budget
+  INFO("thread budget: " << Parallel::get_num_threads());
   const std::vector<arma::vec> gn = gradients(k, gamma);
   if (!blas_reproducible)
     WARN(

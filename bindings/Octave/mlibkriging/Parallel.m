@@ -2,7 +2,7 @@ classdef Parallel
     % Parallel - thread budget of libKriging and how it is distributed between
     % its levels: multistart workers, OpenMP loops, BLAS threads
     % (docs/dev/parallel.md). Static methods; they modify global settings, to
-    % set before the calls. Optim's thread settings are the same settings.
+    % set before the calls. In Optim before 2.0 (#468).
 
     methods (Static)
         function val = get_num_threads_percent()

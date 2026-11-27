@@ -7,6 +7,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
 int main(int argc, char** argv) {
@@ -22,7 +23,7 @@ int main(int argc, char** argv) {
       arma::arma_rng::set_seed(1000 * rep + c.n);
       arma::mat X = arma::randu(c.n, c.d);
       arma::vec y = arma::sum(arma::sin(3 * X), 1) + X.col(0);
-      Optim::set_num_threads_percent(100);
+      Parallel::set_num_threads_percent(100);
       Kriging k(c.kernel);
       k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
       arma::mat Xr = arma::randu(200, c.d);
@@ -32,7 +33,7 @@ int main(int argc, char** argv) {
       Xn = arma::join_vert(Xn, arma::repmat(Xr.row(0), 20, 1) + 1e-7 * arma::randu(20, c.d));
       LinearAlgebra::set_chol_warning(true);
       for (const double pct : {10.0, 100.0, 200.0}) {
-        Optim::set_num_threads_percent(pct);
+        Parallel::set_num_threads_percent(pct);
         std::printf(
             "@ %s n=%llu d=%llu rep=%d pct=%g\n", c.kernel, (unsigned long long)c.n, (unsigned long long)c.d, rep, pct);
         std::fflush(stdout);

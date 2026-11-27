@@ -14,9 +14,9 @@
 #include <string>
 // clang-format on
 
-// Parallel (Parallel.hpp): the thread settings of the library in one place, the
-// same settings as Optim's (kept for compatibility), the OpenMP threshold at run
-// time, and the read-only state of each level.
+// Parallel (Parallel.hpp): the thread settings of the library (only there since
+// 2.0, #468), the OpenMP threshold at run time, and the read-only state of each
+// level.
 
 namespace {
 struct Restore {
@@ -35,26 +35,32 @@ struct Restore {
 };
 }  // namespace
 
-TEST_CASE("Parallel and Optim share the thread settings", "[parallel]") {
+TEST_CASE("Parallel: thread settings set / get, invalid values rejected", "[parallel]") {
   Restore restore;
 
   Parallel::set_num_threads_percent(0.5);
-  CHECK(Optim::get_num_threads_percent() == 0.5);
-  CHECK(Parallel::get_num_threads() == Optim::get_num_threads());
+  CHECK(Parallel::get_num_threads_percent() == 0.5);
   CHECK(Parallel::get_num_threads() >= 1);
-  Optim::set_num_threads_percent(1e-6);  // at least 1 thread
+  Parallel::set_num_threads_percent(1e-6);  // at least 1 thread
   CHECK(Parallel::get_num_threads_percent() == 1e-6);
   CHECK(Parallel::get_num_threads() == 1);
   CHECK_THROWS_AS(Parallel::set_num_threads_percent(-1), std::invalid_argument);
 
   Parallel::set_thread_pool_size(3);
-  CHECK(Optim::get_thread_pool_size() == 3);
+  CHECK(Parallel::get_thread_pool_size() == 3);
   Parallel::set_thread_start_delay_ms(7);
-  CHECK(Optim::get_thread_start_delay_ms() == 7);
+  CHECK(Parallel::get_thread_start_delay_ms() == 7);
   Parallel::set_blas_threads_min_n(123);
-  CHECK(Optim::get_blas_threads_min_n() == 123);
-  Optim::set_blas_threads_min_n(0);
+  CHECK(Parallel::get_blas_threads_min_n() == 123);
+  Parallel::set_blas_threads_min_n(0);
   CHECK(Parallel::get_blas_threads_min_n() == 0);
+  Parallel::set_blas_threads_min_n(-1);
+  CHECK(Parallel::get_blas_threads_min_n() == -1);
+  CHECK_THROWS_AS(Parallel::set_blas_threads_min_n(-2), std::invalid_argument);
+  CHECK_THROWS_AS(Parallel::set_thread_pool_size(-1), std::invalid_argument);
+  CHECK_THROWS_AS(Parallel::set_thread_start_delay_ms(-1), std::invalid_argument);
+  CHECK(Parallel::get_thread_pool_size() == 3);
+  CHECK(Parallel::get_thread_start_delay_ms() == 7);
 }
 
 TEST_CASE("OpenMP threshold: set at run time, results do not depend on it", "[parallel]") {

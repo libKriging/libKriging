@@ -8,6 +8,7 @@
 #include <libKriging/Kriging.hpp>
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Optim.hpp>
+#include <libKriging/Parallel.hpp>
 #include <libKriging/Trend.hpp>
 #include <vector>
 
@@ -185,8 +186,8 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
 
     // Test with explicit thread pool size
     INFO("Testing with thread_pool_size=2");
-    Optim::set_thread_pool_size(2);
-    CHECK(Optim::get_thread_pool_size() == 2);
+    Parallel::set_thread_pool_size(2);
+    CHECK(Parallel::get_thread_pool_size() == 2);
 
     nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS5", "LL", parameters);
     CHECK(nk.theta().n_elem == d);
@@ -194,8 +195,8 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
 
     // Test with auto thread pool size
     INFO("Testing with thread_pool_size=0 (auto)");
-    Optim::set_thread_pool_size(0);
-    CHECK(Optim::get_thread_pool_size() == 0);
+    Parallel::set_thread_pool_size(0);
+    CHECK(Parallel::get_thread_pool_size() == 0);
 
     nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS5", "LL", parameters);
     CHECK(nk.theta().n_elem == d);
@@ -203,26 +204,27 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
   }
 
   SECTION("Thread startup delay") {
+    const int saved_delay = Parallel::get_thread_start_delay_ms();
     Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
     Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
 
     // Test with different delays
     INFO("Testing with thread_start_delay_ms=1");
-    Optim::set_thread_start_delay_ms(1);
-    CHECK(Optim::get_thread_start_delay_ms() == 1);
+    Parallel::set_thread_start_delay_ms(1);
+    CHECK(Parallel::get_thread_start_delay_ms() == 1);
 
     nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS5", "LL", parameters);
     CHECK(nk.theta().n_elem == d);
 
     INFO("Testing with thread_start_delay_ms=20");
-    Optim::set_thread_start_delay_ms(20);
-    CHECK(Optim::get_thread_start_delay_ms() == 20);
+    Parallel::set_thread_start_delay_ms(20);
+    CHECK(Parallel::get_thread_start_delay_ms() == 20);
 
     nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS5", "LL", parameters);
     CHECK(nk.theta().n_elem == d);
 
-    // Reset to default
-    Optim::set_thread_start_delay_ms(10);
+    // Restore
+    Parallel::set_thread_start_delay_ms(saved_delay);
   }
 }
 

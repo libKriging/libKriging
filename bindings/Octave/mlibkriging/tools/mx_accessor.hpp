@@ -217,7 +217,9 @@ inline void setter<uint64_t>(const uint64_t& v, mxArray*& x) {
 
 template <>
 inline void setter<int32_t>(const int32_t& v, mxArray*& x) {
-  x = mxCreateNumericMatrix(1, 1, mxUINT64_CLASS, mxREAL);
+  // int32, not uint64: a uint64 array with only its low 4 bytes written turned
+  // -1 (e.g. Parallel.get_blas_threads_min_n(), automatic) into 4294967295
+  x = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL);
   *static_cast<int32_t*>(mxGetData(x)) = v;
 }
 

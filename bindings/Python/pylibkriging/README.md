@@ -47,8 +47,8 @@ share one budget). To use part of them, e.g. half, or one share per process when
 several fits at once (`multiprocessing`, a job array):
 
 ```python
-lk.Optim.set_num_threads_percent(50)  # or 0.5; 0 = all
-lk.Optim.get_num_threads()            # resulting number of threads
+lk.Parallel.set_num_threads_percent(50)  # or 0.5; 0 = all
+lk.Parallel.get_num_threads()            # resulting number of threads
 ```
 
 `OMP_NUM_THREADS` and `OPENBLAS_NUM_THREADS` are never exceeded. See the

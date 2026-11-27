@@ -96,6 +96,20 @@ int optim_get_log_level() {
 //' @rdname optim_settings
 //' @export
 // [[Rcpp::export]]
+int optim_get_max_restart() {
+  return Optim::get_max_restart();
+}
+
+//' @rdname optim_settings
+//' @export
+// [[Rcpp::export]]
+void optim_set_max_restart(int max_restart) {
+  Optim::set_max_restart(max_restart);
+}
+
+//' @rdname optim_settings
+//' @export
+// [[Rcpp::export]]
 int optim_get_max_iteration() {
   Optim* la = new Optim();
   Rcpp::XPtr<Optim> impl_ptr(la);
@@ -145,55 +159,4 @@ void optim_set_objective_rel_tolerance(double objective_rel_tolerance) {
   Optim* la = new Optim();
   Rcpp::XPtr<Optim> impl_ptr(la);
   impl_ptr->set_objective_rel_tolerance(objective_rel_tolerance);
-}
-
-//' @rdname optim_settings
-//' @export
-// [[Rcpp::export]]
-int optim_get_thread_start_delay_ms() {
-  return Optim::get_thread_start_delay_ms();
-}
-
-//' @rdname optim_settings
-//' @export
-// [[Rcpp::export]]
-void optim_set_thread_start_delay_ms(int delay_ms) {
-  Optim::set_thread_start_delay_ms(delay_ms);
-}
-
-//' @rdname optim_settings
-//' @export
-// [[Rcpp::export]]
-int optim_get_thread_pool_size() {
-  return Optim::get_thread_pool_size();
-}
-
-//' @rdname optim_settings
-//' @export
-// [[Rcpp::export]]
-void optim_set_thread_pool_size(int pool_size) {
-  Optim::set_thread_pool_size(pool_size);
-}
-
-// Thread budget: x <= 1 ratio, x > 1 percentage of the cores, 0 automatic (100 %)
-//' @rdname optim_settings
-//' @export
-// [[Rcpp::export]]
-double optim_get_num_threads_percent() {
-  return Optim::get_num_threads_percent();
-}
-
-//' @rdname optim_settings
-//' @export
-// [[Rcpp::export]]
-void optim_set_num_threads_percent(double percent) {
-  Optim::set_num_threads_percent(percent);
-}
-
-// Resolved thread budget (number of threads), read only
-//' @rdname optim_settings
-//' @export
-// [[Rcpp::export]]
-int optim_get_num_threads() {
-  return Optim::get_num_threads();
 }

@@ -64,6 +64,40 @@ catch_discover_tests(CholJitterTest)
 add_test(NAME CholJitterTest/LK_CHOL_JITTER COMMAND CholJitterTest "[.env]")
 set_tests_properties(CholJitterTest/LK_CHOL_JITTER PROPERTIES ENVIRONMENT "LK_CHOL_JITTER=0")
 
+add_executable(SettingsTest SettingsTest.cpp)
+target_link_libraries(SettingsTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries SettingsTest)
+catch_discover_tests(SettingsTest)
+# the hidden [.env] case checks the precedence rule of docs/Settings.md: every
+# LK_* user variable read at load, a setter call overrides it
+add_test(NAME SettingsTest/LK_environment COMMAND SettingsTest "[.env]")
+set_tests_properties(SettingsTest/LK_environment PROPERTIES ENVIRONMENT
+  "LK_REPARAMETRIZE=0;LK_THETA_LOWER_FACTOR=0.05;LK_THETA_UPPER_FACTOR=20;LK_VARIOGRAM_BOUNDS_HEURISTIC=false;LK_LOG_LEVEL=1;LK_MAX_RESTART=4;LK_MAX_ITERATION=33;LK_GRADIENT_TOLERANCE=0.002;LK_OBJECTIVE_REL_TOLERANCE=0.004;LK_NUM_THREADS_PERCENT=0.75;LK_THREAD_POOL_SIZE=3;LK_THREAD_START_DELAY_MS=5;LK_BLAS_THREADS_MIN_N=123;LK_OMP_MIN_ROWS=456;LK_CHOL_JITTER=1e-8")
+# invalid values: the default is used (LK_invalid) and a [WARNING] line names
+# each ignored variable (LK_invalid_warning/<variable>, on the output)
+set(SETTINGS_INVALID_ENV
+  "LK_MAX_RESTART=abc;LK_MAX_ITERATION=3.7;LK_REPARAMETRIZE=maybe;LK_GRADIENT_TOLERANCE=-1;LK_THREAD_POOL_SIZE=-2;LK_NUM_THREADS_PERCENT=inf;LK_CHOL_JITTER=1e-9x;LK_OMP_MIN_ROWS=12abc")
+add_test(NAME SettingsTest/LK_invalid COMMAND SettingsTest "[.env_invalid]")
+set_tests_properties(SettingsTest/LK_invalid PROPERTIES ENVIRONMENT "${SETTINGS_INVALID_ENV}")
+# one test per variable: the static initializers of different files run in
+# no fixed order
+foreach(var_value "LK_MAX_RESTART=abc" "LK_MAX_ITERATION=3.7" "LK_REPARAMETRIZE=maybe" "LK_GRADIENT_TOLERANCE=-1"
+        "LK_THREAD_POOL_SIZE=-2" "LK_NUM_THREADS_PERCENT=inf" "LK_CHOL_JITTER=1e-9x" "LK_OMP_MIN_ROWS=12abc")
+  string(REPLACE "=" ";" var_value_list "${var_value}")
+  list(GET var_value_list 0 var_name)
+  list(GET var_value_list 1 var_val)
+  add_test(NAME SettingsTest/LK_invalid_warning/${var_name} COMMAND SettingsTest "[.env_invalid]")
+  set_tests_properties(SettingsTest/LK_invalid_warning/${var_name} PROPERTIES ENVIRONMENT "${SETTINGS_INVALID_ENV}"
+    PASS_REGULAR_EXPRESSION "WARNING\\] ${var_name}=\"${var_val}\" ignored")
+endforeach()
+
+# WarpKriging / MLPKriging multistart fits do not depend on the start delay, at
+# each pool size (default start delay 0 ms, #468)
+add_executable(MultistartDeterminismTest MultistartDeterminismTest.cpp)
+target_link_libraries(MultistartDeterminismTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries MultistartDeterminismTest)
+catch_discover_tests(MultistartDeterminismTest)
+
 add_executable(JitterRuleTest JitterRuleTest.cpp)
 target_link_libraries(JitterRuleTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries JitterRuleTest)
@@ -297,9 +331,7 @@ add_dependencies(all_test_binaries LinearAlgebraTest)
 if(DEFINED ENV{GITHUB_ACTIONS})
     set(AdditionalCatchParameters "~[intensive]")
 endif()
-# LK_LINEARALGEBRA_CHECK_TRACE: LinearAlgebra::check prints each check it starts (locates a backend crash)
-catch_discover_tests(LinearAlgebraTest EXTRA_ARGS ${AdditionalCatchParameters}
-                     PROPERTIES ENVIRONMENT "LK_LINEARALGEBRA_CHECK_TRACE=1")
+catch_discover_tests(LinearAlgebraTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
 

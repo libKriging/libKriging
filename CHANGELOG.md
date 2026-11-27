@@ -12,18 +12,52 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- **Settings: one table, one rule, the same setters in every binding** (#468): `docs/Settings.md`
+  lists the 15 `LK_*` environment variables read by the library, with the setter / getter of
+  each in C++, Python, R, Julia and Octave / MATLAB, its default and its kind (result /
+  performance / output). Rule: each setting belongs to one class by domain (`Optim` optimizer,
+  `Parallel` threads, `LinearAlgebra` Cholesky), never duplicated; an environment variable only
+  gives the default, read once when the library is loaded (changing it afterwards has no
+  effect), and a setter call overrides it. The `LK_*` rows of `docs/dev/parallel.md` section 9
+  moved there.
+- **`Optim::set_max_restart` / `get_max_restart`** in C++ and every binding (Python / Octave
+  `Optim.set_max_restart`, R `optim_set_max_restart`, Julia `jlibkriging.Optim.set_max_restart`):
+  the restarts of one optimizer start were set by `LK_MAX_RESTART` only (default 10 unchanged;
+  0: no restart; a negative value is an error). Migration: none, `LK_MAX_RESTART` still sets the
+  default.
 - **`Parallel`: the thread settings in one place, in every binding** (TODO of #480): C++
   `libKriging/Parallel.hpp`, Python / Octave `Parallel.*`, Julia `jlibkriging.Parallel.*`, R
   `parallel_*`. Budget (`set_num_threads_percent`, `get_num_threads`), its distribution
   (`set_thread_pool_size`, `set_thread_start_delay_ms`, `set_blas_threads_min_n`, until now
   C++ / environment only, and `set_omp_min_rows`, new), and the state of each level, read only
   (`blas_backend`, `blas_num_threads`, `omp_enabled`). No separate OpenMP / BLAS thread count:
-  one budget bounds them together. Optim's thread settings stay, as the same settings.
+  one budget bounds them together. Since #468 they are in `Parallel` only (see Removed).
 - **OpenMP threshold at run time**: `kOmpMinRows` stays the build default; `LK_OMP_MIN_ROWS` in
   the environment or `Parallel::set_omp_min_rows` set it without recompiling (a performance
   setting: the results do not depend on it, #441).
 
 ### Changed
+- **Start delay of the multistart workers: 0 ms by default (was 10 ms)** (#468,
+  `Parallel::set_thread_start_delay_ms`, `LK_THREAD_START_DELAY_MS`). The first start of
+  WarpKriging / MLPKriging worker k waited k × 10 ms, against start-up races that no longer
+  exist: with reentrant tasks and a deterministic choice of the best start, 800 multistart fits
+  (WarpKriging kumaraswamy n 60 / 150, `BFGS8` and `BFGS4+Adam`, MLPKriging `BFGS8`; delays 0 to
+  10 ms; pools of 4 and 8 workers on 4 cores) are all bit-identical to the sequential run
+  (`bench/thread-budget/start_delay_study.cpp`, OpenBLAS); `MultistartDeterminismTest` checks on
+  every CI platform that the fit does not depend on the delay at a given pool size (with MKL it
+  does depend on the pool size, through the BLAS thread count of each start). Results unchanged; small multistart fits faster (WarpKriging n 60 `BFGS8`: 26
+  instead of 42 ms, 28 instead of 81 ms with 8 workers). Migration: none;
+  `set_thread_start_delay_ms(10)` restores the former stagger.
+- **Invalid `LK_*` values: a warning instead of silence, and stricter parsing** (#468). A value
+  that is not entirely a valid number or boolean, or below the minimum of the setting, is
+  ignored with a line `[WARNING] LK_X="..." ignored (expected ...), default ... used` when the
+  library is loaded; before, it was silently ignored, and a prefix was accepted (`LK_MAX_ITERATION=3.7`
+  gave 3, `"12abc"` gave 12: now the default and a warning). Booleans accept `1/true/yes/on` and
+  `0/false/no/off` in any case (before: `1`, `true`, `TRUE`, `True` true, anything else false,
+  so `LK_REPARAMETRIZE=yes` turned it off). The thread setters reject invalid values with an
+  error: `set_thread_pool_size(n < 0)`, `set_thread_start_delay_ms(ms < 0)`,
+  `set_blas_threads_min_n(n < -1)` (before: accepted, a negative pool size meaning automatic).
+  Migration: pass 0 for an automatic pool size.
 - **rcond test of the Cholesky retry: the noise-free committed model is checked by its
   interpolation residual** (#496, follow-up of #465). The retry added a nugget when the 1-norm
   rcond estimate of the factor was below 1e-18, about 4 orders of magnitude pessimistic: on the
@@ -268,6 +302,19 @@ past release, see the corresponding entry on the
   [docs/dev/rationalization/T4-kmodel-per-worker.md](docs/dev/rationalization/T4-kmodel-per-worker.md).
 
 ### Removed
+- **Thread settings of `Optim`, moved to `Parallel`** (#468): `set_num_threads_percent`,
+  `get_num_threads_percent`, `get_num_threads`, `set_thread_pool_size`, `get_thread_pool_size`,
+  `set_thread_start_delay_ms`, `get_thread_start_delay_ms` (and in C++ `set_blas_threads_min_n`,
+  `get_blas_threads_min_n`, plus the public static members `Optim::num_threads_percent`,
+  `thread_pool_size`, `thread_start_delay_ms`, `blas_threads_min_n`). They were the same settings
+  as those of `Parallel` (#480). Migration: same names in `Parallel` — C++ `Parallel::<name>`
+  (`#include "libKriging/Parallel.hpp"`), Python / Octave / MATLAB `Parallel.<name>`, Julia
+  `jlibkriging.Parallel.<name>`, R `parallel_<name>` instead of `optim_<name>`.
+- **`LK_LINEARALGEBRA_CHECK_TRACE` and `LK_ACCELERATE_POOL_SINGLE`** (#468): developer
+  diagnostics without a setter (a stderr trace of `LinearAlgebra.check()`, and on macOS 15+ a
+  switch keeping Accelerate multithreaded in the multistart workers, for the measurements of
+  #491); now ignored. Migration: none for users; the workers of a multistart pool always run
+  Accelerate single-threaded.
 - **Objectives `"LLVecchia(m)"` / `"LLNystrom(k)"` and the Vecchia exact-commit setter** (#469).
   The objective aliases were the 1.2 way to ask for an approximate fit, deprecated during the
   2.0 cycle and never deprecated in a release: 1.2.x code using them fails with 2.0. A fit with
@@ -412,6 +459,11 @@ past release, see the corresponding entry on the
   an older rlibkriging cannot be restored (use `$save()` / `load.*()`).
 
 ### Fixed
+- **Octave / MATLAB: integer getters returned a wrong value for a negative number** (#468):
+  an `int` result was a `uint64` array with only its low 4 bytes written, so
+  `Parallel.get_blas_threads_min_n()` returned 4294967295 instead of -1 (automatic) and could not
+  be restored with its setter. Integer results are now `int32` (they were `uint64`): code that
+  tested `isa(x, 'uint64')` must test `isinteger(x)`.
 - **macOS: forked workers** (R `parallel::mclapply`, #455, #459, #487): libomp's own fork handlers
   deadlocked the library's (no `omp_*` call in the handlers any more), and a forked child crashed
   (SIGSEGV) in its first large Accelerate call, then in its first `BFGS4` fit: Accelerate runs

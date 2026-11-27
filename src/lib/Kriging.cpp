@@ -391,12 +391,9 @@ namespace libKriging {
 namespace detail {
 void accelerate_single_thread_here(bool pool_with_several_workers) {
 #if defined(LK_ACCELERATE_THREADING_API)
-  // LK_ACCELERATE_POOL_SINGLE=0 restores Accelerate's default mode in the workers of a pool (measurements)
-  static const bool pool_policy = [] {
-    const char* e = getenv("LK_ACCELERATE_POOL_SINGLE");
-    return !(e && e[0] == '0');
-  }();
-  if ((accelerate_single_in_child || (pool_with_several_workers && pool_policy)) && accelerate_set_threading) {
+  // the workers of a pool with several workers run Accelerate single-threaded
+  // (#491; the LK_ACCELERATE_POOL_SINGLE switch of the measurements was removed in 2.0, #468)
+  if ((accelerate_single_in_child || pool_with_several_workers) && accelerate_set_threading) {
     if (__builtin_available(macOS 15.0, *))
       accelerate_set_threading(static_cast<int>(BLAS_THREADING_SINGLE_THREADED));
   }

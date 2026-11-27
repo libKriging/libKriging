@@ -5,6 +5,7 @@
 
 #include <catch2/catch.hpp>
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 // clang-format on
 
 #if defined(_WIN32)
@@ -55,5 +56,5 @@ TEST_CASE("The thread budget counts only the cores of the affinity mask", "[thre
     WARN("affinity mask not settable here: skipped");
     return;
   }
-  CHECK(Optim::get_num_threads() == 1);
+  CHECK(Parallel::get_num_threads() == 1);
 }

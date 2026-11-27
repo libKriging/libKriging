@@ -20,6 +20,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "BlasThreads.hpp"
+#include "EnvSettings.hpp"
 #include "OmpLoops.hpp"
 #include "ParallelFor.hpp"
 #include "ThreadBudget.hpp"
@@ -40,16 +41,8 @@ LIBKRIGING_EXPORT double LinearAlgebra::get_num_nugget() {
   return LinearAlgebra::num_nugget;
 };
 
-double LinearAlgebra::chol_jitter = [] {
-  const char* v = std::getenv("LK_CHOL_JITTER");
-  if (v == nullptr)
-    return -1.0;
-  try {
-    return std::stod(v);
-  } catch (...) {
-    return -1.0;
-  }
-}();
+// < 0: per kernel (default); LK_CHOL_JITTER read at load (EnvSettings.hpp)
+double LinearAlgebra::chol_jitter = libKriging::detail::env_double("LK_CHOL_JITTER", -1.0);
 
 LIBKRIGING_EXPORT void LinearAlgebra::set_chol_jitter(double x) {
   LinearAlgebra::chol_jitter = x;

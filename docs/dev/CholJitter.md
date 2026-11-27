@@ -22,7 +22,7 @@ continuous (`fit_repro_study.cpp`, table in parallel.md 8.6).
 near-singular region). J is added to the diagonal of the **correlation** matrix (R + J I, diagonal
 1 + J; `LinearAlgebra::cholCov`), sigma2 being profiled apart: in covariance units the jitter is
 sigma2 J, a relative nugget (noise-to-signal ratio J, alpha = 1 / (1 + J)), invariant to the scale
-of y and to `normalize`. "Diagonal 1 + J" below means that matrix. `set_chol_jitter(x)` / `LK_CHOL_JITTER`: x < 0 per kernel (default), 0 off,
+of y and to `normalize`. "Diagonal 1 + J" below means that matrix. `set_chol_jitter(x)` / `LK_CHOL_JITTER` ([docs/Settings.md](../Settings.md)): x < 0 per kernel (default), 0 off,
 x > 0 that value. Noise-free fits only (nugget and noise models keep their own diagonal).
 
 gauss, 240 data sets (Branin 50, sin n 50–500 d 2–8, Hartmann6 60 / 300), with the starting points
@@ -197,7 +197,7 @@ the 12 failed fits and up to 3.6 (6.2) for the good ones; pairs of successive ev
 |d log theta| > 0.3 and |df| < 10 occur in both. What separates them is the range:
 max_j theta_j / maxdX_j >= 3.6 for 11 of the 12 failed fits, <= 1.3 for every good one.
 
-Restart criterion, implemented (`Optim::set_long_range_restart(c)` / `LK_LONG_RANGE_RESTART`,
+Restart criterion, implemented then removed in 2.0 (#466) (`Optim::set_long_range_restart(c)` / `LK_LONG_RANGE_RESTART`,
 default 2, 0 off; `Optim::set_max_long_range_restart` / `LK_MAX_LONG_RANGE_RESTART`, default 2):
 one more condition of the existing restart test of a single-start (`BFGS`) noise-free LL fit,
 max_j theta_j / maxdX_j > c, at most 2 times per start, same restart point (contracted toward the

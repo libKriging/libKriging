@@ -11,7 +11,7 @@
 //              noise model, y + N(0, (0.1 sd(y))^2), seed 5000 + set)
 //   objective: LL, LOO or LMP
 //   sets:      data sets set0 .. set1 - 1 (seed 9000 + set, as jitter_n_study)
-//   pct:       Optim::set_num_threads_percent
+//   pct:       Parallel::set_num_threads_percent
 //   variants:  comma list of BFGS, BFGS-nolr, BFGSk; the long-range restart
 //              that BFGS-nolr switched off was removed in 2.0 (#466): BFGS-nolr
 //              is now the same fit as BFGS, kept for the T3 command lines
@@ -34,6 +34,7 @@
 #include <vector>
 #include "libKriging/Kriging.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
 static arma::vec f(const std::string& family, const arma::mat& X, const arma::rowvec& freq) {
@@ -92,7 +93,7 @@ int main(int argc, char** argv) {
     while (std::getline(ss, tok, ','))
       variants.push_back(tok);
   }
-  Optim::set_num_threads_percent(pct);
+  Parallel::set_num_threads_percent(pct);
   {
     // OpenBLAS pthreads threads spin ~100 ms after loading (bench/thread-budget/README.md)
     auto e = std::chrono::steady_clock::now() + std::chrono::milliseconds(300);
@@ -164,10 +165,10 @@ int main(int argc, char** argv) {
                   s,
                   v.c_str(),
                   pct,
-                  Optim::get_num_threads(),
+                  Parallel::get_num_threads(),
                   row.c_str());
       std::fflush(stdout);
     }
   }
-  Optim::set_num_threads_percent(0);
+  Parallel::set_num_threads_percent(0);
 }

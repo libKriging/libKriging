@@ -7,6 +7,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
+#include "libKriging/Parallel.hpp"
 #include "libKriging/WarpKriging.hpp"
 #include <cmath>
 #include <cstdlib>
@@ -69,19 +70,19 @@ TEST_CASE("fixed Cholesky jitter: the fit does not depend on the thread budget",
   arma::vec y;
   sin_data(c.seed, c.n, c.d, X, y);
 
-  const double saved_pct = Optim::get_num_threads_percent();
+  const double saved_pct = Parallel::get_num_threads_percent();
   LinearAlgebra::set_chol_jitter(-1);  // per-kernel default
   arma::mat theta(3, c.d);
   arma::vec ll(3);
   int k = 0;
   for (const double pct : {10.0, 100.0, 200.0}) {
-    Optim::set_num_threads_percent(pct);
+    Parallel::set_num_threads_percent(pct);
     Kriging m(c.kernel);
     m.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
     theta.row(k) = m.theta().t();
     ll(k++) = m.logLikelihood();
   }
-  Optim::set_num_threads_percent(saved_pct);
+  Parallel::set_num_threads_percent(saved_pct);
 
   INFO(c.kernel << " n " << c.n << " d " << c.d << " seed " << c.seed << "\ntheta\n" << theta << "LL " << ll.t());
 #if defined(__APPLE__)
