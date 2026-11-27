@@ -16,6 +16,8 @@ It targets to provide a fast, robust and easy to use implementation of Kriging /
 
 Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab and Julia. See [Installation from pre-built packages](#installation-from-pre-built-packages) for more details.
 
+**Upgrading from 1.x?** Version 2.0 changes defaults (e.g. `optim="BFGS4"` for `Kriging` and `MLPKriging`), fitted results and some APIs (thread settings in `Parallel`, `method=` instead of the `LLVecchia` / `LLNystrom` objectives, ...): see the migration guide [docs/Migration-2.0.md](docs/Migration-2.0.md) and the *Breaking changes* of [CHANGELOG.md](CHANGELOG.md).
+
 
 ## Features
 
@@ -597,6 +599,7 @@ python3 -m pip install "git+https://github.com/libKriging/libKriging.git@tag"
 * Mathematical background (models, objectives, large-design methods, update/simulate, each input warping): [docs/math](docs/math).
 * Comparisons with other Kriging / Gaussian process packages (scikit-learn, GPy, GPflow, GPyTorch, SMT, OpenTURNS, DiceKriging, RobustGaSP, GaussianProcesses.jl, STK): [docs/comparisons](docs/comparisons).
 * Process-wide settings (optimizer, threads, Cholesky jitter) and the `LK_*` environment variables: [docs/Settings.md](docs/Settings.md).
+* Migrating from 1.x to 2.0 (every change of default, result or API, with code before / after): [docs/Migration-2.0.md](docs/Migration-2.0.md).
 * Developer documentation: [docs/dev](docs/dev).
 * The C++ API reference (Doxygen) can be generated locally with `cmake --build . --target doc`.
 

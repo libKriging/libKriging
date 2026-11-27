@@ -58,6 +58,8 @@ wk <- WarpKriging(y, X, warping = c("kumaraswamy", "categorical(5,2)", "none"),
                   regmodel = "constant",
                   normalize = FALSE,
                   optim = "BFGS",       # default: joint L-BFGS-B on warp params + theta
+                                        # (with mlp_joint use MLPKriging: a single spec is
+                                        # recycled per column here, and the default differs)
                   objective = "LL",     # only "LL": any other value is ignored
                   parameters = NULL,
                   noise = NULL,        # NULL | numeric variance vector (no "nugget" mode)
@@ -82,7 +84,8 @@ mk <- MLPKriging(y, X, hidden_dims = c(16, 8),
                  regmodel = "constant",
                  normalize = FALSE,
                  optim = "BFGS4",      # default since 2.0: 4 parallel joint L-BFGS-B starts
-                                       # (MLP weights + theta); "BFGS" = 1.x single start
+                                       # (MLP weights + theta); "BFGS" = one joint start
+                                       # (1.2.2 default: "BFGS+Adam")
                  objective = "LL",
                  parameters = NULL)
 ```
@@ -157,9 +160,12 @@ other classes.
   bindings expect a plain numeric matrix.
 - `aggregation = "NK"` with `regmodel` other than `"constant"`.
 - Expecting `WarpKriging`/`MLPKriging` to still default to `optim =
-  "BFGS+Adam"` (older versions): the default is now `"BFGS"` (joint
+  "BFGS+Adam"` (1.x): the default is now `"BFGS"` (joint
   L-BFGS-B) for `WarpKriging` and `"BFGS4"` (4 joint L-BFGS-B starts, since
-  2.0) for `MLPKriging`; `"BFGS+Adam"` must be asked for explicitly.
+  2.0) for `MLPKriging`; `"BFGS+Adam"` must be asked for explicitly. Known
+  inconsistency: `WarpKriging` with `mlp_joint` keeps `"BFGS"` while
+  `MLPKriging` (the same model) uses `"BFGS4"`; in R use `MLPKriging` for that
+  model (docs/Migration-2.0.md §27).
 - Forgetting `y <- as.numeric(y)` when `y` comes from a single-column
   `data.frame`/`matrix` (e.g. from a DOE package) — the bindings expect a
   plain numeric vector, not an `n × 1` object.

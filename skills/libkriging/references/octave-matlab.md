@@ -70,7 +70,11 @@ s = k.simulate(int32(10), int32(123), Xnew, true, noise_var_new);   % (nsim, see
 s_u = k.update_simulate(y_u, X_u);   % (y_u, X_u [, noise_u]): noise_u required iff fitted with noise
 ```
 `warping` is a cell array with one spec string per column of `X` (see
-`SKILL.md` §4). `noise` is a variance vector (no `"nugget"` mode) and `objective`
+`SKILL.md` §4), or a single `{"mlp_joint(h1:h2,d_out,act)"}`. Default `optim`:
+`"BFGS"` (joint L-BFGS-B; 1.2.2: `"BFGS+Adam"`), with `mlp_joint` too, while
+`MLPKriging` (the same model) defaults to `"BFGS4"`: known inconsistency, pass
+`"BFGS4"` there, e.g. `WarpKriging(y, X, {"mlp_joint(16:8,2,selu)"}, "gauss", "constant", false, "BFGS4")`
+(docs/Migration-2.0.md §27). `noise` is a variance vector (no `"nugget"` mode) and `objective`
 is always `"LL"` (any other value is ignored).
 
 ## MLPKriging
@@ -78,6 +82,7 @@ is always `"LL"` (any other value is ignored).
 ```matlab
 % k = MLPKriging(y, X, hidden_dims, d_out, activation, kernel, regmodel, normalize, ...)
 k = MLPKriging(y, X, [16, 8], 2, "selu", "gauss", "constant", true);
+%   9th argument optim: "BFGS4" by default since 2.0 (1.2.2: "BFGS+Adam")
 ```
 Valid `activation` values: `"selu"` (default), `"relu"`, `"tanh"`,
 `"sigmoid"`, `"elu"`. Prefer `"tanh"` over `"selu"` if a single-start fit

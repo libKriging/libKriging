@@ -68,15 +68,25 @@ overconfident predictive variance. `max_iter_bfgs` overrides it.
 
 `MLPKriging` runs 4 such starts by default (`optim = "BFGS4"`, since 2.0;
 the starts after the first draw random θ and network weights, and run in
-parallel). A single start (`"BFGS"`, the 1.x default) stops at a poor mean
+parallel). A single joint start (`"BFGS"`, the default during the 2.0 cycle;
+the 1.2.2 default was the bi-level `"BFGS+Adam"`) stops at a poor mean
 on most problems: on the 15-function benchmark of
 `docs/dev/rationalization/mlp-default-467.md` (600 cases) its test Q² is
 below 0.5 on 69 % of the cases, against 29 % with `"BFGS4"` and 25 % with
 `"BFGS10"`; on `Branin(Wx)` in 10D (#407) the median Q² is −6.0 (tanh) /
 −2.5 (selu) against 0.983 / 0.993. `"BFGS4"` costs 1.6 times the CPU time
-of the 1.x default on one core (5 calibration folds both) and 1.04 times its
-wall time on 4 cores. `WarpKriging` keeps `"BFGS"`: pass `"BFGS4"` with an
-`mlp_joint` warping.
+of the single start on one core (5 calibration folds both) and 1.04 times its
+wall time on 4 cores.
+
+**Known inconsistency of the defaults.** `WarpKriging` keeps `"BFGS"` as its
+default optimizer for every warping, `mlp_joint` included, while `MLPKriging`
+uses `"BFGS4"`: the same model gets a different default depending on the class
+it is built with (maintainer decision 2026-11-27, #464: documented in 2.0, not
+changed; the other warpings were not measured with `"BFGS4"`). Pass
+`optim = "BFGS4"` explicitly with an `mlp_joint` warping, or use `MLPKriging`.
+In Python and R use `MLPKriging`: their `WarpKriging` wrappers recycle a single
+warping spec to one per input column, so `["mlp_joint(...)"]` fails there when
+`X` has more than one column. See [Migration-2.0.md](../Migration-2.0.md) §27.
 
 ### Calibration of the predictive variance
 

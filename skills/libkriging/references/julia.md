@@ -64,6 +64,8 @@ wk = WarpKriging(y, X, ["kumaraswamy", "categorical(5,2)", "none"], "gauss";
                  regmodel="constant",
                  normalize=false,
                  optim="BFGS",        # default: joint L-BFGS-B on warp params + θ
+                                      # (also with mlp_joint, unlike MLPKriging's "BFGS4":
+                                      # known inconsistency, pass optim="BFGS4" there)
                  objective="LL",     # only "LL": any other value is ignored
                  noise=nothing,      # nothing | Vector{Float64} of variances (no "nugget" mode)
                  method="exact")     # only "exact" is implemented (same for MLPKriging)
@@ -82,7 +84,8 @@ mk = MLPKriging(y, X, [16, 8], 2;    # hidden_dims, d_out
                 regmodel="constant",
                 normalize=false,
                 optim="BFGS4",       # default since 2.0: 4 parallel joint L-BFGS-B starts
-                                     # (MLP weights + θ); "BFGS" = 1.x single start
+                                     # (MLP weights + θ); "BFGS" = one joint start
+                                     # (1.2.2 default: "BFGS+Adam")
                 objective="LL")
 ```
 Prefer `activation="tanh"` over the default `"selu"` if a single-start fit
@@ -154,9 +157,11 @@ jlibkriging.method(nk), objective(nk)
 - Passing `X`/`y` as `Vector{Vector{Float64}}` or a non-`Float64` matrix —
   the ccall FFI layer expects `Matrix{Float64}`/`Vector{Float64}` exactly.
 - Expecting `WarpKriging`/`MLPKriging` to still default to
-  `optim="BFGS+Adam"` (older versions): the default is now `"BFGS"` (joint
+  `optim="BFGS+Adam"` (1.x): the default is now `"BFGS"` (joint
   L-BFGS-B) for `WarpKriging` and `"BFGS4"` (4 joint L-BFGS-B starts, since
-  2.0) for `MLPKriging`; `"BFGS+Adam"` must be asked for explicitly.
+  2.0) for `MLPKriging`; `"BFGS+Adam"` must be asked for explicitly. Known
+  inconsistency: `WarpKriging` with `mlp_joint` (the `MLPKriging` model) keeps
+  `"BFGS"`; pass `optim="BFGS4"` (docs/Migration-2.0.md §27).
 - `aggregation="NK"` with `regmodel != "constant"` on `NestedKriging`.
 - **Name clashes with other loaded packages**: `jlibkriging` exports common
   names (`predict`, `update`, `simulate`, ...) that many other Julia
