@@ -50,6 +50,15 @@ without conflict), the PR may be merged without waiting for the new run.
 Say so in a PR comment, and if the run on master after the merge fails, fix
 it first.
 
+Squash is the only merge method for PRs into master (one commit per PR; the
+detailed history stays on the PR page). Inside a branch, never rebase: bring
+it up to date with master by a merge commit. Avoid stacking a PR on another
+PR's branch: after the base PR is squash-merged, its commits are not
+ancestors of master and the stacked branch conflicts with its own changes.
+If stacking is unavoidable, retarget the stacked PR to master once the base
+is merged, merge master into it and resolve by keeping master's version of
+the base's changes.
+
 ## Known pitfalls
 
 ### Build
