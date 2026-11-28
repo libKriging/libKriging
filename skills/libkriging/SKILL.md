@@ -127,7 +127,7 @@ is both simpler and, for NestedKriging's NK aggregation, actually a
 | `regmodel` / trend | `"constant"`, `"linear"`, `"interactive"`, `"quadratic"` (`"none"` = zero mean) | `"constant"` (ordinary kriging) is the default and usually the right start. Move to `"linear"` if the response has an obvious global trend the GP should not have to explain via short-range correlation. Avoid `"quadratic"`/`"interactive"` in high dimension — parameter count grows fast and can overfit the trend, starving the covariance part. |
 | `objective` | `"LL"` (log-likelihood, default), `"LOO"` (leave-one-out, [details](../../docs/math/LOO.md)), `"LMP"` (log marginal posterior, [details](../../docs/math/LMP.md)) | `"LL"` by default. `"LOO"` is a reasonable alternative when you specifically care about predictive accuracy at the design points rather than the full likelihood. `"LMP"` is a good alternative with few observations, where `"LL"` can drift θ into a degenerate (too small/too large) range. |
 | `method` | `"exact"` (default), `"vecchia"` / `"vecchia(m)"`, `"nystrom"` / `"nystrom(k)"` | How the covariance is evaluated, for the fit and afterwards. Approximate methods only for scaling, with any `objective` (see §1.5; the approximate `"LOO"` is the leave-one-out of the approximate joint law, not of the local Vecchia predictor); noise models (both methods) only with `objective="LL"`, `"LOO"` / `"LMP"` noise-free — they approximate the criterion, so don't use them on small problems expecting identical results to the exact fit. |
-| `optim` | `"BFGS4"` (default for `Kriging`: 4 random starts run in parallel, the best kept), `"BFGSk"` for k starts (e.g. `"BFGS10"`), `"BFGS"` (single start, the `Kriging` default up to 1.2 and the `MLPKriging` default up to 1.x; still the default of `WarpKriging` / `NestedKriging`), `"none"` | Use `"none"` only when supplying fixed/known hyperparameters via `parameters` (e.g. reusing a fit, or a controlled experiment). A single start misses the likelihood optimum on ~18 % of the benchmark data sets against ~5 % for `"BFGS4"` and ~1 % for `"BFGS10"` (docs/dev/rationalization/T3-default-multistart.md): for a difficult/multimodal likelihood (many or inactive inputs, LOO objective) or a suspicious fit, recommend `"BFGS10"`+; `"BFGS2"` when time is short (on the benchmark it is as good as the former restarted single start at a lower cost); `"BFGS"` only when fit time on a single core matters more than the optimum (x 1.6–3.7 cheaper there). Since 2.0 a single start is no longer restarted on a long-range solution (`Optim::set_long_range_restart` / `LK_LONG_RANGE_RESTART` removed, #466): code that relied on it should pass `"BFGS2"`. |
+| `optim` | `"BFGS4"` (default for `Kriging`: 4 random starts run in parallel, the best kept), `"BFGSk"` for k starts (e.g. `"BFGS10"`), `"BFGS"` (single start, the `Kriging` default up to 1.2; still the default of `WarpKriging` / `NestedKriging`; the 1.2 `MLPKriging` / `WarpKriging` default was `"BFGS+Adam"`), `"none"` | Use `"none"` only when supplying fixed/known hyperparameters via `parameters` (e.g. reusing a fit, or a controlled experiment). A single start misses the likelihood optimum on ~18 % of the benchmark data sets against ~5 % for `"BFGS4"` and ~1 % for `"BFGS10"` (docs/dev/rationalization/T3-default-multistart.md): for a difficult/multimodal likelihood (many or inactive inputs, LOO objective) or a suspicious fit, recommend `"BFGS10"`+; `"BFGS2"` when time is short (on the benchmark it is as good as the former restarted single start at a lower cost); `"BFGS"` only when fit time on a single core matters more than the optimum (x 1.6–3.7 cheaper there). Since 2.0 a single start is no longer restarted on a long-range solution (`Optim::set_long_range_restart` / `LK_LONG_RANGE_RESTART` removed, #466): code that relied on it should pass `"BFGS2"`. |
 | `normalize` | boolean, default off | Turn on when input dimensions have very different scales/units — it rescales `X`/`y` to `[0,1]` internally, which helps the optimizer's bounds and starting values. On `Kriging` everything public stays in the original scale of `X`/`y`: `parameters` in, `theta()`/`sigma2()`/`nugget()`/`noise()`/`beta()` and the `*Fun(theta)` objectives (values and gradients) out, so they round-trip and match a `normalize=false` fit (`X()`/`y()` are the internal normalized data). Not on `WarpKriging`/`MLPKriging` (warped feature space); not supported yet on `NestedKriging`. |
 | `noise` | vector, `"nugget"`, or absent | See §1.2. |
 | `parameters` | dict/struct with `sigma2`, `theta`, `beta`, plus per-argument `is_*_estim` flags | Use to seed the optimizer (multistart with multiple `theta` rows) or to fix a hyperparameter (`is_theta_estim=false` with a single `theta` row) rather than estimate it. A fixed `theta` stays fixed with any `optim`: with `"BFGS"` the other hyperparameters (nugget, heterogeneous-noise `sigma2`) are still optimized per their own `is_*_estim` flags, while `optim="none"` optimizes nothing. An `is_*_estim=false` flag without the matching value is ignored (the parameter is estimated). |
@@ -190,17 +190,27 @@ starts in parallel; #467). The former single start (`"BFGS"`) stopped at a
 poor mean on most problems: test Q² < 0.5 on 69 % of the cases of the
 15-function MLP benchmark against 29 % for `"BFGS4"` and 25 % for
 `"BFGS10"`, and Q² −6 / −2.5 (tanh / selu) against 0.98 / 0.99 on the
-projected-Branin 10D case of #407, for x 1.6 the CPU time of the 1.x
-default on one core and x 1.04 its wall time on 4 cores (5 calibration
+projected-Branin 10D case of #407, for x 1.6 the CPU time of the single
+start on one core and x 1.04 its wall time on 4 cores (5 calibration
 folds both)
-(docs/dev/rationalization/mlp-default-467.md). Pass `"BFGS"` only to
-reproduce a 1.x fit; recommend `"BFGS10"` for a hard fit (high dimension,
+(docs/dev/rationalization/mlp-default-467.md). The 1.2.2 default was
+`"BFGS+Adam"` without variance calibration, and `"BFGS+Adam"` itself changed
+since (#382): no setting reproduces a 1.2.2 `MLPKriging` fit exactly (closest:
+`docs/Migration-2.0.md` §2). Recommend `"BFGS10"` for a hard fit (high dimension,
 Q² on held-out data below expectations). `calibration_folds` defaults to 5
 (2.0; 3 was tried during 2.0 development): with the multistart default, 3
 folds widen the intervals more (median test NLPD +0.15) for 0.75x the CPU
-time; pass `"3"` only when fit time matters more. `WarpKriging` keeps
-`"BFGS"` for every warping: with an `mlp_joint` warping (the code path of
-`MLPKriging`) pass `optim = "BFGS4"` explicitly.
+time; pass `"3"` only when fit time matters more.
+
+**Known inconsistency (2.0, documented, not changed: maintainer decision
+2026-11-27, #464).** `WarpKriging` keeps `"BFGS"` as default for every warping,
+`mlp_joint` included, although `WarpKriging(y, X, ["mlp_joint(...)"], kernel)`
+and `MLPKriging` are the same model on the same code path and `MLPKriging`
+defaults to `"BFGS4"`. With `mlp_joint`, always pass `optim = "BFGS4"` (or
+more) explicitly, or use `MLPKriging`. In Python and R, prefer `MLPKriging`:
+their `WarpKriging` wrappers recycle a single warping spec to one per column
+of `X`, so a single `mlp_joint` spec fails when `X` has more than one column
+("mlp_joint must be the only warp spec"). See `docs/Migration-2.0.md` §27.
 
 Even well fitted, `MLPKriging` is not a general replacement for `Kriging`:
 on that benchmark (n 15–120, d 1–10) plain `Kriging` is better (test Q²

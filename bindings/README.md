@@ -1,6 +1,7 @@
 # libKriging Bindings — Method Reference
 
 This document lists all methods exposed by each language binding for accessing the underlying C++ library.
+For the changes of API and defaults between 1.x and 2.0, see [docs/Migration-2.0.md](../docs/Migration-2.0.md).
 
 The workflow `.github/workflows/binding-api.yml` (Linux, one job per binding)
 lists the methods each built binding exposes and compares them across
@@ -196,6 +197,11 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 > per row of `X`, added as independent N(0, `with_noise`) draws (and again by `update_simulate` after a
 > `will_update=true` simulate); negative / NaN values raise (Python `ValueError`). Unlike `Kriging`, there is no
 > "fitted nugget" shortcut: a logical `TRUE` / `True` raises. `WarpKriging` always fits with `objective="LL"`.
+> Default `optim`: `"BFGS4"` for `MLPKriging` (2.0; 1.2.2: `"BFGS+Adam"`), `"BFGS"` for `WarpKriging` (1.2.2:
+> `"BFGS+Adam"`), **`mlp_joint` included**: a known inconsistency of 2.0 (documented, not changed), since
+> `WarpKriging(y, X, ["mlp_joint(...)"], kernel)` is the `MLPKriging` model. Pass `optim="BFGS4"` with `mlp_joint`;
+> in Python and R use `MLPKriging`, as their `WarpKriging` wrappers recycle a single warping spec to one per column
+> of `X` (a single `mlp_joint` spec then fails for d > 1). See [docs/Migration-2.0.md](../docs/Migration-2.0.md) §27.
 > `WarpKriging` and `MLPKriging` accept `method=` for API consistency, but only `"exact"` is implemented.
 
 ---

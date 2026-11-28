@@ -23,8 +23,10 @@ Fit a libKriging model. Context / arguments: $ARGUMENTS
      `predict` / `simulate` / `logLikelihood` calls pass the same method.
 
 2. Pick options from §2: `kernel="matern5_2"` and `regmodel="constant"` and
-   `objective="LL"` and `optim="BFGS"` as defaults; deviate only with a
-   stated reason (e.g. `"BFGS10"` for an unstable fit, `"LMP"` for very few
+   `objective="LL"` and the class's default `optim` (`"BFGS4"` for
+   `Kriging` / `MLPKriging`, `"BFGS"` for `WarpKriging` / `NestedKriging`;
+   pass `"BFGS4"` explicitly for a `WarpKriging` with `mlp_joint`); deviate
+   only with a stated reason (e.g. `"BFGS10"` for an unstable fit, `"LMP"` for very few
    points, `normalize=True` for very different input scales).
 
 3. Determine the target language from $ARGUMENTS or the surrounding code;

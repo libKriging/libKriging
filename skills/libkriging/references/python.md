@@ -69,7 +69,10 @@ model = lk.WarpKriging(
     regmodel="constant",
     normalize=False,
     optim="BFGS",         # default: joint L-BFGS-B on warp params + θ;
-                          # "BFGSk" k starts, "BFGS+Adam" bi-level
+                          # "BFGSk" k starts, "BFGS+Adam" bi-level (the 1.2.2 default).
+                          # With mlp_joint use MLPKriging ("BFGS4" by default): a single
+                          # spec is recycled per column here (known inconsistency, §27
+                          # of docs/Migration-2.0.md)
     objective="LL",       # only "LL": any other value is ignored
     parameters={},
     noise=None,   # None | per-observation variance vector (no "nugget" mode, unlike Kriging)
@@ -97,8 +100,8 @@ model = lk.MLPKriging(
     regmodel="constant",
     normalize=False,
     optim="BFGS4",         # default since 2.0: 4 parallel joint L-BFGS-B starts
-                           # (MLP weights + θ); "BFGS10" for 10 starts, "BFGS" = 1.x
-                           # single start
+                           # (MLP weights + θ); "BFGS10" for 10 starts, "BFGS" one
+                           # joint start; 1.2.2 default: "BFGS+Adam"
     objective="LL",
     parameters={},
 )

@@ -153,8 +153,12 @@ re-added by `update_simulate` after a `will_update=true` simulate.
 // Facade over WarpKriging({"mlp_joint(...)"} , kernel); construct/fit the
 // same way as Kriging/WarpKriging — see MLPKriging.hpp for the exact
 // Parameters struct (theta / warp_params seeds) if you need to warm-start.
-// Default optim "BFGS4" (4 parallel starts, since 2.0; "BFGS" = 1.x single
-// start). WarpKriging keeps "BFGS": pass "BFGS4" for an mlp_joint warping.
+// Default optim "BFGS4" (4 parallel starts, since 2.0; 1.2.2: "BFGS+Adam";
+// "BFGS" = one joint start). Known inconsistency (docs/Migration-2.0.md §27):
+// WarpKriging keeps "BFGS" for every warping, mlp_joint included, although it is
+// the same model: pass "BFGS4" explicitly, e.g.
+// libKriging::WarpKriging w(y, X, {"mlp_joint(16:8,2,selu)"}, "gauss",
+//                           Trend::RegressionModel::Constant, false, "BFGS4");
 ```
 
 ## NestedKriging

@@ -247,7 +247,11 @@ warp_knots <- function(n_knots = 3, knot_positions = NULL) {
 #'   \code{"BFGS10"}), \code{"BFGS+Adam"} (bi-level: Adam on the warp
 #'   parameters, L-BFGS-B on theta), or \code{"none"} to skip optimisation and
 #'   keep the values passed in \code{parameters} (e.g. to rebuild a model with
-#'   frozen hyper-parameters).
+#'   frozen hyper-parameters). The default is \code{"BFGS"} for every warping
+#'   (1.2.2: \code{"BFGS+Adam"}), while \code{MLPKriging}, the \code{mlp_joint}
+#'   model, defaults to \code{"BFGS4"}: a known inconsistency of 2.0 (see
+#'   \code{docs/Migration-2.0.md}, section 27); use \code{MLPKriging} for that
+#'   model (a single warping spec is recycled to one per column here).
 #' @param objective "LL" (log-likelihood)
 #' @param parameters optional named list of initial hyper-parameter values
 #'   and/or optimiser knobs. Recognised entries:
